@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+  "api",
+  "babel",
+  "blockvisord",
+  "turnstile",
+]
