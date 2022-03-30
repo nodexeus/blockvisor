@@ -1,8 +1,16 @@
 [package]
-name = "api"
-version = "0.1.0"
 edition = "2021"
+name = "api"
+publish = false
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = "0.4.8"
+chrono = "0.4.19"
+serde = "1.0.136"
+tokio = {version = "1.17.0", features = ["full"]}
+tracing = "0.1.32"
+tracing-subscriber = "0.3.9"
+uuid = {version = "0.8.2", features = ["v4", "serde"]}
