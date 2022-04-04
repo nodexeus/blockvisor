@@ -1,0 +1,3 @@
+interface Slot {
+  slotValue: string;
+}

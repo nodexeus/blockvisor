@@ -1,0 +1,11 @@
+@define-mixin theme $theme {
+    :global(.theme--$(theme)) {
+        @mixin-content;
+    }
+}
+
+@define-mixin font $size {
+    font-size: var(--font-size-$(size));
+    line-height: var(--line-height-$(size));
+    letter-spacing: var(--letter-spacing-$(size));
+}
