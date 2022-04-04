@@ -1,3 +1,3 @@
 export const FEATURE_FLAGS = {
-  BLOCKVISOR: false,
+  BLOCKVISOR: import.meta.env.VITE_FEATURE_FLAG_BLOCKVISOR,
 };
