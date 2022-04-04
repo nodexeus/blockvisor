@@ -1,0 +1,21 @@
+<input
+  tabindex="-1"
+  style="display:none"
+  aria-hidden="true"
+  type="hidden"
+  name="network"
+/>
+<input
+  tabindex="-1"
+  style="display:none"
+  aria-hidden="true"
+  type="hidden"
+  name="nodeType"
+/>
+<input
+  tabindex="-1"
+  style="display:none"
+  aria-hidden="true"
+  type="hidden"
+  name="host"
+/>

@@ -1,0 +1,66 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:latest
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    env_file: ./.env.development
+    ports:
+      - '5432:5432'
+    networks:
+      - intranet
+
+  kratos-migrate:
+    depends_on:
+      - db
+    image: oryd/kratos:v0.8.0-alpha.3
+    env_file:
+      - ./.env.development
+    volumes:
+      - type: bind
+        source: ./.kratos
+        target: /etc/config/kratos
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    restart: on-failure
+    networks:
+      - intranet
+
+  kratos-cli:
+    image: oryd/kratos:v0.8.0-alpha.3
+    environment:
+      - KRATOS_ADMIN_URL=http://kratos:4434
+
+  kratos:
+    depends_on:
+      - kratos-migrate
+    image: oryd/kratos:v0.8.0-alpha.3
+    ports:
+      - '4433:4433'
+      - '4434:4434'
+    env_file:
+      - ./.env.development
+    volumes:
+      - type: bind
+        source: ./.kratos
+        target: /etc/config/kratos
+    # do not use --dev in production
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    restart: unless-stopped
+    networks:
+      - intranet
+
+  mailslurper:
+    image: oryd/mailslurper:latest-smtps
+    ports:
+      - '4436:4436'
+      - '4437:4437'
+    networks:
+      - intranet
+
+networks:
+  intranet:
+
+volumes:
+  postgres:
+    name: blockvisor

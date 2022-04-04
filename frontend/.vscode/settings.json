@@ -1,0 +1,22 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "editor.formatOnSave": true,
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  },
+  "workbench.colorCustomizations": {
+    "titleBar.activeForeground": "#000",
+    "titleBar.inactiveForeground": "#000000EE",
+    "titleBar.activeBackground": "#bff58a",
+    "titleBar.inactiveBackground": "#bff58a"
+  },
+  "stylelint.config": {
+    "rules": {
+      "at-rule-name-case": "lower",
+      "at-rule-name-space-after": "always-single-line",
+      "at-rule-semicolon-newline-after": "always"
+    }
+  }
+}
