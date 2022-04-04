@@ -1,0 +1,85 @@
+protocol = "helium"
+
+[babel]
+version = "beta1"
+
+[meta]
+version = "1.8.3-beta1"
+node_type = "validator"
+artifact = "https://storage.blockjoy.com/proto/helium/MS44LjMtYmV0YTEK"
+checksum = "72581bda0586561dd7397e983059c186"
+description = "blockchain for p2p wireless services"
+
+[monitor]
+pid_file = "/blockjoy/var/run/validator.pid"
+
+
+[commands]
+
+    [commands.start]
+    type = "sh"
+    desc = "start the helium validator"
+    body = "/blockjoy/bin/miner daemon"
+
+        [commands.start.response]
+        response = "sh" 
+        code = 0 #must match 
+        field = "blob"
+        validate = "none"
+        check = "none"
+
+    [commands.stop]
+    type = "sh"
+    desc = "stop the helium validator"
+    body = "/blockjoy/bin/miner stop"
+
+        [commands.stop.response]
+        response = "sh" 
+        code = 0 #must match 
+        field = "blob"
+        validate = "none"
+        check = "none"
+
+    [commands.height]
+    type = "jrpc"
+    desc = "get the blockchain height from this node"
+    body = "http://localhost:4467/block_height"
+
+    [commands.name]
+    type = "jrpc"
+    desc = "get the name of the validator"
+    body = "http://localhost:4467/info_name"
+
+    [commands.address]
+    type = "jrpc"
+    desc = "get the address of the validator"
+    body = "http://localhost:4467/peer_addr"
+    
+        [commands.address.response]
+        response = "jrpc"
+        code = 200
+        field = "address"
+        validate = "regex"
+        check = "[a-zA-Z]{0,255}"
+
+    [commands.kill]
+    type = "sh"
+    desc = "send the kill command to the helium validator"
+    body = "kill `pidof beam.smp`"
+
+    [commands.kill9]
+    type = "sh"
+    desc = "send kill -9 to the helium validator"
+    body = "kill -9 `pidof beam.smp`"
+
+
+    [commands.status]
+    type = "jrpc"
+    desc = "get the status of the helium valiator"
+    body = "http://localhost:4467/ping"
+
+
+
+
+
+
