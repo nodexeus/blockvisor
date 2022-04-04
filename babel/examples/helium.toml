@@ -3,6 +3,20 @@ protocol = "helium"
 [babel]
 version = "beta1"
 
+[turnstile]
+enabled = true
+    [turnstile.red]
+    cores = 3
+    ram = "6G"
+    nice = 10
+    command =  "write command here for config change"
+
+    [turnstile.green]
+    cores = 6
+    ram = "11G"
+    nice = -10
+    command =  "write command here for config change"
+
 [meta]
 version = "1.8.3-beta1"
 node_type = "validator"
