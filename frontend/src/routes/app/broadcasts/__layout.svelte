@@ -18,7 +18,7 @@
       },
       {
         title: 'All Broadcasts',
-        url: '#',
+        url: '',
       },
     ]);
   });

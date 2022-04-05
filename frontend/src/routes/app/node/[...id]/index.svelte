@@ -10,6 +10,7 @@
   import { useForm } from 'svelte-use-form';
   import MapSection from 'modules/nodes/components/MapSection/MapSection.svelte';
   import BackButton from 'modules/app/components/BackButton/BackButton.svelte';
+  import { ROUTES } from 'consts/routes';
 
   const id = $page.params.id;
 
@@ -26,7 +27,7 @@
     app.setBreadcrumbs([
       {
         title: 'Nodes',
-        url: '/nodes',
+        url: ROUTES.NODES,
       },
       {
         title: 'YellowBeaver',

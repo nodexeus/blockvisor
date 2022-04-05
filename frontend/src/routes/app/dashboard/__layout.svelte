@@ -1,4 +1,6 @@
 <script>
+  import { ROUTES } from 'consts/routes';
+
   import { APPS } from 'models/App';
   import { app } from 'modules/app/store';
   import BlockVisorFeature from 'modules/feature-flags/components/BlockVisorFeature/BlockVisorFeature.svelte';
@@ -13,11 +15,11 @@
       app.setBreadcrumbs([
         {
           title: 'Dashboard',
-          url: '/dashboard',
+          url: ROUTES.DASHBOARD,
         },
         {
           title: 'Home',
-          url: '/dashboard',
+          url: '',
         },
       ]);
     }, 200);

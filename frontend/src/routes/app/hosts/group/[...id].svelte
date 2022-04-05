@@ -19,11 +19,11 @@
     app.setBreadcrumbs([
       {
         title: 'Hosts',
-        url: '/hosts',
+        url: ROUTES.HOSTS,
       },
       {
         title: 'All',
-        url: '#',
+        url: '',
       },
     ]);
   });

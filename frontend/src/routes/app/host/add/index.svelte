@@ -7,6 +7,7 @@
   import { app } from 'modules/app/store';
   import HostAdd from 'modules/dashboard/components/HostAdd/HostAdd.svelte';
   import { onMount } from 'svelte';
+  import { ROUTES } from 'consts/routes';
 
   let currentStep = 1;
 
@@ -17,12 +18,12 @@
   onMount(() => {
     app.setBreadcrumbs([
       {
-        title: 'Dashboard',
-        url: '/dashboard',
+        title: 'Hosts',
+        url: ROUTES.HOSTS,
       },
       {
         title: 'Add a host',
-        url: '/host/add',
+        url: ROUTES.HOST_ADD,
       },
     ]);
   });
