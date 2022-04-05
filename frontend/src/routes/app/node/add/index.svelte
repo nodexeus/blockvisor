@@ -7,6 +7,7 @@
   import { app } from 'modules/app/store';
   import { onDestroy, onMount } from 'svelte';
   import NodeAdd from 'modules/nodes/components/NodeAdd/NodeAdd.svelte';
+  import { ROUTES } from 'consts/routes';
 
   let currentStep = 1;
 
@@ -18,11 +19,11 @@
     app.setBreadcrumbs([
       {
         title: 'Nodes',
-        url: '/nodes',
+        url: ROUTES.NODES,
       },
       {
         title: 'Add a node',
-        url: '/nodes/add',
+        url: '',
       },
     ]);
   });

@@ -20,11 +20,11 @@
     app.setBreadcrumbs([
       {
         title: 'Nodes',
-        url: '/nodes',
+        url: ROUTES.NODES,
       },
       {
         title: 'All',
-        url: '/nodes',
+        url: '',
       },
     ]);
   });
