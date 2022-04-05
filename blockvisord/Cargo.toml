@@ -9,5 +9,6 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.56"
 async-trait = "0.1.53"
+clap = "3.1.7"
 fork = "0.1.19"
 tokio = {version = "1.17.0", features = ["full"]}

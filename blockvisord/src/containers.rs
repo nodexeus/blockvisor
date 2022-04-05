@@ -1,6 +1,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
+pub enum ContainerStatus {
+    Created,
+}
 #[async_trait]
 pub trait NodeContainer {
     /// Creates a new container with `id`.
