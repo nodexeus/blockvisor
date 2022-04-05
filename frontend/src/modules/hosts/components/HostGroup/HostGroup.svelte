@@ -27,9 +27,9 @@
   {:else}
     <div class="host-group--empty">
       <EmptyColumn id={`graphic-${id}`}>
-        <svelte:fragment slot="title">No Nodes In Group</svelte:fragment>
+        <svelte:fragment slot="title">No Hosts In Group</svelte:fragment>
         <svelte:fragment slot="description"
-          >Assign a node to this group to easily track multiple node
+          >Assign a host to this group to easily track multiple host
           performance.</svelte:fragment
         >
       </EmptyColumn>
