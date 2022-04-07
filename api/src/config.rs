@@ -149,14 +149,14 @@ mod tests {
 
     #[test]
     fn test_env_prefix() {
-        std::env::set_var("BLOCKVISOR_TELEMETRY__OPENTELEMETRY", "true");
-        std::env::set_var("BLOCKVISOR_TELEMETRY__LOG_FORMAT", "json");
+        std::env::set_var("BLOCKVISOR_TELEMETRY_OPENTELEMETRY", "true");
+        std::env::set_var("BLOCKVISOR_TELEMETRY_LOG_FORMAT", "json");
         let config = AppConfig::new().unwrap();
 
         assert!(config.telemetry.opentelemetry);
         assert_eq!(config.telemetry.log_format, LogFormat::Json);
 
-        std::env::remove_var("BLOCKVISOR_TELEMETRY__OPENTELEMETRY");
-        std::env::remove_var("BLOCKVISOR_TELEMETRY__LOG_FORMAT");
+        std::env::remove_var("BLOCKVISOR_TELEMETRY_OPENTELEMETRY");
+        std::env::remove_var("BLOCKVISOR_TELEMETRY_LOG_FORMAT");
     }
 }
