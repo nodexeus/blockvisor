@@ -1,0 +1,14 @@
+# gitignore
+/target
+
+# Docker-specific
+**/target
+/.cargo
+.direnv
+.git
+/flake.lock
+## Meta
+.dockerignore
+Dockerfile*
+docker-compose.yml
+shared
