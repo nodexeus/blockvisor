@@ -17,4 +17,4 @@ Config is processed as follows. Each subsequent file or env var overrides any co
 1. `config/Default.toml`
 2. `config/development.toml` or `config/production.toml` or `config/staging.toml` depending on the `APP_ENV` environment variable setting. Defaults to `config/development.toml`.
 3. `config/Local.toml`
-4. Individual config parameters can be overridden via env vars with the prefix `BLOCLVISOR`, e.g. (`BLOCKVISOR_DATABASE_URL`).
+4. Individual config parameters can be overridden via env vars, e.g. (`DATABASE__URL`). Sections are separated by their attributes by `__`.

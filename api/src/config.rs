@@ -36,14 +36,10 @@ impl AppConfig {
         let env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".into());
 
         Config::builder()
-            .add_source(File::with_name("config/default"))
+            .add_source(File::with_name("config/default").required(false))
             .add_source(File::with_name(&format!("config/{}", env)).required(false))
             .add_source(File::with_name("config/local").required(false))
-            .add_source(
-                Environment::with_prefix("BLOCKVISOR")
-                    .try_parsing(true)
-                    .separator("_"),
-            )
+            .add_source(Environment::default().try_parsing(true).separator("__"))
             .build()?
             .try_deserialize()
     }
@@ -146,17 +142,24 @@ pub struct TelemetryConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use secrecy::ExposeSecret;
 
     #[test]
     fn test_env_prefix() {
-        std::env::set_var("BLOCKVISOR_TELEMETRY_OPENTELEMETRY", "true");
-        std::env::set_var("BLOCKVISOR_TELEMETRY_LOG_FORMAT", "json");
+        std::env::set_var("DATABASE__URL", "postgres://");
+        std::env::set_var("TELEMETRY__OPENTELEMETRY", "true");
+        std::env::set_var("HTTP__LISTEN_PORT", "3000");
+        std::env::set_var("TELEMETRY__LOG_FORMAT", "json");
         let config = AppConfig::new().unwrap();
 
+        assert_eq!(config.database.url.expose_secret(), "postgres://");
         assert!(config.telemetry.opentelemetry);
+        assert_eq!(config.http.listen_port, 3000);
         assert_eq!(config.telemetry.log_format, LogFormat::Json);
 
-        std::env::remove_var("BLOCKVISOR_TELEMETRY_OPENTELEMETRY");
-        std::env::remove_var("BLOCKVISOR_TELEMETRY_LOG_FORMAT");
+        std::env::remove_var("DATABASE__URL");
+        std::env::remove_var("TELEMETRY__OPENTELEMETRY");
+        std::env::remove_var("HTTP__LISTEN_PORT");
+        std::env::remove_var("TELEMETRY__LOG_FORMAT");
     }
 }
