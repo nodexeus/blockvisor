@@ -4,7 +4,8 @@ name = "api"
 publish = false
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.dev.package.sqlx-macros]
+opt-level = 3
 
 [dependencies]
 anyhow = "1.0.56"
@@ -18,7 +19,7 @@ opentelemetry-otlp = {version = "0.10.0", optional = true, features = ["metrics"
 secrecy = {version = "0.8.0", features = ["serde"]}
 serde = "1.0.136"
 serde_json = "1.0.79"
-sqlx = {version = "0.5.11", features = ["chrono", "migrate", "offline", "postgres", "runtime-tokio-rustls", "uuid"]}
+sqlx = {version = "0.5.11", features = ["chrono", "migrate", "offline", "postgres", "runtime-tokio-rustls", "uuid", "tls"]}
 thiserror = "1.0.30"
 tokio = {version = "1.17.0", features = ["full"]}
 tower = {version = "0.4.12", features = []}
