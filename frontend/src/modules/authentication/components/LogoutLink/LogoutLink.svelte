@@ -1,6 +1,18 @@
-<script lang="ts">
-  import { getContext } from 'svelte';
-  const logoutUrl: string = getContext('logoutUrl');
+<script>
+  import axios from 'axios';
+
+  import { ROUTES } from 'consts/routes';
+
+  const handleClick = async () => {
+    axios.post(ROUTES.AUTH_LOGOUT).then(() => {
+      location.reload();
+    });
+  };
 </script>
 
-<a class="link link--primary" href={logoutUrl} {...$$restProps}><slot /></a>
+<a
+  class="link link--primary"
+  href="#logout"
+  on:click|preventDefault={handleClick}
+  {...$$restProps}><slot /></a
+>

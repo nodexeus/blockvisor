@@ -1,5 +1,6 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
+  import { ROUTES } from 'consts/routes';
   import { loginUser } from 'modules/authentication/services/loginUser';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
@@ -13,24 +14,9 @@
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
-
-  const handleCallback = (data) => {
-    console.log(data);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    loginUser(
-      {
-        email: $form.email.value,
-        password: $form.password.value,
-      },
-      handleCallback,
-    );
-  };
 </script>
 
-<form use:form on:submit={handleSubmit}>
+<form method="post" action={ROUTES.AUTH_LOGIN} use:form>
   <ul class="u-list-reset">
     <li class="s-bottom--medium-small">
       <Input

@@ -12,8 +12,7 @@
   import { getContext } from 'svelte';
   import { ROUTES } from 'consts/routes';
   import { user } from 'modules/authentication/store';
-
-  const logoutUrl: string = getContext('logoutUrl');
+  import LogoutLink from 'modules/authentication/components/LogoutLink/LogoutLink.svelte';
 
   let isActive = false;
 
@@ -33,9 +32,10 @@
     isActive = true;
   };
 
-  $: fullName = $user
-    ? `${$user?.firstName ?? ''} ${$user?.lastName ?? ''}`
-    : 'John Doe';
+  $: fullName =
+    $user && $user.firstName && $user.lastName
+      ? `${$user?.firstName ?? ''} ${$user?.lastName ?? ''}`
+      : 'John Doe';
   export let src = '';
 </script>
 
@@ -73,10 +73,10 @@
         >
       </li>
       <li class="profile-dropdown__item--with-divider">
-        <DropdownItem href={logoutUrl}>
+        <LogoutLink>
           <IconDoor />
 
-          Logout</DropdownItem
+          Logout</LogoutLink
         >
       </li>
     </DropdownLinkList>
