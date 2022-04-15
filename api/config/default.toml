@@ -4,7 +4,7 @@ idle_timeout_seconds = 900
 max_connections = 128
 max_lifetime_seconds = 3600
 min_connections = 8
-url = "postgresql://postgres:postgres@localhost/blockvisor_dyeah"
+url = "postgresql://postgres:postgres@localhost/blockvisor_dev"
 
 [http]
 listen_address = "0.0.0.0"
