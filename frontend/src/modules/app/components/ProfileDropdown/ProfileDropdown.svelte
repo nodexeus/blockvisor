@@ -9,11 +9,9 @@
   import IconDocument from 'icons/document-12.svg';
   import IconCog from 'icons/cog-12.svg';
   import IconDoor from 'icons/door-12.svg';
-  import { getContext } from 'svelte';
   import { ROUTES } from 'consts/routes';
   import { user } from 'modules/authentication/store';
-
-  const logoutUrl: string = getContext('logoutUrl');
+  import axios from 'axios';
 
   let isActive = false;
 
@@ -33,9 +31,16 @@
     isActive = true;
   };
 
-  $: fullName = $user
-    ? `${$user?.firstName ?? ''} ${$user?.lastName ?? ''}`
-    : 'John Doe';
+  const handleLogout = async () => {
+    axios.post(ROUTES.AUTH_LOGOUT).then(() => {
+      location.reload();
+    });
+  };
+
+  $: fullName =
+    $user && $user.firstName && $user.lastName
+      ? `${$user?.firstName ?? ''} ${$user?.lastName ?? ''}`
+      : 'John Doe';
   export let src = '';
 </script>
 
@@ -73,7 +78,7 @@
         >
       </li>
       <li class="profile-dropdown__item--with-divider">
-        <DropdownItem href={logoutUrl}>
+        <DropdownItem as="button" on:click={handleLogout}>
           <IconDoor />
 
           Logout</DropdownItem

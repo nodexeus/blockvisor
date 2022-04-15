@@ -1,4 +1,7 @@
 export const ROUTES = {
+  AUTH_LOGIN: '/api/auth/login',
+  AUTH_REGISTER: '/api/auth/register',
+  AUTH_LOGOUT: '/api/auth/logout',
   LOGIN: '/',
   REGISTER: '/register',
   DASHBOARD: '/app/dashboard',
