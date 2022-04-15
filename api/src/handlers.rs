@@ -6,6 +6,6 @@
 /// to validate that the HTTP service is available for traffic, by returning a
 /// 200 OK response with any content.
 #[allow(clippy::unused_async)]
-pub async fn health_endpoint() -> &'static str {
+pub async fn health() -> &'static str {
     "OK"
 }

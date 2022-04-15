@@ -71,7 +71,7 @@ pub async fn start(config: &AppConfig) -> Result<()> {
     let pool = db::new_pool(config).await?;
 
     let app = Router::new()
-        .route("/health", get(handlers::health_endpoint))
+        .route("/health", get(handlers::health))
         .layer(Extension(pool))
         .layer(
             TraceLayer::new_for_http()
