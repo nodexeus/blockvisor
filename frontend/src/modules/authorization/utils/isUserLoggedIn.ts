@@ -1,3 +1,4 @@
-export const isUserLoggedIn = (user) => !!user?.id;
+export const isUserLoggedIn = (user: UserSession) => !!user?.id;
 
-export const isUserVerified = (user) => isUserLoggedIn(user) && user?.verified;
+export const isUserVerified = (user: UserSession) =>
+  isUserLoggedIn(user) && user?.verified;

@@ -9,10 +9,9 @@
   import IconDocument from 'icons/document-12.svg';
   import IconCog from 'icons/cog-12.svg';
   import IconDoor from 'icons/door-12.svg';
-  import { getContext } from 'svelte';
   import { ROUTES } from 'consts/routes';
   import { user } from 'modules/authentication/store';
-  import LogoutLink from 'modules/authentication/components/LogoutLink/LogoutLink.svelte';
+  import axios from 'axios';
 
   let isActive = false;
 
@@ -30,6 +29,12 @@
     }
 
     isActive = true;
+  };
+
+  const handleLogout = async () => {
+    axios.post(ROUTES.AUTH_LOGOUT).then(() => {
+      location.reload();
+    });
   };
 
   $: fullName =
@@ -73,10 +78,10 @@
         >
       </li>
       <li class="profile-dropdown__item--with-divider">
-        <LogoutLink>
+        <DropdownItem as="button" on:click={handleLogout}>
           <IconDoor />
 
-          Logout</LogoutLink
+          Logout</DropdownItem
         >
       </li>
     </DropdownLinkList>

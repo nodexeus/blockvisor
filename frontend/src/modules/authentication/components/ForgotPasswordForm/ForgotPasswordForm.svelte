@@ -17,6 +17,7 @@
 <form
   use:form
   on:submit={(e) => {
+    // TODO: implement this once API supports password reset
     e.preventDefault();
   }}
 >

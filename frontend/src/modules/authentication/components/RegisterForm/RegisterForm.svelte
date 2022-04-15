@@ -1,39 +1,35 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
-  import { createUser } from 'modules/authentication/services';
+  import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { ROUTES } from 'consts/routes';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
   import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
-  import { required, Hint, useForm, email } from 'svelte-use-form';
+  import { required, Hint, useForm, email, minLength } from 'svelte-use-form';
   import { passwordMatchConfirm, passwordMatchPassword } from 'utils';
 
   const form = useForm();
 
   let activeType: 'password' | 'text' = 'password';
 
+  let isSubmitting = false;
+
+  const handleSubmit = () => {
+    isSubmitting = true;
+  };
+
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
-
-  const handleCallback = (data) => {
-    console.log(data);
-  };
-
-  const handleFormSubmit = (e) => {
-    e.preventDefault();
-    console.log($form);
-    createUser(
-      {
-        email: $form.email.value,
-        password: $form.password.value,
-        password_confirm: $form.confirmPassword.value,
-      },
-      handleCallback,
-    );
-  };
 </script>
 
-<form use:form on:submit={handleFormSubmit}>
+<form
+  on:submit={handleSubmit}
+  method="post"
+  action={ROUTES.AUTH_REGISTER}
+  use:form
+  class="register-form"
+>
   <ul class="u-list-reset">
     <li class="s-bottom--medium-small">
       <Input
@@ -48,7 +44,7 @@
         <svelte:fragment slot="label">Email</svelte:fragment>
         <svelte:fragment slot="hints">
           <Hint on="required">Your e-mail address is required</Hint>
-          <Hint on="email">Email format is not correct</Hint>
+          <Hint hideWhenRequired on="email">Email format is not correct</Hint>
         </svelte:fragment>
       </Input>
     </li>
@@ -58,14 +54,18 @@
         name="password"
         placeholder="Password"
         labelClass="visually-hidden"
-        validate={[required, passwordMatchConfirm]}
+        validate={[required, passwordMatchConfirm, minLength(8)]}
         type={activeType}
       >
         <PasswordToggle on:click={handleToggle} {activeType} slot="utilRight" />
         <svelte:fragment slot="label">Password</svelte:fragment>
         <svelte:fragment slot="hints">
           <Hint on="required">This is a mandatory field</Hint>
-          <Hint on="passwordMatch">Passwords do not match</Hint>
+          <Hint hideWhenRequired on="passwordMatch">Passwords do not match</Hint
+          >
+          <Hint hideWhenRequired hideWhen="passwordMatch" on="minLength"
+            >Password should be at least 8 characters long</Hint
+          >
         </svelte:fragment>
       </PasswordField>
     </li>
@@ -76,20 +76,37 @@
         name="confirmPassword"
         placeholder="Confirm Password"
         labelClass="visually-hidden"
-        validate={[required, passwordMatchPassword]}
+        validate={[required, passwordMatchPassword, minLength(8)]}
         type={activeType}
       >
         <PasswordToggle on:click={handleToggle} {activeType} slot="utilRight" />
         <svelte:fragment slot="label">Confirm password</svelte:fragment>
         <svelte:fragment slot="hints">
           <Hint on="required">This is a mandatory field</Hint>
-          <Hint on="passwordMatch">Passwords do not match</Hint>
+          <Hint hideWhenRequired on="passwordMatch">Passwords do not match</Hint
+          >
+          <Hint hideWhenRequired hideWhen="passwordMatch" on="minLength"
+            >Password should be at least 8 characters long</Hint
+          >
         </svelte:fragment>
       </PasswordField>
     </li>
   </ul>
 
-  <Button size="medium" display="block" style="primary" type="submit"
-    >Create account</Button
-  >
+  <Button size="medium" display="block" style="primary" type="submit">
+    {#if isSubmitting}
+      &nbsp;
+      <LoadingSpinner size="button" id="js-form-submit" />
+    {:else}
+      Create account
+    {/if}
+  </Button>
 </form>
+
+<style>
+  .register-form {
+    & :global(button) {
+      position: relative;
+    }
+  }
+</style>
