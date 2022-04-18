@@ -4,8 +4,12 @@ use crate::handlers;
 use crate::{config::AppConfig, db};
 use anyhow::Result;
 use axum::{
-    body::BoxBody, extract::Extension, http::Request, response::Response, routing::get, Router,
-    Server,
+    body::BoxBody,
+    extract::Extension,
+    http::Request,
+    response::Response,
+    routing::{get, post},
+    Router, Server,
 };
 use hyper::Body;
 use std::{
@@ -72,6 +76,7 @@ pub async fn start(config: &AppConfig) -> Result<()> {
 
     let app = Router::new()
         .route("/health", get(handlers::health))
+        .route("/v1/registrations", post(handlers::registration_create))
         .layer(Extension(pool))
         .layer(
             TraceLayer::new_for_http()
