@@ -1,6 +1,10 @@
 // This will eventually be broken out into sub files in module
 
-use crate::models::RegistrationReq;
+use crate::{
+    errors::ApiError,
+    models::{RegistrationReq, User},
+};
+use anyhow::Result;
 use axum::{http::StatusCode, Extension, Json};
 use sqlx::PgPool;
 use tracing::instrument;
@@ -19,6 +23,6 @@ pub async fn health() -> &'static str {
 pub async fn registration_create(
     db: Extension<PgPool>,
     Json(payload): Json<RegistrationReq>,
-) -> StatusCode {
+) -> Result<(StatusCode, Json<User>), ApiError> {
     unimplemented!()
 }
