@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import ActionRow from '../ActionRow/ActionRow.svelte';
   import AnimatedGraphic from '../AnimatedGraphic/AnimatedGraphic.svelte';
+  import { ROUTES } from 'consts/routes';
 
   onMount(() => {
     anime({
@@ -49,7 +50,7 @@
           size="small"
           slot="action"
           asLink
-          href="/TODO"
+          href={ROUTES.NODE_ADD}
         >
           Add Node</Button
         >
@@ -66,7 +67,7 @@
           size="small"
           slot="action"
           asLink
-          href="/TODO"
+          href={ROUTES.HOST_ADD}
         >
           Add Host</Button
         >

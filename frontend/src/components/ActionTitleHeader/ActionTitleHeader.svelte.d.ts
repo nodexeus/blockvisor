@@ -6,6 +6,7 @@ export interface ActionTitleHeaderProps {
 export interface ActionTitleHeaderSlots {
   title: Slot;
   action: Slot;
+  util: Slot;
 }
 export default class ActionTitleHeader extends SvelteComponentTyped<
   ActionTitleHeaderProps,
