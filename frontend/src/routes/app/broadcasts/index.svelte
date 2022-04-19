@@ -15,11 +15,13 @@
   import Button from 'components/Button/Button.svelte';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
   import { fadeDefault } from 'consts/animations';
+  import ActiveFilters from 'modules/app/components/ActiveFilters/ActiveFilters.svelte';
 
   const hasBroadcasts = false;
 </script>
 
 <ActionTitleHeader className="container--pull-back">
+  <ActiveFilters slot="util" />
   <Button style="primary" asLink size="small" href={ROUTES.BROADCAST_CREATE}>
     Create a Broadcast
   </Button>
