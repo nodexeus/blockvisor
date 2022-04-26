@@ -1,10 +1,10 @@
 -- Add up migration script here
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS citext;
+--CREATE EXTENSION IF NOT EXISTS citext;
 CREATE TYPE enum_org_role AS ENUM ('admin', 'owner');
 CREATE TABLE IF NOT EXISTS orgs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name citext UNIQUE NOT NULL,
+  name TEXT UNIQUE NOT NULL, -- CITEXT is not supported by sqlx yet
   is_personal BOOLEAN NOT NULL DEFAULT 't',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  email citext UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL, -- CITEXT is not supported by sqlx yet
   hashword TEXT NOT NULL,
   salt TEXT NOT NULL,
   token TEXT UNIQUE,

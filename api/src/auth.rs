@@ -11,8 +11,7 @@ use futures_util::future::{err, ok, Ready};
 use std::borrow::Cow;
 use log::{debug, warn};
 use sqlx::PgPool;
-use crate::models::User;
-use crate::models::UserRole;
+use crate::models::{User,UserRole};
 use axum::{
     async_trait,
     extract::{Extension, FromRequest, RequestParts,TypedHeader},

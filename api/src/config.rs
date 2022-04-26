@@ -63,6 +63,7 @@ pub struct DatabaseConfig {
 
 fn default_database_url() -> Secret<String> {
     Secret::new("postgresql://postgres:postgres@localhost/blockvisor_dev".to_owned())
+
 }
 
 impl Default for DatabaseConfig {

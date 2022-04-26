@@ -19,7 +19,7 @@ opentelemetry-otlp = {version = "0.10.0", optional = true, features = ["metrics"
 secrecy = {version = "0.8.0", features = ["serde"]}
 serde = "1.0.136"
 serde_json = "1.0.79"
-sqlx = {version = "0.5.11", features = ["chrono", "migrate", "offline", "postgres", "runtime-tokio-rustls", "uuid", "tls"]}
+sqlx = {version = "0.5.11", features = ["postgres", "runtime-tokio-rustls", "migrate", "chrono", "uuid"]}
 
 thiserror = "1.0.30"
 tokio = {version = "1.17.0", features = ["full"]}

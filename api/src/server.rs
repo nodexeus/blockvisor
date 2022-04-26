@@ -20,7 +20,6 @@ use tokio::signal::unix::{signal, SignalKind};
 use tower_http::trace::TraceLayer;
 use tracing::{debug_span, field, info, span, Span};
 
-
 /// Internal helper for [`tower_http::trace::TraceLayer`] to create
 /// [`tracing::Span`]s around a request.
 fn make_span(_request: &Request<Body>) -> Span {

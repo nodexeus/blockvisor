@@ -16,7 +16,7 @@ use sendgrid::v3::{
     Message,
     Personalization,
     Sender};
-use sqlx::PgPool;
+use sqlx::{PgPool,FromRow,Type,PgConnection};
 
 
 #[derive(Debug, Serialize, Deserialize,Validate)]
@@ -31,13 +31,15 @@ pub struct RegistrationReq {
     pub password_confirm: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize,FromRow)]
 pub struct User {
     pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
     pub email: String,
+    pub orgs: Option<Vec<Org>>,
     #[serde(skip_serializing)]
     pub hashword: String,
-    pub role: UserRole,
     #[serde(skip_serializing)]
     pub salt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -45,15 +47,32 @@ pub struct User {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "enum_role", rename_all = "snake_case")]
+pub enum UserRole {
+    User,
+    Admin,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admin => write!(f, "admin"),
+            Self::User => write!(f, "user"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct UserSummary {
     pub id: Uuid,
     pub first_name: String,
     pub last_name: String,
     pub email: String,
-    pub organization: Option<String>,
 }
 
 
@@ -85,11 +104,31 @@ pub struct PwdResetInfo {
     pub password_confirm: String,
 }
 
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "enum_org_role", rename_all = "snake_case")]
+pub enum UserOrgRole {
+    Admin,
+    Owner,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type,FromRow)]
+pub struct Org {
+    pub id: Uuid,
+    pub name: String,
+    pub is_personal: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<UserOrgRole>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 impl User {
-    pub async fn create_user(user: RegistrationReq, db_pool: &PgPool) -> Result<User> {
+    pub async fn create_user(user: RegistrationReq, db_pool: &PgPool) -> Result<Self> {
         let _ = user
             .validate()
-            .map_err(|e| Error::ValidationError(e.to_string()))?;
+            .map_err(|e| Error::ValidationError(e.to_string()));
 
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut OsRng);
@@ -97,28 +136,48 @@ impl User {
             .hash_password(user.password.as_bytes(), salt.as_str())?
             .hash
         {
-            let user = sqlx::query_as::<_, User>(
+            let mut tx = db_pool.begin().await?;
+            let result = sqlx::query!(
                 r#"
                 INSERT INTO
-                   users (email, hashword, salt,first_name,last_name)
+                users (email, hashword, salt,first_name,last_name)
                 values
-                   (
-                      $1::TEXT::CITEXT, $2, $3, $4, $5
-                   )
+                (
+                    Lower($1), $2, $3, $4, $5
+                )
                    RETURNING *
                 "#,
+                user.email,
+                hashword.to_string(),
+                salt.as_str(),
+                user.first_name,
+                user.last_name
             )
-                .bind(user.email.as_str())
-                .bind(hashword.to_string())
-                .bind(salt.as_str())
-                .bind(user.first_name)
-                .bind(user.last_name)
-                .fetch_one(db_pool)              
-                .await?
-                .set_jwt()
-                .map_err(Error::from)?;
-                
-            Ok(user)
+                .fetch_one(&mut tx)
+                .await
+                .map(|rec| User {
+                    first_name: rec.first_name,
+                    last_name: rec.last_name,
+                    email:rec.email,
+                    id:rec.id,
+                    hashword:rec.hashword,
+                    refresh:rec.refresh,
+                    token:rec.token,
+                    created_at:rec.created_at,
+                    updated_at:rec.updated_at,
+                    salt:rec.salt,
+                    orgs:None
+
+                })              
+                .map_err(Error::from);
+
+                // let mut user  =result.unwrap();
+                // user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
+
+                tx.commit().await?; 
+
+               
+            Ok(result.unwrap())
         } else {
             Err(Error::ValidationError("Invalid password.".to_string()))
         }
@@ -136,18 +195,35 @@ impl User {
     }
 
     pub async fn find_by_email(email: &str, db_pool: &PgPool) -> Result<User> {
-        let user = sqlx::query_as::<_, User>(
+        let mut tx = db_pool.begin().await?;
+        let user = sqlx::query!(
             r#"SELECT *
                     FROM   users
                     WHERE  Lower(email) = Lower($1)
                     LIMIT  1
-                    "#
+                    "#,
+                    email
         )
-            .bind(email)
-            .fetch_one(db_pool)
-            .await?;
-        Ok(user)
-        // .map_err(ApiError::from)
+            .fetch_one(&mut tx)
+            .await
+                .map(|rec| User {
+                    first_name: rec.first_name,
+                    last_name: rec.last_name,
+                    email:rec.email,
+                    id:rec.id,
+                    hashword:rec.hashword,
+                    refresh:rec.refresh,
+                    token:rec.token,
+                    created_at:rec.created_at,
+                    updated_at:rec.updated_at,
+                    salt:rec.salt,
+                    orgs:None
+
+                }).map_err(Error::from);    
+                let mut user  =user.unwrap();
+                user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
+                tx.commit().await?; 
+        user.set_jwt()
     }
 
     pub async fn find_summary_by_user(user_id: &Uuid, db_pool: &PgPool) -> Result<UserSummary> {
@@ -170,24 +246,49 @@ impl User {
     }
 
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<User> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1 limit 1")
-            .bind(id)
+        let user = sqlx::query!(r#"SELECT * FROM users WHERE id = $1 limit 1"#,id)
             .fetch_one(pool)
-            .await?;
-        Ok(user)
+            .await
+            .map(|rec| User {
+                first_name: rec.first_name,
+                last_name: rec.last_name,
+                email:rec.email,
+                id:rec.id,
+                hashword:rec.hashword,
+                refresh:rec.refresh,
+                token:rec.token,
+                created_at:rec.created_at,
+                updated_at:rec.updated_at,
+                salt:rec.salt,
+                orgs:None
+
+            }).map_err(Error::from);    
+        Ok(user.unwrap())
     }
 
     pub async fn refresh(req: UserRefreshRequest, pool: &PgPool) -> Result<User> {
-        let mut user = User::find_by_refresh(&req.refresh, pool).await?;
-        user.set_jwt();
+        let  user = User::find_by_refresh(&req.refresh, pool).await?.set_jwt().map_err(Error::from)?;
         Ok(user)
     }
     pub async fn find_by_refresh(refresh: &str, pool: &PgPool) -> Result<User> {
-        let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE refresh = $1 limit 1")
-            .bind(refresh)
+        let user = sqlx::query!(r#"SELECT * FROM users WHERE refresh = $1 limit 1"#, refresh)
             .fetch_one(pool)
-            .await?;
-        Ok(user)
+            .await
+            .map(|rec| User {
+                first_name: rec.first_name,
+                last_name: rec.last_name,
+                email:rec.email,
+                id:rec.id,
+                hashword:rec.hashword,
+                refresh:rec.refresh,
+                token:rec.token,
+                created_at:rec.created_at,
+                updated_at:rec.updated_at,
+                salt:rec.salt,
+                orgs:None
+
+            }).map_err(Error::from);    
+        Ok(user.unwrap())
     }
 
 
@@ -196,7 +297,7 @@ impl User {
 
         let auth_data = auth::UserAuthData {
             user_id: user.id,
-            user_role: user.role.to_string(),
+            user_role: user.first_name.to_string(),
         };
 
         let token = auth::create_temp_jwt(&auth_data)?;
@@ -251,24 +352,35 @@ impl User {
             .hash_password(password.as_bytes(), salt.as_str())?
             .hash
         {
-            return sqlx::query_as::<_, User>(
+            return sqlx::query!(
                 r#"
                 UPDATE
-                  users
+                users
                 SET
-                  hashword = $1,
-                  salt = $2
+                hashword = $1,
+                salt = $2
                 WHERE
                   id = $3 RETURNING *
-                "#
+                "#,
+                hashword.to_string(),
+                salt.as_str(),
+                user.id
             )
-                .bind(hashword.to_string())
-                .bind(salt.as_str())
-                .bind(user.id)
-                .fetch_one(pool)
-                .await
-                .map_err(Error::from)?
-                .set_jwt();
+                .fetch_one(pool).await
+                .map(|rec| User {
+                    first_name: rec.first_name,
+                    last_name: rec.last_name,
+                    email:rec.email,
+                    id:rec.id,
+                    hashword:rec.hashword,
+                    refresh:rec.refresh,
+                    token:rec.token,
+                    created_at:rec.created_at,
+                    updated_at:rec.updated_at,
+                    salt:rec.salt,
+                    orgs:None
+    
+                }).map_err(Error::from).unwrap().set_jwt(); 
         }
 
         Err(Error::ValidationError("Invalid password.".to_string()))
@@ -288,27 +400,45 @@ impl User {
     pub fn set_jwt(&mut self) -> Result<Self> {
         let auth_data = auth::UserAuthData {
             user_id: self.id,
-            user_role: self.role.to_string(),
+            user_role: self.first_name.to_string(),
         };
         self.token = Some(auth::create_jwt(&auth_data)?);
         Ok(self.to_owned())
     }
 }
 
+impl Org{
+    pub async fn find_by_name(name: &str, db_pool: &PgPool) -> Result<Org> {
+        let org = sqlx::query!(
+            r#"SELECT *
+                    FROM   orgs
+                    WHERE  Lower(name) = Lower($1)
+                    LIMIT  1
+                    "#,
+                    name
+        )
+            .fetch_one(db_pool)
+            .await
+                .map(|rec| Org {
+                    id:rec.id,
+                    name:rec.name,
+                    is_personal:rec.is_personal,
+                    created_at:rec.created_at,
+                    updated_at:rec.updated_at,
+                    role:None
+                }).map_err(Error::from);    
+                Ok(org.unwrap())
+    }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, sqlx::Type)]
-#[serde(rename_all = "snake_case")]
-#[sqlx(type_name = "enum_user_role", rename_all = "snake_case")]
-pub enum UserRole {
-    User,
-    Admin,
-}
-
-impl fmt::Display for UserRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Admin => write!(f, "admin"),
-            Self::User => write!(f, "user"),
-        }
+    pub async fn find_all_by_user(user_id: Uuid,  tx: &mut PgConnection) -> Result<Vec<Self>> {
+        sqlx::query_as::<_, Self>(
+            "SELECT o.id, o.name, o.is_personal,o.created_at, o.updated_at , ou.role FROM orgs o inner join orgs_users ou on o.id = ou.orgs_id WHERE users_id = $1 order by created_at DESC",
+        )
+        .bind(user_id)
+        .fetch_all(tx)
+        .await
+        .map_err(Error::from)
     }
 }
+
+
