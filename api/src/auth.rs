@@ -11,7 +11,7 @@ use futures_util::future::{err, ok, Ready};
 use std::borrow::Cow;
 use log::{debug, warn};
 use sqlx::PgPool;
-use crate::models::{User,UserRole};
+use crate::models::{User,UserOrgRole};
 use axum::{
     async_trait,
     extract::{Extension, FromRequest, RequestParts,TypedHeader},
@@ -122,7 +122,7 @@ fn get_current_timestamp() -> u64 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq,Copy)]
 pub struct UserAuthInfo {
     pub id: Uuid,
-    pub role: UserRole,
+    pub role: UserOrgRole,
 }
 
 pub type UserAuthToken = String;
@@ -139,7 +139,7 @@ impl Authentication {
         matches!(self, Self::User(_))
     }
     pub fn is_admin(&self) -> bool {
-        matches!(self, Self::User(u) if u.role == UserRole::Admin)
+        matches!(self, Self::User(u) if u.role == UserOrgRole::Admin)
     }
 
     pub fn is_service(&self) -> bool {
@@ -180,12 +180,12 @@ impl Authentication {
     }
 }
 use std::str::FromStr;
-impl FromStr for UserRole {
-    type Err = ApiError;
+impl FromStr for UserOrgRole {
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "owner" => Ok(Self::User),
+            "owner" => Ok(Self::Owner),
             _ => Ok(Self::Admin),
         }
     }
@@ -216,7 +216,7 @@ where
                 if let Ok(JwtValidationStatus::Valid(auth_data)) =
                     validate_jwt(token.as_ref())
                 {
-                    if let Ok(role) = UserRole::from_str(&auth_data.user_role) {
+                    if let Ok(role) = UserOrgRole::from_str(&auth_data.user_role) {
                         return Ok(Self::User(UserAuthInfo {
                             id: auth_data.user_id,
                             role,

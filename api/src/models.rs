@@ -17,6 +17,7 @@ use sendgrid::v3::{
     Personalization,
     Sender};
 use sqlx::{PgPool,FromRow,Type,PgConnection,Row, postgres::PgRow};
+use std::str::FromStr;
 
 
 #[derive(Debug, Serialize, Deserialize,Validate)]
@@ -86,22 +87,8 @@ impl From<PgRow> for User {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-#[sqlx(type_name = "enum_role", rename_all = "snake_case")]
-pub enum UserRole {
-    User,
-    Admin,
-}
 
-impl fmt::Display for UserRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Admin => write!(f, "admin"),
-            Self::User => write!(f, "user"),
-        }
-    }
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct UserSummary {
@@ -149,7 +136,15 @@ pub enum UserOrgRole {
     Owner,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+impl fmt::Display for UserOrgRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admin => write!(f, "admin"),
+            Self::Owner => write!(f, "owner"),
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize,FromRow)]
 pub struct Org {
     pub id: Uuid,
     pub name: String,
@@ -159,17 +154,38 @@ pub struct Org {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
+// impl From<PgRow> for Org {
+//     fn from(row: PgRow) -> Self {
+//         Org {
+//             id: row
+//                 .try_get("id")
+//                 .expect("Couldn't try_get id for org."),
+//             name: row
+//                 .try_get("name")
+//                 .expect("Couldn't try_get name for org."),
+//             is_personal: row
+//                 .try_get("is_personal")
+//                 .expect("Couldn't try_get is_personal for org."),
+//             role: None,          
+//             created_at: row
+//                 .try_get("created_at")
+//                 .expect("Couldn't try_get created_at for org."),
+//             updated_at: row
+//                 .try_get("updated_at")
+//                 .expect("Couldn't try_get updated_at for org."),
+//         }
+//     }
+// }
 impl User {
-    pub async fn create_user(user: RegistrationReq, db_pool: &PgPool) -> Result<Self> {
-        let _ = user
+    pub async fn create_user(req: RegistrationReq, db_pool: &PgPool) -> Result<Self> {
+        let _ = req
             .validate()
             .map_err(|e| Error::ValidationError(e.to_string()));
 
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut OsRng);
         if let Some(hashword) = argon2
-            .hash_password(user.password.as_bytes(), salt.as_str())?
+            .hash_password(req.password.as_bytes(), salt.as_str())?
             .hash
         {
             let mut tx = db_pool.begin().await?;
@@ -184,11 +200,11 @@ impl User {
                    RETURNING *
                 "#
             )
-            .bind(user.email)
+            .bind(req.email)
             .bind(hashword.to_string())
             .bind(salt.as_str())
-            .bind(user.first_name)
-            .bind(user.last_name)
+            .bind(req.first_name)
+            .bind(req.last_name)
                 .fetch_one(&mut tx)
                 .await  
                 .map(|row: PgRow| {
@@ -196,11 +212,17 @@ impl User {
                 })           
                 .map_err(Error::from);
 
-                // let mut user  =result.unwrap();
-                // user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
+                let mut user  =result.unwrap();
+                let organization= req.organization.unwrap();
+                let org = Org::find_by_name(&organization, &mut tx).await?;
+
+                Org::create_orgs_users_owner(org.id,user.id,&mut tx).await?;
+
+
+                user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
 
                 tx.commit().await?; 
-            Ok(result.unwrap())
+            Ok(user)
         } else {
             Err(Error::ValidationError("Invalid password.".to_string()))
         }
@@ -224,26 +246,11 @@ impl User {
                     FROM   users
                     WHERE  Lower(email) = Lower($1)
                     LIMIT  1
-                    "#,
-                    // email
+                    "#
         )
         .bind(email)
             .fetch_one(&mut tx)
             .await
-                // .map(|rec| User {
-                //     first_name: rec.first_name,
-                //     last_name: rec.last_name,
-                //     email:rec.email,
-                //     id:rec.id,
-                //     hashword:rec.hashword,
-                //     refresh:rec.refresh,
-                //     token:rec.token,
-                //     created_at:rec.created_at,
-                //     updated_at:rec.updated_at,
-                //     salt:rec.salt,
-                //     orgs:None
-
-                // })
                 .map(|row: PgRow| {
             Self::from(row)
         })           
@@ -408,19 +415,14 @@ impl User {
 }
 
 impl Org{
-    pub async fn find_by_name(name: &str, db_pool: &PgPool) -> Result<Org> {
-        let org = sqlx::query_as::<_, Self>(
-            r#"SELECT *
-                    FROM   orgs
-                    WHERE  Lower(name) = Lower($1)
-                    LIMIT  1
-                    "#             
+    pub async fn find_by_name(name: &str,  tx: &mut PgConnection) -> Result<Org> {
+        sqlx::query_as::<_, Self>(
+            "SELECT o.id, o.name, o.is_personal,o.created_at, o.updated_at , ou.role FROM orgs o inner join orgs_users ou on o.id = ou.orgs_id WHERE o.name = $1 order by created_at DESC",
         )
         .bind(name)
-            .fetch_one(db_pool)
-            .await
-                .map_err(Error::from);    
-                Ok(org.unwrap())
+        .fetch_one(tx)
+        .await
+        .map_err(Error::from)
     }
 
     pub async fn find_all_by_user(user_id: Uuid,  tx: &mut PgConnection) -> Result<Vec<Self>> {
@@ -432,6 +434,30 @@ impl Org{
         .await
         .map_err(Error::from)
     }
+
+    pub async fn create_orgs_users_owner(org_id: Uuid,user_id: Uuid, tx: &mut PgConnection) -> Result<()> {
+        let result = sqlx::query
+        (
+            r#"
+            INSERT INTO
+            orgs_users (orgs_id, users_id, role)
+            values
+            (
+                $1, $2, $3
+            )
+            "#
+        )
+        .bind(org_id)
+        .bind(user_id)
+        .bind(UserOrgRole::Owner)
+
+            .execute(tx)
+            .await           
+            .map_err(Error::from);
+
+            Ok(())
+    }
 }
+
 
 
