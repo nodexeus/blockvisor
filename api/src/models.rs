@@ -16,7 +16,7 @@ use sendgrid::v3::{
     Message,
     Personalization,
     Sender};
-use sqlx::{PgPool,FromRow,Type,PgConnection};
+use sqlx::{PgPool,FromRow,Type,PgConnection,Row, postgres::PgRow};
 
 
 #[derive(Debug, Serialize, Deserialize,Validate)]
@@ -31,7 +31,7 @@ pub struct RegistrationReq {
     pub password_confirm: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize,FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Uuid,
     pub first_name: String,
@@ -49,7 +49,43 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
+impl From<PgRow> for User {
+    fn from(row: PgRow) -> Self {
+        User {
+            id: row
+                .try_get("id")
+                .expect("Couldn't try_get id for user."),
+            first_name: row
+                .try_get("first_name")
+                .expect("Couldn't try_get first_name for user."),
+            last_name: row
+                .try_get("last_name")
+                .expect("Couldn't try_get last_name for user."),
+            email: row
+                .try_get("email")
+                .expect("Couldn't try_get email for user."),
+            hashword: row
+                .try_get("hashword")
+                .expect("Couldn't try_get hashword for user."),
+            salt: row
+                .try_get("salt")
+                .expect("Couldn't try_get salt for user."),
+            token: row
+                .try_get("token")
+                .expect("Couldn't try_get token for user."),
+            refresh: row
+                .try_get("refresh")
+                .expect("Couldn't try_get refresh for user."),
+            orgs: None,
+            created_at: row
+                .try_get("created_at")
+                .expect("Couldn't try_get created_at for user."),
+            updated_at: row
+                .try_get("updated_at")
+                .expect("Couldn't try_get updated_at for user."),
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 #[sqlx(type_name = "enum_role", rename_all = "snake_case")]
@@ -113,7 +149,7 @@ pub enum UserOrgRole {
     Owner,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type,FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Org {
     pub id: Uuid,
     pub name: String,
@@ -137,7 +173,7 @@ impl User {
             .hash
         {
             let mut tx = db_pool.begin().await?;
-            let result = sqlx::query!(
+            let result = sqlx::query(
                 r#"
                 INSERT INTO
                 users (email, hashword, salt,first_name,last_name)
@@ -146,37 +182,24 @@ impl User {
                     Lower($1), $2, $3, $4, $5
                 )
                    RETURNING *
-                "#,
-                user.email,
-                hashword.to_string(),
-                salt.as_str(),
-                user.first_name,
-                user.last_name
+                "#
             )
+            .bind(user.email)
+            .bind(hashword.to_string())
+            .bind(salt.as_str())
+            .bind(user.first_name)
+            .bind(user.last_name)
                 .fetch_one(&mut tx)
-                .await
-                .map(|rec| User {
-                    first_name: rec.first_name,
-                    last_name: rec.last_name,
-                    email:rec.email,
-                    id:rec.id,
-                    hashword:rec.hashword,
-                    refresh:rec.refresh,
-                    token:rec.token,
-                    created_at:rec.created_at,
-                    updated_at:rec.updated_at,
-                    salt:rec.salt,
-                    orgs:None
-
-                })              
+                .await  
+                .map(|row: PgRow| {
+                    Self::from(row)
+                })           
                 .map_err(Error::from);
 
                 // let mut user  =result.unwrap();
                 // user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
 
                 tx.commit().await?; 
-
-               
             Ok(result.unwrap())
         } else {
             Err(Error::ValidationError("Invalid password.".to_string()))
@@ -196,30 +219,35 @@ impl User {
 
     pub async fn find_by_email(email: &str, db_pool: &PgPool) -> Result<User> {
         let mut tx = db_pool.begin().await?;
-        let user = sqlx::query!(
+        let user = sqlx::query(
             r#"SELECT *
                     FROM   users
                     WHERE  Lower(email) = Lower($1)
                     LIMIT  1
                     "#,
-                    email
+                    // email
         )
+        .bind(email)
             .fetch_one(&mut tx)
             .await
-                .map(|rec| User {
-                    first_name: rec.first_name,
-                    last_name: rec.last_name,
-                    email:rec.email,
-                    id:rec.id,
-                    hashword:rec.hashword,
-                    refresh:rec.refresh,
-                    token:rec.token,
-                    created_at:rec.created_at,
-                    updated_at:rec.updated_at,
-                    salt:rec.salt,
-                    orgs:None
+                // .map(|rec| User {
+                //     first_name: rec.first_name,
+                //     last_name: rec.last_name,
+                //     email:rec.email,
+                //     id:rec.id,
+                //     hashword:rec.hashword,
+                //     refresh:rec.refresh,
+                //     token:rec.token,
+                //     created_at:rec.created_at,
+                //     updated_at:rec.updated_at,
+                //     salt:rec.salt,
+                //     orgs:None
 
-                }).map_err(Error::from);    
+                // })
+                .map(|row: PgRow| {
+            Self::from(row)
+        })           
+                .map_err(Error::from);    
                 let mut user  =user.unwrap();
                 user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
                 tx.commit().await?; 
@@ -246,24 +274,16 @@ impl User {
     }
 
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<User> {
-        let user = sqlx::query!(r#"SELECT * FROM users WHERE id = $1 limit 1"#,id)
+        let user = sqlx::query(r#"SELECT * FROM users WHERE id = $1 limit 1"#
+        )
+            .bind(id)
             .fetch_one(pool)
             .await
-            .map(|rec| User {
-                first_name: rec.first_name,
-                last_name: rec.last_name,
-                email:rec.email,
-                id:rec.id,
-                hashword:rec.hashword,
-                refresh:rec.refresh,
-                token:rec.token,
-                created_at:rec.created_at,
-                updated_at:rec.updated_at,
-                salt:rec.salt,
-                orgs:None
-
-            }).map_err(Error::from);    
-        Ok(user.unwrap())
+            .map(|row: PgRow| {
+                Self::from(row)
+            }) 
+            .map_err(Error::from);    
+            Ok(user.unwrap())
     }
 
     pub async fn refresh(req: UserRefreshRequest, pool: &PgPool) -> Result<User> {
@@ -271,23 +291,14 @@ impl User {
         Ok(user)
     }
     pub async fn find_by_refresh(refresh: &str, pool: &PgPool) -> Result<User> {
-        let user = sqlx::query!(r#"SELECT * FROM users WHERE refresh = $1 limit 1"#, refresh)
+        let user = sqlx::query(r#"SELECT * FROM users WHERE refresh = $1 limit 1"#)
+    .bind(refresh)
             .fetch_one(pool)
             .await
-            .map(|rec| User {
-                first_name: rec.first_name,
-                last_name: rec.last_name,
-                email:rec.email,
-                id:rec.id,
-                hashword:rec.hashword,
-                refresh:rec.refresh,
-                token:rec.token,
-                created_at:rec.created_at,
-                updated_at:rec.updated_at,
-                salt:rec.salt,
-                orgs:None
-
-            }).map_err(Error::from);    
+            .map(|row: PgRow| {
+                Self::from(row)
+            }) 
+            .map_err(Error::from);    
         Ok(user.unwrap())
     }
 
@@ -345,14 +356,14 @@ impl User {
     }
 
 
-    pub async fn update_password(user: User, password: &str, pool: &PgPool) -> Result<User> {
+    pub async fn update_password(user: User, password: &str, pool: &PgPool) -> Result<Self> {
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut OsRng);
         if let Some(hashword) = argon2
             .hash_password(password.as_bytes(), salt.as_str())?
             .hash
         {
-            return sqlx::query!(
+            return sqlx::query(
                 r#"
                 UPDATE
                 users
@@ -360,27 +371,16 @@ impl User {
                 hashword = $1,
                 salt = $2
                 WHERE
-                  id = $3 RETURNING *
-                "#,
-                hashword.to_string(),
-                salt.as_str(),
-                user.id
+                  id = $3 RETURNING *, '' as orgs
+                "#
             )
-                .fetch_one(pool).await
-                .map(|rec| User {
-                    first_name: rec.first_name,
-                    last_name: rec.last_name,
-                    email:rec.email,
-                    id:rec.id,
-                    hashword:rec.hashword,
-                    refresh:rec.refresh,
-                    token:rec.token,
-                    created_at:rec.created_at,
-                    updated_at:rec.updated_at,
-                    salt:rec.salt,
-                    orgs:None
-    
-                }).map_err(Error::from).unwrap().set_jwt(); 
+            .bind(hashword.to_string())
+            .bind(salt.as_str())
+            .bind( user.id)
+                .map(|row: PgRow| {
+                    Self::from(row)
+                })
+                .fetch_one(pool).await.map_err(Error::from).unwrap().set_jwt(); 
         }
 
         Err(Error::ValidationError("Invalid password.".to_string()))
@@ -409,24 +409,17 @@ impl User {
 
 impl Org{
     pub async fn find_by_name(name: &str, db_pool: &PgPool) -> Result<Org> {
-        let org = sqlx::query!(
+        let org = sqlx::query_as::<_, Self>(
             r#"SELECT *
                     FROM   orgs
                     WHERE  Lower(name) = Lower($1)
                     LIMIT  1
-                    "#,
-                    name
+                    "#             
         )
+        .bind(name)
             .fetch_one(db_pool)
             .await
-                .map(|rec| Org {
-                    id:rec.id,
-                    name:rec.name,
-                    is_personal:rec.is_personal,
-                    created_at:rec.created_at,
-                    updated_at:rec.updated_at,
-                    role:None
-                }).map_err(Error::from);    
+                .map_err(Error::from);    
                 Ok(org.unwrap())
     }
 
