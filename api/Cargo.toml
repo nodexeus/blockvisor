@@ -36,6 +36,7 @@ sendgrid = { version = "0.17.4", default-features = false, features = ["rustls",
 futures-util = "0.3.15"
 log = "0.4.14"
 headers = "0.3"
+authy = "0.9.8"
 
 [features]
 default = ["tracing/release_max_level_debug"]

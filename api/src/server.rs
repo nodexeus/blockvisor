@@ -83,6 +83,9 @@ pub async fn start(config: &AppConfig) -> Result<()> {
         .route("/whoami/:id", get(handlers::whoami))
         .route("/reset", post(handlers::reset_pwd).put(handlers::update_pwd))
         .route("/refresh", post(handlers::refresh))
+        .route("/authy/register", post(handlers::authy_register))
+        .route("/authy/verify", post(handlers::authy_verify))
+        // .route("/authy/qr", post(handlers::authy_qr))
         .layer(Extension(pool))
         .layer(
             TraceLayer::new_for_http()

@@ -28,6 +28,10 @@ pub struct AppConfig {
     /// Configuration pertaining specifically to observability
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+    /// Configuration pertaining specifically to authy 2FA
+    #[serde(default)]
+    pub authy: AuthyConfig,
+
 }
 
 impl AppConfig {
@@ -138,6 +142,14 @@ pub struct TelemetryConfig {
     /// Select a named logging preset from [`LogFormat`]
     #[serde(default)]
     pub log_format: LogFormat,
+}
+
+/// Configuration pertaining specifically to Authy 2FA
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AuthyConfig {
+    /// api key for your authy application
+    #[serde(default)]
+    pub api_key: String,
 }
 
 #[cfg(test)]

@@ -1,26 +1,31 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use validator::Validate;
-use chrono::{DateTime, Utc};
 use std::fmt;
+use std::str::FromStr;
+
+use anyhow::anyhow;
 use argon2::{
     Argon2,
     password_hash::{PasswordHasher, rand_core::OsRng, SaltString},
 };
-use crate::errors::{Error, Result};
-use anyhow::anyhow;
-use crate::auth;
+use authy::api::user;
+use authy::Client;
+use chrono::{DateTime, Utc};
 use sendgrid::v3::{
     Content,
     Email,
     Message,
     Personalization,
     Sender};
-use sqlx::{PgPool,FromRow,Type,PgConnection,Row, postgres::PgRow};
-use std::str::FromStr;
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgConnection, PgPool, postgres::PgRow, Row, Type};
+use uuid::Uuid;
+use validator::Validate;
 
+use crate::auth;
+use crate::errors::{Error, Result};
 
-#[derive(Debug, Serialize, Deserialize,Validate)]
+type AuthyUserApi = authy::User;
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct RegistrationReq {
     pub first_name: String,
     pub last_name: String,
@@ -50,6 +55,7 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
 impl From<PgRow> for User {
     fn from(row: PgRow) -> Self {
         User {
@@ -87,7 +93,6 @@ impl From<PgRow> for User {
         }
     }
 }
-
 
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -144,7 +149,8 @@ impl fmt::Display for UserOrgRole {
         }
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize,FromRow)]
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Org {
     pub id: Uuid,
     pub name: String,
@@ -154,6 +160,7 @@ pub struct Org {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
 // impl From<PgRow> for Org {
 //     fn from(row: PgRow) -> Self {
 //         Org {
@@ -166,7 +173,7 @@ pub struct Org {
 //             is_personal: row
 //                 .try_get("is_personal")
 //                 .expect("Couldn't try_get is_personal for org."),
-//             role: None,          
+//             role: None,
 //             created_at: row
 //                 .try_get("created_at")
 //                 .expect("Couldn't try_get created_at for org."),
@@ -200,28 +207,28 @@ impl User {
                    RETURNING *
                 "#
             )
-            .bind(req.email)
-            .bind(hashword.to_string())
-            .bind(salt.as_str())
-            .bind(req.first_name)
-            .bind(req.last_name)
+                .bind(req.email)
+                .bind(hashword.to_string())
+                .bind(salt.as_str())
+                .bind(req.first_name)
+                .bind(req.last_name)
                 .fetch_one(&mut tx)
-                .await  
+                .await
                 .map(|row: PgRow| {
                     Self::from(row)
-                })           
+                })
                 .map_err(Error::from);
 
-                let mut user  =result.unwrap();
-                let organization= req.organization.unwrap();
-                let org = Org::find_by_name(&organization, &mut tx).await?;
+            let mut user = result.unwrap();
+            let organization = req.organization.unwrap();
+            let org = Org::find_by_name(&organization, &mut tx).await?;
 
-                Org::create_orgs_users_owner(org.id,user.id,&mut tx).await?;
+            Org::create_orgs_users_owner(org.id, user.id, &mut tx).await?;
 
 
-                user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
+            user.orgs = Some(Org::find_all_by_user(user.id, &mut tx).await?);
 
-                tx.commit().await?; 
+            tx.commit().await?;
             Ok(user)
         } else {
             Err(Error::ValidationError("Invalid password.".to_string()))
@@ -248,16 +255,16 @@ impl User {
                     LIMIT  1
                     "#
         )
-        .bind(email)
+            .bind(email)
             .fetch_one(&mut tx)
             .await
-                .map(|row: PgRow| {
-            Self::from(row)
-        })           
-                .map_err(Error::from);    
-                let mut user  =user.unwrap();
-                user.orgs = Some(Org::find_all_by_user(user.id,&mut tx).await?);
-                tx.commit().await?; 
+            .map(|row: PgRow| {
+                Self::from(row)
+            })
+            .map_err(Error::from);
+        let mut user = user.unwrap();
+        user.orgs = Some(Org::find_all_by_user(user.id, &mut tx).await?);
+        tx.commit().await?;
         user.set_jwt()
     }
 
@@ -288,24 +295,24 @@ impl User {
             .await
             .map(|row: PgRow| {
                 Self::from(row)
-            }) 
-            .map_err(Error::from);    
-            Ok(user.unwrap())
+            })
+            .map_err(Error::from);
+        Ok(user.unwrap())
     }
 
     pub async fn refresh(req: UserRefreshRequest, pool: &PgPool) -> Result<User> {
-        let  user = User::find_by_refresh(&req.refresh, pool).await?.set_jwt().map_err(Error::from)?;
+        let user = User::find_by_refresh(&req.refresh, pool).await?.set_jwt().map_err(Error::from)?;
         Ok(user)
     }
     pub async fn find_by_refresh(refresh: &str, pool: &PgPool) -> Result<User> {
         let user = sqlx::query(r#"SELECT * FROM users WHERE refresh = $1 limit 1"#)
-    .bind(refresh)
+            .bind(refresh)
             .fetch_one(pool)
             .await
             .map(|row: PgRow| {
                 Self::from(row)
-            }) 
-            .map_err(Error::from);    
+            })
+            .map_err(Error::from);
         Ok(user.unwrap())
     }
 
@@ -381,13 +388,13 @@ impl User {
                   id = $3 RETURNING *, '' as orgs
                 "#
             )
-            .bind(hashword.to_string())
-            .bind(salt.as_str())
-            .bind( user.id)
+                .bind(hashword.to_string())
+                .bind(salt.as_str())
+                .bind(user.id)
                 .map(|row: PgRow| {
                     Self::from(row)
                 })
-                .fetch_one(pool).await.map_err(Error::from).unwrap().set_jwt(); 
+                .fetch_one(pool).await.map_err(Error::from).unwrap().set_jwt();
         }
 
         Err(Error::ValidationError("Invalid password.".to_string()))
@@ -414,31 +421,31 @@ impl User {
     }
 }
 
-impl Org{
-    pub async fn find_by_name(name: &str,  tx: &mut PgConnection) -> Result<Org> {
+impl Org {
+    pub async fn find_by_name(name: &str, tx: &mut PgConnection) -> Result<Org> {
         sqlx::query_as::<_, Self>(
             "SELECT o.id, o.name, o.is_personal,o.created_at, o.updated_at , ou.role FROM orgs o inner join orgs_users ou on o.id = ou.orgs_id WHERE o.name = $1 order by created_at DESC",
         )
-        .bind(name)
-        .fetch_one(tx)
-        .await
-        .map_err(Error::from)
+            .bind(name)
+            .fetch_one(tx)
+            .await
+            .map_err(Error::from)
     }
 
-    pub async fn find_all_by_user(user_id: Uuid,  tx: &mut PgConnection) -> Result<Vec<Self>> {
+    pub async fn find_all_by_user(user_id: Uuid, tx: &mut PgConnection) -> Result<Vec<Self>> {
         sqlx::query_as::<_, Self>(
             "SELECT o.id, o.name, o.is_personal,o.created_at, o.updated_at , ou.role FROM orgs o inner join orgs_users ou on o.id = ou.orgs_id WHERE users_id = $1 order by created_at DESC",
         )
-        .bind(user_id)
-        .fetch_all(tx)
-        .await
-        .map_err(Error::from)
+            .bind(user_id)
+            .fetch_all(tx)
+            .await
+            .map_err(Error::from)
     }
 
-    pub async fn create_orgs_users_owner(org_id: Uuid,user_id: Uuid, tx: &mut PgConnection) -> Result<()> {
+    pub async fn create_orgs_users_owner(org_id: Uuid, user_id: Uuid, tx: &mut PgConnection) -> Result<()> {
         let result = sqlx::query
-        (
-            r#"
+            (
+                r#"
             INSERT INTO
             orgs_users (orgs_id, users_id, role)
             values
@@ -446,18 +453,71 @@ impl Org{
                 $1, $2, $3
             )
             "#
-        )
-        .bind(org_id)
-        .bind(user_id)
-        .bind(UserOrgRole::Owner)
+            )
+            .bind(org_id)
+            .bind(user_id)
+            .bind(UserOrgRole::Owner)
 
             .execute(tx)
-            .await           
+            .await
             .map_err(Error::from);
 
-            Ok(())
+        Ok(())
     }
 }
 
 
+#[derive(Debug, Copy, Clone)]
+pub struct AuthyUser;
+
+impl AuthyUser {
+    pub async fn register(client: &Client, authy_reg_req: &AuthyRegistrationReq) -> Result<AuthyIDReq> {
+        let (_, user) = user::create(&client,
+                                     authy_reg_req.email.as_str(),
+                                     authy_reg_req.country_code,
+                                     authy_reg_req.phone.as_str(),
+                                     false).unwrap();
+        Ok(AuthyIDReq::new(user.id))
+    }
+
+    pub async fn qr(_client: &Client) -> Result<()> {
+        unimplemented!()
+    }
+
+    pub async fn verify(client: &Client, authy_verify_req: &AuthyVerifyReq) -> Result<bool> {
+        let mut user = AuthyUserApi::find(&client, authy_verify_req.authy_id).unwrap();
+        let result = user.verify(&client, authy_verify_req.token.as_str());
+        match result {
+            Ok(verifies) => Ok(verifies),
+            Err(_) => {
+                Err(Error::ValidationError("Invalid token.".to_string()))
+            }
+        }
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthyRegistrationReq {
+    pub country_code: u16,
+    pub phone: String,
+    pub email: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Copy)]
+pub struct AuthyIDReq {
+    pub authy_id: u32,
+}
+
+impl AuthyIDReq {
+    pub fn new(authy_id: u32) -> Self {
+        AuthyIDReq { authy_id }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AuthyVerifyReq {
+    pub authy_id: u32,
+    pub token: String,
+}
 

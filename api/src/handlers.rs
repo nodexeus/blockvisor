@@ -1,17 +1,21 @@
 // This will eventually be broken out into sub files in module
 
+use authy::{Client, Status};
+use axum::{Extension, http::StatusCode, Json, response::{IntoResponse, Response}};
+use sqlx::PgPool;
+use tracing::instrument;
+use uuid::Uuid;
+
+use crate::auth::Authentication;
+use crate::config::AuthyConfig;
+use crate::models::{AuthyRegistrationReq, AuthyUser, AuthyVerifyReq, PasswordResetRequest};
+use crate::models::PwdResetInfo;
 use crate::models::RegistrationReq;
 use crate::models::User;
 use crate::models::UserLoginRequest;
 use crate::models::UserRefreshRequest;
-use crate::models::PasswordResetRequest;
-use crate::models::PwdResetInfo;
-use axum::{http::StatusCode, Extension, Json, response::{IntoResponse, Response},};
-use sqlx::PgPool;
-use tracing::instrument;
-use crate::auth::Authentication;
+
 type ApiResponse = crate::errors::Result<Response>;
-use uuid::Uuid;
 
 /// GET handler for health requests by an application platform
 ///
@@ -77,8 +81,8 @@ pub async fn login(
 }
 
 pub async fn whoami(Extension(db_pool): Extension<PgPool>,
-           //     auth: Authentication,
-                axum::extract::Path(id): axum::extract::Path<Uuid>,
+                    //     auth: Authentication,
+                    axum::extract::Path(id): axum::extract::Path<Uuid>,
 ) -> ApiResponse {
     let result = User::find_by_id(id, &db_pool).await;
     match result {
@@ -89,7 +93,7 @@ pub async fn whoami(Extension(db_pool): Extension<PgPool>,
     }
 }
 
-pub async fn refresh(Json(req): Json<UserRefreshRequest>,Extension(db_pool): Extension<PgPool>) -> ApiResponse {
+pub async fn refresh(Json(req): Json<UserRefreshRequest>, Extension(db_pool): Extension<PgPool>) -> ApiResponse {
     let result = User::refresh(req, &db_pool).await;
     match result {
         Ok(user) => Ok((Json(user)).into_response()),
@@ -127,5 +131,41 @@ pub async fn update_pwd(
     }
 }
 
+// TODO : move to config files
+const API_URL: &str = "https://api.authy.com";
+const API_KEY: &str = "yb0mhD2F2Otb5CJxRoPWLWnTNeQgGs5U";
 
+pub async fn authy_register(
+    Json(authy_reg_req): Json<AuthyRegistrationReq>,
+    // Extension(db_pool): Extension<PgPool>,
+) -> ApiResponse {
+    let client = Client::new(API_URL, API_KEY);
+    let result = AuthyUser::register(&client, &authy_reg_req).await;
+    match result {
+        Ok(user) => Ok((Json(user)).into_response()),
+        Err(err) => {
+            Err(err)
+        }
+    }
+}
 
+pub async fn authy_qr(
+    // Json(authy_id_req): Json<AuthyIDReq>,
+    // Extension(db_pool): Extension<PgPool>,
+) -> ApiResponse {
+    unimplemented!()
+}
+
+pub async fn authy_verify(
+    Json(authy_verify_req): Json<AuthyVerifyReq>,
+    // Extension(db_pool): Extension<PgPool>,
+) -> ApiResponse {
+    let client = Client::new(API_URL, API_KEY);
+    let result = AuthyUser::verify(&client, &authy_verify_req).await;
+    match result {
+        Ok(verified) => Ok((Json(verified)).into_response()),
+        Err(err) => {
+            Err(err)
+        }
+    }
+}
