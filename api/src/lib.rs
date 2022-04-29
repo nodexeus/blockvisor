@@ -24,5 +24,6 @@ pub mod handlers;
 pub mod models;
 pub mod server;
 pub mod telemetry;
+pub mod auth;
 #[cfg(test)]
 mod test_helpers;

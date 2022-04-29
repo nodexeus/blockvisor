@@ -13,3 +13,6 @@ listen_port = 8080
 [telemetry]
 log_format = "full"
 opentelemetry = false
+
+[authy]
+api_key = ""

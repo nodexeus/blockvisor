@@ -9,7 +9,7 @@ use axum::{
     http::Request,
     response::Response,
     routing::{get, post},
-    Router, Server,
+    Router, Server,Json,
 };
 use hyper::Body;
 use std::{
@@ -77,6 +77,15 @@ pub async fn start(config: &AppConfig) -> Result<()> {
     let app = Router::new()
         .route("/health", get(handlers::health))
         .route("/v1/registrations", post(handlers::registration_create))
+        .route("/users", post(handlers::create_user))
+        .route("/users/:id", get(handlers::user_summary))
+        .route("/login", post(handlers::login))
+        .route("/whoami/:id", get(handlers::whoami))
+        .route("/reset", post(handlers::reset_pwd).put(handlers::update_pwd))
+        .route("/refresh", post(handlers::refresh))
+        .route("/authy/register", post(handlers::authy_register))
+        .route("/authy/verify", post(handlers::authy_verify))
+        // .route("/authy/qr", post(handlers::authy_qr))
         .layer(Extension(pool))
         .layer(
             TraceLayer::new_for_http()
@@ -137,3 +146,4 @@ pub async fn start(config: &AppConfig) -> Result<()> {
 
     Ok(())
 }
+
