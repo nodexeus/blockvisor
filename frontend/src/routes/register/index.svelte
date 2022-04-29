@@ -2,11 +2,13 @@
   import { MetaTags } from 'svelte-meta-tags';
   import PublicRoute from 'modules/authorization/components/PublicRoute/PublicRoute.svelte';
   import { ROUTES } from 'consts/routes';
+  import RegisterForm from 'modules/authentication/components/RegisterForm/RegisterForm.svelte';
 </script>
 
 <MetaTags title="Register | BlockVisor" />
 
 <PublicRoute>
+  <RegisterForm />
   <footer class="register-footer t-tiny">
     <div class="register-footer__account">
       <p class="t-color-text-2">Already have a BlockVisor account?</p>

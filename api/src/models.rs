@@ -1,3 +1,4 @@
+
 use std::fmt;
 use std::str::FromStr;
 
@@ -24,6 +25,18 @@ use crate::auth;
 use crate::errors::{Error, Result};
 
 type AuthyUserApi = authy::User;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "enum_org_role", rename_all = "snake_case")]
+pub enum UserOrgRole {
+    Admin,
+    Owner,
+}
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct RegistrationReq {
@@ -156,33 +169,10 @@ pub struct Org {
     pub name: String,
     pub is_personal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<UserOrgRole>,
+    pub user_role: Option<UserOrgRole>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
-// impl From<PgRow> for Org {
-//     fn from(row: PgRow) -> Self {
-//         Org {
-//             id: row
-//                 .try_get("id")
-//                 .expect("Couldn't try_get id for org."),
-//             name: row
-//                 .try_get("name")
-//                 .expect("Couldn't try_get name for org."),
-//             is_personal: row
-//                 .try_get("is_personal")
-//                 .expect("Couldn't try_get is_personal for org."),
-//             role: None,
-//             created_at: row
-//                 .try_get("created_at")
-//                 .expect("Couldn't try_get created_at for org."),
-//             updated_at: row
-//                 .try_get("updated_at")
-//                 .expect("Couldn't try_get updated_at for org."),
-//         }
-//     }
-// }
 impl User {
     pub async fn create_user(req: RegistrationReq, db_pool: &PgPool) -> Result<Self> {
         let _ = req
@@ -521,3 +511,21 @@ pub struct AuthyVerifyReq {
     pub token: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+    pub orgs: Option<Vec<Org>>,
+    #[serde(skip_serializing)]
+    pub hashword: String,
+    #[serde(skip_serializing)]
+    pub salt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}

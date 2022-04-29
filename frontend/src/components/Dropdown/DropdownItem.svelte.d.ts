@@ -6,8 +6,12 @@ export interface DropdownItemProps
 export interface DropdownItemSlots {
   default: Slot;
 }
+
+export interface DropdownItemEvents {
+  click: VoidFunction;
+}
 export default class DropdownItem extends SvelteComponentTyped<
   DropdownItemProps,
-  undefined,
+  DropdownItemEvents,
   DropdownItemSlots
 > {}

@@ -5,7 +5,11 @@
 {#if as === 'a'}
   <a {...$$restProps} class="t-tiny link dropdown-item"><slot /></a>
 {:else}
-  <button on:click {...$$restProps} class="t-tiny u-button-reset dropdown-item">
+  <button
+    on:click|preventDefault
+    {...$$restProps}
+    class="t-tiny u-button-reset dropdown-item"
+  >
     <slot />
   </button>
 {/if}

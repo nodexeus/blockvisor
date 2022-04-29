@@ -11,6 +11,7 @@
     </div>
     <slot />
   </div>
+  <slot name="util" />
 </header>
 
 <style>

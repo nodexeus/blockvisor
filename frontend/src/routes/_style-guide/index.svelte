@@ -29,8 +29,6 @@
     sweets: { initial: 'chocolate' },
   });
 
-  console.log(form);
-
   let files = {
     accepted: [],
     rejected: [],

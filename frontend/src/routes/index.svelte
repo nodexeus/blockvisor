@@ -3,15 +3,19 @@
   import { MetaTags } from 'svelte-meta-tags';
   import PublicRoute from 'modules/authorization/components/PublicRoute/PublicRoute.svelte';
   import { ROUTES } from 'consts/routes';
+  import LoginForm from 'modules/authentication/components/LoginForm/LoginForm.svelte';
 </script>
 
 <MetaTags title="Login | BlockVisor" />
 
 <PublicRoute>
   <Layout title="Login">
+    <LoginForm />
     <footer class="login-footer t-tiny">
       <div class="t-right">
-        <a class="link" href={ROUTES.FORGOT_PASSWORD}>Forgot password?</a>
+        <a class="link login__link" href={ROUTES.FORGOT_PASSWORD}
+          >Forgot password?</a
+        >
       </div>
       <div class="login-footer__account">
         <p class="t-color-text-2">Don't have a BlockVisor account?</p>
@@ -24,6 +28,10 @@
 </PublicRoute>
 
 <style>
+  .login__link {
+    color: theme(--color-text-2);
+  }
+
   .login-footer {
     margin-top: 12px;
 
