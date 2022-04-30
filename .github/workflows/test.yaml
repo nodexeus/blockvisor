@@ -2,11 +2,11 @@ name: API
 
 on:
   push:
-    branches: [main]
+    #branches: [main]
     paths:
       - "api/**.rs"
   pull_request:
-    branches: [main]
+    #branches: [main]
     paths:
       - "api/**.rs"
 

@@ -1,5 +1,3 @@
-// Test to trigger action?
-
 use crate::errors::AppError;
 use crate::models::{User, UserRole};
 use crate::result::Result;
