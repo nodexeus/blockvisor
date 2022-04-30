@@ -1,54 +1,63 @@
 use axum::{
     http::StatusCode,
-    Json,
     response::{IntoResponse, Response},
-
+    Json,
+};
 use serde_json::json;
 
 /// Wrapper Error enum used to provide a consistent [`IntoResponse`] target for
 /// request handlers that return inner domain Error types.
 #[derive(Debug, thiserror::Error)]
-pub enum ApiError {
-    #[error("database error")]
+pub enum AppError {
+    #[error("{0}")]
+    ValidationError(String),
+
+    #[error("Record not found.")]
+    NotFoundError,
+
+    #[error("Duplicate resource conflict.")]
+    DuplicateResource,
+
+    #[error("invalid authentication credentials")]
+    InvalidAuthentication(anyhow::Error),
+
+    #[error("Insufficient permission.")]
+    InsufficientPermissionsError,
+
+    #[error("Error processing JWT")]
+    JWTError(#[from] jsonwebtoken::errors::Error),
+
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+
+    #[error("Database error")]
     SqlError(#[from] sqlx::Error),
 }
 
-impl IntoResponse for ApiError {
+impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            ApiError::SqlError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "database error"),
-
+            AppError::ValidationError(s) => (StatusCode::BAD_REQUEST, s),
+            AppError::NotFoundError => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::DuplicateResource => (StatusCode::CONFLICT, self.to_string()),
+            AppError::InvalidAuthentication(_e) => {
+                (StatusCode::UNAUTHORIZED, "Unauthorized".into())
+            }
+            AppError::InsufficientPermissionsError => (StatusCode::FORBIDDEN, self.to_string()),
+            AppError::JWTError(e) => (StatusCode::BAD_REQUEST, e.to_string()),
+            AppError::UnexpectedError(_e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal Server Error".into(),
+            ),
+            AppError::SqlError(e) => match e {
+                sqlx::Error::RowNotFound => {
+                    (StatusCode::NOT_FOUND, AppError::NotFoundError.to_string())
+                }
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            },
         };
-        let payload = json!({"message": self.to_string()});
-        (status_code, payload.to_string()).into_response()
-    }
-}
+        let body = Json(json!({ "error": message }));
 
-pub fn error_chain_fmt(
-    e: &impl std::error::Error,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    writeln!(f, "{}\n", e)?;
-    let mut current = e.source();
-    while let Some(cause) = current {
-        writeln!(f, "Caused by:\n\t{}", cause)?;
-        current = cause.source();
-    }
-    Ok(())
-}
-
-
-impl From<Error> for ApiError {
-    fn from(err: Error) -> Self {
-        let status = match err {
-            Error::ValidationError(_) => StatusCode::BAD_REQUEST,
-            Error::NotFoundError(_) => StatusCode::NOT_FOUND,
-            Error::DuplicateResource => StatusCode::CONFLICT,
-            Error::InvalidAuthentication(_) => StatusCode::UNAUTHORIZED,
-            Error::InsufficientPermissionsError => StatusCode::FORBIDDEN,
-            _ => StatusCode::INTERNAL_SERVER_ERROR
-        };
-        let payload = json!({"message": err.to_string()});
-        (status, Json(payload))
+        (status, body).into_response()
     }
 }

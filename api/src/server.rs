@@ -9,7 +9,7 @@ use axum::{
     http::Request,
     response::Response,
     routing::{get, post},
-    Router, Server,Json,
+    Router, Server,
 };
 use hyper::Body;
 use std::{
@@ -76,15 +76,17 @@ pub async fn start(config: &AppConfig) -> Result<()> {
 
     let app = Router::new()
         .route("/health", get(handlers::health))
-        .route("/v1/registrations", post(handlers::registration_create))
-        .route("/users", post(handlers::create_user))
-        .route("/users/:id", get(handlers::user_summary))
-        .route("/login", post(handlers::login))
-        .route("/whoami/:id", get(handlers::whoami))
-        .route("/reset", post(handlers::reset_pwd).put(handlers::update_pwd))
-        .route("/refresh", post(handlers::refresh))
-        .route("/authy/register", post(handlers::authy_register))
-        .route("/authy/verify", post(handlers::authy_verify))
+        .route("/v1/users", post(handlers::create_user))
+        .route("/v1/users/:id", get(handlers::user_summary))
+        .route("/v1/login", post(handlers::login))
+        .route("/v1/whoami/:id", get(handlers::whoami))
+        .route(
+            "/v1/reset",
+            post(handlers::reset_pwd).put(handlers::update_pwd),
+        )
+        .route("/v1/refresh", post(handlers::refresh))
+        .route("/v1/authy/register", post(handlers::authy_register))
+        .route("/v1/authy/verify", post(handlers::authy_verify))
         // .route("/authy/qr", post(handlers::authy_qr))
         .layer(Extension(pool))
         .layer(
@@ -146,4 +148,3 @@ pub async fn start(config: &AppConfig) -> Result<()> {
 
     Ok(())
 }
-

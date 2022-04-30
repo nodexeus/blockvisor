@@ -1,34 +1,22 @@
-
-use std::fmt;
-use std::str::FromStr;
-
+use crate::auth;
+use crate::errors::AppError;
+use crate::result::Result;
 use anyhow::anyhow;
 use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
-    password_hash::{PasswordHasher, rand_core::OsRng, SaltString},
 };
 use authy::api::user;
 use authy::Client;
 use chrono::{DateTime, Utc};
-use sendgrid::v3::{
-    Content,
-    Email,
-    Message,
-    Personalization,
-    Sender};
+use sendgrid::v3::{Content, Email, Message, Personalization, Sender};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgConnection, PgPool, postgres::PgRow, Row, Type};
+use sqlx::{postgres::PgRow, FromRow, PgConnection, PgPool, Row};
+use std::{fmt, str::FromStr};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::auth;
-use crate::errors::{Error, Result};
-
 type AuthyUserApi = authy::User;
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
@@ -36,6 +24,46 @@ use uuid::Uuid;
 pub enum UserOrgRole {
     Admin,
     Owner,
+}
+
+impl fmt::Display for UserOrgRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admin => write!(f, "admin"),
+            Self::Owner => write!(f, "owner"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(type_name = "enum_user_role", rename_all = "snake_case")]
+pub enum UserRole {
+    User,
+    Host,
+    Admin,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admin => write!(f, "admin"),
+            Self::Host => write!(f, "host"),
+            Self::User => write!(f, "user"),
+        }
+    }
+}
+
+impl FromStr for UserRole {
+    type Err = AppError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "admin" => Ok(Self::Admin),
+            "host" => Ok(Self::Host),
+            _ => Ok(Self::User),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
@@ -72,9 +100,7 @@ pub struct User {
 impl From<PgRow> for User {
     fn from(row: PgRow) -> Self {
         User {
-            id: row
-                .try_get("id")
-                .expect("Couldn't try_get id for user."),
+            id: row.try_get("id").expect("Couldn't try_get id for user."),
             first_name: row
                 .try_get("first_name")
                 .expect("Couldn't try_get first_name for user."),
@@ -107,7 +133,6 @@ impl From<PgRow> for User {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct UserSummary {
     pub id: Uuid,
@@ -115,7 +140,6 @@ pub struct UserSummary {
     pub last_name: String,
     pub email: String,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct UserLoginRequest {
@@ -136,31 +160,12 @@ pub struct PasswordResetRequest {
     pub email: String,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct PwdResetInfo {
     pub token: String,
     #[validate(length(min = 8), must_match = "password_confirm")]
     pub password: String,
     pub password_confirm: String,
-}
-
-
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case")]
-#[sqlx(type_name = "enum_org_role", rename_all = "snake_case")]
-pub enum UserOrgRole {
-    Admin,
-    Owner,
-}
-
-impl fmt::Display for UserOrgRole {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Admin => write!(f, "admin"),
-            Self::Owner => write!(f, "owner"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -177,12 +182,13 @@ impl User {
     pub async fn create_user(req: RegistrationReq, db_pool: &PgPool) -> Result<Self> {
         let _ = req
             .validate()
-            .map_err(|e| Error::ValidationError(e.to_string()));
+            .map_err(|e| AppError::ValidationError(e.to_string()));
 
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut OsRng);
         if let Some(hashword) = argon2
-            .hash_password(req.password.as_bytes(), salt.as_str())?
+            .hash_password(req.password.as_bytes(), salt.as_str())
+            .map_err(|_| anyhow!("Hashing error"))?
             .hash
         {
             let mut tx = db_pool.begin().await?;
@@ -195,19 +201,17 @@ impl User {
                     Lower($1), $2, $3, $4, $5
                 )
                    RETURNING *
-                "#
+                "#,
             )
-                .bind(req.email)
-                .bind(hashword.to_string())
-                .bind(salt.as_str())
-                .bind(req.first_name)
-                .bind(req.last_name)
-                .fetch_one(&mut tx)
-                .await
-                .map(|row: PgRow| {
-                    Self::from(row)
-                })
-                .map_err(Error::from);
+            .bind(req.email)
+            .bind(hashword.to_string())
+            .bind(salt.as_str())
+            .bind(req.first_name)
+            .bind(req.last_name)
+            .fetch_one(&mut tx)
+            .await
+            .map(|row: PgRow| Self::from(row))
+            .map_err(AppError::from);
 
             let mut user = result.unwrap();
             let organization = req.organization.unwrap();
@@ -215,13 +219,12 @@ impl User {
 
             Org::create_orgs_users_owner(org.id, user.id, &mut tx).await?;
 
-
             user.orgs = Some(Org::find_all_by_user(user.id, &mut tx).await?);
 
             tx.commit().await?;
             Ok(user)
         } else {
-            Err(Error::ValidationError("Invalid password.".to_string()))
+            Err(AppError::ValidationError("Invalid password.".to_string()))
         }
     }
 
@@ -230,7 +233,7 @@ impl User {
             .await?
             .set_jwt()
             .map_err(|_e| {
-                Error::InvalidAuthentication(anyhow!("Email or password is invalid."))
+                AppError::InvalidAuthentication(anyhow!("Email or password is invalid."))
             })?;
         let _ = user.verify_password(&user_login_req.password)?;
         Ok(user)
@@ -243,15 +246,13 @@ impl User {
                     FROM   users
                     WHERE  Lower(email) = Lower($1)
                     LIMIT  1
-                    "#
+                    "#,
         )
-            .bind(email)
-            .fetch_one(&mut tx)
-            .await
-            .map(|row: PgRow| {
-                Self::from(row)
-            })
-            .map_err(Error::from);
+        .bind(email)
+        .fetch_one(&mut tx)
+        .await
+        .map(|row: PgRow| Self::from(row))
+        .map_err(AppError::from);
         let mut user = user.unwrap();
         user.orgs = Some(Org::find_all_by_user(user.id, &mut tx).await?);
         tx.commit().await?;
@@ -268,30 +269,30 @@ impl User {
                 users
             WHERE
                 users.id = $1
-            "#
+            "#,
         )
-            .bind(user_id)
-            .fetch_one(db_pool)
-            .await?;
+        .bind(user_id)
+        .fetch_one(db_pool)
+        .await?;
 
         Ok(user)
     }
 
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<User> {
-        let user = sqlx::query(r#"SELECT * FROM users WHERE id = $1 limit 1"#
-        )
+        let user = sqlx::query(r#"SELECT * FROM users WHERE id = $1 limit 1"#)
             .bind(id)
             .fetch_one(pool)
             .await
-            .map(|row: PgRow| {
-                Self::from(row)
-            })
-            .map_err(Error::from);
+            .map(|row: PgRow| Self::from(row))
+            .map_err(AppError::from);
         Ok(user.unwrap())
     }
 
     pub async fn refresh(req: UserRefreshRequest, pool: &PgPool) -> Result<User> {
-        let user = User::find_by_refresh(&req.refresh, pool).await?.set_jwt().map_err(Error::from)?;
+        let user = User::find_by_refresh(&req.refresh, pool)
+            .await?
+            .set_jwt()
+            .map_err(AppError::from)?;
         Ok(user)
     }
     pub async fn find_by_refresh(refresh: &str, pool: &PgPool) -> Result<User> {
@@ -299,13 +300,10 @@ impl User {
             .bind(refresh)
             .fetch_one(pool)
             .await
-            .map(|row: PgRow| {
-                Self::from(row)
-            })
-            .map_err(Error::from);
+            .map(|row: PgRow| Self::from(row))
+            .map_err(AppError::from);
         Ok(user.unwrap())
     }
-
 
     pub async fn email_reset_password(req: PasswordResetRequest, db_pool: &PgPool) -> Result<()> {
         let user = User::find_by_email(&req.email, db_pool).await?;
@@ -328,7 +326,7 @@ impl User {
             https://console.blockjoy.com/reset?t={token}</a>.</p><br /><br /><p>Thank You!</p>"##
         );
         let sendgrid_api_key = dotenv::var("SENDGRID_API_KEY").map_err(|_| {
-            Error::UnexpectedError(anyhow!("Could not find SENDGRID_API_KEY in env."))
+            AppError::UnexpectedError(anyhow!("Could not find SENDGRID_API_KEY in env."))
         })?;
         let sender = Sender::new(sendgrid_api_key);
         let m = Message::new(Email::new("BlockJoy <hello@blockjoy.com>"))
@@ -339,32 +337,31 @@ impl User {
         sender
             .send(&m)
             .await
-            .map_err(|_| Error::UnexpectedError(anyhow!("Could not send email")))?;
+            .map_err(|_| AppError::UnexpectedError(anyhow!("Could not send email")))?;
 
         Ok(())
     }
 
-
     pub async fn reset_password(req: &PwdResetInfo, db_pool: &PgPool) -> Result<User> {
         let _ = req
             .validate()
-            .map_err(|e| Error::ValidationError(e.to_string()))?;
+            .map_err(|e| AppError::ValidationError(e.to_string()))?;
 
         match auth::validate_jwt(&req.token)? {
             auth::JwtValidationStatus::Valid(auth_data) => {
                 let user = User::find_by_id(auth_data.user_id, db_pool).await?;
                 return User::update_password(user, &req.password, db_pool).await;
             }
-            _ => Err(Error::InsufficientPermissionsError),
+            _ => Err(AppError::InsufficientPermissionsError),
         }
     }
-
 
     pub async fn update_password(user: User, password: &str, pool: &PgPool) -> Result<Self> {
         let argon2 = Argon2::default();
         let salt = SaltString::generate(&mut OsRng);
         if let Some(hashword) = argon2
-            .hash_password(password.as_bytes(), salt.as_str())?
+            .hash_password(password.as_bytes(), salt.as_str())
+            .map_err(|_| anyhow!("Hashing error"))?
             .hash
         {
             return sqlx::query(
@@ -376,29 +373,35 @@ impl User {
                 salt = $2
                 WHERE
                   id = $3 RETURNING *, '' as orgs
-                "#
+                "#,
             )
-                .bind(hashword.to_string())
-                .bind(salt.as_str())
-                .bind(user.id)
-                .map(|row: PgRow| {
-                    Self::from(row)
-                })
-                .fetch_one(pool).await.map_err(Error::from).unwrap().set_jwt();
+            .bind(hashword.to_string())
+            .bind(salt.as_str())
+            .bind(user.id)
+            .map(|row: PgRow| Self::from(row))
+            .fetch_one(pool)
+            .await
+            .map_err(AppError::from)
+            .unwrap()
+            .set_jwt();
         }
 
-        Err(Error::ValidationError("Invalid password.".to_string()))
+        Err(AppError::ValidationError("Invalid password.".to_string()))
     }
     pub fn verify_password(&self, password: &str) -> Result<()> {
         let argon2 = Argon2::default();
-        let parsed_hash = argon2.hash_password(password.as_bytes(), &self.salt)?;
+        let parsed_hash = argon2
+            .hash_password(password.as_bytes(), &self.salt)
+            .map_err(|_| anyhow!("Hashing error"))?;
 
         if let Some(output) = parsed_hash.hash {
             if self.hashword == output.to_string() {
                 return Ok(());
             }
         }
-        Err(Error::InvalidAuthentication(anyhow!("Invalid email or password.")))
+        Err(AppError::InvalidAuthentication(anyhow!(
+            "Invalid email or password."
+        )))
     }
 
     pub fn set_jwt(&mut self) -> Result<Self> {
@@ -419,7 +422,7 @@ impl Org {
             .bind(name)
             .fetch_one(tx)
             .await
-            .map_err(Error::from)
+            .map_err(AppError::from)
     }
 
     pub async fn find_all_by_user(user_id: Uuid, tx: &mut PgConnection) -> Result<Vec<Self>> {
@@ -429,44 +432,51 @@ impl Org {
             .bind(user_id)
             .fetch_all(tx)
             .await
-            .map_err(Error::from)
+            .map_err(AppError::from)
     }
 
-    pub async fn create_orgs_users_owner(org_id: Uuid, user_id: Uuid, tx: &mut PgConnection) -> Result<()> {
-        let result = sqlx::query
-            (
-                r#"
+    pub async fn create_orgs_users_owner(
+        org_id: Uuid,
+        user_id: Uuid,
+        tx: &mut PgConnection,
+    ) -> Result<()> {
+        let _result = sqlx::query(
+            r#"
             INSERT INTO
             orgs_users (orgs_id, users_id, role)
             values
             (
                 $1, $2, $3
             )
-            "#
-            )
-            .bind(org_id)
-            .bind(user_id)
-            .bind(UserOrgRole::Owner)
-
-            .execute(tx)
-            .await
-            .map_err(Error::from);
+            "#,
+        )
+        .bind(org_id)
+        .bind(user_id)
+        .bind(UserOrgRole::Owner)
+        .execute(tx)
+        .await
+        .map_err(AppError::from);
 
         Ok(())
     }
 }
 
-
 #[derive(Debug, Copy, Clone)]
 pub struct AuthyUser;
 
 impl AuthyUser {
-    pub async fn register(client: &Client, authy_reg_req: &AuthyRegistrationReq) -> Result<AuthyIDReq> {
-        let (_, user) = user::create(&client,
-                                     authy_reg_req.email.as_str(),
-                                     authy_reg_req.country_code,
-                                     authy_reg_req.phone.as_str(),
-                                     false).unwrap();
+    pub async fn register(
+        client: &Client,
+        authy_reg_req: &AuthyRegistrationReq,
+    ) -> Result<AuthyIDReq> {
+        let (_, user) = user::create(
+            &client,
+            authy_reg_req.email.as_str(),
+            authy_reg_req.country_code,
+            authy_reg_req.phone.as_str(),
+            false,
+        )
+        .unwrap();
         Ok(AuthyIDReq::new(user.id))
     }
 
@@ -479,13 +489,10 @@ impl AuthyUser {
         let result = user.verify(&client, authy_verify_req.token.as_str());
         match result {
             Ok(verifies) => Ok(verifies),
-            Err(_) => {
-                Err(Error::ValidationError("Invalid token.".to_string()))
-            }
+            Err(_) => Err(AppError::ValidationError("Invalid token.".to_string())),
         }
     }
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthyRegistrationReq {
@@ -509,23 +516,4 @@ impl AuthyIDReq {
 pub struct AuthyVerifyReq {
     pub authy_id: u32,
     pub token: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct User {
-    pub id: Uuid,
-    pub first_name: String,
-    pub last_name: String,
-    pub email: String,
-    pub orgs: Option<Vec<Org>>,
-    #[serde(skip_serializing)]
-    pub hashword: String,
-    #[serde(skip_serializing)]
-    pub salt: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refresh: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
