@@ -10,7 +10,7 @@ COPY ./ /app
 RUN cargo build --release
 RUN strip target/release/api
 
-# use a plain alpine image, the alpine version needs to match the builder
+# NOTE: use a plain alpine image, the alpine version needs to match the builder
 FROM alpine:3.15
 
 RUN apk add --no-cache libgcc
