@@ -31,7 +31,6 @@ pub struct AppConfig {
     /// Configuration pertaining specifically to authy 2FA
     #[serde(default)]
     pub authy: AuthyConfig,
-
 }
 
 impl AppConfig {
@@ -67,7 +66,6 @@ pub struct DatabaseConfig {
 
 fn default_database_url() -> Secret<String> {
     Secret::new("postgresql://postgres:postgres@localhost/blockvisor_dev".to_owned())
-
 }
 
 impl Default for DatabaseConfig {
