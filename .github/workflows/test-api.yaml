@@ -1,17 +1,19 @@
-name: Rust
+name: API
 
 on:
   push:
-      branches: [main]
-      pull_request:
-        branches: [main]
-      paths:
+    branches: [main]
+    paths:
       - "api/**"
-      
-      env:
-      SQLX_OFFLINE: true
-    
-    jobs:
+  pull_request:
+    branches: [main]
+    paths:
+      - "api/**"
+
+env:
+  SQLX_OFFLINE: true
+
+jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -21,7 +23,7 @@ on:
         env:
           POSTRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: blockvisor
+          POSTGRES_DB: stakejoy
         ports:
           # Port expected by integration tests
           - 10891:5432
@@ -32,7 +34,7 @@ on:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:10891/blockvisor
+      DATABASE_URL: postgres://postgres:postgres@localhost:10891/stakejoy
 
     steps:
       - uses: actions/checkout@v2
@@ -75,4 +77,3 @@ on:
         with:
           command: clippy
           args: --tests -- -D warnings
-
