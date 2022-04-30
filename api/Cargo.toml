@@ -26,6 +26,7 @@ futures-util = "0.3.15"
 headers = "0.3"
 jsonwebtoken = "7.2.0"
 log = "0.4.14"
+opentelemetry-otlp = {version = "0.10.0", optional = true, features = ["metrics", "tls", "trace"], default-features = false}
 sendgrid = {version = "0.17.4", default-features = false, features = ["rustls", "async"]}
 thiserror = "1.0.30"
 tokio = {version = "1.17.0", features = ["full"]}
@@ -39,3 +40,4 @@ validator = {version = "0.13.0", features = ["derive"]}
 
 [features]
 default = ["tracing/release_max_level_debug"]
+otel = ["opentelemetry", "opentelemetry-otlp", "opentelemetry-otlp/tonic"]
