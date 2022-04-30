@@ -1,0 +1,78 @@
+name: Rust
+
+on:
+  push:
+      branches: [main]
+      pull_request:
+        branches: [main]
+      paths:
+      - "api/**"
+      
+      env:
+      SQLX_OFFLINE: true
+    
+    jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blockvisor
+        ports:
+          # Port expected by integration tests
+          - 10891:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:10891/blockvisor
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Install sqlx-cli
+        run: >
+          cargo install sqlx-cli --features postgres
+      - name: Migrate
+        uses: actions-rs/cargo@v1
+        with:
+          command: sqlx
+          args: migrate run
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -- test-threads=1
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy, rustfmt
+          override: true
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
+      - name: Catch common mistakes
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --tests -- -D warnings
+
