@@ -9,18 +9,24 @@ opt-level = 3
 
 [dependencies]
 anyhow = "1.0.56"
-axum = { version = "0.5.1", features = ["headers"] }
+axum = {version = "0.5.1", features = ["headers"]}
 chrono = {version = "0.4.19", features = ["serde"]}
 config = "0.13.0"
 dotenv = "0.15.0"
 hyper = {version = "0.14.18", features = []}
 opentelemetry = {version = "0.17.0", optional = true, features = ["rt-tokio", "metrics", "trace"]}
-opentelemetry-otlp = {version = "0.10.0", optional = true, features = ["metrics", "tls", "trace"], default-features = false}
 secrecy = {version = "0.8.0", features = ["serde"]}
 serde = "1.0.136"
 serde_json = "1.0.79"
 sqlx = {version = "0.5.13", features = ["postgres", "runtime-tokio-rustls", "migrate", "chrono", "uuid"]}
 
+argon2 = "0.4.0"
+authy = "0.9.8"
+futures-util = "0.3.15"
+headers = "0.3"
+jsonwebtoken = "7.2.0"
+log = "0.4.14"
+sendgrid = {version = "0.17.4", default-features = false, features = ["rustls", "async"]}
 thiserror = "1.0.30"
 tokio = {version = "1.17.0", features = ["full"]}
 tower = {version = "0.4.12", features = []}
@@ -29,15 +35,7 @@ tracing = "0.1.32"
 tracing-opentelemetry = "0.17.2"
 tracing-subscriber = {version = "0.3.10", features = ["env-filter", "json"]}
 uuid = {version = "0.8.2", features = ["v4", "serde"]}
-validator = { version = "0.13.0", features = ["derive"] }
-argon2 = "0.4.0"
-jsonwebtoken = "7.2.0"
-sendgrid = { version = "0.17.4", default-features = false, features = ["rustls", "async"] }
-futures-util = "0.3.15"
-log = "0.4.14"
-headers = "0.3"
-authy = "0.9.8"
+validator = {version = "0.13.0", features = ["derive"]}
 
 [features]
 default = ["tracing/release_max_level_debug"]
-otel = ["opentelemetry", "opentelemetry-otlp", "opentelemetry-otlp/tonic"]

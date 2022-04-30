@@ -12,3 +12,11 @@
 Dockerfile*
 docker-compose.yml
 shared
+
+
+**/.env*
+**/.git
+**/.gitignore
+**/docker-compose.yml
+
+Makefile
