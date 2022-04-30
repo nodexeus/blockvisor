@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "api/**"
+      - "api/**.rs"
   pull_request:
     branches: [main]
     paths:
-      - "api/**"
+      - "api/**.rs"
 
 env:
   SQLX_OFFLINE: true
