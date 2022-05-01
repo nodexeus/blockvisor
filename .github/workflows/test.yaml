@@ -27,7 +27,7 @@ jobs:
         env:
           POSTRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: stakejoy
+          POSTGRES_DB: blockvisor
         ports:
           # Port expected by integration tests
           - 10891:5432
@@ -38,7 +38,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:10891/stakejoy
+      DATABASE_URL: postgres://postgres:postgres@localhost:10891/blockvisor
 
     steps:
       - uses: actions/checkout@v2
