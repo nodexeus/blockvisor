@@ -2,6 +2,7 @@ use crate::{config::AppConfig, db};
 use secrecy::Secret;
 use sqlx::PgPool;
 
+#[allow(dead_code)]
 pub(crate) async fn test_db() -> anyhow::Result<PgPool> {
     let mut config = AppConfig::new()?;
     config.database.url =
