@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: api
+        working-directory: ./api
     services:
       postgres:
         image: postgres:12
@@ -55,9 +55,9 @@ jobs:
           cargo install sqlx-cli --features postgres
       - name: Migrate
         uses: actions-rs/cargo@v1
-        with:
-          command: sqlx
-          args: migrate run
+        run:
+          sqlx migrate run
+        working-directory: ./api
       - name: Test
         uses: actions-rs/cargo@v1
         with:
