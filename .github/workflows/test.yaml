@@ -7,6 +7,7 @@ on:
       - "master"
     paths:
       - "api/**.rs"
+      - ".github/workflows/**"
   pull_request:
     branches:
       - "main"
@@ -54,9 +55,8 @@ jobs:
         run: >
           cargo install sqlx-cli --features postgres
       - name: Migrate
-        uses: actions-rs/cargo@v1
-        run:
-          sqlx migrate run
+        #uses: actions-rs/cargo@v1
+        run: sqlx migrate run
         working-directory: ./api
       - name: Test
         uses: actions-rs/cargo@v1
