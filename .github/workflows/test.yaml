@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        # Mobile folder working directory.
         working-directory: api
     services:
       postgres:
