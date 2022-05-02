@@ -2,7 +2,7 @@ import autoPreprocess from 'svelte-preprocess';
 import path from 'path';
 import fs from 'fs';
 import svg from '@poppanator/sveltekit-svg';
-import cloudflare from '@sveltejs/adapter-cloudflare';
+import auto from "@sveltejs/adapter-auto";
 
 const mediaQueries = fs
   .readFileSync('./src/styles/_internal.media.pcss')
@@ -21,10 +21,9 @@ const config = {
   ],
 
   kit: {
-    adapter: cloudflare(),
+    adapter: auto(),
 
     // hydrate the <div id="svelte"> element in src/app.html
-    target: '#svelte',
     vite: {
       plugins: [
         svg({
