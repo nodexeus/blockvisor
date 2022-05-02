@@ -14,7 +14,7 @@
   "devDependencies": {
     "@poppanator/sveltekit-svg": "^0.2.2",
     "@sveltejs/adapter-auto": "next",
-    "@sveltejs/adapter-cloudflare": "^1.0.0-next.9",
+    "@sveltejs/adapter-cloudflare": "^1.0.0-next.19",
     "@sveltejs/kit": "next",
     "@tsconfig/svelte": "^2.0.1",
     "@types/animejs": "^3.1.4",
