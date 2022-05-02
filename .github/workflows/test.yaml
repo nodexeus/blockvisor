@@ -80,4 +80,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -p api --tests -- -D warnings
+          args: -p api -- -D warnings
