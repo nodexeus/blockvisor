@@ -8,12 +8,12 @@ WORKDIR /app
 COPY ./ /app
 
 RUN cargo build --release
-RUN strip target/release/api
+RUN strip target/release/blockvisor-api
 
 # NOTE: use a plain alpine image, the alpine version needs to match the builder
 FROM alpine:3.15
 
 RUN apk add --no-cache libgcc
-COPY --from=0 /app/target/release/api .
+COPY --from=0 /app/target/release/blockvisor-api .
 
-ENTRYPOINT ["/api"]
+ENTRYPOINT ["/blockvisor-api"]

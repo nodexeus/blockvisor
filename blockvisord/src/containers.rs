@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
+#[allow(dead_code)]
 pub enum ContainerStatus {
     Created,
 }

@@ -210,7 +210,7 @@ impl User {
             .bind(req.last_name)
             .fetch_one(&mut tx)
             .await
-            .map(|row: PgRow| Self::from(row))
+            .map(Self::from)
             .map_err(AppError::from);
 
             let mut user = result.unwrap();
@@ -251,7 +251,7 @@ impl User {
         .bind(email)
         .fetch_one(&mut tx)
         .await
-        .map(|row: PgRow| Self::from(row))
+        .map(Self::from)
         .map_err(AppError::from);
         let mut user = user.unwrap();
         user.orgs = Some(Org::find_all_by_user(user.id, &mut tx).await?);
@@ -283,7 +283,7 @@ impl User {
             .bind(id)
             .fetch_one(pool)
             .await
-            .map(|row: PgRow| Self::from(row))
+            .map(Self::from)
             .map_err(AppError::from);
         Ok(user.unwrap())
     }
@@ -300,7 +300,7 @@ impl User {
             .bind(refresh)
             .fetch_one(pool)
             .await
-            .map(|row: PgRow| Self::from(row))
+            .map(Self::from)
             .map_err(AppError::from);
         Ok(user.unwrap())
     }
@@ -378,7 +378,7 @@ impl User {
             .bind(hashword.to_string())
             .bind(salt.as_str())
             .bind(user.id)
-            .map(|row: PgRow| Self::from(row))
+            .map(Self::from)
             .fetch_one(pool)
             .await
             .map_err(AppError::from)
@@ -470,7 +470,7 @@ impl AuthyUser {
         authy_reg_req: &AuthyRegistrationReq,
     ) -> Result<AuthyIDReq> {
         let (_, user) = user::create(
-            &client,
+            client,
             authy_reg_req.email.as_str(),
             authy_reg_req.country_code,
             authy_reg_req.phone.as_str(),
@@ -485,8 +485,8 @@ impl AuthyUser {
     }
 
     pub async fn verify(client: &Client, authy_verify_req: &AuthyVerifyReq) -> Result<bool> {
-        let mut user = AuthyUserApi::find(&client, authy_verify_req.authy_id).unwrap();
-        let result = user.verify(&client, authy_verify_req.token.as_str());
+        let mut user = AuthyUserApi::find(client, authy_verify_req.authy_id).unwrap();
+        let result = user.verify(client, authy_verify_req.token.as_str());
         match result {
             Ok(verifies) => Ok(verifies),
             Err(_) => Err(AppError::ValidationError("Invalid token.".to_string())),

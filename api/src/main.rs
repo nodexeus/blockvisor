@@ -1,5 +1,5 @@
 use anyhow::Result;
-use api::{config::AppConfig, server, telemetry};
+use blockvisor_api::{config::AppConfig, server, telemetry};
 use tracing::debug;
 
 #[tokio::main]

@@ -53,40 +53,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4361135be9122e0870de935d7c439aef945b9f9ddd4199a553b5270b49c82a27"
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "argon2",
- "authy",
- "axum",
- "chrono",
- "config",
- "dotenv",
- "futures-util",
- "headers",
- "hyper 0.14.18",
- "jsonwebtoken",
- "log",
- "opentelemetry",
- "opentelemetry-otlp",
- "secrecy",
- "sendgrid",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror",
- "tokio 1.17.0",
- "tower",
- "tower-http",
- "tracing",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "uuid 0.8.2",
- "validator",
-]
-
-[[package]]
 name = "argon2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -311,6 +277,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
 dependencies = [
  "byte-tools",
+]
+
+[[package]]
+name = "blockvisor-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "argon2",
+ "authy",
+ "axum",
+ "chrono",
+ "config",
+ "dotenv",
+ "futures-util",
+ "headers",
+ "hyper 0.14.18",
+ "jsonwebtoken",
+ "log",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "secrecy",
+ "sendgrid",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio 1.17.0",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "uuid 0.8.2",
+ "validator",
 ]
 
 [[package]]

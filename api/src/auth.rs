@@ -14,7 +14,6 @@ use sqlx::PgPool;
 use std::borrow::Cow;
 use std::env;
 use std::str::FromStr;
-use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 const JWT_SECRET: &str = "?G'A$jNW<$6x(PdFP?4VdRvmotIV^^";
@@ -35,7 +34,7 @@ pub enum JwtValidationStatus {
 struct Claims {
     sub: String,
     role: String,
-    exp: usize,
+    exp: i64,
 }
 
 /// Creates a jwt with default duration for expires.
@@ -58,7 +57,7 @@ pub fn create_jwt_with_duration(data: &UserAuthData, duration: chrono::Duration)
     let claims = Claims {
         sub: data.user_id.to_string(),
         role: data.user_role.clone(),
-        exp: exp as usize,
+        exp,
     };
 
     let header = Header::new(Algorithm::HS512);
@@ -74,7 +73,7 @@ pub fn validate_jwt(jwt: &str) -> Result<JwtValidationStatus> {
         leeway: 60,
         validate_exp: false,
         algorithms: vec![Algorithm::HS512],
-        ..Default::default()
+        ..jsonwebtoken::Validation::default()
     };
 
     let result = match decode::<Claims>(
@@ -92,7 +91,7 @@ pub fn validate_jwt(jwt: &str) -> Result<JwtValidationStatus> {
             // Check Expiration
             let exp = decoded.claims.exp;
             let now = get_current_timestamp();
-            if (exp as u64) < now - 60 {
+            if exp < now - 60 {
                 JwtValidationStatus::Expired(auth_data)
             } else {
                 JwtValidationStatus::Valid(auth_data)
@@ -109,12 +108,8 @@ fn jwt_secret() -> String {
     env::var("JWT_SECRET").unwrap_or_else(|_| JWT_SECRET.to_string())
 }
 
-fn get_current_timestamp() -> u64 {
-    let start = SystemTime::now();
-    start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs()
+fn get_current_timestamp() -> i64 {
+    Utc::now().timestamp()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
@@ -133,6 +128,7 @@ pub enum Authentication {
 }
 
 impl Authentication {
+    #[must_use]
     pub fn is_user(&self) -> bool {
         matches!(self, Self::User(_))
     }
@@ -140,6 +136,7 @@ impl Authentication {
         matches!(self, Self::User(u) if u.role == UserRole::Admin)
     }
 
+    #[must_use]
     pub fn is_service(&self) -> bool {
         matches!(self, Self::Service(_))
     }
