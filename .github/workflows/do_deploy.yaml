@@ -13,6 +13,10 @@ jobs:
   build:
     name: Build, push, and deploy
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    
     steps:
       - name: Checkout main
         uses: actions/checkout@v2
