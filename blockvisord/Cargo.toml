@@ -6,9 +6,14 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "bv"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.56"
 async-trait = "0.1.53"
-clap = "3.1.7"
+camino = "1.0.7"
+clap = {version = "3.1.15", features = ["derive"]}
 fork = "0.1.19"
 tokio = {version = "1.17.0", features = ["full"]}
