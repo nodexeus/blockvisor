@@ -14,7 +14,13 @@ path = "src/main.rs"
 anyhow = "1.0.56"
 async-trait = "0.1.53"
 camino = "1.0.7"
+chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive"]}
 daemonize = "0.4.1"
 reqwest = "0.11.10"
+serde = "1.0.136"
+serde_json = "1.0.79"
 tokio = {version = "1.17.0", features = ["full"]}
+
+[dev-dependencies]
+httpmock = "0.6"
