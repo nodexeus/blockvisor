@@ -18,8 +18,6 @@
 
   $: hasGroups = false;
 
-  console.log($selectedNode);
-
   $: {
     fetchNodeById($page.params.id);
   }
