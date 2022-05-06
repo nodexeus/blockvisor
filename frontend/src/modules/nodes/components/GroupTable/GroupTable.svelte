@@ -2,7 +2,7 @@
   import Sorter from 'components/Sorter/Sorter.svelte';
   import NodeDataRow from 'modules/nodes/components/GroupTable/NodeDataRow.svelte';
 
-  export let nodes;
+  export let nodes: [];
 
   let sortActive;
 

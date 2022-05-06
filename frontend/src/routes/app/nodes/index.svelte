@@ -15,6 +15,8 @@
   import { ROUTES } from 'consts/routes';
   import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
   import Button from 'components/Button/Button.svelte';
+  import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
+  import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -28,6 +30,8 @@
       },
     ]);
   });
+
+  fetchAllNodes();
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -61,32 +65,7 @@
 </ActionTitleHeader>
 
 <ul class="u-list-reset nodes__group">
-  <li class="nodes__group-item">
-    <NodeGroup id="group-1" nodes={52}>
-      <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-      <svelte:fragment slot="title">Node group 1</svelte:fragment>
-      <Button
-        asLink
-        href={ROUTES.NODE_GROUP('group-1')}
-        style="outline"
-        size="small"
-        slot="action">View</Button
-      >
-    </NodeGroup>
-  </li>
-  <li class="nodes__group-item">
-    <NodeGroup id="group-2" nodes={42}>
-      <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-      <svelte:fragment slot="title">Node group 2</svelte:fragment>
-      <Button
-        asLink
-        href={ROUTES.NODE_GROUP('group-2')}
-        style="outline"
-        size="small"
-        slot="action">View</Button
-      >
-    </NodeGroup>
-  </li>
+  <p>No nodes selected.</p>
 </ul>
 
 <style>
