@@ -87,15 +87,17 @@ async fn work(daemonized: bool) {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{APIClient, CommandStatusUpdate, HostInfo};
+    use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
     use chrono::{TimeZone, Utc};
     use httpmock::prelude::*;
     use serde_json::json;
     use std::time::Duration;
+    use uuid::Uuid;
 
     #[test]
     fn test_register_host() {
         let server = MockServer::start();
+        let org_id = Uuid::new_v4();
 
         let m = server.mock(|when, then| {
             when.method(POST)
@@ -103,15 +105,17 @@ mod tests {
                 .header("Content-Type", "application/json")
                 .header("authorization", "Bearer OTP")
                 .json_body(json!({
+                    "org_id": org_id,
                     "name": "some-host",
                     "version": "1.0",
+                    "location": null,
+                    "cpu_count": 4_i64,
+                    "mem_size": 8_i64,
+                    "disk_size": 100_i64,
+                    "os": "ubuntu",
+                    "os_version": "4.14.12",
                     "ip_addr": "192.168.0.1",
-                    "os_flavor": "ubuntu",
-                    "os_kernel_version": "4.14.12",
-                    "cpu_count": 4,
-                    "mem_size": 8,
-                    "hostname": "host",
-                    "disk_size": 100,
+                    "val_ip_addrs": null,
                 }));
             then.status(200)
                 .header("Content-Type", "application/json")
@@ -123,17 +127,18 @@ mod tests {
 
         let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
         let otp = "OTP";
-        let info = HostInfo {
+        let info = HostCreateRequest {
+            org_id: Some(org_id),
             name: "some-host".to_string(),
             version: Some("1.0".to_string()),
             location: None,
+            cpu_count: Some(4),
+            mem_size: Some(8),
+            disk_size: Some(100),
+            os: Some("ubuntu".to_string()),
+            os_version: Some("4.14.12".to_string()),
             ip_addr: "192.168.0.1".to_string(),
-            os_flavor: "ubuntu".to_string(),
-            os_kernel_version: "4.14.12".to_string(),
-            cpu_count: 4,
-            mem_size: 8,
-            hostname: "host".to_string(),
-            disk_size: 100,
+            val_ip_addrs: None,
         };
         let resp = client.register_host(otp, &info).unwrap();
 

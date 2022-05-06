@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use uuid::Uuid;
 
 pub struct APIClient {
     inner: reqwest::blocking::Client,
@@ -19,9 +20,9 @@ impl APIClient {
         })
     }
 
-    pub fn register_host(&self, otp: &str, info: &HostInfo) -> Result<HostCredentials> {
+    pub fn register_host(&self, otp: &str, create: &HostCreateRequest) -> Result<HostCredentials> {
         let url = format!("{}/hosts", self.base_url.as_str().trim_end_matches('/'));
-        let body = serde_json::to_string(info)?;
+        let body = serde_json::to_string(create)?;
 
         let text = self
             .inner
@@ -83,19 +84,18 @@ impl APIClient {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct HostInfo {
+pub struct HostCreateRequest {
+    pub org_id: Option<Uuid>,
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
+    pub cpu_count: Option<i64>,
+    pub mem_size: Option<i64>,
+    pub disk_size: Option<i64>,
+    pub os: Option<String>,
+    pub os_version: Option<String>,
     pub ip_addr: String,
-    pub os_flavor: String,
-    pub os_kernel_version: String,
-    pub cpu_count: usize,
-    pub mem_size: usize,
-    pub hostname: String,
-    pub disk_size: usize,
+    pub val_ip_addrs: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
