@@ -11,14 +11,16 @@
   import IconDocument from 'icons/document-12.svg';
   import IconDots from 'icons/dots-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
+  import { formatDistanceToNow } from 'date-fns';
 
-  export let token;
-  export let id;
-  export let ip;
-  export let name;
-  export let added;
-  export let state;
-  const classes = ['table__row node-data-row', `node-data-row--${state}`].join(
+  export let token = 'eth';
+  export let id = '9b74c98979b74c9897';
+  export let ip_addr = '212.213.214.2';
+  export let name = 'YellowBeaver';
+  export let created_at = '5 weeks ago';
+  export let status = 'unstaked';
+
+  const classes = ['table__row node-data-row', `node-data-row--${status}`].join(
     ' ',
   );
 </script>
@@ -38,7 +40,7 @@
       </a>
     </div>
     <small class="t-small t-color-text-2 node-data-row__details-added"
-      >{added}</small
+      >{formatDistanceToNow(+new Date(created_at))}</small
     >
     <div class="node-data-row__info">
       <CopyNode value="abc">
@@ -48,14 +50,14 @@
           >{id}</small
         >
       </CopyNode>
-      <span class="t-small t-color-text-2">{ip}</span>
+      <span class="t-small t-color-text-2">{ip_addr}</span>
     </div>
   </td>
   <td class="t-small t-color-text-2 node-data-row__col node-data-row__added"
-    >{added}</td
+    >{formatDistanceToNow(+new Date(created_at))} ago</td
   >
   <td class="t-uppercase t-color-text-3 t-microlabel node-data-row__state">
-    <DataState {state} />
+    <DataState {status} />
   </td>
   <td class="node-data-row__action">
     <ButtonWithDropdown

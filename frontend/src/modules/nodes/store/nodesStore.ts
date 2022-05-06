@@ -4,7 +4,7 @@ import { NODES, USER_NODES } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
 
 export const nodes = writable([]);
-export const selectedNode = writable({});
+export const selectedNode = writable([]);
 
 const groupBy = (array, key) => {
   return array.reduce((result, currentValue) => {
@@ -19,7 +19,7 @@ const token =
   'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4OWI3MzgyMi04ODM3LTQ5NTAtOTA4Yy0zZTNiM2E4MjJlMzQiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE2NTE4NDA0MTV9.i_TPUQ7kN8mXJ5i793q3BcvcbYP_n_oNWU-OHjujzl4I0oxEIDbsNEHqcnJVm6sPZTgOV3SUHM-TjAqcWMNsdw';
 
 export const fetchAllNodes = async () => {
-  let all_nodes = [
+  const all_nodes = [
     {
       title: 'All Nodes',
       href: ROUTES.NODES,

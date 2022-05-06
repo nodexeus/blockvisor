@@ -7,6 +7,7 @@
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
 
   export let numberOfNodes: number;
+  export let nodes: [];
   export let id = 'js-group-graphic';
 
   /* Temp - generates random data for graphs */
@@ -49,7 +50,7 @@
       >
         <slot name="label" slot="label" />
       </MinimalLineGraph>
-      <GroupTable />
+      <GroupTable {nodes} />
     </div>
   {:else}
     <div class="node-group--empty">

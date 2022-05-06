@@ -13,7 +13,7 @@
   import Pagination from 'modules/app/components/Pagination/Pagination.svelte';
   import { USER_NODES } from 'modules/authentication/const';
   import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
-import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
+  import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
   import { onMount, afterUpdate } from 'svelte';
 
   let currentPage = 1;
@@ -23,16 +23,16 @@ import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
 
   let thisUserNodes = [];
 
- /*  onMount(() => {
+  /*  onMount(() => {
     fetchNodeById(id)
   }); */
 
- $: {
-   console.log("bča")
-  fetchNodeById(id);
- }
+  $: {
+    console.log('bča');
+    fetchNodeById(id);
+  }
 
-  console.log("currentNode", $selectedNode);
+  console.log('currentNode', $selectedNode);
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -61,7 +61,7 @@ import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
     </DropdownLinkList>
   </ButtonWithDropdown>
 </ActionTitleHeader>
-<NodeGroup {id} numberOfNodes={thisUserNodes.length}>
+<NodeGroup {id} numberOfNodes={thisUserNodes.length} nodes={$selectedNode}>
   <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
   <svelte:fragment slot="title">Node group 1</svelte:fragment>
 </NodeGroup>

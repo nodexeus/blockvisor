@@ -11,19 +11,18 @@
   import type { StateIconProps } from './StateIcon.svelte';
 
   const icons: { [key in NodeState | HostState]: string } = {
-    staking: IconChain,
     syncing: IconRefresh,
-    updating: IconUpdate,
+    synced: IconChain,
+    upgrading: IconUpdate,
     consensus: IconConsensus,
-    unstaked: IconChain,
-    disabled: IconIndicator,
+    stopped: IconIndicator,
     pending: IconStopwatch,
     normal: IconCheckmark,
     loaded: IconFlag,
     issue: IconExclamation,
   };
 
-  export let state: StateIconProps['state'];
+  export let state: StateIconProps['status'];
 
   $: icon = icons[state];
 </script>

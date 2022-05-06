@@ -2,6 +2,8 @@
   import Sorter from 'components/Sorter/Sorter.svelte';
   import NodeDataRow from 'modules/nodes/components/GroupTable/NodeDataRow.svelte';
 
+  export let nodes;
+
   const PLACEHOLDER_DATA = [
     {
       token: 'eth',
@@ -30,6 +32,8 @@
   ];
 
   let sortActive;
+
+  console.log(nodes);
 
   const handleSort = (id: string, value: SorterValues) => {
     sortActive = { id, value };
@@ -68,8 +72,8 @@
     </tr>
   </thead>
   <tbody>
-    {#each PLACEHOLDER_DATA as node}
-      <NodeDataRow {...node} />
+    {#each nodes as node}
+      <NodeDataRow {nodes} {...node} />
     {/each}
   </tbody>
 </table>

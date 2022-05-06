@@ -63,7 +63,7 @@
       ip: '212.213.214.2',
       node: 'a1234567890123456789012345678901234567890',
       added: '1h 22m',
-      state: 'staking',
+      state: 'staked',
       url: 'placeholder-node',
     },
     {
