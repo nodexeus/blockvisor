@@ -1,22 +1,14 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
-import { NODES, USER_NODES } from 'modules/authentication/const';
-import { writable } from 'svelte/store';
+import { NODE_GROUPS, USER_NODES } from 'modules/authentication/const';
+import { derived, writable } from 'svelte/store';
 
 export const nodes = writable([]);
+export const selectedUser = writable();
 export const selectedNode = writable([]);
 
-const groupBy = (array, key) => {
-  return array.reduce((result, currentValue) => {
-    (result[currentValue[key]] = result[currentValue[key]] || []).push(
-      currentValue,
-    );
-    return result;
-  }, {});
-};
-
 const token =
-  'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4OWI3MzgyMi04ODM3LTQ5NTAtOTA4Yy0zZTNiM2E4MjJlMzQiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE2NTE4NDA0MTV9.i_TPUQ7kN8mXJ5i793q3BcvcbYP_n_oNWU-OHjujzl4I0oxEIDbsNEHqcnJVm6sPZTgOV3SUHM-TjAqcWMNsdw';
+  'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4OWI3MzgyMi04ODM3LTQ5NTAtOTA4Yy0zZTNiM2E4MjJlMzQiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE2NTE5MjgxOTl9.G7NQPJoL-g97EKdplOC1DYUtlpi1Bs1rGE1fnyrKHOdhOS0F5kPqa7SYUgMJ7nQvBA4-IU283YY776JJxYQezA';
 
 export const fetchAllNodes = async () => {
   const all_nodes = [
@@ -27,19 +19,17 @@ export const fetchAllNodes = async () => {
     },
   ];
 
-  const res = await axios.get(NODES, {
+  const res = await axios.get(NODE_GROUPS, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  const filteredData = res.data.slice(0, 100);
+  const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
-  const groupedData = Object.entries(groupBy(filteredData, 'user_id'));
-
-  all_nodes[0].children = groupedData.map((item) => {
+  all_nodes[0].children = sorted.map((item) => {
     return {
-      title: item[0],
-      href: ROUTES.NODE_GROUP(item[0]),
-      id: 'host-id1',
+      title: item.name,
+      href: ROUTES.NODE_GROUP(item.id),
+      id: item.id,
     };
   });
 
@@ -53,3 +43,18 @@ export const fetchNodeById = async (id: string) => {
 
   selectedNode.set(res.data);
 };
+
+export const fetchUserById = async (id: string) => {
+  const res = await axios.get(NODE_GROUPS, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const foundUser = res.data.find((item) => item.id === id);
+
+  selectedUser.set(foundUser);
+};
+
+export const userDetails = (userId: string) =>
+  derived(nodes, ($nodes) =>
+    $nodes[0].children.find((item) => item.id === userId),
+  );

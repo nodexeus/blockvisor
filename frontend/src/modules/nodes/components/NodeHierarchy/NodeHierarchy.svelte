@@ -1,15 +1,9 @@
 <script lang="ts">
-  import axios from 'axios';
-  import { nodes , fetchAllNodes} from 'modules/nodes/store/nodesStore';
   import HierarchyList from 'components/HierarchyList/HierarchyList.svelte';
-  import { ROUTES } from 'consts/routes';
-  import { NODES } from 'modules/authentication/const';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
+  import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
   import NodeGroupAdd from '../NodeGroupAdd/NodeGroupAdd.svelte';
-  import { app } from 'modules/app/store';
-  import { claim_svg_element } from 'svelte/internal';
-
 
   let isAddingNewGroup = false;
   let editingId = null;
@@ -18,7 +12,6 @@
   const handleEditConfirm = () => (editingId = null);
   const handleAddConfirm = () => (isAddingNewGroup = false);
   const handleAddGroup = () => (isAddingNewGroup = true);
-
 
   onMount(() => {
     fetchAllNodes();

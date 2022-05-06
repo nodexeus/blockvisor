@@ -36,7 +36,7 @@
       <slot name="action" slot="action" />
       <svelte:fragment slot="stats">
         <IconBox />
-        {nodes.length} nodes
+        {nodes.length || 0} nodes
       </svelte:fragment>
     </GroupTitle>
   </div>

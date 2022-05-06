@@ -47,6 +47,7 @@
     top: 0;
     left: 0;
     max-height: calc(100vh - 65px);
+    overflow-y: auto;
 
     @media (--screen-medium-large) {
       padding-top: 32px;
