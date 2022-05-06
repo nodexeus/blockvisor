@@ -1,9 +1,9 @@
 use clap::Parser;
 use cli::{App, Command};
-use core::time;
 use daemonize::Daemonize;
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
+use tokio::time::{sleep, Duration};
 
 mod cli;
 mod containers;
@@ -54,7 +54,9 @@ fn main() {
                     }
                 }
             }
-            work(cmd_args.daemonize);
+
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(work(cmd_args.daemonize));
         }
         Command::Stop(_) => {
             if Path::new(PID_FILE).exists() {
@@ -65,11 +67,16 @@ fn main() {
     }
 }
 
-fn work(daemonized: bool) {
+async fn work(daemonized: bool) {
     loop {
         if !daemonized || Path::new(PID_FILE).exists() {
             println!("Hello");
-            std::thread::sleep(time::Duration::from_secs(2));
+            let resp = reqwest::get("https://httpbin.org/status/200")
+                .await
+                .unwrap()
+                .status();
+            println!("status: {}", resp);
+            sleep(Duration::from_secs(2)).await;
         } else {
             println!("Stopping blockvisor");
             break;
