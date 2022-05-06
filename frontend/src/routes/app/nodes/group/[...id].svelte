@@ -13,7 +13,8 @@
   import Pagination from 'modules/app/components/Pagination/Pagination.svelte';
   import { USER_NODES } from 'modules/authentication/const';
   import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
-  import { onMount } from 'svelte';
+import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
+  import { onMount, afterUpdate } from 'svelte';
 
   let currentPage = 1;
   const id = $page.params.id;
@@ -22,16 +23,16 @@
 
   let thisUserNodes = [];
 
-  onMount(async () => {
-    const token =
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4OWI3MzgyMi04ODM3LTQ5NTAtOTA4Yy0zZTNiM2E4MjJlMzQiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE2NTE4NDA0MTV9.i_TPUQ7kN8mXJ5i793q3BcvcbYP_n_oNWU-OHjujzl4I0oxEIDbsNEHqcnJVm6sPZTgOV3SUHM-TjAqcWMNsdw';
+ /*  onMount(() => {
+    fetchNodeById(id)
+  }); */
 
-    const res = await axios.get(USER_NODES($page.params.id), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+ $: {
+   console.log("bča")
+  fetchNodeById(id);
+ }
 
-    thisUserNodes = res.data;
-  });
+  console.log("currentNode", $selectedNode);
 </script>
 
 <ActionTitleHeader className="container--pull-back">
