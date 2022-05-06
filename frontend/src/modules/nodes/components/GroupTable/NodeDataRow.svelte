@@ -16,7 +16,7 @@
   export let token = 'eth';
   export let id = '9b74c98979b74c9897';
   export let ip_addr = '212.213.214.2';
-  export let name = 'YellowBeaver';
+  export let address_name = 'YellowBeaver';
   export let created_at = '5 weeks ago';
   export let status = 'unstaked';
 
@@ -31,12 +31,12 @@
   </td>
 
   <td class="node-data-row__col node-data-row__details">
-    <div title={name} class="t-ellipsis">
+    <div title={address_name} class="t-ellipsis">
       <a
         class="u-link-reset node-data-row__link"
         href={ROUTES.NODE_DETAILS(id)}
       >
-        {name}
+        {address_name}
       </a>
     </div>
     <small class="t-small t-color-text-2 node-data-row__details-added"

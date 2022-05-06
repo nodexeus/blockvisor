@@ -6,7 +6,6 @@
   import GroupTable from 'modules/nodes/components/GroupTable/GroupTable.svelte';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
 
-  export let numberOfNodes: number;
   export let nodes: [];
   export let id = 'js-group-graphic';
 
@@ -37,7 +36,7 @@
       <slot name="action" slot="action" />
       <svelte:fragment slot="stats">
         <IconBox />
-        {numberOfNodes} nodes
+        {nodes.length} nodes
       </svelte:fragment>
     </GroupTitle>
   </div>

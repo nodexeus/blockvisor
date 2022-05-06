@@ -4,36 +4,7 @@
 
   export let nodes;
 
-  const PLACEHOLDER_DATA = [
-    {
-      token: 'eth',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'unstaked',
-    },
-    {
-      token: 'sol',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'consensus',
-    },
-    {
-      token: 'btc',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'disabled',
-    },
-  ];
-
   let sortActive;
-
-  console.log(nodes);
 
   const handleSort = (id: string, value: SorterValues) => {
     sortActive = { id, value };

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import axios from 'axios';
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
@@ -11,10 +10,8 @@
   import IconPlus from 'icons/plus-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import Pagination from 'modules/app/components/Pagination/Pagination.svelte';
-  import { USER_NODES } from 'modules/authentication/const';
   import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
   import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
-  import { onMount, afterUpdate } from 'svelte';
 
   let currentPage = 1;
   const id = $page.params.id;
@@ -23,16 +20,9 @@
 
   let thisUserNodes = [];
 
-  /*  onMount(() => {
-    fetchNodeById(id)
-  }); */
-
   $: {
-    console.log('bča');
-    fetchNodeById(id);
+    fetchNodeById($page.params.id);
   }
-
-  console.log('currentNode', $selectedNode);
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -61,7 +51,7 @@
     </DropdownLinkList>
   </ButtonWithDropdown>
 </ActionTitleHeader>
-<NodeGroup {id} numberOfNodes={thisUserNodes.length} nodes={$selectedNode}>
+<NodeGroup {id} nodes={$selectedNode}>
   <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
   <svelte:fragment slot="title">Node group 1</svelte:fragment>
 </NodeGroup>
