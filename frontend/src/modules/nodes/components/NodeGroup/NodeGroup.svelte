@@ -6,7 +6,7 @@
   import GroupTable from 'modules/nodes/components/GroupTable/GroupTable.svelte';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
 
-  export let nodes;
+  export let numberOfNodes: number;
   export let id = 'js-group-graphic';
 
   /* Temp - generates random data for graphs */
@@ -29,37 +29,40 @@
   $: hasItems = true;
 </script>
 
-<div class="node-group__section">
-  <GroupTitle>
-    <slot name="title" slot="title" />
-    <slot name="action" slot="action" />
-    <svelte:fragment slot="stats">
-      <IconBox />
-      {nodes} nodes
-    </svelte:fragment>
-  </GroupTitle>
-</div>
-{#if hasItems}
-  <div class="container--medium-large">
-    <MinimalLineGraph
-      height="200"
-      config={CONFIG_EARNINGS}
-      data={[PLACEHOLDER_DATA]}
-    >
-      <slot name="label" slot="label" />
-    </MinimalLineGraph>
-    <GroupTable />
+<div class="s-bottom--large">
+  <div class="node-group__section">
+    <GroupTitle>
+      <slot name="title" slot="title" />
+      <slot name="action" slot="action" />
+      <svelte:fragment slot="stats">
+        <IconBox />
+        {numberOfNodes} nodes
+      </svelte:fragment>
+    </GroupTitle>
   </div>
-{:else}
-  <div class="node-group--empty">
-    <EmptyColumn id={`graphic-${id}`}>
-      <svelte:fragment slot="title">No Nodes In Group</svelte:fragment>
-      <svelte:fragment slot="description"
-        >Assign a node to this group to easily track multiple node performance.</svelte:fragment
+  {#if hasItems}
+    <div class="container--medium-large">
+      <MinimalLineGraph
+        height="200"
+        config={CONFIG_EARNINGS}
+        data={[PLACEHOLDER_DATA]}
       >
-    </EmptyColumn>
-  </div>
-{/if}
+        <slot name="label" slot="label" />
+      </MinimalLineGraph>
+      <GroupTable />
+    </div>
+  {:else}
+    <div class="node-group--empty">
+      <EmptyColumn id={`graphic-${id}`}>
+        <svelte:fragment slot="title">No Nodes In Group</svelte:fragment>
+        <svelte:fragment slot="description"
+          >Assign a node to this group to easily track multiple node
+          performance.</svelte:fragment
+        >
+      </EmptyColumn>
+    </div>
+  {/if}
+</div>
 
 <style>
   .node-group {

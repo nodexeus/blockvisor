@@ -31,6 +31,6 @@
 </script>
 
 <LayoutTwoColumn transition={pageTransition}>
-  <NodeHierarchy slot="sidebar" nodes={TEMP_NODES} />
+  <NodeHierarchy slot="sidebar" />
   <slot />
 </LayoutTwoColumn>

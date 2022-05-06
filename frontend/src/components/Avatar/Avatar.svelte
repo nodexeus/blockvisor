@@ -9,8 +9,8 @@
   const avatarClass = ['avatar', `avatar--${size}`].join(' ');
 
   const getInitials = () => {
-    const [name = '', surename = ''] = fullName.split(' ');
-    return `${name?.charAt(0) ?? ''}${surename?.charAt(0) ?? ''}`;
+    const [name = '', surname = ''] = fullName.split(' ');
+    return `${name?.charAt(0) ?? ''}${surname?.charAt(0) ?? ''}`;
   };
 </script>
 

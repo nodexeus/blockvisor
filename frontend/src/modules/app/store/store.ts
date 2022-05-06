@@ -6,6 +6,7 @@ import type { App } from '../models/App';
 const INITIAL_STATE: App = {
   breadcrumbs: [],
   activeApp: APPS.BROADCAST,
+  nodes: [],
 };
 
 const createActions = (
@@ -16,6 +17,7 @@ const createActions = (
     update((store) => ({ ...store, activeApp })),
   setBreadcrumbs: (breadcrumbs: App['breadcrumbs']) =>
     update((store) => ({ ...store, breadcrumbs })),
+  setNodes: (nodes: any) => update((store) => ({ ...store, nodes })),
   reset: () => set(INITIAL_STATE),
 });
 
