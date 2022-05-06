@@ -14,11 +14,7 @@
   import { fetchNodeById, selectedNode } from 'modules/nodes/store/nodesStore';
 
   let currentPage = 1;
-  const id = $page.params.id;
-
   $: hasGroups = false;
-
-  let thisUserNodes = [];
 
   $: {
     fetchNodeById($page.params.id);
@@ -51,7 +47,7 @@
     </DropdownLinkList>
   </ButtonWithDropdown>
 </ActionTitleHeader>
-<NodeGroup {id} nodes={$selectedNode}>
+<NodeGroup id={$page.params.id} nodes={$selectedNode}>
   <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
   <svelte:fragment slot="title">Node group 1</svelte:fragment>
 </NodeGroup>
