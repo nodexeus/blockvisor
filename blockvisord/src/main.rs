@@ -103,6 +103,11 @@ mod tests {
                 .header("Content-Type", "application/json")
                 .header("authorization", "Bearer OTP")
                 .json_body(json!({
+                    "name": "some-host",
+                    "version": "1.0",
+                    "ip_addr": "192.168.0.1",
+                    "os_flavor": "ubuntu",
+                    "os_kernel_version": "4.14.12",
                     "cpu_count": 4,
                     "mem_size": 8,
                     "hostname": "host",
@@ -119,6 +124,12 @@ mod tests {
         let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
         let otp = "OTP";
         let info = HostInfo {
+            name: "some-host".to_string(),
+            version: Some("1.0".to_string()),
+            location: None,
+            ip_addr: "192.168.0.1".to_string(),
+            os_flavor: "ubuntu".to_string(),
+            os_kernel_version: "4.14.12".to_string(),
             cpu_count: 4,
             mem_size: 8,
             hostname: "host".to_string(),

@@ -84,6 +84,14 @@ impl APIClient {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct HostInfo {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    pub ip_addr: String,
+    pub os_flavor: String,
+    pub os_kernel_version: String,
     pub cpu_count: usize,
     pub mem_size: usize,
     pub hostname: String,
