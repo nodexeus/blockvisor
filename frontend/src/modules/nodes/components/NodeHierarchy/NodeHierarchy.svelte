@@ -1,8 +1,10 @@
 <script lang="ts">
   import HierarchyList from 'components/HierarchyList/HierarchyList.svelte';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
+  import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
+  import { onMount } from 'svelte';
   import NodeGroupAdd from '../NodeGroupAdd/NodeGroupAdd.svelte';
-  export let nodes;
+  import { user } from 'modules/authentication/store';
 
   let isAddingNewGroup = false;
   let editingId = null;
@@ -11,6 +13,10 @@
   const handleEditConfirm = () => (editingId = null);
   const handleAddConfirm = () => (isAddingNewGroup = false);
   const handleAddGroup = () => (isAddingNewGroup = true);
+
+  onMount(() => {
+    fetchAllNodes($user);
+  });
 </script>
 
 <HierarchyList
@@ -18,7 +24,7 @@
   handleConfirm={handleEditConfirm}
   {handleEdit}
   {editingId}
-  {nodes}
+  nodes={$nodes}
 >
   {#if isAddingNewGroup}
     <li>

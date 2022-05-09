@@ -1,7 +1,7 @@
 import { SvelteComponentTyped } from 'svelte';
 export interface NodeGroupProps {
-  nodes: number;
   id?: string;
+  nodes: any[];
 }
 
 export interface NodeGroupSlots {

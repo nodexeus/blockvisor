@@ -1,20 +1,18 @@
 <script lang="ts">
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
+  import Button from 'components/Button/Button.svelte';
+  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { ROUTES } from 'consts/routes';
+  import IconCog from 'icons/cog-12.svg';
+  import IconDocument from 'icons/document-12.svg';
+  import IconAccount from 'icons/person-12.svg';
+  import IconPlus from 'icons/plus-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { app } from 'modules/app/store';
-
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
-  import IconAccount from 'icons/person-12.svg';
-  import IconDocument from 'icons/document-12.svg';
-  import IconCog from 'icons/cog-12.svg';
-  import IconPlus from 'icons/plus-12.svg';
-
+  import { fetchAllNodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
-  import { ROUTES } from 'consts/routes';
-  import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
-  import Button from 'components/Button/Button.svelte';
+  import { user } from 'modules/authentication/store';
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -28,6 +26,8 @@
       },
     ]);
   });
+
+  fetchAllNodes($user);
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -61,32 +61,7 @@
 </ActionTitleHeader>
 
 <ul class="u-list-reset nodes__group">
-  <li class="nodes__group-item">
-    <NodeGroup id="group-1" nodes={52}>
-      <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-      <svelte:fragment slot="title">Node group 1</svelte:fragment>
-      <Button
-        asLink
-        href={ROUTES.NODE_GROUP('group-1')}
-        style="outline"
-        size="small"
-        slot="action">View</Button
-      >
-    </NodeGroup>
-  </li>
-  <li class="nodes__group-item">
-    <NodeGroup id="group-2" nodes={42}>
-      <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-      <svelte:fragment slot="title">Node group 2</svelte:fragment>
-      <Button
-        asLink
-        href={ROUTES.NODE_GROUP('group-2')}
-        style="outline"
-        size="small"
-        slot="action">View</Button
-      >
-    </NodeGroup>
-  </li>
+  <p>No nodes selected.</p>
 </ul>
 
 <style>

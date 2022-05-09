@@ -1,12 +1,12 @@
 <script lang="ts">
   import StateIcon from 'components/StateIcon/StateIcon.svelte';
 
-  export let state: HostState | NodeState;
+  export let status: HostState | NodeState;
 </script>
 
 <div class="data-state">
-  <StateIcon {state} />
-  {state}
+  <StateIcon {status} />
+  {status}
 </div>
 
 <style>

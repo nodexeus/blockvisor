@@ -1,7 +1,7 @@
 import { SvelteComponentTyped } from 'svelte';
 
 export interface DataStateProps {
-  state: HostState | NodeState;
+  status: HostState | NodeState;
 }
 
 export default class DataState extends SvelteComponentTyped<

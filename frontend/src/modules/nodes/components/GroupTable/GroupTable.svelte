@@ -2,32 +2,7 @@
   import Sorter from 'components/Sorter/Sorter.svelte';
   import NodeDataRow from 'modules/nodes/components/GroupTable/NodeDataRow.svelte';
 
-  const PLACEHOLDER_DATA = [
-    {
-      token: 'eth',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'unstaked',
-    },
-    {
-      token: 'sol',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'consensus',
-    },
-    {
-      token: 'btc',
-      id: '9b74c98979b74c9897',
-      ip: '212.213.214.2',
-      name: 'YellowBeaver',
-      added: '5 weeks ago',
-      state: 'disabled',
-    },
-  ];
+  export let nodes: [];
 
   let sortActive;
 
@@ -68,8 +43,8 @@
     </tr>
   </thead>
   <tbody>
-    {#each PLACEHOLDER_DATA as node}
-      <NodeDataRow {...node} />
+    {#each nodes as node}
+      <NodeDataRow {nodes} {...node} />
     {/each}
   </tbody>
 </table>

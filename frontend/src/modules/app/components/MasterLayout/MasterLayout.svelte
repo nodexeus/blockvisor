@@ -173,7 +173,7 @@
         in:fade|local={{ ...fadeDefault, delay: 200 }}
       >
         <SubMenu isActive={activeSubNav === 'nodes'} {changeSubNav}>
-          <NodeHierarchy on:click={handleClickOutside} nodes={TEMP_NODES} />
+          <NodeHierarchy on:click={handleClickOutside} />
         </SubMenu>
 
         <SubMenu isActive={activeSubNav === 'hosts'} {changeSubNav}>

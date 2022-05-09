@@ -1,23 +1,33 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
+  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import { ROUTES } from 'consts/routes';
+  import IconCog from 'icons/cog-12.svg';
+  import IconDocument from 'icons/document-12.svg';
+  import IconAccount from 'icons/person-12.svg';
+  import IconPlus from 'icons/plus-12.svg';
+  import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import Pagination from 'modules/app/components/Pagination/Pagination.svelte';
   import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
-  import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
-  import IconAccount from 'icons/person-12.svg';
-  import IconDocument from 'icons/document-12.svg';
-  import IconCog from 'icons/cog-12.svg';
-  import IconPlus from 'icons/plus-12.svg';
-  import { page } from '$app/stores';
+  import {
+    fetchNodeById,
+    fetchUserById,
+    selectedNode,
+    selectedUser,
+  } from 'modules/nodes/store/nodesStore';
+  import { user } from 'modules/authentication/store';
 
   let currentPage = 1;
   const id = $page.params.id;
 
   $: hasGroups = false;
+
+  $: {
+    fetchNodeById($page.params.id, $user);
+    fetchUserById($page.params.id, $user);
+  }
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -46,10 +56,9 @@
     </DropdownLinkList>
   </ButtonWithDropdown>
 </ActionTitleHeader>
-
-<NodeGroup {id} nodes={52}>
+<NodeGroup {id} nodes={$selectedNode}>
   <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-  <svelte:fragment slot="title">Node group 1</svelte:fragment>
+  <svelte:fragment slot="title">{$selectedUser?.name ?? ''}</svelte:fragment>
 </NodeGroup>
 {#if hasGroups}
   <footer class="nodes-group__footer container--medium-large">

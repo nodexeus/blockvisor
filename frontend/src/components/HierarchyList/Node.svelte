@@ -1,16 +1,16 @@
 <script lang="ts">
-  import NavItem from 'components/NavItem/NavItem.svelte';
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import NavItem from 'components/NavItem/NavItem.svelte';
+  import IconDelete from 'icons/close-12.svg';
+  import IconDots from 'icons/dots-12.svg';
+  import IconFolder from 'icons/folder-12.svg';
+  import IconList from 'icons/list-12.svg';
   import IconEdit from 'icons/pencil-2-12.svg';
   import IconPerson from 'icons/person-12.svg';
-  import IconDelete from 'icons/close-12.svg';
-  import IconList from 'icons/list-12.svg';
-  import IconFolder from 'icons/folder-12.svg';
-  import IconDots from 'icons/dots-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
+  import { userDetails } from 'modules/nodes/store/nodesStore';
 
   export let isParent;
   export let href;
