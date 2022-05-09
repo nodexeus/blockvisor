@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
-import { NODE_GROUPS, USER_NODES } from 'modules/authentication/const';
 import { derived, writable } from 'svelte/store';
 
 export const nodes = writable([]);
@@ -16,11 +15,9 @@ export const fetchAllNodes = async (user: UserSession) => {
     },
   ];
 
-  const res = await axios.get(NODE_GROUPS, {
-    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
-  });
+  const res = await axios.get('/api/nodes/fetchNodes');
 
-  const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
+  const sorted = res.data.nodes.sort((a, b) => b.node_count - a.node_count);
 
   all_nodes[0].children = sorted.map((item) => {
     return {
@@ -33,22 +30,16 @@ export const fetchAllNodes = async (user: UserSession) => {
   nodes.set(all_nodes);
 };
 
-export const fetchNodeById = async (id: string, user: UserSession) => {
-  const res = await axios.get(USER_NODES(id), {
-    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
-  });
+export const fetchNodeById = async (id: string) => {
+  const res = await axios.get('/api/nodes/fetchNodeById', { params: { id } });
 
-  selectedNode.set(res.data);
+  selectedNode.set(res.data.node);
 };
 
-export const fetchUserById = async (id: string, user: UserSession) => {
-  const res = await axios.get(NODE_GROUPS, {
-    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
-  });
+export const fetchUserById = async (id: string) => {
+  const res = await axios.get('/api/nodes/fetchUserById', { params: { id } });
 
-  const foundUser = res.data.find((item) => item.id === id);
-
-  selectedUser.set(foundUser);
+  selectedUser.set(res.data.user);
 };
 
 export const userDetails = (userId: string) =>
