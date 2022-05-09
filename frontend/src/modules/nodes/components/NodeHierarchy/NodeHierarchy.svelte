@@ -4,6 +4,7 @@
   import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
   import NodeGroupAdd from '../NodeGroupAdd/NodeGroupAdd.svelte';
+  import { user } from 'modules/authentication/store';
 
   let isAddingNewGroup = false;
   let editingId = null;
@@ -14,7 +15,7 @@
   const handleAddGroup = () => (isAddingNewGroup = true);
 
   onMount(() => {
-    fetchAllNodes();
+    fetchAllNodes($user);
   });
 </script>
 

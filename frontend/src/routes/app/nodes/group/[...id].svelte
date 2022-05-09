@@ -17,6 +17,7 @@
     selectedNode,
     selectedUser,
   } from 'modules/nodes/store/nodesStore';
+  import { user } from 'modules/authentication/store';
 
   let currentPage = 1;
   const id = $page.params.id;
@@ -24,8 +25,8 @@
   $: hasGroups = false;
 
   $: {
-    fetchNodeById($page.params.id);
-    fetchUserById($page.params.id);
+    fetchNodeById($page.params.id, $user);
+    fetchUserById($page.params.id, $user);
   }
 </script>
 
@@ -57,7 +58,7 @@
 </ActionTitleHeader>
 <NodeGroup {id} nodes={$selectedNode}>
   <svelte:fragment slot="label">Group earnings (USD)</svelte:fragment>
-  <svelte:fragment slot="title">{$selectedUser.name ?? ''}</svelte:fragment>
+  <svelte:fragment slot="title">{$selectedUser?.name ?? ''}</svelte:fragment>
 </NodeGroup>
 {#if hasGroups}
   <footer class="nodes-group__footer container--medium-large">

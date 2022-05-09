@@ -10,7 +10,7 @@ export const selectedNode = writable([]);
 const token =
   'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI4OWI3MzgyMi04ODM3LTQ5NTAtOTA4Yy0zZTNiM2E4MjJlMzQiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE2NTE5MjgxOTl9.G7NQPJoL-g97EKdplOC1DYUtlpi1Bs1rGE1fnyrKHOdhOS0F5kPqa7SYUgMJ7nQvBA4-IU283YY776JJxYQezA';
 
-export const fetchAllNodes = async () => {
+export const fetchAllNodes = async (user: UserSession) => {
   const all_nodes = [
     {
       title: 'All Nodes',
@@ -20,7 +20,7 @@ export const fetchAllNodes = async () => {
   ];
 
   const res = await axios.get(NODE_GROUPS, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
   });
 
   const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
@@ -36,17 +36,17 @@ export const fetchAllNodes = async () => {
   nodes.set(all_nodes);
 };
 
-export const fetchNodeById = async (id: string) => {
+export const fetchNodeById = async (id: string, user: UserSession) => {
   const res = await axios.get(USER_NODES(id), {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
   });
 
   selectedNode.set(res.data);
 };
 
-export const fetchUserById = async (id: string) => {
+export const fetchUserById = async (id: string, user: UserSession) => {
   const res = await axios.get(NODE_GROUPS, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
   });
 
   const foundUser = res.data.find((item) => item.id === id);

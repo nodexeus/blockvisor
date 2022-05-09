@@ -1,22 +1,18 @@
 <script lang="ts">
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
+  import Button from 'components/Button/Button.svelte';
+  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { ROUTES } from 'consts/routes';
+  import IconCog from 'icons/cog-12.svg';
+  import IconDocument from 'icons/document-12.svg';
+  import IconAccount from 'icons/person-12.svg';
+  import IconPlus from 'icons/plus-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { app } from 'modules/app/store';
-
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
-  import IconAccount from 'icons/person-12.svg';
-  import IconDocument from 'icons/document-12.svg';
-  import IconCog from 'icons/cog-12.svg';
-  import IconPlus from 'icons/plus-12.svg';
-
+  import { fetchAllNodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
-  import { ROUTES } from 'consts/routes';
-  import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
-  import Button from 'components/Button/Button.svelte';
-  import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
-  import NodeGroup from 'modules/nodes/components/NodeGroup/NodeGroup.svelte';
+  import { user } from 'modules/authentication/store';
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -31,7 +27,7 @@
     ]);
   });
 
-  fetchAllNodes();
+  fetchAllNodes($user);
 </script>
 
 <ActionTitleHeader className="container--pull-back">
