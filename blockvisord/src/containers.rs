@@ -1,10 +1,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
 pub enum ContainerStatus {
     Created,
+    Started,
+    Killed,
 }
+
 #[async_trait]
 pub trait NodeContainer {
     /// Creates a new container with `id`.
@@ -16,16 +19,16 @@ pub trait NodeContainer {
     fn id(&self) -> String;
 
     /// Starts the container.
-    async fn start(&self) -> Result<()>;
+    async fn start(&mut self) -> Result<()>;
 
     /// Returns the state of the container.
-    async fn state(&self) -> Result<()>;
+    async fn state(&self) -> Result<ContainerStatus>;
 
     /// Kills the running container.
-    async fn kill(&self) -> Result<()>;
+    async fn kill(&mut self) -> Result<()>;
 
     /// Deletes the container.
-    async fn delete(&self) -> Result<()>;
+    async fn delete(&mut self) -> Result<()>;
 }
 
 pub struct LinuxNode {
@@ -42,20 +45,61 @@ impl NodeContainer for LinuxNode {
         self.id.to_owned()
     }
 
-    async fn start(&self) -> Result<()> {
+    async fn start(&mut self) -> Result<()> {
         unimplemented!()
     }
 
-    async fn state(&self) -> Result<()> {
+    async fn state(&self) -> Result<ContainerStatus> {
         unimplemented!()
     }
 
-    async fn kill(&self) -> Result<()> {
+    async fn kill(&mut self) -> Result<()> {
         unimplemented!()
     }
 
-    /// Deletes the container.
-    async fn delete(&self) -> Result<()> {
+    async fn delete(&mut self) -> Result<()> {
         unimplemented!()
+    }
+}
+
+pub struct DummyNode {
+    pub id: String,
+    pub state: ContainerStatus,
+}
+
+#[async_trait]
+impl NodeContainer for DummyNode {
+    async fn create(id: &str) -> Result<Self> {
+        println!("Creating node: {}", id);
+        Ok(Self {
+            id: id.to_owned(),
+            state: ContainerStatus::Created,
+        })
+    }
+
+    fn id(&self) -> String {
+        self.id.to_owned()
+    }
+
+    async fn start(&mut self) -> Result<()> {
+        println!("Starting node: {}", self.id());
+        self.state = ContainerStatus::Started;
+        Ok(())
+    }
+
+    async fn state(&self) -> Result<ContainerStatus> {
+        Ok(self.state)
+    }
+
+    async fn kill(&mut self) -> Result<()> {
+        println!("Killing node: {}", self.id());
+        self.state = ContainerStatus::Killed;
+        Ok(())
+    }
+
+    async fn delete(&mut self) -> Result<()> {
+        println!("Deleting node: {}", self.id());
+        self.kill().await?;
+        Ok(())
     }
 }
