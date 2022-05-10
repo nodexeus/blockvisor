@@ -2,7 +2,7 @@ use camino::Utf8PathBuf;
 use clap::{ArgEnum, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[clap(name = "bv", author, version, about)]
+#[clap(name = "bvs", author, version, about)]
 pub struct App {
     #[clap(flatten)]
     pub global_opts: GlobalOpts,
