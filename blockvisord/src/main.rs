@@ -94,8 +94,8 @@ mod tests {
     use std::time::Duration;
     use uuid::Uuid;
 
-    #[test]
-    fn test_register_host() {
+    #[tokio::test]
+    async fn test_register_host() {
         let server = MockServer::start();
         let org_id = Uuid::new_v4();
 
@@ -140,7 +140,7 @@ mod tests {
             ip_addr: "192.168.0.1".to_string(),
             val_ip_addrs: None,
         };
-        let resp = client.register_host(otp, &info).unwrap();
+        let resp = client.register_host(otp, &info).await.unwrap();
 
         assert_eq!(resp.host_id, "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
         assert_eq!(resp.token, "secret_token");
@@ -148,8 +148,8 @@ mod tests {
         m.assert();
     }
 
-    #[test]
-    fn test_get_pending_commands() {
+    #[tokio::test]
+    async fn test_get_pending_commands() {
         let server = MockServer::start();
 
         let token = "TOKEN";
@@ -173,7 +173,7 @@ mod tests {
         });
 
         let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
-        let resp = client.get_pending_commands(token, host_id).unwrap();
+        let resp = client.get_pending_commands(token, host_id).await.unwrap();
 
         assert_eq!(resp.len(), 1);
         assert_eq!(resp[0].id, "497f6eca-6276-4993-bfeb-53cbbbba6f08");
@@ -188,8 +188,8 @@ mod tests {
         m.assert();
     }
 
-    #[test]
-    fn test_update_command_status() {
+    #[tokio::test]
+    async fn test_update_command_status() {
         let server = MockServer::start();
 
         let token = "TOKEN";
@@ -226,6 +226,7 @@ mod tests {
         };
         let resp = client
             .update_command_status(token, command_id, &update)
+            .await
             .unwrap();
 
         assert_eq!(resp.id, command_id);
