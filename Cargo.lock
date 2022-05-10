@@ -322,6 +322,7 @@ dependencies = [
  "camino",
  "clap",
  "daemonize",
+ "reqwest 0.11.10",
  "tokio 1.18.1",
 ]
 
@@ -1293,6 +1294,19 @@ dependencies = [
  "hyper 0.12.36",
  "native-tls",
  "tokio-io",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
+dependencies = [
+ "bytes 1.1.0",
+ "hyper 0.14.18",
+ "native-tls",
+ "tokio 1.18.1",
+ "tokio-native-tls",
 ]
 
 [[package]]
@@ -2370,7 +2384,7 @@ dependencies = [
  "futures 0.1.31",
  "http 0.1.21",
  "hyper 0.12.36",
- "hyper-tls",
+ "hyper-tls 0.3.2",
  "log",
  "mime",
  "mime_guess",
@@ -2405,11 +2419,13 @@ dependencies = [
  "http-body 0.4.4",
  "hyper 0.14.18",
  "hyper-rustls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "lazy_static",
  "log",
  "mime",
+ "native-tls",
  "percent-encoding 2.1.0",
  "pin-project-lite",
  "rustls 0.20.4",
@@ -2418,6 +2434,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded 0.7.1",
  "tokio 1.18.1",
+ "tokio-native-tls",
  "tokio-rustls 0.23.3",
  "url 2.2.2",
  "wasm-bindgen",
@@ -3120,6 +3137,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tokio-native-tls"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7d995660bd2b7f8c1568414c1126076c13fbb725c40112dc0120b78eb9b717b"
+dependencies = [
+ "native-tls",
+ "tokio 1.18.1",
 ]
 
 [[package]]
