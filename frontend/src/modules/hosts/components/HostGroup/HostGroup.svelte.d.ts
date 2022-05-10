@@ -1,6 +1,6 @@
 import { SvelteComponentTyped } from 'svelte';
 export interface HostGroupProps {
-  hosts: string | number;
+  selectedHosts: any;
   id?: string;
 }
 

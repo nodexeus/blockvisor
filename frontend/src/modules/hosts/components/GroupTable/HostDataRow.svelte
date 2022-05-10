@@ -9,9 +9,9 @@
   import IconDots from 'icons/dots-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
 
-  export let name;
+  export let address_name;
   export let status;
-  export let ip;
+  export let ip_addr;
   export let url;
   export let location;
 
@@ -23,11 +23,11 @@
 <tr class={classes}>
   <td class="host-data-row__col">
     <a class="u-link-reset" href={url}>
-      {name}
+      {address_name}
     </a>
     <small class="host-data-row__info t-small">
       <span>
-        {ip}
+        {ip_addr}
       </span>
       <address>
         {location}

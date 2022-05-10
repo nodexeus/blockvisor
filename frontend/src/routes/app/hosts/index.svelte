@@ -60,17 +60,5 @@
 </ActionTitleHeader>
 
 <section class="container--medium-large ">
-  <HostGroup id="group-1" hosts={52}>
-    <svelte:fragment slot="title">Host group 1</svelte:fragment>
-    <Button asLink href="#" style="outline" size="small" slot="action"
-      >View</Button
-    >
-  </HostGroup>
-
-  <HostGroup id="group-2" hosts={52}>
-    <svelte:fragment slot="title">Host group 2</svelte:fragment>
-    <Button asLink href="#" style="outline" size="small" slot="action"
-      >View</Button
-    >
-  </HostGroup>
+  <p>Select host group.</p>
 </section>

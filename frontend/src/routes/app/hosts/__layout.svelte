@@ -39,7 +39,7 @@
 
 <BlockVisorFeature>
   <LayoutTwoColumn transition={pageTransition}>
-    <HostsHierarchy slot="sidebar" nodes={TEMP_NODES} />
+    <HostsHierarchy slot="sidebar" />
     <slot />
   </LayoutTwoColumn>
 </BlockVisorFeature>

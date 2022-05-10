@@ -3,6 +3,8 @@
   import { ROUTES } from 'consts/routes';
   import HostDataRow from './HostDataRow.svelte';
 
+  export let hosts;
+
   const PLACEHOLDER_DATA = [
     {
       name: 'HostFox',
@@ -64,7 +66,7 @@
     </tr>
   </thead>
   <tbody>
-    {#each PLACEHOLDER_DATA as host}
+    {#each hosts as host}
       <HostDataRow {...host} />
     {/each}
   </tbody>

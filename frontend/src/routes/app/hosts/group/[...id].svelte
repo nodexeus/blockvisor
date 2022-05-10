@@ -14,6 +14,9 @@
   import { ROUTES } from 'consts/routes';
   import HostGroup from 'modules/hosts/components/HostGroup/HostGroup.svelte';
   import Button from 'components/Button/Button.svelte';
+  import { selectedHosts, fetchHostById } from 'modules/hosts/store/hostsStore';
+  import { page } from '$app/stores';
+  import { user } from 'modules/authentication/store';
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -27,6 +30,10 @@
       },
     ]);
   });
+
+  $: {
+    fetchHostById($page.params.id, $user);
+  }
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -57,7 +64,7 @@
 </ActionTitleHeader>
 
 <section class="container--medium-large ">
-  <HostGroup hosts={52}>
+  <HostGroup selectedHosts={$selectedHosts} id={$page.params.id}>
     <svelte:fragment slot="title">Host group 1</svelte:fragment>
     <Button asLink href="#" style="outline" size="small" slot="action"
       >View</Button
