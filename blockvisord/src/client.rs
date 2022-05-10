@@ -24,14 +24,13 @@ impl APIClient {
         create: &HostCreateRequest,
     ) -> Result<HostCredentials> {
         let url = format!("{}/hosts", self.base_url.as_str().trim_end_matches('/'));
-        let body = serde_json::to_string(create)?;
 
         let text = self
             .inner
             .post(url)
             .header("Content-Type", "application/json")
             .bearer_auth(otp)
-            .body(body)
+            .json(create)
             .send()
             .await?
             .text()
@@ -73,14 +72,13 @@ impl APIClient {
             self.base_url.as_str().trim_end_matches('/'),
             command_id
         );
-        let body = serde_json::to_string(update)?;
 
         let text = self
             .inner
             .put(url)
             .header("Content-Type", "application/json")
             .bearer_auth(token)
-            .body(body)
+            .json(update)
             .send()
             .await?
             .text()
