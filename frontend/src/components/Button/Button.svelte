@@ -144,4 +144,16 @@
       background-color: var(--color-text-5-o3);
     }
   }
+
+  .warning {
+    background-color: theme(--color-utility-warning);
+    color: theme(--color-foreground-primary);
+    box-shadow: 0px 0px 0px 3px var(--color-utility-warning-o0);
+    transition: box-shadow 0.18s var(--transition-easing-cubic);
+
+    &:hover,
+    &:active {
+      box-shadow: 0px 0px 0px 3px var(--color-primary-o30);
+    }
+  }
 </style>
