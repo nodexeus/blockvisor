@@ -535,7 +535,7 @@ dependencies = [
  "sysinfo",
  "tokio 1.18.1",
  "toml",
- "uuid 0.8.2",
+ "uuid 1.0.0",
 ]
 
 [[package]]
