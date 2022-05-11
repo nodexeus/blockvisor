@@ -2,6 +2,7 @@
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { format } from 'date-fns';
   import { onMount } from 'svelte';
 
   let install_cmd;
@@ -76,7 +77,7 @@
   <pre class="code-block">{install_cmd || 'Loading command...'}
 </pre>
 
-  {#if install_cmd}
+  {#if install_cmd && !claimed_host_id}
     <p class="continue-text">
       Click continue after you have run the command on your host.
       {#if retrying}
@@ -115,8 +116,12 @@
 
   {#if claimed_host_id}
     <div>
-      <p>Congrats.</p>
-      <p>Your host was claimed on {claimed_at} with id {claimed_host_id}</p>
+      <p>
+        Congrats, your host was claimed on {format(
+          +new Date(claimed_at),
+          'dd MMM yyyy',
+        )} with id {claimed_host_id}
+      </p>
     </div>
   {/if}
 </section>

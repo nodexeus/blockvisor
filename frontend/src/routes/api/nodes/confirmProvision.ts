@@ -17,9 +17,7 @@ export const get: RequestHandler = async ({ request, url }) => {
 
     return {
       status: res.status,
-      body: {
-        user: res.data,
-      },
+      body: res.data,
     };
   } catch (error) {
     return {
