@@ -11,7 +11,7 @@
   import MapSection from 'modules/nodes/components/MapSection/MapSection.svelte';
   import BackButton from 'modules/app/components/BackButton/BackButton.svelte';
   import { ROUTES } from 'consts/routes';
-  import { fetchValidatorById } from 'modules/nodes/store/nodesStore';
+  import { fetchValidatorById, selectedValidator } from 'modules/nodes/store/nodesStore';
 
   const id = $page.params.id;
 
@@ -63,7 +63,7 @@
 <DetailsLayout>
   <BackButton slot="nav" />
 
-  <DetailsHeader {form} state="consensus" {id} />
+  <DetailsHeader data={$selectedValidator} {form} state="consensus" {id} />
 
   <MinimalLineGraph
     height="200"
@@ -73,7 +73,7 @@
     <svelte:fragment slot="label">Node earnings (USD)</svelte:fragment>
   </MinimalLineGraph>
 
-  <DetailsTable data={PLACEHOLDER_NODE} />
+  <DetailsTable data={$selectedValidator} />
 
   <MapSection />
 </DetailsLayout>

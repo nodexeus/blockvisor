@@ -4,13 +4,16 @@
   export let data: NodeDetails;
 
   const {
-    ownerAddress,
+    owner_address,
     version,
-    blockHeight,
-    migrateValidator,
-    penalties,
-    user,
+    block_height,
+    tenure_penalty,
+    performance_penalty,
+    dkg_penalty,
+    total_penalty,
+    user_id,
   } = data;
+console.log("data", data)
 </script>
 
 <table class="table">
@@ -21,7 +24,7 @@
   <tbody>
     <DataRow>
       <svelte:fragment slot="label">Owner address</svelte:fragment>
-      {ownerAddress}
+      {owner_address}
     </DataRow>
     <DataRow>
       <svelte:fragment slot="label">Version</svelte:fragment>
@@ -29,19 +32,15 @@
     </DataRow>
     <DataRow>
       <svelte:fragment slot="label">Block height</svelte:fragment>
-      {blockHeight}
-    </DataRow>
-    <DataRow>
-      <svelte:fragment slot="label">Migrate validator</svelte:fragment>
-      {migrateValidator}
+      {block_height}
     </DataRow>
     <DataRow>
       <svelte:fragment slot="label">Penalties</svelte:fragment>
-      {penalties}
+      {`Tenure: ${tenure_penalty}, DKG: ${dkg_penalty}, Perf: ${performance_penalty}, Tot: ${total_penalty}`}
     </DataRow>
     <DataRow>
       <svelte:fragment slot="label">User</svelte:fragment>
-      {user}
+      {user_id}
     </DataRow>
   </tbody>
 </table>
