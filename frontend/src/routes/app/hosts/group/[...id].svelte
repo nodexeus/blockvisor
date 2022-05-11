@@ -32,7 +32,7 @@
   });
 
   $: {
-    fetchHostById($page.params.id, $user);
+    fetchHostById($page.params.id);
   }
 </script>
 

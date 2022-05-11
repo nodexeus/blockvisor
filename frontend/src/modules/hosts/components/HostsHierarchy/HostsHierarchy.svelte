@@ -16,7 +16,7 @@
   const handleAddGroup = () => (isAddingNewGroup = true);
 
   onMount(() => {
-    fetchAllHosts($user);
+    fetchAllHosts();
   });
 </script>
 

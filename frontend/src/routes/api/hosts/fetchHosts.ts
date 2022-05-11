@@ -1,14 +1,13 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { USER_NODES } from 'modules/authentication/const';
+import { HOSTS } from 'modules/authentication/const';
 import { httpClient } from 'utils/httpClient';
 import { getTokens } from 'utils/ServerRequest';
 
-export const get: RequestHandler = async ({ request, url }) => {
+export const get: RequestHandler = async ({ request }) => {
   const { accessToken, refreshToken } = getTokens(request);
-  const param = url.searchParams.get('id');
 
   try {
-    const res = await httpClient.get(USER_NODES(param), {
+    const res = await httpClient.get(HOSTS, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'X-Refresh-Token': `${refreshToken}`,
@@ -18,7 +17,7 @@ export const get: RequestHandler = async ({ request, url }) => {
     return {
       status: res.status,
       body: {
-        node: res.data,
+        hosts: res.data,
       },
     };
   } catch (error) {
