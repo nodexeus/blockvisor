@@ -27,6 +27,8 @@ export const fetchAllNodes = async () => {
       id: item.id,
     };
   });
+
+  nodes.set(all_nodes);
 };
 
 export const fetchNodeById = async (id: string) => {

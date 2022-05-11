@@ -70,7 +70,7 @@ import { formatDistanceToNow } from 'date-fns';
           >
         </CopyNode>
         <small class="t-small">{ip_addr}</small>
-        <date>{formatDistanceToNow(+new Date(created_at))} ago</date>
+        <date>{created_at && formatDistanceToNow(+new Date(created_at))} ago</date>
       </div>
       <PillBox>
         <Pill removable={false} transition={fadeDefault}>eth</Pill>
