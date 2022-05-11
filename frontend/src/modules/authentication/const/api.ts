@@ -20,3 +20,8 @@ export const NODE_GROUPS = `${API.URL}/groups/nodes`;
 export const USER_NODES = (userId) => `${API.URL}/users/${userId}/validators`;
 
 export const VALIDATOR = (id) => `${API.URL}/validators/${id}`;
+
+export const PROVISION_HOST = `${API.URL}/host_provisions`;
+
+export const CONFIRM_PROVISION = (host_id: string) =>
+  `${API.URL}/host_provisions/${host_id}`;

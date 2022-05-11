@@ -1,6 +1,6 @@
 type ButtonSize = 'small' | 'medium' | 'normal';
 
-type ButtonStyle = 'primary' | 'secondary' | 'outline' | 'ghost';
+type ButtonStyle = 'primary' | 'secondary' | 'outline' | 'ghost' | 'warning';
 
 type ButtonBorder = 'rounded';
 

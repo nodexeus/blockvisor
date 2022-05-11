@@ -16,7 +16,7 @@
     { title: 'Add a Node', size: ' large' },
     { title: 'Add a Node', size: 'large' },
     { title: 'Add a Node', size: 'large' },
-    { title: 'Review', size: 'large' },
+    { title: 'Provision Host', size: 'large' },
   ];
 
   let activeComponent = null;
