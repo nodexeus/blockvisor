@@ -1,12 +1,12 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
-import { HOSTS, SINGLE_HOST } from 'modules/authentication/const';
+import { SINGLE_HOST } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
 
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
 
-export const fetchAllHosts = async (user: UserSession) => {
+export const fetchAllHosts = async () => {
   const all_hosts = [
     {
       title: 'All Hosts',
@@ -15,11 +15,9 @@ export const fetchAllHosts = async (user: UserSession) => {
     },
   ];
 
-  const res = await axios.get(HOSTS, {
-    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
-  });
+  const res = await axios.get('/api/hosts/fetchHosts');
 
-  const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
+  const sorted = res.data.hosts.sort((a, b) => b.node_count - a.node_count);
 
   all_hosts[0].children = sorted.map((item) => {
     return {
@@ -33,10 +31,8 @@ export const fetchAllHosts = async (user: UserSession) => {
   hosts.set(all_hosts);
 };
 
-export const fetchHostById = async (id: string, user: UserSession) => {
-  const res = await axios.get(SINGLE_HOST(id), {
-    headers: { Authorization: `Bearer ${user ? user.token : ''}` },
-  });
+export const fetchHostById = async (id: string) => {
+  const res = await axios.get('/api/hosts/fetchHosts', { params: { id } });
 
-  selectedHosts.set(res.data);
+  selectedHosts.set(res.data.host);
 };
