@@ -11,7 +11,7 @@
 
   export let name;
   export let status;
-  export let ip;
+  export let ip_addr;
   export let url;
   export let location;
 
@@ -27,7 +27,7 @@
     </a>
     <small class="host-data-row__info t-small">
       <span>
-        {ip}
+        {ip_addr}
       </span>
       <address>
         {location}
@@ -35,7 +35,8 @@
     </small>
   </td>
   <td class="host-data-row__col t-uppercase t-microlabel host-data-row__state">
-    <DataState state={status} />
+    <!-- Temp fix since statuses are not the same and we don't have icons for new statuses. -->
+    <DataState {status} />
   </td>
   <td class="host-data-row__col t-right">
     <ButtonWithDropdown

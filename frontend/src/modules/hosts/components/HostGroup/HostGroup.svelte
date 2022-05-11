@@ -1,13 +1,11 @@
 <script lang="ts">
-  import IconBox from 'icons/box-12.svg';
   import GroupTitle from 'components/GroupTitle/GroupTitle.svelte';
-  import GroupTable from 'modules/hosts/components/GroupTable/GroupTable.svelte';
+  import IconBox from 'icons/box-12.svg';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
+  import GroupTable from 'modules/hosts/components/GroupTable/GroupTable.svelte';
 
-  export let hosts;
+  export let selectedHosts;
   export let id;
-
-  $: hasItems = false;
 </script>
 
 <article class="host-group">
@@ -17,13 +15,14 @@
       <slot name="action" slot="action" />
       <svelte:fragment slot="stats">
         <IconBox />
-        {hosts} hosts
+        <!-- {selectedHosts?.validators?.length || 0} hosts -->
+        1 host
       </svelte:fragment>
     </GroupTitle>
   </div>
 
-  {#if hasItems}
-    <GroupTable />
+  {#if selectedHosts}
+    <GroupTable hosts={selectedHosts} />
   {:else}
     <div class="host-group--empty">
       <EmptyColumn id={`graphic-${id}`}>

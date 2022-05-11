@@ -11,17 +11,14 @@
   import MapSection from 'modules/nodes/components/MapSection/MapSection.svelte';
   import BackButton from 'modules/app/components/BackButton/BackButton.svelte';
   import { ROUTES } from 'consts/routes';
+  import { fetchValidatorById, selectedValidator, isLoading } from 'modules/nodes/store/nodesStore';
+import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
 
   const id = $page.params.id;
 
-  const PLACEHOLDER_NODE: NodeDetails = {
-    ownerAddress: 'mizAjYud6o9oLh2UZH13o9zyR9crKYRPEm',
-    version: '1.6.2',
-    blockHeight: '1206202',
-    migrateValidator: 'Migrate',
-    penalties: 'Tenure: 5.5, DKG: 0, Perf: 1.824873823862, Tot: 6.824873823862',
-    user: '8d405951-7df5-4804-9ccb-31f7acdc19aa',
-  };
+  $: {
+    fetchValidatorById($page.params.id);
+  }
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -55,20 +52,27 @@
   const form = useForm();
 </script>
 
+{#if $isLoading}
+
+  <LoadingSpinner id='js-spinner' size="page" />
+
+{:else}
 <DetailsLayout>
-  <BackButton slot="nav" />
+<BackButton slot="nav" />
 
-  <DetailsHeader {form} state="consensus" {id} />
+<DetailsHeader data={$selectedValidator} {form} state="consensus" {id} />
 
-  <MinimalLineGraph
-    height="200"
-    config={CONFIG_EARNINGS}
-    data={[PLACEHOLDER_DATA]}
-  >
-    <svelte:fragment slot="label">Node earnings (USD)</svelte:fragment>
-  </MinimalLineGraph>
+<MinimalLineGraph
+  height="200"
+  config={CONFIG_EARNINGS}
+  data={[PLACEHOLDER_DATA]}
+>
+  <svelte:fragment slot="label">Node earnings (USD)</svelte:fragment>
+</MinimalLineGraph>
 
-  <DetailsTable data={PLACEHOLDER_NODE} />
+<DetailsTable data={$selectedValidator} />
 
-  <MapSection />
+<MapSection />
+
 </DetailsLayout>
+{/if}

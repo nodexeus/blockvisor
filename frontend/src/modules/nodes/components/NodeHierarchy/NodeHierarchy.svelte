@@ -15,7 +15,7 @@
   const handleAddGroup = () => (isAddingNewGroup = true);
 
   onMount(() => {
-    fetchAllNodes($user);
+    fetchAllNodes();
   });
 </script>
 

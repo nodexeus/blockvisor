@@ -25,8 +25,8 @@
   $: hasGroups = false;
 
   $: {
-    fetchNodeById($page.params.id, $user);
-    fetchUserById($page.params.id, $user);
+    fetchNodeById($page.params.id);
+    fetchUserById($page.params.id);
   }
 </script>
 

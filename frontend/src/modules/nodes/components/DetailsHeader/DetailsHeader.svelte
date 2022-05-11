@@ -17,10 +17,14 @@
   import IconDelete from 'icons/trash-12.svg';
   import IconUser from 'icons/person-12.svg';
   import IconButton from 'components/IconButton/IconButton.svelte';
+  import { formatDistanceToNow } from 'date-fns';
 
   export let id;
   export let state = '';
   export let form;
+  export let data: NodeDetails;
+
+  const { ip_addr, address_name, status, created_at } = data;
 
   let isModalOpen = false;
 
@@ -45,7 +49,7 @@
 <header class={classes}>
   <div>
     <h2 class="t-xlarge details-header__title">
-      YellowBeaver{' '}
+      {address_name}
 
       <span class="details-header__icon">
         <TokenIcon icon="eth" />
@@ -60,8 +64,10 @@
             >{id}</small
           >
         </CopyNode>
-        <small class="t-small">212.213.214.2</small>
-        <date>5 weeks ago</date>
+        <small class="t-small">{ip_addr}</small>
+        <date
+          >{created_at && formatDistanceToNow(+new Date(created_at))} ago</date
+        >
       </div>
       <PillBox>
         <Pill removable={false} transition={fadeDefault}>eth</Pill>
@@ -85,7 +91,7 @@
     </Select>
     <div class="details-header__wrapper">
       <div class="t-uppercase t-microlabel details-header__state">
-        <DataState state="consensus" />
+        <DataState {status} />
       </div>
       <div class="container--buttons">
         <IconButton style="outline" size="small">
