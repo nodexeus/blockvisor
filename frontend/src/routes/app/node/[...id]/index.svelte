@@ -11,6 +11,7 @@
   import MapSection from 'modules/nodes/components/MapSection/MapSection.svelte';
   import BackButton from 'modules/app/components/BackButton/BackButton.svelte';
   import { ROUTES } from 'consts/routes';
+  import { fetchValidatorById } from 'modules/nodes/store/nodesStore';
 
   const id = $page.params.id;
 
@@ -22,6 +23,10 @@
     penalties: 'Tenure: 5.5, DKG: 0, Perf: 1.824873823862, Tot: 6.824873823862',
     user: '8d405951-7df5-4804-9ccb-31f7acdc19aa',
   };
+
+  $: {
+    fetchValidatorById($page.params.id);
+  }
 
   onMount(() => {
     app.setBreadcrumbs([

@@ -17,5 +17,6 @@ export const HOST_GROUPS = (token: string) => `${API.URL}/hosts/token/${token}`;
 
 export const NODE_GROUPS = `${API.URL}/groups/nodes`;
 
-export const USER_NODES = (userId: string) =>
-  `${API.URL}/users/${userId}/validators`;
+export const USER_NODES = (userId) => `${API.URL}/users/${userId}/validators`;
+
+export const VALIDATOR = (id) => `${API.URL}/validators/${id}`;

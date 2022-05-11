@@ -42,6 +42,12 @@ export const fetchUserById = async (id: string) => {
   selectedUser.set(res.data.user);
 };
 
+export const fetchValidatorById = async (id: string) => {
+  const res = await axios.get('/api/nodes/fetchValidator', { params: { id } });
+
+  console.log('data', res.data);
+};
+
 export const userDetails = (userId: string) =>
   derived(nodes, ($nodes) =>
     $nodes[0].children.find((item) => item.id === userId),
