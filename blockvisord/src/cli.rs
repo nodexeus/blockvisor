@@ -15,11 +15,11 @@ pub struct App {
 pub struct ConfigureArgs {
     /// One-time password
     #[clap(long)]
-    otp: String,
+    pub otp: String,
 
     /// BlockJoy API url
     #[clap(long = "url")]
-    blockjoy_api_url: String,
+    pub blockjoy_api_url: String,
 }
 
 #[derive(Debug, Args)]
@@ -37,7 +37,7 @@ pub struct StartArgs {
 pub struct StopArgs {
     /// Path to config file
     #[clap(long, short, default_value = "config.toml")]
-    config_path: Utf8PathBuf,
+    pub config_path: Utf8PathBuf,
 }
 
 #[derive(Debug, Subcommand)]

@@ -10,7 +10,7 @@ pub struct APIClient {
 }
 
 impl APIClient {
-    pub fn new(base_url: String, timeout: Duration) -> Result<Self> {
+    pub fn new(base_url: &str, timeout: Duration) -> Result<Self> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
         Ok(Self {
             inner: client,
