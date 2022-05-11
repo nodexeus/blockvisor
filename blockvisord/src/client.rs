@@ -61,6 +61,33 @@ impl APIClient {
         Ok(commands)
     }
 
+    pub async fn create_command(
+        &self,
+        token: &str,
+        host_id: &str,
+        create: &CommandCreateRequest,
+    ) -> Result<Command> {
+        let url = format!(
+            "{}/hosts/{}/commands",
+            self.base_url.as_str().trim_end_matches('/'),
+            host_id
+        );
+
+        let text = self
+            .inner
+            .post(url)
+            .header("Content-Type", "application/json")
+            .bearer_auth(token)
+            .json(create)
+            .send()
+            .await?
+            .text()
+            .await?;
+        let command: Command = serde_json::from_str(&text)?;
+
+        Ok(command)
+    }
+
     pub async fn update_command_status(
         &self,
         token: &str,
@@ -120,6 +147,12 @@ pub struct Command {
     pub exit_status: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct CommandCreateRequest {
+    pub cmd: String,
+    pub sub_cmd: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

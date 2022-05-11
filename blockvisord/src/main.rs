@@ -10,7 +10,8 @@ use sysinfo::{DiskExt, System, SystemExt};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
-use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
+use crate::cli::NodeCommand;
+use crate::client::{APIClient, CommandCreateRequest, CommandStatusUpdate, HostCreateRequest};
 use crate::containers::{DummyNode, NodeContainer};
 use crate::hosts::HostConfig;
 
@@ -104,7 +105,35 @@ async fn main() -> Result<()> {
                 fs::remove_file(PID_FILE)?
             }
         }
-        _ => {}
+        Command::Node { command } => match command {
+            NodeCommand::Create { r#type } => {
+                let config = fs::read_to_string(CONFIG_FILE)?;
+                let config: HostConfig = toml::from_str(&config)?;
+                let timeout = Duration::from_secs(10);
+                let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
+                let create = CommandCreateRequest {
+                    cmd: "start".to_string(),
+                    sub_cmd: Some(r#type.to_string()),
+                };
+                client
+                    .create_command(&config.token, &config.id, &create)
+                    .await?;
+            }
+            NodeCommand::Delete { id } => {
+                let config = fs::read_to_string(CONFIG_FILE)?;
+                let config: HostConfig = toml::from_str(&config)?;
+                let timeout = Duration::from_secs(10);
+                let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
+                let create = CommandCreateRequest {
+                    cmd: "stop".to_string(),
+                    sub_cmd: Some(id),
+                };
+                client
+                    .create_command(&config.token, &config.id, &create)
+                    .await?;
+            }
+            _ => {}
+        },
     }
 
     Ok(())
@@ -137,14 +166,16 @@ async fn work(daemonized: bool) -> Result<()> {
                     }
                     "stop" => {
                         if let Some(id) = command.sub_cmd {
-                            if host.containers.remove(&id).is_none() {
+                            if let Some(node) = host.containers.get_mut(&id) {
+                                node.kill().await?;
+                                host.containers.remove(&id);
+                            } else {
                                 println!("Cannot stop node: {} not present", id);
                             };
                         } else {
                             println!("Cannot stop node: id not provided");
                         }
                     }
-                    "clear" => host.containers.clear(),
                     _ => {}
                 }
 
@@ -169,7 +200,7 @@ async fn work(daemonized: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
+    use crate::client::{APIClient, CommandCreateRequest, CommandStatusUpdate, HostCreateRequest};
     use chrono::{TimeZone, Utc};
     use httpmock::prelude::*;
     use serde_json::json;
@@ -322,6 +353,57 @@ mod tests {
             resp.completed_at,
             Some(Utc.ymd(2020, 8, 24).and_hms(14, 15, 22))
         );
+
+        m.assert();
+    }
+
+    #[tokio::test]
+    async fn test_create_command() {
+        let server = MockServer::start();
+
+        let token = "TOKEN";
+        let host_id = "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b";
+
+        let m = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/hosts/{}/commands", host_id))
+                .header("Content-Type", "application/json")
+                .header("authorization", format!("Bearer {}", token))
+                .json_body(json!({
+                    "cmd": "start",
+                    "sub_cmd": "helium-latest",
+                }));
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .json_body(json!(
+                  {
+                    "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+                    "host_id": host_id,
+                    "cmd": "start",
+                    "sub_cmd": "helium-latest",
+                    "created_at": "2019-08-24T14:15:22Z",
+                  }
+                ));
+        });
+
+        let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
+        let create = CommandCreateRequest {
+            cmd: "start".to_string(),
+            sub_cmd: Some("helium-latest".to_string()),
+        };
+        let resp = client
+            .create_command(token, host_id, &create)
+            .await
+            .unwrap();
+
+        assert_eq!(resp.id, "497f6eca-6276-4993-bfeb-53cbbbba6f08");
+        assert_eq!(resp.host_id, "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
+        assert_eq!(resp.cmd, "start");
+        assert_eq!(resp.sub_cmd, Some("helium-latest".to_string()));
+        assert_eq!(resp.response, None);
+        assert_eq!(resp.exit_status, None);
+        assert_eq!(resp.created_at, Utc.ymd(2019, 8, 24).and_hms(14, 15, 22));
+        assert_eq!(resp.completed_at, None);
 
         m.assert();
     }
