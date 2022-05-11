@@ -57,13 +57,13 @@ async fn main() -> Result<()> {
             println!("{:?}", create);
 
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
-            let creds = client.register_host(&cmd_args.otp, &create).await?;
+            let host = client.register_host(&cmd_args.otp, &create).await?;
 
             let config = HostConfig {
                 data_dir: ".".to_string(),
                 pool_dir: ".".to_string(),
-                id: creds.host_id,
-                token: creds.token,
+                id: host.id.to_string(),
+                token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
             };
             let config = toml::to_string(&config)?;
@@ -109,7 +109,6 @@ async fn main() -> Result<()> {
             NodeCommand::Create => {
                 let config = fs::read_to_string(CONFIG_FILE)?;
                 let config: HostConfig = toml::from_str(&config)?;
-                let timeout = Duration::from_secs(10);
                 let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
                 let create = CommandCreateRequest {
                     cmd: "create_node".to_string(),
@@ -122,7 +121,6 @@ async fn main() -> Result<()> {
             NodeCommand::Kill { id } => {
                 let config = fs::read_to_string(CONFIG_FILE)?;
                 let config: HostConfig = toml::from_str(&config)?;
-                let timeout = Duration::from_secs(10);
                 let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
                 let create = CommandCreateRequest {
                     cmd: "kill_node".to_string(),
@@ -221,9 +219,8 @@ mod tests {
 
         let m = server.mock(|when, then| {
             when.method(POST)
-                .path("/hosts")
+                .path("/host_provisions/OTP/hosts")
                 .header("Content-Type", "application/json")
-                .header("authorization", "Bearer OTP")
                 .json_body(json!({
                     "org_id": org_id,
                     "name": "some-host",
@@ -240,8 +237,22 @@ mod tests {
             then.status(200)
                 .header("Content-Type", "application/json")
                 .json_body(json!({
-                    "host_id": "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b",
-                    "token": "secret_token"
+                    "id": "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b",
+                    "token": "secret_token",
+                    "org_id": org_id,
+                    "name": "some-host",
+                    "version": "1.0",
+                    "location": null,
+                    "cpu_count": 4_i64,
+                    "mem_size": 8_i64,
+                    "disk_size": 100_i64,
+                    "os": "ubuntu",
+                    "os_version": "4.14.12",
+                    "ip_addr": "192.168.0.1",
+                    "val_ip_addrs": null,
+                    "created_at": "2019-08-24T14:15:22Z",
+                    "status": "online",
+                    "validators": [],
                 }));
         });
 
@@ -262,7 +273,7 @@ mod tests {
         };
         let resp = client.register_host(otp, &info).await.unwrap();
 
-        assert_eq!(resp.host_id, "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
+        assert_eq!(resp.id.to_string(), "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
         assert_eq!(resp.token, "secret_token");
 
         m.assert();
