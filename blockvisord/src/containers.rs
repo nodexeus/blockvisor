@@ -32,7 +32,7 @@ pub trait NodeContainer {
 }
 
 pub struct LinuxNode {
-    pub id: String,
+    id: String,
 }
 
 #[async_trait]
