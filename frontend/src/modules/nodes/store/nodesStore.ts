@@ -6,6 +6,7 @@ export const nodes = writable([]);
 export const selectedUser = writable();
 export const selectedNode = writable([]);
 export const selectedValidator = writable({});
+export const isLoading = writable(false);
 
 export const fetchAllNodes = async () => {
   const all_nodes = [
@@ -44,9 +45,10 @@ export const fetchUserById = async (id: string) => {
 };
 
 export const fetchValidatorById = async (id: string) => {
+  isLoading.set(true);
   const res = await axios.get('/api/nodes/fetchValidator', { params: { id } });
-
   selectedValidator.set(res.data.validator);
+  isLoading.set(false);
 };
 
 export const userDetails = (userId: string) =>
