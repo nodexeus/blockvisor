@@ -1,4 +1,5 @@
 interface NodeDetails {
+  address_name: string;
   owner_address: string;
   version: string;
   block_height: number;
