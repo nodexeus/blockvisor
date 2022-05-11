@@ -5,6 +5,7 @@ import { derived, writable } from 'svelte/store';
 export const nodes = writable([]);
 export const selectedUser = writable();
 export const selectedNode = writable([]);
+export const selectedValidator = writable({});
 
 export const fetchAllNodes = async (user: UserSession) => {
   const all_nodes = [
@@ -45,7 +46,7 @@ export const fetchUserById = async (id: string) => {
 export const fetchValidatorById = async (id: string) => {
   const res = await axios.get('/api/nodes/fetchValidator', { params: { id } });
 
-  console.log('data', res.data);
+  selectedValidator.set(res.data.validator);
 };
 
 export const userDetails = (userId: string) =>
