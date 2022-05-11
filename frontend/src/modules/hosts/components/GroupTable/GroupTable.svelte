@@ -1,6 +1,5 @@
 <script lang="ts">
   import Sorter from 'components/Sorter/Sorter.svelte';
-  import { ROUTES } from 'consts/routes';
   import HostDataRow from './HostDataRow.svelte';
 
   export let hosts;
