@@ -15,7 +15,7 @@ export const post = async ({ request }) => {
         'Set-Cookie': `user=${JSON.stringify(
           response.data,
         )}; Expires=${expires}; Path=/; SameSite=Strict; HttpOnly`,
-        Location: ROUTES.BROADCASTS,
+        Location: ROUTES.DASHBOARD,
       },
       status: 302,
     };
