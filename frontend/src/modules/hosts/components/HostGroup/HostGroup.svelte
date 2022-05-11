@@ -15,7 +15,8 @@
       <slot name="action" slot="action" />
       <svelte:fragment slot="stats">
         <IconBox />
-        {selectedHosts?.validators?.length || 0} hosts
+        <!-- {selectedHosts?.validators?.length || 0} hosts -->
+        1 host
       </svelte:fragment>
     </GroupTitle>
   </div>
