@@ -26,5 +26,7 @@ tokio = {version = "1.17.0", features = ["full"]}
 toml = "0.5.8"
 uuid = {version = "0.8", features = ["serde", "v4"]}
 
+firec = { git = "https://github.com/blockjoy/firec.git" }
+
 [dev-dependencies]
 httpmock = "0.6"
