@@ -9,6 +9,7 @@
   let retrying;
   let claimed_at;
   let claimed_host_id;
+  let isChecking = false;
 
   onMount(async () => {
     const res = await axios.post('/api/nodes/provisionNewHost', {
@@ -21,10 +22,10 @@
     }
   });
 
-  let isChecking = false;
-
   const checkProvision = (isRetrying?: boolean) => {
-    isChecking = true;
+    if (!isChecking) {
+      return;
+    }
 
     if (!host_id) {
       isChecking = false;
@@ -47,13 +48,24 @@
             setTimeout(() => {
               checkProvision(true);
             }, 5000);
+          } else {
+            claimed_at = res.data.claimed_at;
+            claimed_host_id = res.data.host_id;
+            retrying = false;
+            isChecking = false;
           }
         }
       });
   };
 
   const handleCheck = () => {
+    isChecking = true;
     checkProvision();
+  };
+
+  const handleCancel = () => {
+    retrying = false;
+    isChecking = false;
   };
 </script>
 
@@ -79,7 +91,7 @@
       cssCustom="class"
       on:click={handleCheck}
     >
-      {#if isChecking}
+      {#if isChecking && !claimed_host_id}
         &nbsp;
         <LoadingSpinner size="button" id="js-form-submit" />
       {:else}
@@ -93,11 +105,18 @@
           size="medium"
           display="block"
           style="warning"
-          on:click={handleCheck}
+          on:click={handleCancel}
         >
           Cancel
         </Button>
       {/if}
+    </div>
+  {/if}
+
+  {#if claimed_host_id}
+    <div>
+      <p>Congrats.</p>
+      <p>Your host was claimed on {claimed_at} with id {claimed_host_id}</p>
     </div>
   {/if}
 </section>
