@@ -16,7 +16,7 @@ pub trait NodeContainer {
         Self: Sized;
 
     /// Returns the container's `id`.
-    fn id(&self) -> String;
+    fn id(&self) -> &str;
 
     /// Starts the container.
     async fn start(&mut self) -> Result<()>;
@@ -41,8 +41,8 @@ impl NodeContainer for LinuxNode {
         unimplemented!()
     }
 
-    fn id(&self) -> String {
-        self.id.to_owned()
+    fn id(&self) -> &str {
+        &self.id
     }
 
     async fn start(&mut self) -> Result<()> {
@@ -77,8 +77,8 @@ impl NodeContainer for DummyNode {
         })
     }
 
-    fn id(&self) -> String {
-        self.id.to_owned()
+    fn id(&self) -> &str {
+        &self.id
     }
 
     async fn start(&mut self) -> Result<()> {
