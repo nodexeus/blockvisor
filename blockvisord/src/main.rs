@@ -34,7 +34,11 @@ async fn main() -> Result<()> {
         Command::Configure(cmd_args) => {
             println!("Configuring blockvisor");
 
+            let network_interfaces = local_ip_address::list_afinet_netifas().unwrap();
+            let (_, ip) = local_ip_address::find_ifa(network_interfaces, &cmd_args.ifa).unwrap();
+
             let sys = System::new_all();
+
             let create = HostCreateRequest {
                 org_id: None,
                 name: sys.host_name().unwrap(),
@@ -45,7 +49,7 @@ async fn main() -> Result<()> {
                 disk_size: Some(sys.disks()[0].total_space() as i64),
                 os: sys.name(),
                 os_version: sys.os_version(),
-                ip_addr: public_ip::addr().await.unwrap().to_string(),
+                ip_addr: ip.to_string(),
                 val_ip_addrs: None,
             };
             println!("{:?}", create);

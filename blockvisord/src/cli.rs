@@ -20,6 +20,10 @@ pub struct ConfigureArgs {
     /// BlockJoy API url
     #[clap(long = "url")]
     pub blockjoy_api_url: String,
+
+    /// Network interface name
+    #[clap(long = "ifa", default_value = "bvbr0")]
+    pub ifa: String,
 }
 
 #[derive(Debug, Args)]
