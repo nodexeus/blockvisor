@@ -6,7 +6,7 @@ export const nodes = writable([]);
 export const selectedUser = writable();
 export const selectedNode = writable([]);
 
-export const fetchAllNodes = async (user: UserSession) => {
+export const fetchAllNodes = async () => {
   const all_nodes = [
     {
       title: 'All Nodes',
@@ -26,8 +26,6 @@ export const fetchAllNodes = async (user: UserSession) => {
       id: item.id,
     };
   });
-
-  nodes.set(all_nodes);
 };
 
 export const fetchNodeById = async (id: string) => {
