@@ -30,6 +30,7 @@ const ERR_FILE: &str = "/tmp/blockvisor.err";
 async fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
+    let timeout = Duration::from_secs(10);
 
     match args.command {
         Command::Configure(cmd_args) => {
@@ -55,7 +56,6 @@ async fn main() -> Result<()> {
             };
             println!("{:?}", create);
 
-            let timeout = Duration::from_secs(10);
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
             let creds = client.register_host(&cmd_args.otp, &create).await?;
 
@@ -106,33 +106,32 @@ async fn main() -> Result<()> {
             }
         }
         Command::Node { command } => match command {
-            NodeCommand::Create { r#type } => {
+            NodeCommand::Create => {
                 let config = fs::read_to_string(CONFIG_FILE)?;
                 let config: HostConfig = toml::from_str(&config)?;
                 let timeout = Duration::from_secs(10);
                 let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
                 let create = CommandCreateRequest {
-                    cmd: "start".to_string(),
-                    sub_cmd: Some(r#type.to_string()),
+                    cmd: "create_node".to_string(),
+                    sub_cmd: None,
                 };
                 client
                     .create_command(&config.token, &config.id, &create)
                     .await?;
             }
-            NodeCommand::Delete { id } => {
+            NodeCommand::Kill { id } => {
                 let config = fs::read_to_string(CONFIG_FILE)?;
                 let config: HostConfig = toml::from_str(&config)?;
                 let timeout = Duration::from_secs(10);
                 let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
                 let create = CommandCreateRequest {
-                    cmd: "stop".to_string(),
+                    cmd: "kill_node".to_string(),
                     sub_cmd: Some(id),
                 };
                 client
                     .create_command(&config.token, &config.id, &create)
                     .await?;
             }
-            _ => {}
         },
     }
 
@@ -158,31 +157,39 @@ async fn work(daemonized: bool) -> Result<()> {
                 .get_pending_commands(&config.token, &config.id)
                 .await?
             {
+                let mut response = "Done".to_string();
+                let mut exit_status = 0;
+
                 match command.cmd.as_str() {
-                    "start" => {
+                    "create_node" => {
                         let id = Uuid::new_v4().to_string();
                         let node = DummyNode::create(&id).await?;
                         host.containers.insert(id, Box::new(node));
                     }
-                    "stop" => {
+                    "kill_node" => {
                         if let Some(id) = command.sub_cmd {
                             if let Some(node) = host.containers.get_mut(&id) {
                                 node.kill().await?;
                                 host.containers.remove(&id);
                             } else {
-                                println!("Cannot stop node: {} not present", id);
+                                println!("Cannot kill node: {} not present", id);
+                                response = "Error".to_string();
+                                exit_status = 1;
                             };
                         } else {
-                            println!("Cannot stop node: id not provided");
+                            println!("Cannot kill node: id not provided");
+                            response = "Error".to_string();
+                            exit_status = 2;
                         }
                     }
                     _ => {}
-                }
+                };
 
                 let update = CommandStatusUpdate {
-                    response: "Done".to_owned(),
-                    exit_status: 0,
+                    response,
+                    exit_status,
                 };
+
                 client
                     .update_command_status(&config.token, &command.id, &update)
                     .await?;
@@ -370,8 +377,8 @@ mod tests {
                 .header("Content-Type", "application/json")
                 .header("authorization", format!("Bearer {}", token))
                 .json_body(json!({
-                    "cmd": "start",
-                    "sub_cmd": "helium-latest",
+                    "cmd": "create_node",
+                    "sub_cmd": null,
                 }));
             then.status(200)
                 .header("Content-Type", "application/json")
@@ -379,8 +386,7 @@ mod tests {
                   {
                     "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
                     "host_id": host_id,
-                    "cmd": "start",
-                    "sub_cmd": "helium-latest",
+                    "cmd": "create_node",
                     "created_at": "2019-08-24T14:15:22Z",
                   }
                 ));
@@ -388,8 +394,8 @@ mod tests {
 
         let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
         let create = CommandCreateRequest {
-            cmd: "start".to_string(),
-            sub_cmd: Some("helium-latest".to_string()),
+            cmd: "create_node".to_string(),
+            sub_cmd: None,
         };
         let resp = client
             .create_command(token, host_id, &create)
@@ -398,8 +404,8 @@ mod tests {
 
         assert_eq!(resp.id, "497f6eca-6276-4993-bfeb-53cbbbba6f08");
         assert_eq!(resp.host_id, "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
-        assert_eq!(resp.cmd, "start");
-        assert_eq!(resp.sub_cmd, Some("helium-latest".to_string()));
+        assert_eq!(resp.cmd, "create_node");
+        assert_eq!(resp.sub_cmd, None);
         assert_eq!(resp.response, None);
         assert_eq!(resp.exit_status, None);
         assert_eq!(resp.created_at, Utc.ymd(2019, 8, 24).and_hms(14, 15, 22));

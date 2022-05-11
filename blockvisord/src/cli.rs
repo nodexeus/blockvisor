@@ -1,7 +1,5 @@
-use std::fmt;
-
 use camino::Utf8PathBuf;
-use clap::{ArgEnum, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(name = "bvs", author, version, about)]
@@ -67,32 +65,14 @@ pub enum Command {
 #[derive(Debug, Subcommand)]
 pub enum NodeCommand {
     /// Create node
-    Create {
-        /// Node type
-        #[clap(long, arg_enum)]
-        r#type: NodeType,
-    },
+    Create,
 
-    /// List created nodes
-    List,
-
-    /// Delete node
-    Delete {
+    /// Delete node and clean up resources
+    Kill {
         /// Node id
         #[clap(long)]
         id: String,
     },
-}
-
-#[derive(Clone, Debug, ArgEnum)]
-pub enum NodeType {
-    HeliumLatest,
-}
-
-impl fmt::Display for NodeType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 #[derive(Debug, Args)]
