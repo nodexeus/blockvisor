@@ -25,7 +25,7 @@ export const fetchAllHosts = async (user: UserSession) => {
     return {
       title: item.name,
       location: item.location,
-      href: ROUTES.HOST_GROUP(item.token),
+      href: ROUTES.HOST_GROUP(item.id),
       id: item.id,
     };
   });
@@ -37,8 +37,6 @@ export const fetchHostById = async (id: string, user: UserSession) => {
   const res = await axios.get(SINGLE_HOST(id), {
     headers: { Authorization: `Bearer ${user ? user.token : ''}` },
   });
-
-  console.log(res);
 
   selectedHosts.set(res.data);
 };

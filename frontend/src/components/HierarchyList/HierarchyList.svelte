@@ -7,8 +7,6 @@
   export let handleConfirm;
   export let handleEdit;
   export let editingId;
-
-  console.log(nodes);
 </script>
 
 {#if Boolean(nodes.length)}

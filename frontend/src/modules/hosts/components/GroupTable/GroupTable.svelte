@@ -5,37 +5,6 @@
 
   export let hosts;
 
-  const PLACEHOLDER_DATA = [
-    {
-      name: 'HostFox',
-      ip: '212.213.214.2',
-      location: 'Zagreb, Croatia',
-      status: 'pending',
-      url: ROUTES.HOST_DETAILS('id-1'),
-    },
-    {
-      name: 'HostFox',
-      ip: '212.213.214.2',
-      location: 'Zagreb, Croatia',
-      status: 'normal',
-      url: ROUTES.HOST_DETAILS('id-2'),
-    },
-    {
-      name: 'HostFox',
-      ip: '212.213.214.2',
-      location: 'Zagreb, Croatia',
-      status: 'issue',
-      url: ROUTES.HOST_DETAILS('id-3'),
-    },
-    {
-      name: 'HostFox',
-      ip: '212.213.214.2',
-      location: 'Zagreb, Croatia',
-      status: 'loaded',
-      url: ROUTES.HOST_DETAILS('id-4'),
-    },
-  ];
-
   let sortActive;
 
   const handleSort = (id: string, value: SorterValues) => {
@@ -66,9 +35,7 @@
     </tr>
   </thead>
   <tbody>
-    {#each hosts as host}
-      <HostDataRow {...host} />
-    {/each}
+    <HostDataRow {...hosts} />
   </tbody>
 </table>
 

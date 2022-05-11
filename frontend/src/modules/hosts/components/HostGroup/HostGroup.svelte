@@ -6,8 +6,6 @@
 
   export let selectedHosts;
   export let id;
-
-  $: console.log(selectedHosts);
 </script>
 
 <article class="host-group">

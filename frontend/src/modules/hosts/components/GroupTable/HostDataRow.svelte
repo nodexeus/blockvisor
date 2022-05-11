@@ -35,7 +35,8 @@
     </small>
   </td>
   <td class="host-data-row__col t-uppercase t-microlabel host-data-row__state">
-    <DataState state={status} />
+    <!-- Temp fix since statuses are not the same and we don't have icons for new statuses. -->
+    <DataState {status} />
   </td>
   <td class="host-data-row__col t-right">
     <ButtonWithDropdown
