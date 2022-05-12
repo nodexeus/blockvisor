@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
-import { SINGLE_HOST } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
 
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
+export const provisionedHostId = writable('');
 
 export const fetchAllHosts = async () => {
   const all_hosts = [
@@ -32,7 +32,13 @@ export const fetchAllHosts = async () => {
 };
 
 export const fetchHostById = async (id: string) => {
-  const res = await axios.get('/api/hosts/fetchHosts', { params: { id } });
+  const res = await axios.get('/api/hosts/fetchHostById', { params: { id } });
 
   selectedHosts.set(res.data.host);
+};
+
+export const getHostById = async (id: string) => {
+  const res = await axios.get('/api/hosts/fetchHostById', { params: { id } });
+
+  return res.data.host;
 };

@@ -1,13 +1,12 @@
 <script lang="ts">
   import StepLabel from 'components/StepLabel/StepLabel.svelte';
-  import { fade } from 'svelte/transition';
   import StepList from 'components/StepList/StepList.svelte';
-  import { MetaTags } from 'svelte-meta-tags';
-
-  import { app } from 'modules/app/store';
-  import { onDestroy, onMount } from 'svelte';
-  import NodeAdd from 'modules/nodes/components/NodeAdd/NodeAdd.svelte';
   import { ROUTES } from 'consts/routes';
+  import { app } from 'modules/app/store';
+  import NodeAdd from 'modules/nodes/components/NodeAdd/NodeAdd.svelte';
+  import { onMount } from 'svelte';
+  import { MetaTags } from 'svelte-meta-tags';
+  import { fade } from 'svelte/transition';
 
   let currentStep = 1;
 
@@ -44,7 +43,13 @@
         <StepLabel {setStep} {currentStep} step={3}>Add a host</StepLabel>
       </li>
       <li in:fade={{ duration: 250, delay: 660 }}>
-        <StepLabel {setStep} {currentStep} step={4}>Review & finish</StepLabel>
+        <StepLabel {setStep} {currentStep} step={4}>Provision host</StepLabel>
+      </li>
+      <li in:fade={{ duration: 250, delay: 660 }}>
+        <StepLabel {setStep} {currentStep} step={5}>Install Node</StepLabel>
+      </li>
+      <li in:fade={{ duration: 250, delay: 660 }}>
+        <StepLabel {setStep} {currentStep} step={6}>Review & finish</StepLabel>
       </li>
     </StepList>
   </aside>
