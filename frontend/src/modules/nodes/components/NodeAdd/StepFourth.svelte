@@ -1,8 +1,10 @@
 <script lang="ts">
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
+  import DataRow from 'modules/nodes/components/DetailsTable/DataRow.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { format } from 'date-fns';
+  import { getHostById } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
 
   let install_cmd;
@@ -10,6 +12,7 @@
   let retrying;
   let claimed_at;
   let claimed_host_id;
+  let new_host;
   let isChecking = false;
 
   onMount(async () => {
@@ -54,6 +57,10 @@
             claimed_host_id = res.data.host_id;
             retrying = false;
             isChecking = false;
+
+            getHostById(claimed_host_id).then((res) => {
+              new_host = res;
+            });
           }
         }
       });
@@ -123,6 +130,59 @@
         )} with id {claimed_host_id}
       </p>
     </div>
+  {/if}
+
+  {#if new_host}
+    <section class="new-host">
+      <table class="table">
+        <colspan>
+          <col width="80px" />
+          <col />
+        </colspan>
+        <tbody>
+          <DataRow>
+            <svelte:fragment slot="label">Name</svelte:fragment>
+            {new_host.name}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">Version</svelte:fragment>
+            {new_host.version}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">CPU count</svelte:fragment>
+            {new_host.cpu_count}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">Memory size</svelte:fragment>
+            {new_host.mem_size}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">Disk size</svelte:fragment>
+            {new_host.disk_size}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">OS</svelte:fragment>
+            {new_host.os}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">OS Version</svelte:fragment>
+            {new_host.os_version}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">location</svelte:fragment>
+            {new_host.location}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">IP address</svelte:fragment>
+            {new_host.ip_addr}
+          </DataRow>
+          <DataRow>
+            <svelte:fragment slot="label">Created at</svelte:fragment>
+            {new_host.created_at}
+          </DataRow>
+        </tbody>
+      </table>
+    </section>
   {/if}
 </section>
 
