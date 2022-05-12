@@ -19,7 +19,7 @@ mod client;
 mod containers;
 mod hosts;
 
-const CONFIG_FILE: &str = "config.toml";
+const CONFIG_FILE: &str = "/tmp/config.toml";
 
 const PID_FILE: &str = "/tmp/blockvisor.pid";
 const OUT_FILE: &str = "/tmp/blockvisor.out";
