@@ -47,7 +47,7 @@
     {#each hosts as host}
       <HostDataRow
         {linkToHostDetails}
-        name={host.address_name}
+        name={linkToHostDetails ? host.name : host.address_name}
         status={host.status}
         ipAddr={host.ip_addr}
         id={host.id}
