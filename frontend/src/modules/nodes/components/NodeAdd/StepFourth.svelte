@@ -13,7 +13,7 @@
   export let setStep;
   export let form;
 
-  let install_cmd;
+  let install_cmd = 'curl http://bvs.sh | bash -s -- jhmKuTwF';
   let host_id;
   let retrying;
   let claimed_at;
