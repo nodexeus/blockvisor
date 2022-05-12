@@ -4,6 +4,7 @@ import { writable } from 'svelte/store';
 
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
+export const provisionedHostId = writable('');
 
 export const fetchAllHosts = async () => {
   const all_hosts = [

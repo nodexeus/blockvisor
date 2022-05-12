@@ -4,7 +4,10 @@
   import DataRow from 'modules/nodes/components/DetailsTable/DataRow.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { format } from 'date-fns';
-  import { getHostById } from 'modules/hosts/store/hostsStore';
+  import {
+    getHostById,
+    provisionedHostId,
+  } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
 
   export let setStep;
@@ -60,6 +63,8 @@
             claimed_host_id = res.data.host_id;
             retrying = false;
             isChecking = false;
+
+            $provisionedHostId = claimed_host_id;
 
             getHostById(claimed_host_id).then((res) => {
               new_host = res;
