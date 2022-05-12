@@ -20,9 +20,6 @@
     success = false;
     installing = true;
 
-    console.log($provisionedHostId);
-    console.log($form.nodeType.value);
-
     axios
       .get('/api/nodes/installNode', {
         params: {

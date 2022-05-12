@@ -13,7 +13,7 @@
 </script>
 
 <section>
-  <p>Review installed node</p>
+  <p>Your node has been successfully created</p>
 
   <section class="review">
     <table class="table">
@@ -32,7 +32,7 @@
         </DataRow>
         <DataRow>
           <svelte:fragment slot="label">Chain type</svelte:fragment>
-          {$installedNode?.chain_type || 'n/a'}
+          <span class="title-case">{$installedNode?.chain_type || 'n/a'}</span>
         </DataRow>
         <DataRow>
           <svelte:fragment slot="label">Created at</svelte:fragment>
@@ -46,11 +46,11 @@
         </DataRow>
         <DataRow>
           <svelte:fragment slot="label">Node Type</svelte:fragment>
-          {$installedNode?.node_type || 'n/a'}
+          <span class="title-case">{$installedNode?.node_type || 'n/a'}</span>
         </DataRow>
         <DataRow>
           <svelte:fragment slot="label">Status</svelte:fragment>
-          {$installedNode?.status || 'n/a'}
+          <span class="title-case">{$installedNode?.status || 'n/a'}</span>
         </DataRow>
       </tbody>
     </table>
@@ -61,12 +61,16 @@
       style="primary"
       on:click={handleViewNode}
     >
-      View all nodes
+      Done
     </Button>
   </section>
 </section>
 
 <style>
+  .title-case {
+    text-transform: capitalize;
+  }
+
   .review {
     padding-bottom: 100px;
     & :global(button) {

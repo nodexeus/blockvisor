@@ -27,7 +27,7 @@
     { title: 'Add a Node', size: 'large' },
     { title: 'Provision Host', size: 'large' },
     { title: 'Install Node', size: 'large' },
-    { title: 'Review & Finish', size: 'large' },
+    { title: 'Node Created', size: 'large' },
   ];
 
   let activeComponent = null;
