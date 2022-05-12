@@ -5,6 +5,7 @@ import { writable } from 'svelte/store';
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
 export const provisionedHostId = writable('');
+export const isLoading = writable(false);
 
 export const fetchAllHosts = async () => {
   const all_hosts = [
@@ -25,6 +26,7 @@ export const fetchAllHosts = async () => {
       location: item.location,
       href: ROUTES.HOST_GROUP(item.id),
       id: item.id,
+      ...item,
     };
   });
 
@@ -32,8 +34,10 @@ export const fetchAllHosts = async () => {
 };
 
 export const fetchHostById = async (id: string) => {
+  isLoading.set(true);
   const res = await axios.get('/api/hosts/fetchHostById', { params: { id } });
 
+  isLoading.set(false);
   selectedHosts.set(res.data.host);
 };
 

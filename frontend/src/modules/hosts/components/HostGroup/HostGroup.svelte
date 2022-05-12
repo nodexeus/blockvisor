@@ -6,6 +6,8 @@
 
   export let selectedHosts;
   export let id;
+
+  console.log(selectedHosts);
 </script>
 
 <article class="host-group">
@@ -15,14 +17,13 @@
       <slot name="action" slot="action" />
       <svelte:fragment slot="stats">
         <IconBox />
-        <!-- {selectedHosts?.validators?.length || 0} hosts -->
-        1 host
+        {selectedHosts?.validators?.length || 0} hosts
       </svelte:fragment>
     </GroupTitle>
   </div>
 
-  {#if selectedHosts}
-    <GroupTable hosts={selectedHosts} />
+  {#if selectedHosts.validators?.length}
+    <GroupTable hosts={selectedHosts.validators} linkToHostDetails={false} />
   {:else}
     <div class="host-group--empty">
       <EmptyColumn id={`graphic-${id}`}>
