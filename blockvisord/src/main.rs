@@ -25,8 +25,7 @@ const PID_FILE: &str = "/tmp/blockvisor.pid";
 const OUT_FILE: &str = "/tmp/blockvisor.out";
 const ERR_FILE: &str = "/tmp/blockvisor.err";
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
     let timeout = Duration::from_secs(10);
@@ -56,7 +55,8 @@ async fn main() -> Result<()> {
             println!("{:?}", create);
 
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
-            let host = client.register_host(&cmd_args.otp, &create).await?;
+            let rt = tokio::runtime::Runtime::new()?;
+            let host = rt.block_on(client.register_host(&cmd_args.otp, &create))?;
 
             let config = HostConfig {
                 data_dir: ".".to_string(),
@@ -125,6 +125,7 @@ async fn work(daemonized: bool) -> Result<()> {
             let timeout = Duration::from_secs(10);
             let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
 
+            println!("Getting pending commands for host: {}", &config.id);
             for command in client
                 .get_pending_commands(&config.token, &config.id)
                 .await?
@@ -132,6 +133,7 @@ async fn work(daemonized: bool) -> Result<()> {
                 let mut response = "Done".to_string();
                 let mut exit_status = 0;
 
+                println!("Processing command: {}", &command.cmd);
                 match command.cmd.as_str() {
                     "create_node" => {
                         let id = Uuid::new_v4().to_string();
