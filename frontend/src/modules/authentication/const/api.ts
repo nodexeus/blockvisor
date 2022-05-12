@@ -25,3 +25,5 @@ export const PROVISION_HOST = `${API.URL}/host_provisions`;
 
 export const CONFIRM_PROVISION = (host_id: string) =>
   `${API.URL}/host_provisions/${host_id}`;
+
+export const INSTALL_NODE = `${API.URL}/nodes`;

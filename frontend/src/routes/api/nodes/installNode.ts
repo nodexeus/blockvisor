@@ -1,22 +1,35 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { PROVISION_HOST } from 'modules/authentication/const';
+import { INSTALL_NODE } from 'modules/authentication/const';
 import { httpClient } from 'utils/httpClient';
 import { getTokens } from 'utils/ServerRequest';
 
-export const post: RequestHandler = async ({ request }) => {
-  const data = await request.formData();
-
-  const { nodeType, host_id } = data;
-
+export const get: RequestHandler = async ({ request, url }) => {
   const { accessToken, refreshToken } = getTokens(request);
+  const nodeType = url.searchParams.get('node_type');
+  const hostId = url.searchParams.get('host_id');
+
+  let realNodeType;
+
+  switch (nodeType) {
+    case 'ETL':
+      realNodeType = 'etl';
+      break;
+    case 'Node/api':
+      realNodeType = 'node';
+      break;
+    case 'Validator':
+      realNodeType = 'validator';
+      break;
+  }
+
   try {
     const res = await httpClient.post(
-      PROVISION_HOST,
+      INSTALL_NODE,
       {
         org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
-        host_id: host_id,
+        host_id: hostId,
         chain_type: 'helium',
-        node_type: nodeType.toString().toLowerCase(),
+        node_type: realNodeType,
         status: 'installing',
         is_online: false,
       },
