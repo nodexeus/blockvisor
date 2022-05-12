@@ -11,7 +11,8 @@ pub enum ContainerStatus {
 #[async_trait]
 pub trait NodeContainer {
     /// Creates a new container with `id`.
-    async fn create(id: &str) -> Result<Self>
+    /// TODO: machine_index is a hack. Remove after demo.
+    async fn create(id: &str, machine_index: usize) -> Result<Self>
     where
         Self: Sized;
 
@@ -37,7 +38,7 @@ pub struct LinuxNode {
 
 #[async_trait]
 impl NodeContainer for LinuxNode {
-    async fn create(_id: &str) -> Result<Self> {
+    async fn create(_id: &str, machine_index: usize) -> Result<Self> {
         unimplemented!()
     }
 
@@ -69,7 +70,7 @@ pub struct DummyNode {
 
 #[async_trait]
 impl NodeContainer for DummyNode {
-    async fn create(id: &str) -> Result<Self> {
+    async fn create(id: &str, _machine_index: usize) -> Result<Self> {
         println!("Creating node: {}", id);
         Ok(Self {
             id: id.to_owned(),
