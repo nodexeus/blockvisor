@@ -7,6 +7,9 @@
   import { getHostById } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
 
+  export let setStep;
+  export let form;
+
   let install_cmd;
   let host_id;
   let retrying;
@@ -75,9 +78,15 @@
     retrying = false;
     isChecking = false;
   };
+
+  const handleNextStep = () => {
+    setStep(5);
+  };
 </script>
 
 <section class="provision-host">
+  <h2 class="provision-host__title">Node type: {$form.nodeType.value}</h2>
+
   <p>Please execute this command on your host.</p>
   <p>It is a one time only command, and it will expire after 24h.</p>
 
@@ -142,55 +151,71 @@
         <tbody>
           <DataRow>
             <svelte:fragment slot="label">Name</svelte:fragment>
-            {new_host.name}
+            {new_host.name || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">Version</svelte:fragment>
-            {new_host.version}
+            {new_host.version || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">CPU count</svelte:fragment>
-            {new_host.cpu_count}
+            {new_host.cpu_count || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">Memory size</svelte:fragment>
-            {new_host.mem_size}
+            {new_host.mem_size || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">Disk size</svelte:fragment>
-            {new_host.disk_size}
+            {new_host.disk_size || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">OS</svelte:fragment>
-            {new_host.os}
+            {new_host.os || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">OS Version</svelte:fragment>
-            {new_host.os_version}
+            {new_host.os_version || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">location</svelte:fragment>
-            {new_host.location}
+            {new_host.location || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">IP address</svelte:fragment>
-            {new_host.ip_addr}
+            {new_host.ip_addr || 'n/a'}
           </DataRow>
           <DataRow>
             <svelte:fragment slot="label">Created at</svelte:fragment>
-            {new_host.created_at}
+            {new_host.created_at
+              ? format(+new Date(new_host.created_at), 'dd MMM yyyy')
+              : 'n/a'}
           </DataRow>
         </tbody>
       </table>
     </section>
+
+    <Button
+      size="medium"
+      display="block"
+      style="primary"
+      on:click={handleNextStep}
+    >
+      Continue
+    </Button>
   {/if}
 </section>
 
 <style>
   .provision-host {
+    padding-bottom: 100px;
     & :global(button) {
       position: relative;
     }
+  }
+
+  .provision-host__title {
+    margin-bottom: 20px;
   }
 
   .code-block {
@@ -212,5 +237,9 @@
   .retrying {
     margin-top: 12px;
     opacity: 0.6;
+  }
+
+  .new-host {
+    margin-bottom: 12px;
   }
 </style>

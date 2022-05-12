@@ -15,8 +15,6 @@ export const get: RequestHandler = async ({ request, url }) => {
       },
     });
 
-    console.log(res);
-
     return {
       status: res.status,
       body: {
