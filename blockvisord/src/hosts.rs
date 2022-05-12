@@ -1,9 +1,17 @@
 use crate::containers::NodeContainer;
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-/// Host.
 pub struct Host {
-    containers: Vec<NodeContainer>,
-    data_dir: Path,
-    pool_dir: Path,
+    pub containers: HashMap<String, Box<dyn NodeContainer>>,
+    pub config: HostConfig,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct HostConfig {
+    pub id: String,
+    pub data_dir: String,
+    pub pool_dir: String,
+    pub token: String,
+    pub blockjoy_api_url: String,
 }

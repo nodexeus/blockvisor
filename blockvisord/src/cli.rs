@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use clap::{ArgEnum, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(name = "bvs", author, version, about)]
@@ -15,11 +15,15 @@ pub struct App {
 pub struct ConfigureArgs {
     /// One-time password
     #[clap(long)]
-    otp: String,
+    pub otp: String,
 
     /// BlockJoy API url
-    #[clap(long = "url")]
-    blockjoy_api_url: String,
+    #[clap(long = "url", default_value = "https://api.stakejoy.com")]
+    pub blockjoy_api_url: String,
+
+    /// Network interface name
+    #[clap(long = "ifa", default_value = "bvbr0")]
+    pub ifa: String,
 }
 
 #[derive(Debug, Args)]
@@ -37,7 +41,7 @@ pub struct StartArgs {
 pub struct StopArgs {
     /// Path to config file
     #[clap(long, short, default_value = "config.toml")]
-    config_path: Utf8PathBuf,
+    pub config_path: Utf8PathBuf,
 }
 
 #[derive(Debug, Subcommand)]
@@ -61,30 +65,14 @@ pub enum Command {
 #[derive(Debug, Subcommand)]
 pub enum NodeCommand {
     /// Create node
-    Create {
-        /// Node type
-        #[clap(long, arg_enum)]
-        r#type: NodeType,
+    Create,
 
+    /// Delete node and clean up resources
+    Kill {
         /// Node id
         #[clap(long)]
         id: String,
     },
-
-    /// List created nodes
-    List,
-
-    /// Delete node
-    Delete {
-        /// Node id
-        #[clap(long)]
-        id: String,
-    },
-}
-
-#[derive(Clone, Debug, ArgEnum)]
-pub enum NodeType {
-    HeliumLatest,
 }
 
 #[derive(Debug, Args)]

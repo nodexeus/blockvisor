@@ -1,46 +1,87 @@
+use anyhow::{bail, Result};
 use clap::Parser;
 use cli::{App, Command};
 use daemonize::Daemonize;
-use std::fs::{self, File, OpenOptions};
+use hosts::Host;
+use std::collections::HashMap;
+use std::fs::{self, OpenOptions};
 use std::path::Path;
+use sysinfo::{DiskExt, System, SystemExt};
 use tokio::time::{sleep, Duration};
+use uuid::Uuid;
+
+use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
+use crate::containers::{DummyNode, NodeContainer};
+use crate::hosts::HostConfig;
 
 mod cli;
 mod client;
 mod containers;
+mod hosts;
 
-const CONFIG_FILE: &str = "config.toml";
+const CONFIG_FILE: &str = "/tmp/config.toml";
 
 const PID_FILE: &str = "/tmp/blockvisor.pid";
 const OUT_FILE: &str = "/tmp/blockvisor.out";
 const ERR_FILE: &str = "/tmp/blockvisor.err";
 
-fn main() {
+fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
+    let timeout = Duration::from_secs(10);
 
     match args.command {
-        Command::Configure(_) => {
+        Command::Configure(cmd_args) => {
             println!("Configuring blockvisor");
-            File::create(CONFIG_FILE).unwrap();
+
+            let network_interfaces = local_ip_address::list_afinet_netifas().unwrap();
+            let (_, ip) = local_ip_address::find_ifa(network_interfaces, &cmd_args.ifa).unwrap();
+
+            let sys = System::new_all();
+
+            let create = HostCreateRequest {
+                org_id: None,
+                name: sys.host_name().unwrap(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                location: None,
+                cpu_count: sys.physical_core_count().map(|x| x as i64),
+                mem_size: Some(sys.total_memory() as i64),
+                disk_size: Some(sys.disks()[0].total_space() as i64),
+                os: sys.name(),
+                os_version: sys.os_version(),
+                ip_addr: ip.to_string(),
+                val_ip_addrs: None,
+            };
+            println!("{:?}", create);
+
+            let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
+            let rt = tokio::runtime::Runtime::new()?;
+            let host = rt.block_on(client.register_host(&cmd_args.otp, &create))?;
+
+            let config = HostConfig {
+                data_dir: ".".to_string(),
+                pool_dir: ".".to_string(),
+                id: host.id.to_string(),
+                token: host.token,
+                blockjoy_api_url: cmd_args.blockjoy_api_url,
+            };
+            let config = toml::to_string(&config)?;
+            fs::write(CONFIG_FILE, config)?;
         }
         Command::Start(cmd_args) => {
             if !Path::new(CONFIG_FILE).exists() {
-                eprintln!("Error: not configured, please run `configure` first");
-                return;
+                bail!("Error: not configured, please run `configure` first");
             }
 
             if cmd_args.daemonize {
                 let stdout = OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(OUT_FILE)
-                    .unwrap();
+                    .open(OUT_FILE)?;
                 let stderr = OpenOptions::new()
                     .create(true)
                     .append(true)
-                    .open(ERR_FILE)
-                    .unwrap();
+                    .open(ERR_FILE)?;
 
                 let daemonize = Daemonize::new()
                     .pid_file(PID_FILE)
@@ -50,39 +91,92 @@ fn main() {
                 match daemonize.start() {
                     Ok(_) => println!("Starting blockvisor in background"),
                     Err(e) => {
-                        eprintln!("Error: {}", e);
-                        return;
+                        bail!(e);
                     }
                 }
             }
 
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(work(cmd_args.daemonize));
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(work(cmd_args.daemonize))?;
         }
         Command::Stop(_) => {
             if Path::new(PID_FILE).exists() {
-                fs::remove_file(PID_FILE).unwrap()
+                fs::remove_file(PID_FILE)?
             }
         }
         _ => {}
     }
+
+    Ok(())
 }
 
-async fn work(daemonized: bool) {
+async fn work(daemonized: bool) -> Result<()> {
+    let config = fs::read_to_string(CONFIG_FILE)?;
+    let config: HostConfig = toml::from_str(&config)?;
+    let mut host = Host {
+        containers: HashMap::new(),
+        config,
+    };
+
     loop {
         if !daemonized || Path::new(PID_FILE).exists() {
-            println!("Hello");
-            let resp = reqwest::get("https://httpbin.org/status/200")
-                .await
-                .unwrap()
-                .status();
-            println!("status: {}", resp);
-            sleep(Duration::from_secs(2)).await;
+            println!("Reading config: {}", CONFIG_FILE);
+            let config = host.config.clone();
+            let timeout = Duration::from_secs(10);
+            let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
+
+            println!("Getting pending commands for host: {}", &config.id);
+            for command in client
+                .get_pending_commands(&config.token, &config.id)
+                .await?
+            {
+                let mut response = "Done".to_string();
+                let mut exit_status = 0;
+
+                println!("Processing command: {}", &command.cmd);
+                match command.cmd.as_str() {
+                    "create_node" => {
+                        let id = Uuid::new_v4().to_string();
+                        let node = DummyNode::create(&id).await?;
+                        host.containers.insert(id, Box::new(node));
+                    }
+                    "kill_node" => {
+                        if let Some(id) = command.sub_cmd {
+                            if let Some(node) = host.containers.get_mut(&id) {
+                                node.kill().await?;
+                                host.containers.remove(&id);
+                            } else {
+                                println!("Cannot kill node: {} not present", id);
+                                response = "Error".to_string();
+                                exit_status = 1;
+                            };
+                        } else {
+                            println!("Cannot kill node: id not provided");
+                            response = "Error".to_string();
+                            exit_status = 2;
+                        }
+                    }
+                    _ => {}
+                };
+
+                let update = CommandStatusUpdate {
+                    response,
+                    exit_status,
+                };
+
+                client
+                    .update_command_status(&config.token, &command.id, &update)
+                    .await?;
+            }
+
+            sleep(Duration::from_secs(5)).await;
         } else {
             println!("Stopping blockvisor");
             break;
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -101,9 +195,8 @@ mod tests {
 
         let m = server.mock(|when, then| {
             when.method(POST)
-                .path("/hosts")
+                .path("/host_provisions/OTP/hosts")
                 .header("Content-Type", "application/json")
-                .header("authorization", "Bearer OTP")
                 .json_body(json!({
                     "org_id": org_id,
                     "name": "some-host",
@@ -120,12 +213,26 @@ mod tests {
             then.status(200)
                 .header("Content-Type", "application/json")
                 .json_body(json!({
-                    "host_id": "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b",
-                    "token": "secret_token"
+                    "id": "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b",
+                    "token": "secret_token",
+                    "org_id": org_id,
+                    "name": "some-host",
+                    "version": "1.0",
+                    "location": null,
+                    "cpu_count": 4_i64,
+                    "mem_size": 8_i64,
+                    "disk_size": 100_i64,
+                    "os": "ubuntu",
+                    "os_version": "4.14.12",
+                    "ip_addr": "192.168.0.1",
+                    "val_ip_addrs": null,
+                    "created_at": "2019-08-24T14:15:22Z",
+                    "status": "online",
+                    "validators": [],
                 }));
         });
 
-        let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
+        let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
         let otp = "OTP";
         let info = HostCreateRequest {
             org_id: Some(org_id),
@@ -142,7 +249,7 @@ mod tests {
         };
         let resp = client.register_host(otp, &info).await.unwrap();
 
-        assert_eq!(resp.host_id, "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
+        assert_eq!(resp.id.to_string(), "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
         assert_eq!(resp.token, "secret_token");
 
         m.assert();
@@ -172,7 +279,7 @@ mod tests {
                 ]));
         });
 
-        let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
+        let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
         let resp = client.get_pending_commands(token, host_id).await.unwrap();
 
         assert_eq!(resp.len(), 1);
@@ -219,7 +326,7 @@ mod tests {
                 ));
         });
 
-        let client = APIClient::new(server.base_url(), Duration::from_secs(10)).unwrap();
+        let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
         let update = CommandStatusUpdate {
             response: "restarted".to_string(),
             exit_status: 0,
