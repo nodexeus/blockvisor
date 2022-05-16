@@ -6,6 +6,12 @@ use firec::Machine;
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug)]
+pub enum ServiceStatus {
+    Enabled,
+    Disabled,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum ContainerStatus {
     Created,
     Started,

@@ -11,7 +11,7 @@ use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
-use crate::containers::{LinuxNode, NodeContainer};
+use crate::containers::{LinuxNode, NodeContainer, ServiceStatus};
 use crate::hosts::HostConfig;
 
 mod cli;
@@ -102,6 +102,13 @@ fn main() -> Result<()> {
         Command::Stop(_) => {
             if Path::new(PID_FILE).exists() {
                 fs::remove_file(PID_FILE)?
+            }
+        }
+        Command::Status(_) => {
+            if Path::new(PID_FILE).exists() {
+                println!("bvs: {:?}", ServiceStatus::Enabled);
+            } else {
+                println!("bvs: {:?}", ServiceStatus::Disabled);
             }
         }
         _ => {}

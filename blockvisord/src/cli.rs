@@ -36,6 +36,9 @@ pub struct StartArgs {
 #[derive(Debug, Args)]
 pub struct StopArgs {}
 
+#[derive(Debug, Args)]
+pub struct StatusArgs {}
+
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Configure blockvisor to run on this host
@@ -46,6 +49,9 @@ pub enum Command {
 
     /// Stop blockvisor service
     Stop(StopArgs),
+
+    /// Return blockvisor status
+    Status(StatusArgs),
 
     /// Manage nodes on this host
     Node {
