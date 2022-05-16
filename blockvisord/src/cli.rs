@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgEnum, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[clap(name = "bvs", author, version, about)]
@@ -31,18 +31,10 @@ pub struct StartArgs {
     /// Should the app run as daemon
     #[clap(long, short)]
     pub daemonize: bool,
-
-    /// Path to config file
-    #[clap(long, short, default_value = "config.toml")]
-    pub config_path: Utf8PathBuf,
 }
 
 #[derive(Debug, Args)]
-pub struct StopArgs {
-    /// Path to config file
-    #[clap(long, short, default_value = "config.toml")]
-    pub config_path: Utf8PathBuf,
-}
+pub struct StopArgs {}
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -75,9 +67,23 @@ pub enum NodeCommand {
     },
 }
 
+#[derive(ArgEnum, PartialEq, Debug, Clone)]
+pub enum FormatArg {
+    Text,
+    Json,
+}
+
 #[derive(Debug, Args)]
 pub struct GlobalOpts {
     /// Verbosity level (can be specified multiple times)
     #[clap(long, short, global = true, parse(from_occurrences))]
     verbose: usize,
+
+    /// Path to config file
+    #[clap(long, short, global = true, default_value = "/tmp/blockvisor.toml")]
+    pub config_path: Utf8PathBuf,
+
+    /// Output format
+    #[clap(long, short, global = true, arg_enum, default_value = "text")]
+    pub format: FormatArg,
 }
