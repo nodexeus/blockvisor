@@ -58,6 +58,12 @@ pub enum Command {
         #[clap(subcommand)]
         command: NodeCommand,
     },
+
+    /// Manage host configuration and collect host info
+    Host {
+        #[clap(subcommand)]
+        command: HostCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -70,6 +76,63 @@ pub enum NodeCommand {
         /// Node id
         #[clap(long)]
         id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostCommand {
+    /// Collect host system information
+    Info,
+
+    /// Manage host network configuration
+    Network {
+        #[clap(subcommand)]
+        command: HostNetworkCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkCommand {
+    Info,
+
+    Bridge {
+        #[clap(subcommand)]
+        command: HostNetworkBridgeCommand,
+    },
+
+    Ip {
+        #[clap(subcommand)]
+        command: HostNetworkIpCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkBridgeCommand {
+    List,
+
+    Create {
+        #[clap(long)]
+        name: String,
+    },
+
+    Delete {
+        #[clap(long)]
+        name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkIpCommand {
+    List,
+
+    Add {
+        #[clap(long)]
+        net: String,
+    },
+
+    Delete {
+        #[clap(long)]
+        net: String,
     },
 }
 

@@ -1,18 +1,17 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use cli::{App, Command};
+use cli::{App, Command, HostCommand};
 use daemonize::Daemonize;
 use hosts::Host;
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::path::Path;
-use sysinfo::{DiskExt, System, SystemExt};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
 use crate::containers::{LinuxNode, NodeContainer, ServiceStatus};
-use crate::hosts::HostConfig;
+use crate::hosts::{get_host_info, get_ip_address, HostConfig};
 
 mod cli;
 mod client;
@@ -34,22 +33,20 @@ fn main() -> Result<()> {
         Command::Configure(cmd_args) => {
             println!("Configuring blockvisor");
 
-            let network_interfaces = local_ip_address::list_afinet_netifas().unwrap();
-            let (_, ip) = local_ip_address::find_ifa(network_interfaces, &cmd_args.ifa).unwrap();
-
-            let sys = System::new_all();
+            let ip = get_ip_address(&cmd_args.ifa);
+            let info = get_host_info();
 
             let create = HostCreateRequest {
                 org_id: None,
-                name: sys.host_name().unwrap(),
+                name: info.name.unwrap(),
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
                 location: None,
-                cpu_count: sys.physical_core_count().map(|x| x as i64),
-                mem_size: Some(sys.total_memory() as i64),
-                disk_size: Some(sys.disks()[0].total_space() as i64),
-                os: sys.name(),
-                os_version: sys.os_version(),
-                ip_addr: ip.to_string(),
+                cpu_count: info.cpu_count,
+                mem_size: info.mem_size,
+                disk_size: info.disk_size,
+                os: info.os,
+                os_version: info.os_version,
+                ip_addr: ip,
                 val_ip_addrs: None,
             };
             println!("{:?}", create);
@@ -111,10 +108,21 @@ fn main() -> Result<()> {
                 println!("bvs: {:?}", ServiceStatus::Disabled);
             }
         }
+        Command::Host { command } => process_host_command(&command),
         _ => {}
     }
 
     Ok(())
+}
+
+fn process_host_command(command: &HostCommand) {
+    match command {
+        HostCommand::Info => {
+            let info = get_host_info();
+            println!("{:?}", info);
+        }
+        HostCommand::Network { command: _ } => {}
+    }
 }
 
 async fn work(daemonized: bool) -> Result<()> {
