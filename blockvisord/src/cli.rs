@@ -68,11 +68,61 @@ pub enum Command {
 
 #[derive(Debug, Subcommand)]
 pub enum NodeCommand {
+    /// Show nodes list
+    List {
+        /// Should we display all nodes including stopped
+        #[clap(long)]
+        all: bool,
+
+        /// Display nodes of particular chain
+        #[clap(long)]
+        chain: String,
+    },
+
     /// Create node
-    Create,
+    Create {
+        /// Chain identifier
+        #[clap(long)]
+        chain: String,
+    },
+
+    /// Start node
+    Start {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Stop node
+    Stop {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Restart node
+    Restart {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
 
     /// Delete node and clean up resources
-    Kill {
+    Delete {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Attach to node console
+    Console {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Display node logs
+    Logs {
         /// Node id
         #[clap(long)]
         id: String,
