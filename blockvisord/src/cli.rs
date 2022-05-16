@@ -64,6 +64,12 @@ pub enum Command {
         #[clap(subcommand)]
         command: HostCommand,
     },
+
+    /// Get information about chains
+    Chain {
+        #[clap(subcommand)]
+        command: ChainCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -183,6 +189,26 @@ pub enum HostNetworkIpCommand {
     Delete {
         #[clap(long)]
         net: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ChainCommand {
+    /// Show chains list
+    List,
+
+    /// Display chain status
+    Status {
+        /// Chain identifier
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Run chain synchronization process
+    Sync {
+        /// Chain identifier
+        #[clap(long)]
+        id: String,
     },
 }
 
