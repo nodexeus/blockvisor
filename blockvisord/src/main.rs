@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use clap::Parser;
-use cli::{App, Command, HostCommand};
+use cli::{App, ChainCommand, Command, HostCommand, NodeCommand};
 use daemonize::Daemonize;
 use hosts::Host;
 use std::collections::HashMap;
@@ -109,7 +109,8 @@ fn main() -> Result<()> {
             }
         }
         Command::Host { command } => process_host_command(&command),
-        _ => {}
+        Command::Chain { command } => process_chain_command(&command),
+        Command::Node { command } => process_node_command(&command),
     }
 
     Ok(())
@@ -122,6 +123,27 @@ fn process_host_command(command: &HostCommand) {
             println!("{:?}", info);
         }
         HostCommand::Network { command: _ } => {}
+    }
+}
+
+fn process_chain_command(command: &ChainCommand) {
+    match command {
+        ChainCommand::List => todo!(),
+        ChainCommand::Status { id: _ } => todo!(),
+        ChainCommand::Sync { id: _ } => todo!(),
+    }
+}
+
+fn process_node_command(command: &NodeCommand) {
+    match command {
+        NodeCommand::List { all: _, chain: _ } => todo!(),
+        NodeCommand::Create { chain: _ } => todo!(),
+        NodeCommand::Start { id: _ } => todo!(),
+        NodeCommand::Stop { id: _ } => todo!(),
+        NodeCommand::Restart { id: _ } => todo!(),
+        NodeCommand::Delete { id: _ } => todo!(),
+        NodeCommand::Console { id: _ } => todo!(),
+        NodeCommand::Logs { id: _ } => todo!(),
     }
 }
 
