@@ -12,7 +12,7 @@ pub struct App {
 }
 
 #[derive(Debug, Args)]
-pub struct ConfigureArgs {
+pub struct InitArgs {
     /// One-time password
     #[clap(long)]
     pub otp: String,
@@ -41,8 +41,8 @@ pub struct StatusArgs {}
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Configure blockvisor to run on this host
-    Configure(ConfigureArgs),
+    /// Initialise blockvisor to run on this host
+    Init(InitArgs),
 
     /// Start blockvisor service
     Start(StartArgs),

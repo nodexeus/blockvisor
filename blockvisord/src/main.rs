@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     let timeout = Duration::from_secs(10);
 
     match args.command {
-        Command::Configure(cmd_args) => {
+        Command::Init(cmd_args) => {
             println!("Configuring blockvisor");
 
             let ip = get_ip_address(&cmd_args.ifa);
