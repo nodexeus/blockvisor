@@ -1,4 +1,3 @@
-use camino::Utf8PathBuf;
 use clap::{ArgEnum, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -223,10 +222,6 @@ pub struct GlobalOpts {
     /// Verbosity level (can be specified multiple times)
     #[clap(long, short, global = true, parse(from_occurrences))]
     verbose: usize,
-
-    /// Path to config file
-    #[clap(long, short, global = true, default_value = "/tmp/blockvisor.toml")]
-    pub config_path: Utf8PathBuf,
 
     /// Output format
     #[clap(long, short, global = true, arg_enum, default_value = "text")]
