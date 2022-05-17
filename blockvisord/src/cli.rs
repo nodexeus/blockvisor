@@ -17,7 +17,7 @@ pub struct InitArgs {
     pub otp: String,
 
     /// BlockJoy API url
-    #[clap(long = "url", default_value = "https://api.stakejoy.com")]
+    #[clap(long = "url", default_value = "https://api.blockvisor.dev")]
     pub blockjoy_api_url: String,
 
     /// Network interface name
