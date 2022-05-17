@@ -4,14 +4,15 @@ use anyhow::{Result, Ok};
 use async_trait::async_trait;
 use firec::Machine;
 use uuid::Uuid;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum ServiceStatus {
     Enabled,
     Disabled,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug)]
 pub enum ContainerStatus {
     Created,
     Started,

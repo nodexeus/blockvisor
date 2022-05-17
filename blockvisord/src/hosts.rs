@@ -1,4 +1,4 @@
-use crate::containers::NodeContainer;
+use crate::containers::{ContainerStatus, NodeContainer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use sysinfo::{DiskExt, System, SystemExt};
@@ -9,8 +9,16 @@ pub struct Host {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ContainerConfig {
+    pub id: String,
+    pub chain: String,
+    pub status: ContainerStatus,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HostConfig {
     pub id: String,
+    pub containers: HashMap<String, ContainerConfig>,
     pub data_dir: String,
     pub pool_dir: String,
     pub token: String,

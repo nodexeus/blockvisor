@@ -28,6 +28,7 @@ fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
     let timeout = Duration::from_secs(10);
+    let rt = tokio::runtime::Runtime::new()?;
 
     match args.command {
         Command::Init(cmd_args) => {
@@ -52,7 +53,6 @@ fn main() -> Result<()> {
             println!("{:?}", create);
 
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
-            let rt = tokio::runtime::Runtime::new()?;
             let host = rt.block_on(client.register_host(&cmd_args.otp, &create))?;
 
             let config = HostConfig {
@@ -61,9 +61,9 @@ fn main() -> Result<()> {
                 id: host.id.to_string(),
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
+                containers: HashMap::new(),
             };
-            let config = toml::to_string(&config)?;
-            fs::write(CONFIG_FILE, config)?;
+            write_config(config)?;
         }
         Command::Start(cmd_args) => {
             if !Path::new(CONFIG_FILE).exists() {
@@ -108,15 +108,15 @@ fn main() -> Result<()> {
                 println!("bvs: {:?}", ServiceStatus::Disabled);
             }
         }
-        Command::Host { command } => process_host_command(&command),
-        Command::Chain { command } => process_chain_command(&command),
-        Command::Node { command } => process_node_command(&command),
+        Command::Host { command } => rt.block_on(process_host_command(&command))?,
+        Command::Chain { command } => rt.block_on(process_chain_command(&command))?,
+        Command::Node { command } => rt.block_on(process_node_command(&command))?,
     }
 
     Ok(())
 }
 
-fn process_host_command(command: &HostCommand) {
+async fn process_host_command(command: &HostCommand) -> Result<()> {
     match command {
         HostCommand::Info => {
             let info = get_host_info();
@@ -124,19 +124,29 @@ fn process_host_command(command: &HostCommand) {
         }
         HostCommand::Network { command: _ } => {}
     }
+
+    Ok(())
 }
 
-fn process_chain_command(command: &ChainCommand) {
+async fn process_chain_command(command: &ChainCommand) -> Result<()> {
     match command {
         ChainCommand::List => todo!(),
         ChainCommand::Status { id: _ } => todo!(),
         ChainCommand::Sync { id: _ } => todo!(),
     }
+
+    Ok(())
 }
 
-fn process_node_command(command: &NodeCommand) {
+async fn process_node_command(command: &NodeCommand) -> Result<()> {
+    let mut config = read_config()?;
+
     match command {
-        NodeCommand::List { all: _, chain: _ } => todo!(),
+        NodeCommand::List { all: _, chain: _ } => {
+            for c in config.containers {
+                println!("{:?}", c);
+            }
+        }
         NodeCommand::Create { chain: _ } => todo!(),
         NodeCommand::Start { id: _ } => todo!(),
         NodeCommand::Stop { id: _ } => todo!(),
@@ -145,11 +155,25 @@ fn process_node_command(command: &NodeCommand) {
         NodeCommand::Console { id: _ } => todo!(),
         NodeCommand::Logs { id: _ } => todo!(),
     }
+    Ok(())
+}
+
+fn read_config() -> Result<HostConfig> {
+    println!("Reading config: {}", CONFIG_FILE);
+    let config = fs::read_to_string(CONFIG_FILE)?;
+    Ok(toml::from_str(&config)?)
+}
+
+fn write_config(config: HostConfig) -> Result<()> {
+    println!("Writing config: {}", CONFIG_FILE);
+    let config = toml::Value::try_from(&config)?;
+    let config = toml::to_string(&config)?;
+    fs::write(CONFIG_FILE, config)?;
+    Ok(())
 }
 
 async fn work(daemonized: bool) -> Result<()> {
-    let config = fs::read_to_string(CONFIG_FILE)?;
-    let config: HostConfig = toml::from_str(&config)?;
+    let config = read_config()?;
     let mut host = Host {
         containers: HashMap::new(),
         config,
@@ -158,7 +182,6 @@ async fn work(daemonized: bool) -> Result<()> {
 
     loop {
         if !daemonized || Path::new(PID_FILE).exists() {
-            println!("Reading config: {}", CONFIG_FILE);
             let config = host.config.clone();
             let timeout = Duration::from_secs(10);
             let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
