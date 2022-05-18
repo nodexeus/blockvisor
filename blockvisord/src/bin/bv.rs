@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
-    containers::{DummyNode, NodeContainer},
+    containers::ContainerStatus,
     hosts::{
         config_exists, get_host_info, get_ip_address, read_config, write_config, ContainerConfig,
         HostConfig,
@@ -18,7 +18,6 @@ async fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
     let timeout = Duration::from_secs(10);
-    let rt = tokio::runtime::Runtime::new()?;
 
     match args.command {
         Command::Init(cmd_args) => {
@@ -43,7 +42,7 @@ async fn main() -> Result<()> {
             println!("{:?}", create);
 
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
-            let host = rt.block_on(client.register_host(&cmd_args.otp, &create))?;
+            let host = client.register_host(&cmd_args.otp, &create).await?;
 
             let config = HostConfig {
                 data_dir: ".".to_string(),
@@ -70,9 +69,9 @@ async fn main() -> Result<()> {
         Command::Status(_) => {
             todo!()
         }
-        Command::Host { command } => rt.block_on(process_host_command(&command))?,
-        Command::Chain { command } => rt.block_on(process_chain_command(&command))?,
-        Command::Node { command } => rt.block_on(process_node_command(&command))?,
+        Command::Host { command } => process_host_command(&command).await?,
+        Command::Chain { command } => process_chain_command(&command).await?,
+        Command::Node { command } => process_node_command(&command).await?,
     }
 
     Ok(())
@@ -84,7 +83,7 @@ async fn process_host_command(command: &HostCommand) -> Result<()> {
             let info = get_host_info();
             println!("{:?}", info);
         }
-        HostCommand::Network { command: _ } => {}
+        HostCommand::Network { command: _ } => todo!(),
     }
 
     Ok(())
@@ -104,28 +103,57 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
     let mut config = read_config()?;
 
     match command {
-        NodeCommand::List { all: _, chain: _ } => {
-            for c in config.containers {
-                println!("{:?}", c);
+        NodeCommand::List { all, chain } => {
+            for (_id, c) in config.containers {
+                let is_chain_visible = if let Some(chain) = chain {
+                    c.chain.contains(chain)
+                } else {
+                    true
+                };
+                let is_status_visible = *all
+                    || c.status == ContainerStatus::Created
+                    || c.status == ContainerStatus::Started;
+
+                if is_chain_visible && is_status_visible {
+                    println!("{:?}", &c);
+                }
             }
         }
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4().to_string();
-            let node = DummyNode::create(&id).await?;
             let container_config = ContainerConfig {
                 id: id.clone(),
                 chain: chain.to_owned(),
-                status: node.state().await?,
+                status: ContainerStatus::Created,
             };
-
+            println!("Container added: {:?}", &container_config);
             config.containers.insert(id, container_config);
-            println!("{:?}", &config);
             write_config(config)?;
         }
-        NodeCommand::Start { id: _ } => todo!(),
-        NodeCommand::Stop { id: _ } => todo!(),
+        NodeCommand::Start { id } => {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Started;
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
+        NodeCommand::Stop { id } => {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Killed;
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
+        NodeCommand::Delete { id } => {
+            if config.containers.remove(id).is_some() {
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
         NodeCommand::Restart { id: _ } => todo!(),
-        NodeCommand::Delete { id: _ } => todo!(),
         NodeCommand::Console { id: _ } => todo!(),
         NodeCommand::Logs { id: _ } => todo!(),
     }

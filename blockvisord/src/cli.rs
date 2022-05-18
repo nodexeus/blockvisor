@@ -26,11 +26,7 @@ pub struct InitArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct StartArgs {
-    /// Should the app run as daemon
-    #[clap(long, short)]
-    pub daemonize: bool,
-}
+pub struct StartArgs {}
 
 #[derive(Debug, Args)]
 pub struct StopArgs {}
@@ -81,7 +77,7 @@ pub enum NodeCommand {
 
         /// Display nodes of particular chain
         #[clap(long)]
-        chain: String,
+        chain: Option<String>,
     },
 
     /// Create node
