@@ -11,8 +11,8 @@ name = "blockvisord"
 path = "src/lib.rs"
 
 [[bin]]
-name = "bvs"
-path = "src/bin/bvs.rs"
+name = "bv"
+path = "src/bin/bv.rs"
 
 [[bin]]
 name = "blockvisord"

@@ -1,7 +1,7 @@
 use clap::{ArgEnum, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[clap(name = "bvs", author, version, about)]
+#[clap(name = "bv", author, version, about)]
 pub struct App {
     #[clap(flatten)]
     pub global_opts: GlobalOpts,
