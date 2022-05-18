@@ -11,7 +11,7 @@ use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use crate::client::{APIClient, CommandStatusUpdate, HostCreateRequest};
-use crate::containers::{DummyNode, NodeContainer};
+use crate::containers::{LinuxNode, NodeContainer};
 use crate::hosts::HostConfig;
 
 mod cli;
@@ -117,6 +117,7 @@ async fn work(daemonized: bool) -> Result<()> {
         containers: HashMap::new(),
         config,
     };
+    let mut machine_index = 0;
 
     loop {
         if !daemonized || Path::new(PID_FILE).exists() {
@@ -137,7 +138,8 @@ async fn work(daemonized: bool) -> Result<()> {
                 match command.cmd.as_str() {
                     "create_node" => {
                         let id = Uuid::new_v4().to_string();
-                        let node = DummyNode::create(&id).await?;
+                        let node = LinuxNode::create(&id, machine_index).await?;
+                        machine_index += 1;
                         host.containers.insert(id, Box::new(node));
                     }
                     "kill_node" => {

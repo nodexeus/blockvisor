@@ -526,6 +526,7 @@ dependencies = [
  "chrono",
  "clap",
  "daemonize",
+ "firec",
  "httpmock",
  "local-ip-address",
  "reqwest 0.11.10",
@@ -534,7 +535,7 @@ dependencies = [
  "sysinfo",
  "tokio 1.18.1",
  "toml",
- "uuid 0.8.2",
+ "uuid 1.0.0",
 ]
 
 [[package]]
@@ -974,6 +975,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1123,6 +1135,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
 dependencies = [
  "instant",
+]
+
+[[package]]
+name = "firec"
+version = "0.1.0"
+source = "git+https://github.com/blockjoy/firec.git#1d9ee0dbacdfed1472a680f843bf47d846e97364"
+dependencies = [
+ "derivative",
+ "hyper 0.14.18",
+ "hyperlocal",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio 1.18.1",
+ "users",
+ "uuid 1.0.0",
 ]
 
 [[package]]
@@ -1708,6 +1736,19 @@ dependencies = [
  "native-tls",
  "tokio 1.18.1",
  "tokio-native-tls",
+]
+
+[[package]]
+name = "hyperlocal"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fafdf7b2b2de7c9784f76e02c0935e65a8117ec3b768644379983ab333ac98c"
+dependencies = [
+ "futures-util",
+ "hex",
+ "hyper 0.14.18",
+ "pin-project",
+ "tokio 1.18.1",
 ]
 
 [[package]]
@@ -4310,6 +4351,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "users"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
+dependencies = [
+ "libc",
+ "log",
+]
+
+[[package]]
 name = "uuid"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4323,6 +4374,16 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
+ "serde",
+]
+
+[[package]]
+name = "uuid"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cfcd319456c4d6ea10087ed423473267e1a071f3bc0aa89f80d60997843c6f0"
 dependencies = [
  "getrandom",
  "serde",
