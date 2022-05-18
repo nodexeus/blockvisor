@@ -527,6 +527,7 @@ dependencies = [
  "firec",
  "home",
  "httpmock",
+ "lazy_static",
  "local-ip-address",
  "reqwest 0.11.10",
  "serde",
