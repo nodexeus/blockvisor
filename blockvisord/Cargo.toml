@@ -6,9 +6,17 @@ version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "blockvisord"
+path = "src/lib.rs"
+
 [[bin]]
 name = "bvs"
-path = "src/main.rs"
+path = "src/bin/bvs.rs"
+
+[[bin]]
+name = "blockvisord"
+path = "src/bin/blockvisord.rs"
 
 [dependencies]
 anyhow = "1.0.56"

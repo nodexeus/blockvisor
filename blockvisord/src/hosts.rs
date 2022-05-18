@@ -1,7 +1,10 @@
 use crate::containers::{ContainerStatus, NodeContainer};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::Path};
 use sysinfo::{DiskExt, System, SystemExt};
+
+const CONFIG_FILE: &str = "/tmp/config.toml";
 
 pub struct Host {
     pub containers: HashMap<String, Box<dyn NodeContainer>>,
@@ -52,4 +55,23 @@ pub fn get_ip_address(ifa_name: &str) -> String {
     let ifas = local_ip_address::list_afinet_netifas().unwrap();
     let (_, ip) = local_ip_address::find_ifa(ifas, ifa_name).unwrap();
     ip.to_string()
+}
+
+// TODO: probably should get into config type
+pub fn read_config() -> Result<HostConfig> {
+    println!("Reading config: {}", CONFIG_FILE);
+    let config = fs::read_to_string(CONFIG_FILE)?;
+    Ok(toml::from_str(&config)?)
+}
+
+pub fn write_config(config: HostConfig) -> Result<()> {
+    println!("Writing config: {}", CONFIG_FILE);
+    let config = toml::Value::try_from(&config)?;
+    let config = toml::to_string(&config)?;
+    fs::write(CONFIG_FILE, config)?;
+    Ok(())
+}
+
+pub fn config_exists() -> bool {
+    Path::new(CONFIG_FILE).exists()
 }
