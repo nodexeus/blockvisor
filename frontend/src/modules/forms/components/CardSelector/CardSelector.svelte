@@ -29,9 +29,9 @@
   on:mouseleave={handleBlur}
   role="radio"
 >
-  {#if $$slots.top}
+  {#if disabled}
     <div class="card-selector__top">
-      <slot name="top" />
+      <span class="t-tiny">Coming soon</span>
     </div>
   {/if}
   <div class="card-selector__label">
