@@ -78,7 +78,8 @@ pub fn config_exists() -> bool {
     Path::new(CONFIG_FILE).exists()
 }
 
-pub async fn apply_config(config: &HostConfig, machine_index: &mut usize) -> Result<()> {
+// used for testing purposes
+pub async fn dummy_apply_config(config: &HostConfig, machine_index: &mut usize) -> Result<()> {
     for (id, container_config) in &config.containers {
         // remove deleted nodes
         if container_config.status == ContainerStatus::Deleted {

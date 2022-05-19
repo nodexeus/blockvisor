@@ -1,7 +1,7 @@
 use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
-    hosts::{apply_config, read_config, HostConfig},
+    hosts::{dummy_apply_config, read_config, HostConfig},
 };
 use tokio::time::{sleep, Duration};
 
@@ -11,8 +11,11 @@ async fn main() -> Result<()> {
     loop {
         let config = read_config()?;
 
-        let mut machine_index = 0;
-        apply_config(&config, &mut machine_index).await?;
+        let mut machine_index: usize = 0;
+        let vmm = std::env::var("VMM").unwrap_or("dummy".into());
+        if vmm == "dummy" {
+            dummy_apply_config(&config, &mut machine_index).await?;
+        }
         process_pending_commands(&config).await?;
 
         sleep(Duration::from_secs(5)).await;
