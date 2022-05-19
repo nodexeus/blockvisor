@@ -106,6 +106,10 @@
     </li>
   </ul>
 
+  <p class="t-note s-top--medium s-bottom--xlarge">
+    Note: any transaction matching this will trigger the callback.
+  </p>
+
   <Button size="medium" style="secondary" type="submit">Add Broadcast</Button>
 </form>
 
@@ -123,7 +127,7 @@
   }
 
   .add-broadcast__list {
-    margin-bottom: 44px;
+    margin-bottom: 26px;
   }
 
   .add-broadcast__item + :global(.add-broadcast__item) {

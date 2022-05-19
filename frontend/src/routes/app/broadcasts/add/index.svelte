@@ -6,7 +6,7 @@
 </script>
 
 <section in:fade={fadeDefault} class="grid broadcast-add">
-  <div class="container--small broadcast-add__wrapper">
+  <div class="container--medium broadcast-add__wrapper">
     <h2 class="t-xxlarge-fluid">Add a Broadcast</h2>
 
     <SectionDescription>
@@ -24,13 +24,13 @@
 <style>
   .broadcast-add {
     margin-top: 40px;
+    margin-bottom: 80px;
+  }
+  .broadcast-add__wrapper {
+    grid-column: 1 / span 12;
 
-    &__wrapper {
-      grid-column: 1 / span 12;
-
-      @media (--screen-medium-large) {
-        grid-column: 2 / span 12;
-      }
+    @media (--screen-medium-large) {
+      grid-column: 2 / span 12;
     }
   }
 </style>
