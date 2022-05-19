@@ -47,12 +47,12 @@
 <style>
   .checkbox {
     display: inline-flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 8px;
     color: theme(--color-text-3);
     cursor: pointer;
     user-select: none;
-    @mixin font tiny;
+    @mixin font small;
 
     &::before {
       flex: 0 0 16px;

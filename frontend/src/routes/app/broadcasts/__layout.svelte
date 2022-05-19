@@ -25,7 +25,7 @@
 </script>
 
 <LayoutSingleColumn transition={pageTransition}>
-  <SubscriptionWrapper hasSubscription={false}>
+  <SubscriptionWrapper hasSubscription={true}>
     <slot />
   </SubscriptionWrapper>
 </LayoutSingleColumn>
