@@ -1,6 +1,7 @@
 import { SvelteComponentTyped } from 'svelte';
 export interface CardSelectorProps {
   disabled?: boolean;
+  index: number;
 }
 
 export interface CardSelectorSlots {
