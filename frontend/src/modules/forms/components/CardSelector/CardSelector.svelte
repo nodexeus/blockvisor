@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { fade } from 'svelte/transition';
+
   export let disabled = false;
+  export let index: number;
 
   let isFocused = false;
 
@@ -21,6 +24,7 @@
 </script>
 
 <article
+  in:fade={{ duration: 250, delay: index * 100 }}
   class={className}
   aria-checked={isFocused}
   on:focus={handleFocus}

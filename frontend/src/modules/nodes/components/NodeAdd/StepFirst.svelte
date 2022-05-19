@@ -39,8 +39,8 @@
     <slot />
     <svelte:fragment slot="label">Select a network</svelte:fragment>
 
-    {#each blockchains as item}
-      <CardSelector disabled={item.status !== 'production'}>
+    {#each blockchains as item, i}
+      <CardSelector disabled={item.status !== 'production'} index={i}>
         <svelte:fragment slot="label">
           <TokenIcon icon="hnt" />
           {item.name}<br />
