@@ -1,10 +1,10 @@
-use std::path::Path;
-
-use anyhow::{Result, Ok};
+use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use firec::Machine;
-use uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub enum ServiceStatus {
@@ -16,7 +16,8 @@ pub enum ServiceStatus {
 pub enum ContainerStatus {
     Created,
     Started,
-    Killed,
+    Stopped,
+    Deleted,
 }
 
 #[async_trait]
@@ -43,6 +44,11 @@ pub trait NodeContainer {
     async fn delete(&mut self) -> Result<()>;
 }
 
+pub trait NodeRegistry {
+    fn contains(id: &str) -> bool;
+    fn get(id: &str) -> Result<Box<dyn NodeContainer>>;
+}
+
 pub struct LinuxNode {
     id: String,
     machine: Machine<'static>,
@@ -67,11 +73,14 @@ impl NodeContainer for LinuxNode {
         root_drive.path_on_host = Path::new(ROOT_FS).into();
         root_drive.is_root_device = true;
 
-        let kernel_args = Some(format!(
-            "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
+        let kernel_args = Some(
+            format!(
+                "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
             ip=74.50.82.8{}::74.50.82.82:255.255.255.240::eth0:on",
-            machine_index + 3,
-        ).into());
+                machine_index + 3,
+            )
+            .into(),
+        );
 
         let mut cni = firec::config::network::Cni::default();
         cni.network_name = "eth0".into();
@@ -122,6 +131,7 @@ impl NodeContainer for LinuxNode {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DummyNode {
     pub id: String,
     pub state: ContainerStatus,
@@ -131,10 +141,13 @@ pub struct DummyNode {
 impl NodeContainer for DummyNode {
     async fn create(id: &str, _machine_index: usize) -> Result<Self> {
         println!("Creating node: {}", id);
-        Ok(Self {
+        let node = Self {
             id: id.to_owned(),
             state: ContainerStatus::Created,
-        })
+        };
+        let contents = toml::to_string(&node)?;
+        fs::write(format!("/tmp/{}.txt", id), &contents)?;
+        Ok(node)
     }
 
     fn id(&self) -> &str {
@@ -144,6 +157,8 @@ impl NodeContainer for DummyNode {
     async fn start(&mut self) -> Result<()> {
         println!("Starting node: {}", self.id());
         self.state = ContainerStatus::Started;
+        let contents = toml::to_string(&self)?;
+        fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
         Ok(())
     }
 
@@ -153,13 +168,34 @@ impl NodeContainer for DummyNode {
 
     async fn kill(&mut self) -> Result<()> {
         println!("Killing node: {}", self.id());
-        self.state = ContainerStatus::Killed;
+        self.state = ContainerStatus::Stopped;
+        let contents = toml::to_string(&self)?;
+        fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
         Ok(())
     }
 
     async fn delete(&mut self) -> Result<()> {
         println!("Deleting node: {}", self.id());
         self.kill().await?;
+        fs::remove_file(format!("/tmp/{}.txt", self.id))?;
         Ok(())
+    }
+}
+
+pub struct DummyNodeRegistry {}
+
+impl NodeRegistry for DummyNodeRegistry {
+    fn contains(id: &str) -> bool {
+        Path::new(&format!("/tmp/{}.txt", id)).exists()
+    }
+
+    fn get(id: &str) -> Result<Box<dyn NodeContainer>> {
+        let node = fs::read_to_string(format!("/tmp/{}.txt", id))?;
+        let node: DummyNode = toml::from_str(&node)?;
+
+        Ok(Box::new(DummyNode {
+            id: id.to_string(),
+            state: node.state,
+        }))
     }
 }

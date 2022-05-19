@@ -89,6 +89,7 @@ async fn process_host_command(command: &HostCommand) -> Result<()> {
     Ok(())
 }
 
+#[allow(unreachable_code)]
 async fn process_chain_command(command: &ChainCommand) -> Result<()> {
     match command {
         ChainCommand::List => todo!(),
@@ -140,14 +141,15 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Stop { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.status = ContainerStatus::Killed;
+                container_config.status = ContainerStatus::Stopped;
                 write_config(config)?;
             } else {
                 println!("Container not found: {}", id);
             }
         }
         NodeCommand::Delete { id } => {
-            if config.containers.remove(id).is_some() {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Deleted;
                 write_config(config)?;
             } else {
                 println!("Container not found: {}", id);

@@ -1,4 +1,6 @@
-use crate::containers::{ContainerStatus, NodeContainer};
+use crate::containers::{
+    ContainerStatus, DummyNode, DummyNodeRegistry, NodeContainer, NodeRegistry,
+};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::Path};
@@ -74,4 +76,39 @@ pub fn write_config(config: HostConfig) -> Result<()> {
 
 pub fn config_exists() -> bool {
     Path::new(CONFIG_FILE).exists()
+}
+
+pub async fn apply_config(config: &HostConfig, machine_index: &mut usize) -> Result<()> {
+    for (id, container_config) in &config.containers {
+        // remove deleted nodes
+        if container_config.status == ContainerStatus::Deleted {
+            if DummyNodeRegistry::contains(id) {
+                let mut node = DummyNodeRegistry::get(id)?;
+                node.delete().await?;
+            }
+        } else {
+            // create non existing nodes
+            if !DummyNodeRegistry::contains(id) {
+                DummyNode::create(id, *machine_index).await?;
+                *machine_index += 1;
+            }
+
+            // fix nodes status
+            let mut node = DummyNodeRegistry::get(id)?;
+            let state = node.state().await?;
+            if state != container_config.status {
+                println!(
+                    "Changing state from {:?} to {:?}: {}",
+                    state, container_config.status, id
+                );
+                match container_config.status {
+                    ContainerStatus::Started => node.start().await?,
+                    ContainerStatus::Stopped => node.kill().await?,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
