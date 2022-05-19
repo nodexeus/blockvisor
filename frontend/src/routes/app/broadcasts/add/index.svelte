@@ -28,6 +28,7 @@
 
 <style>
   .broadcast-add {
+    grid-row-gap: 0;
   }
 
   .broadcast-add__wrapper {
