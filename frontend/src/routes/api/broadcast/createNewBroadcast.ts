@@ -7,8 +7,6 @@ export const post: RequestHandler = async ({ request }) => {
   const { accessToken, refreshToken } = getTokens(request);
   const data = await request.json();
 
-  console.log(data);
-
   const {
     org_id,
     blockchain_id,
