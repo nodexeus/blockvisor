@@ -3,6 +3,10 @@
 
   import Button from 'components/Button/Button.svelte';
   import TokenIcon from 'components/TokenIcon/TokenIcon.svelte';
+  import {
+    blockchains,
+    getAllBlockchains,
+  } from 'modules/broadcasts/store/broadcastStore';
   import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
   import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
   import { blockchains } from 'modules/nodes/store/nodesStore';
@@ -18,18 +22,7 @@
   };
 
   onMount(() => {
-    axios.get('/api/nodes/getBlockchains').then((res) => {
-      if (res.statusText === 'OK') {
-        const active = res.data.filter(
-          (item: Blockchain) => item.status === 'production',
-        );
-        const inactive = res.data.filter(
-          (item: Blockchain) => item.status !== 'production',
-        );
-
-        blockchains.set([...active, ...inactive]);
-      }
-    });
+    getAllBlockchains();
   });
 </script>
 

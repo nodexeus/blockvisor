@@ -1,35 +1,84 @@
 <script lang="ts">
+  import { SvelteToast, toast } from '@zerodevx/svelte-toast';
+
+  import axios from 'axios';
+
   import Button from 'components/Button/Button.svelte';
+  import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { user } from 'modules/authentication/store';
+  import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
+  import {
+    blockchains,
+    getAllBlockchains,
+  } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
+  import Select from 'modules/forms/components/Select/Select.svelte';
+  import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
-  import BroadcastEvent from './BroadcastEvent.svelte';
+
+  let orgId: string;
+  let isSubmitting: boolean;
 
   const form = useForm({
     interval: { initial: 'anytime' },
   });
 
-  const eventTypes = [
-    'Add Gateway',
-    'Assert Location',
-    'Consensus Group',
-    'Payments',
-    'Rewards',
-    'Stake Validator',
-    'Transfer Hotspot',
-    'Trasnfer Validator Stake',
-    'Unstake Validator',
-    "Price Oracle (doesn't require address)",
-    "Chain Vars (doesn't require address)",
+  const BroadcastEvents = [
+    { id: 'add_gateway_v1', value: 'Add Gateway' },
+    { id: 'assert_location_v2', value: 'Assert Location' },
+    { id: 'concensus_group_failure_v1', value: 'Consensus Group Failure' },
+    { id: 'concensus_group_v1', value: 'Consensus Group' },
+    { id: 'payment_v2', value: 'Payments' },
+    { id: 'rewards_v2', value: 'Rewards' },
+    { id: 'stake_validator_v1', value: 'Stake Validator' },
+    { id: 'transfer_hotspot_v1', value: 'Transfer Hotspot' },
+    { id: 'transfer_validator_stake_v1', value: 'Transfer Validator Stake' },
+    { id: 'unstake_validator_v1', value: 'Unstake Validator' },
+    { id: 'validator_heartbeat_v1', value: 'Validator Heartbeat' },
   ];
+
+  onMount(() => {
+    getAllBlockchains();
+
+    axios
+      .get('/api/broadcast/getOrganisationId', { params: { id: $user.id } })
+      .then((res) => {
+        if (res.statusText === 'OK') {
+          orgId = res.data;
+        }
+      });
+  });
+
+  async function handleSubmit() {
+    isSubmitting = true;
+
+    let txn_types = '';
+    BroadcastEvents.forEach((item, i) => {
+      if ($form?.[item.id].value === 'checked') {
+        txn_types += `${item.id}, `;
+      }
+    });
+
+    const res = await axios.post('/api/broadcast/createNewBroadcast', {
+      org_id: orgId,
+      name: $form.name?.value,
+      blockchain_id: $form.blockchain?.value,
+      callback_url: $form.callback_url?.value,
+      auth_token: $form.auth_token?.value,
+      txn_types: txn_types,
+      is_active: $form.is_active?.value,
+      addresses: $form.addresses?.value,
+    });
+
+    if (res.statusText === 'OK') {
+      toast.push('Succesfully added');
+    }
+
+    isSubmitting = false;
+  }
 </script>
 
-<form
-  use:form
-  class="add-broadcast"
-  on:submit={(e) => {
-    e.preventDefault();
-  }}
->
+<form use:form class="add-broadcast" on:submit|preventDefault={handleSubmit}>
   <ul class="u-list-reset add-broadcast__list">
     <li class="add-broadcast__item">
       <Input
@@ -46,13 +95,36 @@
           <Hint on="required">This is a mandatory field</Hint>
         </svelte:fragment>
       </Input>
+
+      <Select
+        labelClass="s-top--medium"
+        items={$blockchains
+          .filter(
+            (chain) =>
+              chain.status === 'production' && chain.supports_broadcast,
+          )
+          .map((item) => {
+            return {
+              label: item.name,
+              value: item.id,
+            };
+          })}
+        value={$form.blockchain?.value}
+        name="blockchain"
+        field={$form?.blockchain}
+        style="outline"
+        size="medium"
+        label="Select a date"
+      >
+        <svelte:fragment slot="label">Group</svelte:fragment>
+      </Select>
     </li>
 
     <li class="add-broadcast__item">
       <div class="add-broadcast__label">Watch Address</div>
 
       <Input
-        name="addresses (comma separated)"
+        name="addresses"
         size="medium"
         value={$form?.address?.value}
         field={$form?.address}
@@ -67,7 +139,7 @@
 
       <div class="add-broadcast__input">
         <Input
-          name="callback"
+          name="callback_url"
           size="medium"
           value={$form?.callback?.value}
           field={$form?.callback}
@@ -84,10 +156,10 @@
 
       <div class="add-broadcast__input">
         <Input
-          name="callback"
+          name="auth_token"
           size="medium"
-          value={$form?.callback?.value}
-          field={$form?.callback}
+          value={$form?.token?.value}
+          field={$form?.token}
           validate={[required]}
           description="Authorization: Bearer <Auth Token>"
           required
@@ -100,8 +172,8 @@
     <li class="add-broadcast__item">
       <div class="add-broadcast__label">Match these Events</div>
 
-      {#each eventTypes as item}
-        <BroadcastEvent name={item} value={item} />
+      {#each BroadcastEvents as item}
+        <BroadcastEvent name={item.id} value={item?.value} />
       {/each}
     </li>
   </ul>
@@ -110,16 +182,23 @@
     Note: any transaction matching this will trigger the callback.
   </p>
 
-  <Button size="medium" style="secondary" type="submit">Add Broadcast</Button>
+  <Button size="medium" style="secondary" type="submit"
+    >{#if isSubmitting}
+      &nbsp;
+      <LoadingSpinner size="button" id="js-form-submit" />
+    {:else}
+      Add Broadcast
+    {/if}</Button
+  >
 </form>
 
 <style>
   .add-broadcast {
     margin-top: 60px;
-  }
 
-  .add-broadcast__checkbox + .add-broadcast__checkbox {
-    margin-top: 16px;
+    & :global(button) {
+      position: relative;
+    }
   }
 
   .add-broadcast__label {

@@ -17,7 +17,7 @@
 
 <div>
   <div class="add-broadcast__checkbox">
-    <Checkbox {name} field={$form?.addGateway}>
+    <Checkbox {name} field={$form?.events?.[name]}>
       {value}
     </Checkbox>
     <button
@@ -41,7 +41,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
+    padding: 8px 0px;
   }
 
   .add-broadcast__action {

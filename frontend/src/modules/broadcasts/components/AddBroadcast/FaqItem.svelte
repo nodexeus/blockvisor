@@ -12,7 +12,7 @@
 </script>
 
 <article class={`${contentVisible ? 'faq-item faq-item__active' : 'faq-item'}`}>
-  <h2 class="faq-item__title">
+  <h2 class="faq-item__title t-large">
     {title}
     <button class="u-button-reset faq-item__action" on:click={toggleContent}
       ><IconCaret /></button
@@ -33,7 +33,7 @@
   .faq-item__title {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     transition: all 0.15s ease-out;
     margin-bottom: 12px;
   }
