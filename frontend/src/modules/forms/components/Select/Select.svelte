@@ -21,7 +21,7 @@
   $: isValid = true;
 
   const checkIfValid = () =>
-    (isValid = !field.touched || isObjectEmpty(field.errors));
+    (isValid = !field?.touched || isObjectEmpty(field.errors));
 
   afterUpdate(checkIfValid);
 
@@ -53,8 +53,8 @@
     id={$$props.name}
     {...$$restProps}
   >
-    {#each items as { value, label }, index}
-      <option {value}>{label}</option>
+    {#each items as item}
+      <option value={item?.value}>{item?.label}</option>
     {/each}
   </select>
 </div>

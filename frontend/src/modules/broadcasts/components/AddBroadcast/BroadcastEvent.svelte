@@ -17,7 +17,7 @@
 
 <div>
   <div class="add-broadcast__checkbox">
-    <Checkbox {name} field={$form?.[name]}>
+    <Checkbox {name} field={$form?.events?.[name]}>
       {value}
     </Checkbox>
     <button

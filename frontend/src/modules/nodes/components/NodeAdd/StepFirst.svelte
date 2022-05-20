@@ -3,14 +3,16 @@
 
   import Button from 'components/Button/Button.svelte';
   import TokenIcon from 'components/TokenIcon/TokenIcon.svelte';
+  import {
+    blockchains,
+    getAllBlockchains,
+  } from 'modules/broadcasts/store/broadcastStore';
   import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
   import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
   import { onMount } from 'svelte';
 
   export let form;
   export let setStep;
-
-  let blockchains: Blockchain[] = [];
 
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
@@ -19,18 +21,7 @@
   };
 
   onMount(() => {
-    axios.get('/api/nodes/getBlockchains').then((res) => {
-      if (res.statusText === 'OK') {
-        const active = res.data.filter(
-          (item: Blockchain) => item.status === 'production',
-        );
-        const inactive = res.data.filter(
-          (item: Blockchain) => item.status !== 'production',
-        );
-
-        blockchains = [...active, ...inactive];
-      }
-    });
+    getAllBlockchains();
   });
 </script>
 
@@ -39,7 +30,7 @@
     <slot />
     <svelte:fragment slot="label">Select a network</svelte:fragment>
 
-    {#each blockchains as item, i}
+    {#each $blockchains as item, i}
       <CardSelector disabled={item.status !== 'production'} index={i}>
         <svelte:fragment slot="label">
           <TokenIcon icon="hnt" />
