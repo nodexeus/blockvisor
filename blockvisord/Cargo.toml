@@ -23,7 +23,6 @@ anyhow = "1.0.56"
 async-trait = "0.1.53"
 chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive"]}
-firec = {git = "https://github.com/blockjoy/firec.git"}
 local-ip-address = "0.4.4"
 reqwest = {version = "0.11.10", features = ["json"]}
 serde = "1.0.136"
@@ -32,6 +31,8 @@ sysinfo = "0.23.12"
 tokio = {version = "1.17.0", features = ["full"]}
 toml = "0.5.8"
 uuid = {version = "1.0.0", features = ["serde", "v4"]}
+
+firec = {git = "https://github.com/blockjoy/firec.git"}
 
 [dev-dependencies]
 httpmock = "0.6"
