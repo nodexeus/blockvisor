@@ -51,22 +51,6 @@
     </li>
 
     <li class="add-broadcast__item">
-      <Dropdown isActive={true}>
-        <DropdownLinkList>
-          <li>
-            <DropdownItem as="button">Profile</DropdownItem>
-          </li>
-          <li>
-            <DropdownItem as="button">Billing</DropdownItem>
-          </li>
-          <li>
-            <DropdownItem as="button">Settings</DropdownItem>
-          </li>
-        </DropdownLinkList>
-      </Dropdown>
-    </li>
-
-    <li class="add-broadcast__item">
       <div class="add-broadcast__label">Watch Address</div>
 
       <Input
