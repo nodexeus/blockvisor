@@ -1,8 +1,12 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
+  import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
   import BroadcastEvent from './BroadcastEvent.svelte';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
+  import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
 
   const form = useForm({
     interval: { initial: 'anytime' },
@@ -44,6 +48,22 @@
           <Hint on="required">This is a mandatory field</Hint>
         </svelte:fragment>
       </Input>
+    </li>
+
+    <li class="add-broadcast__item">
+      <Dropdown isActive={true}>
+        <DropdownLinkList>
+          <li>
+            <DropdownItem as="button">Profile</DropdownItem>
+          </li>
+          <li>
+            <DropdownItem as="button">Billing</DropdownItem>
+          </li>
+          <li>
+            <DropdownItem as="button">Settings</DropdownItem>
+          </li>
+        </DropdownLinkList>
+      </Dropdown>
     </li>
 
     <li class="add-broadcast__item">
