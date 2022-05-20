@@ -1,8 +1,7 @@
-use camino::Utf8PathBuf;
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgEnum, Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[clap(name = "bvs", author, version, about)]
+#[clap(name = "bv", author, version, about)]
 pub struct App {
     #[clap(flatten)]
     pub global_opts: GlobalOpts,
@@ -12,13 +11,13 @@ pub struct App {
 }
 
 #[derive(Debug, Args)]
-pub struct ConfigureArgs {
+pub struct InitArgs {
     /// One-time password
     #[clap(long)]
     pub otp: String,
 
     /// BlockJoy API url
-    #[clap(long = "url", default_value = "https://api.stakejoy.com")]
+    #[clap(long = "url", default_value = "https://api.blockvisor.dev")]
     pub blockjoy_api_url: String,
 
     /// Network interface name
@@ -27,27 +26,18 @@ pub struct ConfigureArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct StartArgs {
-    /// Should the app run as daemon
-    #[clap(long, short)]
-    pub daemonize: bool,
-
-    /// Path to config file
-    #[clap(long, short, default_value = "config.toml")]
-    pub config_path: Utf8PathBuf,
-}
+pub struct StartArgs {}
 
 #[derive(Debug, Args)]
-pub struct StopArgs {
-    /// Path to config file
-    #[clap(long, short, default_value = "config.toml")]
-    pub config_path: Utf8PathBuf,
-}
+pub struct StopArgs {}
+
+#[derive(Debug, Args)]
+pub struct StatusArgs {}
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Configure blockvisor to run on this host
-    Configure(ConfigureArgs),
+    /// Initialise blockvisor to run on this host
+    Init(InitArgs),
 
     /// Start blockvisor service
     Start(StartArgs),
@@ -55,24 +45,172 @@ pub enum Command {
     /// Stop blockvisor service
     Stop(StopArgs),
 
+    /// Return blockvisor status
+    Status(StatusArgs),
+
     /// Manage nodes on this host
     Node {
         #[clap(subcommand)]
         command: NodeCommand,
     },
+
+    /// Manage host configuration and collect host info
+    Host {
+        #[clap(subcommand)]
+        command: HostCommand,
+    },
+
+    /// Get information about chains
+    Chain {
+        #[clap(subcommand)]
+        command: ChainCommand,
+    },
 }
 
 #[derive(Debug, Subcommand)]
 pub enum NodeCommand {
-    /// Create node
-    Create,
+    /// Show nodes list
+    List {
+        /// Should we display all nodes including stopped
+        #[clap(long)]
+        all: bool,
 
-    /// Delete node and clean up resources
-    Kill {
+        /// Display nodes of particular chain
+        #[clap(long)]
+        chain: Option<String>,
+    },
+
+    /// Create node
+    Create {
+        /// Chain identifier
+        #[clap(long)]
+        chain: String,
+    },
+
+    /// Start node
+    Start {
         /// Node id
         #[clap(long)]
         id: String,
     },
+
+    /// Stop node
+    Stop {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Restart node
+    Restart {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Delete node and clean up resources
+    Delete {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Attach to node console
+    Console {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Display node logs
+    Logs {
+        /// Node id
+        #[clap(long)]
+        id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostCommand {
+    /// Collect host system information
+    Info,
+
+    /// Manage host network configuration
+    Network {
+        #[clap(subcommand)]
+        command: HostNetworkCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkCommand {
+    Info,
+
+    Bridge {
+        #[clap(subcommand)]
+        command: HostNetworkBridgeCommand,
+    },
+
+    Ip {
+        #[clap(subcommand)]
+        command: HostNetworkIpCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkBridgeCommand {
+    List,
+
+    Create {
+        #[clap(long)]
+        name: String,
+    },
+
+    Delete {
+        #[clap(long)]
+        name: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum HostNetworkIpCommand {
+    List,
+
+    Add {
+        #[clap(long)]
+        net: String,
+    },
+
+    Delete {
+        #[clap(long)]
+        net: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ChainCommand {
+    /// Show chains list
+    List,
+
+    /// Display chain status
+    Status {
+        /// Chain identifier
+        #[clap(long)]
+        id: String,
+    },
+
+    /// Run chain synchronization process
+    Sync {
+        /// Chain identifier
+        #[clap(long)]
+        id: String,
+    },
+}
+
+#[derive(ArgEnum, PartialEq, Debug, Clone)]
+pub enum FormatArg {
+    Text,
+    Json,
 }
 
 #[derive(Debug, Args)]
@@ -80,4 +218,8 @@ pub struct GlobalOpts {
     /// Verbosity level (can be specified multiple times)
     #[clap(long, short, global = true, parse(from_occurrences))]
     verbose: usize,
+
+    /// Output format
+    #[clap(long, short, global = true, arg_enum, default_value = "text")]
+    pub format: FormatArg,
 }

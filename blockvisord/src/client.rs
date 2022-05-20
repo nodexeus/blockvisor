@@ -18,7 +18,11 @@ impl APIClient {
         })
     }
 
-    pub async fn register_host(&self, otp: &str, create: &HostCreateRequest) -> Result<Host> {
+    pub async fn register_host(
+        &self,
+        otp: &str,
+        create: &HostCreateRequest,
+    ) -> Result<HostCreateResponse> {
         let url = format!(
             "{}/host_provisions/{}/hosts",
             self.base_url.as_str().trim_end_matches('/'),
@@ -34,7 +38,7 @@ impl APIClient {
             .await?
             .text()
             .await?;
-        let host: Host = serde_json::from_str(&text)?;
+        let host: HostCreateResponse = serde_json::from_str(&text)?;
 
         Ok(host)
     }
@@ -104,7 +108,7 @@ pub struct HostCreateRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Host {
+pub struct HostCreateResponse {
     pub id: Uuid,
     pub org_id: Option<Uuid>,
     pub name: String,

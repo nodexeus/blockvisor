@@ -1,0 +1,239 @@
+use anyhow::{bail, Result};
+use blockvisord::{
+    cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
+    client::{APIClient, HostCreateRequest},
+    containers::ContainerStatus,
+    hosts::{
+        config_exists, get_host_info, get_ip_address, read_config, write_config, ContainerConfig,
+        HostConfig,
+    },
+};
+use clap::Parser;
+use std::collections::HashMap;
+use tokio::time::Duration;
+use uuid::Uuid;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = App::parse();
+    println!("{:?}", args);
+    let timeout = Duration::from_secs(10);
+
+    match args.command {
+        Command::Init(cmd_args) => {
+            println!("Configuring blockvisor");
+
+            let ip = get_ip_address(&cmd_args.ifa);
+            let info = get_host_info();
+
+            let create = HostCreateRequest {
+                org_id: None,
+                name: info.name.unwrap(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                location: None,
+                cpu_count: info.cpu_count,
+                mem_size: info.mem_size,
+                disk_size: info.disk_size,
+                os: info.os,
+                os_version: info.os_version,
+                ip_addr: ip,
+                val_ip_addrs: None,
+            };
+            println!("{:?}", create);
+
+            let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
+            let host = client.register_host(&cmd_args.otp, &create).await?;
+
+            let config = HostConfig {
+                data_dir: ".".to_string(),
+                pool_dir: ".".to_string(),
+                id: host.id.to_string(),
+                token: host.token,
+                blockjoy_api_url: cmd_args.blockjoy_api_url,
+                containers: HashMap::new(),
+            };
+            write_config(config)?;
+        }
+        Command::Start(_) => {
+            if !config_exists() {
+                bail!("Error: not configured, please run `configure` first");
+            }
+
+            println!("Starting blockvisor in background");
+            todo!()
+        }
+        Command::Stop(_) => {
+            println!("Stopping blockvisord");
+            todo!()
+        }
+        Command::Status(_) => {
+            todo!()
+        }
+        Command::Host { command } => process_host_command(&command).await?,
+        Command::Chain { command } => process_chain_command(&command).await?,
+        Command::Node { command } => process_node_command(&command).await?,
+    }
+
+    Ok(())
+}
+
+async fn process_host_command(command: &HostCommand) -> Result<()> {
+    match command {
+        HostCommand::Info => {
+            let info = get_host_info();
+            println!("{:?}", info);
+        }
+        HostCommand::Network { command: _ } => todo!(),
+    }
+
+    Ok(())
+}
+
+#[allow(unreachable_code)]
+async fn process_chain_command(command: &ChainCommand) -> Result<()> {
+    match command {
+        ChainCommand::List => todo!(),
+        ChainCommand::Status { id: _ } => todo!(),
+        ChainCommand::Sync { id: _ } => todo!(),
+    }
+
+    Ok(())
+}
+
+async fn process_node_command(command: &NodeCommand) -> Result<()> {
+    let mut config = read_config()?;
+
+    match command {
+        NodeCommand::List { all, chain } => {
+            for (_id, c) in config.containers {
+                let is_chain_visible = if let Some(chain) = chain {
+                    c.chain.contains(chain)
+                } else {
+                    true
+                };
+                let is_status_visible = *all
+                    || c.status == ContainerStatus::Created
+                    || c.status == ContainerStatus::Started;
+
+                if is_chain_visible && is_status_visible {
+                    println!("{:?}", &c);
+                }
+            }
+        }
+        NodeCommand::Create { chain } => {
+            let id = Uuid::new_v4().to_string();
+            let container_config = ContainerConfig {
+                id: id.clone(),
+                chain: chain.to_owned(),
+                status: ContainerStatus::Created,
+            };
+            println!("Container added: {:?}", &container_config);
+            config.containers.insert(id, container_config);
+            write_config(config)?;
+        }
+        NodeCommand::Start { id } => {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Started;
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
+        NodeCommand::Stop { id } => {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Stopped;
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
+        NodeCommand::Delete { id } => {
+            if let Some(container_config) = config.containers.get_mut(id) {
+                container_config.status = ContainerStatus::Deleted;
+                write_config(config)?;
+            } else {
+                println!("Container not found: {}", id);
+            }
+        }
+        NodeCommand::Restart { id: _ } => todo!(),
+        NodeCommand::Console { id: _ } => todo!(),
+        NodeCommand::Logs { id: _ } => todo!(),
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use blockvisord::client::{APIClient, HostCreateRequest};
+    use httpmock::prelude::*;
+    use serde_json::json;
+    use std::time::Duration;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn test_register_host() {
+        let server = MockServer::start();
+        let org_id = Uuid::new_v4();
+
+        let m = server.mock(|when, then| {
+            when.method(POST)
+                .path("/host_provisions/OTP/hosts")
+                .header("Content-Type", "application/json")
+                .json_body(json!({
+                    "org_id": org_id,
+                    "name": "some-host",
+                    "version": "1.0",
+                    "location": null,
+                    "cpu_count": 4_i64,
+                    "mem_size": 8_i64,
+                    "disk_size": 100_i64,
+                    "os": "ubuntu",
+                    "os_version": "4.14.12",
+                    "ip_addr": "192.168.0.1",
+                    "val_ip_addrs": null,
+                }));
+            then.status(200)
+                .header("Content-Type", "application/json")
+                .json_body(json!({
+                    "id": "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b",
+                    "token": "secret_token",
+                    "org_id": org_id,
+                    "name": "some-host",
+                    "version": "1.0",
+                    "location": null,
+                    "cpu_count": 4_i64,
+                    "mem_size": 8_i64,
+                    "disk_size": 100_i64,
+                    "os": "ubuntu",
+                    "os_version": "4.14.12",
+                    "ip_addr": "192.168.0.1",
+                    "val_ip_addrs": null,
+                    "created_at": "2019-08-24T14:15:22Z",
+                    "status": "online",
+                    "validators": [],
+                }));
+        });
+
+        let client = APIClient::new(&server.base_url(), Duration::from_secs(10)).unwrap();
+        let otp = "OTP";
+        let info = HostCreateRequest {
+            org_id: Some(org_id),
+            name: "some-host".to_string(),
+            version: Some("1.0".to_string()),
+            location: None,
+            cpu_count: Some(4),
+            mem_size: Some(8),
+            disk_size: Some(100),
+            os: Some("ubuntu".to_string()),
+            os_version: Some("4.14.12".to_string()),
+            ip_addr: "192.168.0.1".to_string(),
+            val_ip_addrs: None,
+        };
+        let resp = client.register_host(otp, &info).await.unwrap();
+
+        assert_eq!(resp.id.to_string(), "eb4e20fc-2b4a-4d0c-811f-48abcf12b89b");
+        assert_eq!(resp.token, "secret_token");
+
+        m.assert();
+    }
+}
