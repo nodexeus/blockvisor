@@ -17,7 +17,7 @@
 
 <div>
   <div class="add-broadcast__checkbox">
-    <Checkbox {name} field={$form?.addGateway}>
+    <Checkbox {name} field={$form?.[name]}>
       {value}
     </Checkbox>
     <button

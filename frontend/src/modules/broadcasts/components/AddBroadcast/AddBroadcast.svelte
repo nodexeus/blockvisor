@@ -18,18 +18,16 @@
     'Transfer Hotspot',
     'Trasnfer Validator Stake',
     'Unstake Validator',
-    "Price Oracle (doesn't require address)",
-    "Chain Vars (doesn't require address)",
+    'Price Oracle',
+    'Chain Vars',
   ];
+
+  function handleSubmit() {
+    console.log($form.values);
+  }
 </script>
 
-<form
-  use:form
-  class="add-broadcast"
-  on:submit={(e) => {
-    e.preventDefault();
-  }}
->
+<form use:form class="add-broadcast" on:submit|preventDefault={handleSubmit}>
   <ul class="u-list-reset add-broadcast__list">
     <li class="add-broadcast__item">
       <Input
@@ -52,7 +50,7 @@
       <div class="add-broadcast__label">Watch Address</div>
 
       <Input
-        name="addresses (comma separated)"
+        name="addresses"
         size="medium"
         value={$form?.address?.value}
         field={$form?.address}
@@ -84,10 +82,10 @@
 
       <div class="add-broadcast__input">
         <Input
-          name="callback"
+          name="token"
           size="medium"
-          value={$form?.callback?.value}
-          field={$form?.callback}
+          value={$form?.token?.value}
+          field={$form?.token}
           validate={[required]}
           description="Authorization: Bearer <Auth Token>"
           required
