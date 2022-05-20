@@ -4,6 +4,7 @@ interface Blockchain {
   description?: string;
   status: 'development' | 'alpha' | 'beta' | 'production' | 'deleted';
   project_url?: string;
+  token?: string;
   repo_url?: string;
   supports_etl: boolean;
   supports_node: boolean;

@@ -15,7 +15,7 @@
     sol: SolIcon,
   };
 
-  export let icon = 'algo';
+  export let icon = '';
 
   $: token = icons[icon];
 </script>
