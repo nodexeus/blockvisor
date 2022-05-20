@@ -120,10 +120,6 @@
     margin-top: 60px;
   }
 
-  .add-broadcast__checkbox + .add-broadcast__checkbox {
-    margin-top: 16px;
-  }
-
   .add-broadcast__label {
     margin-bottom: 24px;
   }
