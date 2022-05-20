@@ -5,12 +5,11 @@
   import TokenIcon from 'components/TokenIcon/TokenIcon.svelte';
   import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
   import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
+  import { blockchains } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
 
   export let form;
   export let setStep;
-
-  let blockchains: Blockchain[] = [];
 
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
@@ -28,7 +27,7 @@
           (item: Blockchain) => item.status !== 'production',
         );
 
-        blockchains = [...active, ...inactive];
+        blockchains.set([...active, ...inactive]);
       }
     });
   });
@@ -39,13 +38,16 @@
     <slot />
     <svelte:fragment slot="label">Select a network</svelte:fragment>
 
-    {#each blockchains as item, i}
+    {#each $blockchains as item, i}
       <CardSelector disabled={item.status !== 'production'} index={i}>
         <svelte:fragment slot="label">
-          <TokenIcon icon="hnt" />
+          {#if item.token}
+            <TokenIcon icon={item.token.toLowerCase()} />
+          {/if}
           {item.name}<br />
-          <small>HNT</small></svelte:fragment
+          <small>{item.token || ''}</small></svelte:fragment
         >
+        <!-- {#if item.status === 'production'} -->
         <Button
           value={item.name}
           type="submit"
@@ -53,6 +55,7 @@
           style="primary"
           size="small">Select</Button
         >
+        <!-- {/if} -->
       </CardSelector>
     {/each}
   </CardSelectorList>

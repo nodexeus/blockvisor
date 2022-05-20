@@ -23,7 +23,8 @@
     <button
       type="button"
       on:click={toggleDetails}
-      class="u-button-reset add-broadcast__action"><IconEye /></button
+      class={`u-button-reset add-broadcast__action ${details && 'active'}`}
+      ><IconEye /></button
     >
   </div>
   {#if details}
@@ -67,5 +68,9 @@
 
     border: 1px solid rgba(248, 250, 246, 0.1);
     border-radius: 4px;
+  }
+
+  .active {
+    background: var(--color-secondary);
   }
 </style>
