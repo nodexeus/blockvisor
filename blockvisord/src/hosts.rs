@@ -10,10 +10,13 @@ use std::{
 };
 use sysinfo::{DiskExt, System, SystemExt};
 
-const CONFIG_FILENAME: &str = ".config/blockvisor.toml";
+const CONFIG_FILENAME: &str = "blockvisor.toml";
 
 lazy_static::lazy_static! {
-    static ref CONFIG_FILE: PathBuf = home::home_dir().unwrap_or_else(|| PathBuf::from("/tmp")).join(CONFIG_FILENAME);
+    static ref CONFIG_FILE: PathBuf = home::home_dir()
+        .map(|p| p.join(".config"))
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join(CONFIG_FILENAME);
 }
 
 pub struct Host {
