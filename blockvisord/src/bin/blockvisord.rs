@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
         let config = read_config()?;
 
         let mut machine_index: usize = 0;
-        let vmm = std::env::var("VMM").unwrap_or("dummy".into());
+        let vmm = std::env::var("VMM").unwrap_or_else(|_| "dummy".into());
         if vmm == "dummy" {
             dummy_apply_config(&config, &mut machine_index).await?;
         }
