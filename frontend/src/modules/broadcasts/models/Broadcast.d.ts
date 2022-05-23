@@ -6,7 +6,7 @@ interface Broadcast {
   addresses: string;
   callback_url: string;
   auth_token: string;
-  txy_types: string;
+  txn_types: string;
   is_active: boolean;
   last_processes_height: number;
   created_at: string;

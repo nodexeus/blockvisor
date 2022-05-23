@@ -67,7 +67,7 @@
 </ActionTitleHeader>
 {#if $broadcasts.length}
   <section in:fade={fadeDefault} class="container--medium-large">
-    <BroadcastsTable />
+    <BroadcastsTable broadcasts={$broadcasts} />
   </section>
 {:else}
   <section in:fade={fadeDefault} class="automation-wrapper">
