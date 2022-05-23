@@ -76,7 +76,7 @@ impl NodeContainer for LinuxNode {
         let kernel_args = Some(
             format!(
                 "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
-            ip=74.50.82.8{}::74.50.82.82:255.255.255.240::eth0:on",
+            ip=74.50.82.8{}::74.50.82.81:255.255.255.240::eth0:on",
                 machine_index + 3,
             )
             .into(),
