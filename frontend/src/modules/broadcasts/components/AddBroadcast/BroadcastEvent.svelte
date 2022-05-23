@@ -50,11 +50,11 @@
     border: 1px solid var(--color-border-2);
     border-radius: 4px;
     transition: all 0.1s ease-out;
+    fill: var(--color-border-2);
 
     &:hover,
     &:focus {
-      color: white;
-      border-color: white;
+      background: var(--color-secondary);
     }
   }
 
@@ -72,5 +72,7 @@
 
   .active {
     background: var(--color-secondary);
+    fill: theme(--color-text-1);
+    border-color: white;
   }
 </style>

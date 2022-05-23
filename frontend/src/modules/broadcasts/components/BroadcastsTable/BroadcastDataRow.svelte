@@ -9,7 +9,6 @@
   import { formatDistanceToNow } from 'date-fns';
 
   export let item: Broadcast;
-  console.log({ item });
 </script>
 
 <tr class="table__row broadcast">

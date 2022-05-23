@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { SvelteToast, toast } from '@zerodevx/svelte-toast';
-
+  import { toast } from '@zerodevx/svelte-toast';
   import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { user } from 'modules/authentication/store';
@@ -10,8 +8,9 @@
   import {
     blockchains,
     getAllBlockchains,
-    organisationId,
+    getAllBroadcasts,
     getOrganisationId,
+    organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import Select from 'modules/forms/components/Select/Select.svelte';
@@ -22,6 +21,12 @@
 
   const form = useForm({
     interval: { initial: 'anytime' },
+  });
+
+  onMount(() => {
+    if ($organisationId) {
+      getOrganisationId($user.id);
+    }
   });
 
   const BroadcastEvents = [
@@ -46,12 +51,12 @@
   async function handleSubmit() {
     isSubmitting = true;
 
-    let txn_types = '';
-    BroadcastEvents.forEach((item, i) => {
-      if ($form?.[item.id].value === 'checked') {
-        txn_types += `${item.id}, `;
-      }
-    });
+    /** Filter out just values and join in comma separated list. */
+    const txn_types = BroadcastEvents.filter(
+      (item) => $form?.[item.id].value === 'checked',
+    )
+      .map((item) => item.id)
+      .join(', ');
 
     const res = await axios.post('/api/broadcast/createNewBroadcast', {
       org_id: $organisationId,
@@ -66,6 +71,7 @@
 
     if (res.statusText === 'OK') {
       toast.push('Succesfully added');
+      getAllBroadcasts($organisationId);
     }
 
     isSubmitting = false;
@@ -110,7 +116,7 @@
         size="medium"
         label="Select a date"
       >
-        <svelte:fragment slot="label">Group</svelte:fragment>
+        <svelte:fragment slot="label">Blockchain</svelte:fragment>
       </Select>
     </li>
 
