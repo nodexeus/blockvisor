@@ -1,19 +1,22 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
-  import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
-  import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
   import {
     blockchains,
-    selectedValidator,
-  } from 'modules/nodes/store/nodesStore';
+    getAllBlockchains,
+  } from 'modules/broadcasts/store/broadcastStore';
+  import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
+  import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
+  import { onMount } from 'svelte';
   import FormState from './FormState.svelte';
 
   export let form;
   export let setStep;
 
-  const thisBlockchain = $blockchains.find(
-    (item) => item.name === $form.network.value,
-  );
+  onMount(() => {
+    getAllBlockchains();
+  });
+
+  const nodeTypes = [];
 
   const handleSubmit = (e: SubmitEvent) => {
     e.preventDefault();
@@ -21,15 +24,20 @@
     setStep(3);
   };
 
-  const nodeTypes = [];
-  if (thisBlockchain.supports_node) {
-    nodeTypes.push('Node/api');
-  }
-  if (thisBlockchain.supports_staking) {
-    nodeTypes.push('Validator');
-  }
-  if (thisBlockchain.supports_etl) {
-    nodeTypes.push('ETL');
+  $: {
+    const thisBlockchain = $blockchains.find(
+      (item) => item.name === $form.network.value,
+    );
+
+    if (thisBlockchain?.supports_node) {
+      nodeTypes.push('Node/api');
+    }
+    if (thisBlockchain?.supports_staking) {
+      nodeTypes.push('Validator');
+    }
+    if (thisBlockchain?.supports_etl) {
+      nodeTypes.push('ETL');
+    }
   }
 </script>
 

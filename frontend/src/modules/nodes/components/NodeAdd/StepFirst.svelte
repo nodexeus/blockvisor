@@ -1,6 +1,4 @@
 <script lang="ts">
-  import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import TokenIcon from 'components/TokenIcon/TokenIcon.svelte';
   import {
@@ -9,7 +7,6 @@
   } from 'modules/broadcasts/store/broadcastStore';
   import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
   import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
-  import { blockchains } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
 
   export let form;

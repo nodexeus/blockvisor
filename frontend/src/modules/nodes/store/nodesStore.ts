@@ -8,7 +8,6 @@ export const selectedNode = writable([]);
 export const selectedValidator = writable({});
 export const isLoading = writable(false);
 export const installedNode = writable({});
-export const blockchains = writable<Blockchain[]>([]);
 
 export const fetchAllNodes = async () => {
   const all_nodes = [
