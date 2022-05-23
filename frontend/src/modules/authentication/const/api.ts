@@ -32,3 +32,6 @@ export const BLOCKCHAINS = `${API.URL}/blockchains`;
 export const ORGANISATIONS = (id: string) => `${API.URL}/users/${id}/orgs`;
 
 export const CREATE_BROADCAST = `${API.URL}/broadcast_filters`;
+
+export const BROADCASTS = (id: string) =>
+  `${API.URL}/orgs/${id}/broadcast_filters`;

@@ -2,6 +2,8 @@ import axios from 'axios';
 import { writable } from 'svelte/store';
 
 export const blockchains = writable<Blockchain[]>([]);
+export const organisationId = writable<string>();
+export const broadcasts = writable<Broadcast[]>([]);
 
 export const getAllBlockchains = async () => {
   axios.get('/api/nodes/getBlockchains').then((res) => {
@@ -15,4 +17,26 @@ export const getAllBlockchains = async () => {
       blockchains.set([...active, ...inactive]);
     }
   });
+};
+
+export const getAllBroadcasts = async (orgId: string) => {
+  axios
+    .get('/api/broadcast/getBroadcasts', {
+      params: {
+        org_id: orgId,
+      },
+    })
+    .then((res) => {
+      broadcasts.set(res.data);
+    });
+};
+
+export const getOrganisationId = async (userId: string) => {
+  axios
+    .get('/api/broadcast/getOrganisationId', { params: { id: userId } })
+    .then((res) => {
+      if (res.statusText === 'OK') {
+        organisationId.set(res.data);
+      }
+    });
 };
