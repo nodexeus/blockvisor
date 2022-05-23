@@ -1,8 +1,6 @@
 <script lang="ts">
-  import { SvelteToast, toast } from '@zerodevx/svelte-toast';
-
+  import { toast } from '@zerodevx/svelte-toast';
   import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { user } from 'modules/authentication/store';
@@ -10,15 +8,14 @@
   import {
     blockchains,
     getAllBlockchains,
-    organisationId,
-    getOrganisationId,
     getAllBroadcasts,
+    getOrganisationId,
+    organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import Select from 'modules/forms/components/Select/Select.svelte';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
-  import { claim_svg_element } from 'svelte/internal';
 
   let isSubmitting: boolean;
 
@@ -54,13 +51,12 @@
   async function handleSubmit() {
     isSubmitting = true;
 
+    /** Filter out just values and join in comma separated list. */
     const txn_types = BroadcastEvents.filter(
       (item) => $form?.[item.id].value === 'checked',
     )
       .map((item) => item.id)
       .join(', ');
-
-    console.log({ txn_types });
 
     const res = await axios.post('/api/broadcast/createNewBroadcast', {
       org_id: $organisationId,
