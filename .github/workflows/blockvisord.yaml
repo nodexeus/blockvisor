@@ -1,0 +1,55 @@
+name: Blockvisor
+
+on:
+  push:
+    branches:
+      - "main"
+      - "master"
+    paths:
+      - "blockvisord/**.rs"
+      - ".github/workflows/**"
+  pull_request:
+    branches:
+      - "main"
+      - "master"
+    paths:
+      - "blockvisord/**.rs"
+
+env:
+  RUST_LOG: trace
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Test
+        run: >
+          cargo test -p blockvisord
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          components: clippy, rustfmt
+          override: true
+      - name: Check formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -p blockvisord -- --check
+      - name: Catch common mistakes
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -p blockvisord -- -D warnings
