@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
 
@@ -6,16 +6,25 @@
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
+  import { formatDistanceToNow } from 'date-fns';
+
+  export let item: Broadcast;
+  console.log({ item });
 </script>
 
 <tr class="table__row broadcast">
   <td class="broadcast__col">
     <span class="t-line-clamp--2" title="My Broadcast really long name "
-      >My Broadcast
+      >{item.name}
     </span>
   </td>
-  <td class="t-small t-color-text-2 broadcast__col">1h 33min ago</td>
-  <td class="t-small t-color-text-2 broadcast__col">Weekly</td>
+  <td class="t-small t-color-text-2 broadcast__col"
+    >{item.created_at && formatDistanceToNow(+new Date(item.created_at))} ago</td
+  >
+  <td class="t-small t-color-text-2 broadcast__col broadcast__col--trunc"
+    >{item.addresses}</td
+  >
+  <td class="t-small t-color-text-2 broadcast__col">{item.txn_types}</td>
   <td class="t-right broadcast__col broadcast__col--controls">
     <ButtonWithDropdown
       position="right"
@@ -49,33 +58,40 @@
 
 <style>
   .broadcast {
+    padding-bottom: 60px;
+
     @media (--screen-smaller-max) {
       display: block;
       position: relative;
     }
+  }
+  .broadcast__col {
+    vertical-align: middle;
+    padding: 24px 40px 20px 0;
 
-    &__col {
-      vertical-align: middle;
-      padding: 24px 40px 20px 0;
+    @media (--screen-smaller-max) {
+      display: block;
+      padding: 12px 0;
 
-      @media (--screen-smaller-max) {
-        display: block;
-        padding: 12px 0;
-
-        &:first-child {
-          padding-right: 60px;
-        }
-
-        &--controls {
-          position: absolute;
-          top: 0;
-          right: 0;
-        }
-      }
-
-      &:last-child {
-        padding-right: 0;
+      &:first-child {
+        padding-right: 60px;
       }
     }
+
+    &:last-child {
+      padding-right: 0;
+    }
+  }
+
+  .broadcast__col--controls {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .broadcast__col--trunc {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 180px;
   }
 </style>

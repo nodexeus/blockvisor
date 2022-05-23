@@ -4,6 +4,8 @@
 
   let sortActive;
 
+  export let broadcasts: Broadcast[];
+
   const handleSort = (id: string, value: SorterValues) => {
     sortActive = { id, value };
   };
@@ -11,8 +13,8 @@
 
 <table class="table broadcast-table">
   <colgroup>
-    <col width="160px" />
-    <col width="140px" />
+    <col width="260px" />
+    <col width="200px" />
     <col width="140px" />
     <col />
   </colgroup>
@@ -29,8 +31,13 @@
         </Sorter>
       </th>
       <th class="table__heading">
-        <Sorter id="interval" active={sortActive} callback={handleSort}>
-          Interval
+        <Sorter id="addresses" active={sortActive} callback={handleSort}>
+          Addresses
+        </Sorter>
+      </th>
+      <th class="table__heading">
+        <Sorter id="filters" active={sortActive} callback={handleSort}>
+          Filters
         </Sorter>
       </th>
       <th>
@@ -39,11 +46,9 @@
     </tr>
   </thead>
   <tbody>
-    <BroadcastDataRow />
-    <BroadcastDataRow />
-    <BroadcastDataRow />
-    <BroadcastDataRow />
-    <BroadcastDataRow />
+    {#each broadcasts as item}
+      <BroadcastDataRow {item} />
+    {/each}
   </tbody>
 </table>
 

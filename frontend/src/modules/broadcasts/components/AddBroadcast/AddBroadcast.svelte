@@ -10,13 +10,14 @@
   import {
     blockchains,
     getAllBlockchains,
+    organisationId,
+    getOrganisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import Select from 'modules/forms/components/Select/Select.svelte';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
 
-  let orgId: string;
   let isSubmitting: boolean;
 
   const form = useForm({
@@ -39,14 +40,7 @@
 
   onMount(() => {
     getAllBlockchains();
-
-    axios
-      .get('/api/broadcast/getOrganisationId', { params: { id: $user.id } })
-      .then((res) => {
-        if (res.statusText === 'OK') {
-          orgId = res.data;
-        }
-      });
+    getOrganisationId($user.id);
   });
 
   async function handleSubmit() {
@@ -60,7 +54,7 @@
     });
 
     const res = await axios.post('/api/broadcast/createNewBroadcast', {
-      org_id: orgId,
+      org_id: $organisationId,
       name: $form.name?.value,
       blockchain_id: $form.blockchain?.value,
       callback_url: $form.callback_url?.value,
