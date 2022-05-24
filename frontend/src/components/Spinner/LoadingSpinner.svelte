@@ -29,44 +29,50 @@
 
 <style>
   .spinner {
+  }
+  .spinner :global(svg) {
+    aspect-ratio: 1;
+  }
+
+  .spinner--button {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: var(--color-text-1-o70);
+
     & :global(svg) {
-      aspect-ratio: 1;
+      margin: 0 auto;
+      width: 24px;
     }
+  }
 
-    &--button {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      background-color: var(--color-text-1-o70);
-
-      & :global(svg) {
-        margin: 0 auto;
-        width: 24px;
-      }
+  .spinner--medium {
+    & :global(svg) {
+      width: 60px;
     }
+  }
 
-    &--medium {
-      & :global(svg) {
-        width: 60px;
-      }
+  .spinner--large {
+    & :global(svg) {
+      width: 100px;
     }
+  }
 
-    &--page {
-      min-height: 100vh;
-      min-width: 100vw;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
+  .spinner--page {
+    min-height: 100vh;
+    min-width: 100vw;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 
-      & :global(svg) {
-        width: 100px;
-      }
+    & :global(svg) {
+      width: 100px;
     }
   }
 

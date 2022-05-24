@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { toast } from '@zerodevx/svelte-toast';
+
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { fadeDefault } from 'consts/animations';
   import { ROUTES } from 'consts/routes';
   import IconCog from 'icons/cog-12.svg';
@@ -23,13 +26,20 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
 
+  let isLoading = false;
+
   onMount(() => {
+    isLoading = true;
     getOrganisationId($user.id);
   });
 
   $: {
     if ($organisationId) {
-      getAllBroadcasts($organisationId);
+      getAllBroadcasts($organisationId)
+        .then(() => {
+          isLoading = false;
+        })
+        .catch((err) => toast.push(err));
     }
   }
 </script>
@@ -65,7 +75,9 @@
     </DropdownLinkList>
   </ButtonWithDropdown>
 </ActionTitleHeader>
-{#if $broadcasts.length}
+{#if !$broadcasts}
+  <LoadingSpinner size="medium" id="broadcast" />
+{:else if $broadcasts?.length}
   <section in:fade={fadeDefault} class="container--medium-large">
     <BroadcastsTable broadcasts={$broadcasts} />
   </section>
@@ -81,9 +93,7 @@
 {/if}
 
 <style>
-  .automation {
-    &-wrapper {
-      max-width: 484px;
-    }
+  .automation-wrapper {
+    max-width: 484px;
   }
 </style>
