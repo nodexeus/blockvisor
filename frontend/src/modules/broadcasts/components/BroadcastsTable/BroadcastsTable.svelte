@@ -46,8 +46,8 @@
     </tr>
   </thead>
   <tbody>
-    {#each broadcasts as item}
-      <BroadcastDataRow {item} />
+    {#each broadcasts as item, i}
+      <BroadcastDataRow {item} index={i} />
     {/each}
   </tbody>
 </table>

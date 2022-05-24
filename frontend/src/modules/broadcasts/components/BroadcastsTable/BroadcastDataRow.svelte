@@ -10,10 +10,12 @@
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import SimpleConfirmDeleteModal from 'modules/app/components/SimpleConfirmDeleteModal/SimpleConfirmDeleteModal.svelte';
   import { deleteBroadcastById } from 'modules/broadcasts/store/broadcastStore';
+  import { fade } from 'svelte/transition';
 
   let isModalOpen: boolean = false;
   let deleting: boolean = false;
   export let item: Broadcast;
+  export let index: number;
 
   function handleModalClose() {
     isModalOpen = false;
@@ -28,7 +30,10 @@
   }
 </script>
 
-<tr class="table__row broadcast">
+<tr
+  in:fade={{ duration: 250, delay: index * 200 }}
+  class="table__row broadcast"
+>
   <td class="broadcast__col">
     <span class="t-line-clamp--2" title="My Broadcast really long name "
       >{item.name}
