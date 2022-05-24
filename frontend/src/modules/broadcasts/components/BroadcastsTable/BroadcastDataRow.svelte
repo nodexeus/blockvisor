@@ -1,16 +1,33 @@
 <script lang="ts">
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { browser } from '$app/env';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
-  import IconEdit from 'icons/pencil-12.svg';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { ROUTES } from 'consts/routes';
+  import { formatDistanceToNow } from 'date-fns';
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
+  import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-  import { formatDistanceToNow } from 'date-fns';
-  import { ROUTES } from 'consts/routes';
-  import { page } from '$app/stores';
+  import SimpleConfirmDeleteModal from 'modules/app/components/SimpleConfirmDeleteModal/SimpleConfirmDeleteModal.svelte';
 
+  let isModalOpen: boolean = false;
+  let deleting: boolean = false;
   export let item: Broadcast;
+
+  function handleModalClose() {
+    isModalOpen = false;
+  }
+  function handleConfirm() {
+    deleting = true;
+
+    setTimeout(() => {
+      deleting = false;
+      handleModalClose();
+    }, 1000);
+  }
+  function handleCancel() {
+    handleModalClose();
+  }
 </script>
 
 <tr class="table__row broadcast">
@@ -47,7 +64,12 @@
           >
         </li>
         <li class="node__item-divider">
-          <DropdownItem href="#">
+          <DropdownItem
+            as="button"
+            on:click={() => {
+              isModalOpen = true;
+            }}
+          >
             <IconDelete />
             Delete</DropdownItem
           >
@@ -56,6 +78,19 @@
     </ButtonWithDropdown>
   </td>
 </tr>
+
+{#if browser && isModalOpen}
+  <SimpleConfirmDeleteModal
+    isModalOpen={true}
+    {handleModalClose}
+    id="delete-broadcast"
+    on:cancel={handleCancel}
+    on:confirm={handleConfirm}
+    loading={deleting}
+  >
+    <p slot="content">This action will delete {item.name} broadcast.</p>
+  </SimpleConfirmDeleteModal>
+{/if}
 
 <style>
   .broadcast {

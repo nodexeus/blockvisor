@@ -51,6 +51,12 @@
     }
   }
 
+  .spinner--small {
+    & :global(svg) {
+      width: 40px;
+    }
+  }
+
   .spinner--medium {
     & :global(svg) {
       width: 60px;
