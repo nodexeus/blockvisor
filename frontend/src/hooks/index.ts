@@ -1,29 +1,25 @@
-import type { GetSession, Handle } from '@sveltejs/kit/types/hooks';
+import type { GetSession, Handle } from '@sveltejs/kit';
+import axios from 'axios';
 import { ROUTES } from 'consts/routes';
 import cookie from 'cookie';
+import { REFRESH_TOKEN } from 'modules/authentication/const';
 
-export const getSession: GetSession = (request) => {
-  // TOOD: Implement user verification
-  return {
-    user: { ...JSON.parse(request.locals.user), verified: true },
-  };
+export const getSession: GetSession = ({ locals }) => {
+  return { user: locals.user, token: locals.token };
 };
 
 export const handle: Handle = async ({ event, resolve }) => {
   const cookies = cookie.parse(event.request.headers.get('cookie') || '');
-  const isLogout = event.request.url.includes(ROUTES.AUTH_LOGOUT);
-  event.locals.user = isLogout ? null : cookies?.user ?? null;
-  const response = await resolve(event);
+  const refreshToken = cookies.refresh;
 
-  if (event.locals.user) {
-    response.headers.set(
-      'set-cookie',
-      cookie.serialize('user', event.locals.user, {
-        path: '/',
-        httpOnly: true,
-      }),
-    );
+  if (!event.locals.token && refreshToken) {
+    const res = await axios.post(REFRESH_TOKEN, {
+      refresh: refreshToken,
+    });
+
+    const { refresh, token, ...user } = res.data;
+    event.locals = { token, user: { ...user, verified: true } };
   }
 
-  return response;
+  return await resolve(event);
 };
