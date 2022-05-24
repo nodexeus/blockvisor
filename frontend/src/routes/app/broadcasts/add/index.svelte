@@ -1,14 +1,18 @@
-<script context="module">
+<script context="module" lang="ts">
   export async function load({ url }) {
     const id = url.searchParams.get('id');
 
-    const broadcast = await getBroadcastById(id);
+    if (id) {
+      const thisBroadcast: Broadcast = await getBroadcastById(id);
 
-    return {
-      props: {
-        postId: id,
-      },
-    };
+      return {
+        props: {
+          broadcast: thisBroadcast,
+        },
+      };
+    }
+
+    return {};
   }
 </script>
 
@@ -25,7 +29,7 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
 
-  export let postId;
+  export let broadcast;
 
   onMount(() => {
     getOrganisationId($user.id);
@@ -34,7 +38,13 @@
 
 <section in:fade={fadeDefault} class="grid broadcast-add">
   <div class="container-medium broadcast-add__wrapper">
-    <h2 class="t-xxlarge-fluid">Add a Broadcast</h2>
+    <h2 class="t-xxlarge-fluid">
+      {#if broadcast}
+        Edit {broadcast.name}
+      {:else}
+        Add a Broadcast
+      {/if}
+    </h2>
 
     <SectionDescription>
       Broadcast allows you to be instantly notified of any transaction matching
@@ -44,7 +54,7 @@
       callback.
     </SectionDescription>
 
-    <AddBroadcast />
+    <AddBroadcast initial={broadcast} />
   </div>
   <div class="divider" />
   <div class="container-medium faq">

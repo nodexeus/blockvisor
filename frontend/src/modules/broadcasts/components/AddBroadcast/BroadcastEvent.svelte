@@ -2,22 +2,26 @@
   import Checkbox from 'modules/forms/components/Checkbox/Checkbox.svelte';
   import { useForm } from 'svelte-use-form';
   import IconEye from 'icons/eye-12.svg';
+  import type { format } from 'util';
 
   export let name: string;
   export let value: string;
+  export let form;
 
   let details: boolean = false;
 
   function toggleDetails() {
     details = !details;
   }
-
-  const form = useForm();
 </script>
 
 <div>
   <div class="add-broadcast__checkbox">
-    <Checkbox {name} field={$form?.events?.[name]}>
+    <Checkbox
+      {name}
+      field={$form?.[name]}
+      checked={$form.values[name] === 'checked' ? 'checked' : ''}
+    >
       {value}
     </Checkbox>
     <button

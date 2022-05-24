@@ -10,6 +10,7 @@
   import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
     blockchains,
+    broadcasts,
     getAllBlockchains,
     getAllBroadcasts,
     organisationId,
@@ -20,14 +21,35 @@
   import { Hint, required, useForm } from 'svelte-use-form';
 
   let isSubmitting: boolean;
-
-  onMount(() => {
-    getAllBlockchains();
-  });
+  export let initial: Broadcast;
 
   const form = useForm({
     interval: { initial: 'anytime' },
   });
+
+  onMount(() => {
+    getAllBlockchains();
+
+    if (initial) {
+      initFormValues(initial);
+    }
+  });
+
+  function initFormValues(initial: Broadcast) {
+    $form.name.value = initial.name;
+    $form.blockchain.value = initial.blockchain_id;
+    $form.callback_url.value = initial.callback_url;
+    $form.auth_token.value = initial.auth_token;
+    $form.addresses.value = initial.addresses;
+
+    const selectedTokens = initial.txn_types
+      .split(',')
+      .map((item) => item.trim());
+
+    selectedTokens.forEach((item) => {
+      $form[item].value = 'checked';
+    });
+  }
 
   async function handleSubmit() {
     isSubmitting = true;
@@ -43,20 +65,38 @@
       .map((item) => item.id)
       .join(', ');
 
-    const res = await axios.post('/api/broadcast/createNewBroadcast', {
+    const broadcast: Broadcast = {
       org_id: $organisationId,
       name: $form.name?.value,
       blockchain_id: $form.blockchain?.value,
       callback_url: $form.callback_url?.value,
       auth_token: $form.auth_token?.value,
       txn_types: txn_types,
-      is_active: $form.is_active?.value,
+      is_active: true,
       addresses: $form.addresses?.value,
-    });
+    };
 
-    if (res.statusText === 'OK') {
-      toast.success('Succesfully added');
-      getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+    if (initial) {
+      const res = await axios.post('/api/broadcast/updateBroadcast', {
+        broadcast,
+        id: initial.id,
+      });
+
+      if (res.statusText === 'OK') {
+        toast.success('Succesfully updated');
+        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+      } else {
+        toast.warning('An error occured');
+      }
+    } else {
+      const res = await axios.post('/api/broadcast/createNewBroadcast', {
+        broadcast,
+      });
+
+      if (res.statusText === 'OK') {
+        toast.success('Succesfully added');
+        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+      }
     }
 
     isSubmitting = false;
@@ -111,8 +151,8 @@
       <Input
         name="addresses"
         size="medium"
-        value={$form?.address?.value}
-        field={$form?.address}
+        value={$form?.addresses?.value}
+        field={$form?.addresses}
         description="One or more wallet, hotspot, or validator addresses"
       >
         <svelte:fragment slot="label">Address</svelte:fragment>
@@ -126,8 +166,8 @@
         <Input
           name="callback_url"
           size="medium"
-          value={$form?.callback?.value}
-          field={$form?.callback}
+          value={$form?.callback_url?.value}
+          field={$form?.callback_url}
           validate={[required]}
           description="ex: POST https://api.myproject.com/helium/events"
           required
@@ -143,8 +183,8 @@
         <Input
           name="auth_token"
           size="medium"
-          value={$form?.token?.value}
-          field={$form?.token}
+          value={$form?.auth_token?.value}
+          field={$form?.auth_token}
           validate={[required]}
           description="Authorization: Bearer <Auth Token>"
           required
@@ -158,7 +198,7 @@
       <div class="add-broadcast__label">Match these Events</div>
 
       {#each BroadcastEvents as item}
-        <BroadcastEvent name={item.id} value={item?.value} />
+        <BroadcastEvent name={item.id} value={item?.value} {form} />
       {/each}
     </li>
   </ul>
@@ -172,7 +212,7 @@
       &nbsp;
       <LoadingSpinner size="button" id="js-form-submit" />
     {:else}
-      Add Broadcast
+      {initial ? 'Save Changes' : 'Add Broadcast'}
     {/if}</Button
   >
 </form>

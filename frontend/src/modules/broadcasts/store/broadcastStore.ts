@@ -43,10 +43,9 @@ export const getBroadcastById = async (postId: string) => {
       },
     })
     .then((res) => {
-      broadcasts.set(res.data);
+      return res.data;
     })
     .catch((err) => {
-      blockchains.set([]);
       return err;
     });
 };

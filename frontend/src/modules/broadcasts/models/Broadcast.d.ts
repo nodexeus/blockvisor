@@ -8,7 +8,7 @@ interface Broadcast {
   auth_token: string;
   txn_types: string;
   is_active: boolean;
-  last_processes_height: number;
-  created_at: string;
-  updated_at: string;
+  last_processes_height?: number;
+  created_at?: string;
+  updated_at?: string;
 }
