@@ -2,11 +2,9 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
+    config::{config_exists, read_config, write_config, ContainerConfig, HostConfig},
     containers::ContainerStatus,
-    hosts::{
-        config_exists, get_host_info, get_ip_address, read_config, write_config, ContainerConfig,
-        HostConfig,
-    },
+    hosts::{get_host_info, get_ip_address},
 };
 use clap::Parser;
 use std::collections::HashMap;

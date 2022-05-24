@@ -1,7 +1,8 @@
 use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
-    hosts::{dummy_apply_config, read_config, HostConfig},
+    config::{read_config, HostConfig},
+    hosts::dummy_apply_config,
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
