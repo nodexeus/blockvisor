@@ -4,6 +4,7 @@ use firec::Machine;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
@@ -148,7 +149,7 @@ pub struct DummyNode {
 #[async_trait]
 impl NodeContainer for DummyNode {
     async fn create(id: &str, _machine_index: usize) -> Result<Self> {
-        println!("Creating node: {}", id);
+        info!("Creating node: {}", id);
         let node = Self {
             id: id.to_owned(),
             state: ContainerStatus::Created,
@@ -163,7 +164,7 @@ impl NodeContainer for DummyNode {
     }
 
     async fn start(&mut self) -> Result<()> {
-        println!("Starting node: {}", self.id());
+        info!("Starting node: {}", self.id());
         self.state = ContainerStatus::Started;
         let contents = toml::to_string(&self)?;
         fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
@@ -175,7 +176,7 @@ impl NodeContainer for DummyNode {
     }
 
     async fn kill(&mut self) -> Result<()> {
-        println!("Killing node: {}", self.id());
+        info!("Killing node: {}", self.id());
         self.state = ContainerStatus::Stopped;
         let contents = toml::to_string(&self)?;
         fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
@@ -183,7 +184,7 @@ impl NodeContainer for DummyNode {
     }
 
     async fn delete(&mut self) -> Result<()> {
-        println!("Deleting node: {}", self.id());
+        info!("Deleting node: {}", self.id());
         self.kill().await?;
         fs::remove_file(format!("/tmp/{}.txt", self.id))?;
         Ok(())

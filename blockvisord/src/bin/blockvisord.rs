@@ -34,12 +34,12 @@ async fn process_pending_commands(config: &HostConfig) -> Result<()> {
     let timeout = Duration::from_secs(10);
     let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
 
-    println!("Getting pending commands for host: {}", &config.id);
+    info!("Getting pending commands for host: {}", &config.id);
     for command in client
         .get_pending_commands(&config.token, &config.id)
         .await?
     {
-        println!("Processing command: {}", &command.cmd);
+        info!("Processing command: {}", &command.cmd);
 
         let update = CommandStatusUpdate {
             response: "Done".to_string(),
