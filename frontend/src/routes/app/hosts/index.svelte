@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { session } from '$app/stores';
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
@@ -11,7 +12,6 @@
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { app } from 'modules/app/store';
   import GroupTable from 'modules/hosts/components/GroupTable/GroupTable.svelte';
-  import HostGroup from 'modules/hosts/components/HostGroup/HostGroup.svelte';
   import { fetchAllHosts, hosts } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
 
@@ -28,7 +28,7 @@
     ]);
   });
 
-  fetchAllHosts();
+  fetchAllHosts($session.token);
 </script>
 
 <ActionTitleHeader className="container--pull-back">

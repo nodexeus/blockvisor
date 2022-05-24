@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page, session } from '$app/stores';
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
@@ -24,8 +24,8 @@
   $: hasGroups = false;
 
   $: {
-    fetchNodeById($page.params.id);
-    fetchUserById($page.params.id);
+    fetchNodeById($page.params.id, $session.token);
+    fetchUserById($page.params.id, $session.token);
   }
 </script>
 

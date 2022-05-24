@@ -1,6 +1,5 @@
 import type { GetSession, Handle } from '@sveltejs/kit';
 import axios from 'axios';
-import { ROUTES } from 'consts/routes';
 import cookie from 'cookie';
 import { REFRESH_TOKEN } from 'modules/authentication/const';
 

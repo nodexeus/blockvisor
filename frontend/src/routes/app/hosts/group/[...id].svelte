@@ -19,9 +19,8 @@
     selectedHosts,
     fetchHostById,
     isLoading,
-    hosts,
   } from 'modules/hosts/store/hostsStore';
-  import { page } from '$app/stores';
+  import { page, session } from '$app/stores';
   import DetailsTable from 'modules/hosts/components/DetailsTable/DetailsTable.svelte';
   import DetailsHeader from 'modules/hosts/components/DetailsHeader/DetailsHeader.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
@@ -43,7 +42,7 @@
   });
 
   $: {
-    fetchHostById($page.params.id);
+    fetchHostById($page.params.id, $session.token);
   }
 
   const form = useForm();
