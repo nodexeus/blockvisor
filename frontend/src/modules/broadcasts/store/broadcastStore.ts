@@ -35,6 +35,22 @@ export const getAllBroadcasts = async (orgId: string) => {
     });
 };
 
+export const getBroadcastById = async (postId: string) => {
+  return axios
+    .get('/api/broadcast/getBroadcastById', {
+      params: {
+        post_id: postId,
+      },
+    })
+    .then((res) => {
+      broadcasts.set(res.data);
+    })
+    .catch((err) => {
+      blockchains.set([]);
+      return err;
+    });
+};
+
 export const getOrganisationId = async (userId: string) => {
   axios
     .get('/api/broadcast/getOrganisationId', { params: { id: userId } })

@@ -31,6 +31,7 @@
   });
 
   $: {
+    console.log($organisationId);
     if ($organisationId) {
       getAllBroadcasts($organisationId).catch((err) => toast.push(err));
     }

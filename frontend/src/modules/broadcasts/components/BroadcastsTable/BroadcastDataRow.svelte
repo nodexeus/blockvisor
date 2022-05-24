@@ -2,11 +2,13 @@
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
 
-  import IconPerson from 'icons/person-12.svg';
+  import IconEdit from 'icons/pencil-12.svg';
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { formatDistanceToNow } from 'date-fns';
+  import { ROUTES } from 'consts/routes';
+  import { page } from '$app/stores';
 
   export let item: Broadcast;
 </script>
@@ -39,9 +41,9 @@
       </svelte:fragment>
       <DropdownLinkList slot="content">
         <li>
-          <DropdownItem href="#">
-            <IconPerson />
-            Permissions</DropdownItem
+          <DropdownItem href={ROUTES.BROADCAST_EDIT(item.id)}>
+            <IconEdit />
+            Edit</DropdownItem
           >
         </li>
         <li class="node__item-divider">
@@ -65,6 +67,7 @@
     }
   }
   .broadcast__col {
+    position: relative;
     vertical-align: middle;
     padding: 24px 40px 20px 0;
 
@@ -80,12 +83,6 @@
     &:last-child {
       padding-right: 0;
     }
-  }
-
-  .broadcast__col--controls {
-    position: absolute;
-    top: 0;
-    right: 0;
   }
 
   .broadcast__col--trunc {

@@ -16,7 +16,7 @@
     <col width="260px" />
     <col width="200px" />
     <col width="140px" />
-    <col />
+    <col width="140px" />
   </colgroup>
   <thead>
     <tr>

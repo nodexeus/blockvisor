@@ -1,9 +1,37 @@
+<script context="module">
+  export async function load({ url }) {
+    const id = url.searchParams.get('id');
+
+    const broadcast = await getBroadcastById(id);
+
+    console.log(broadcast);
+
+    return {
+      props: {
+        postId: id,
+      },
+    };
+  }
+</script>
+
 <script>
-  import { fade } from 'svelte/transition';
-  import AddBroadcast from 'modules/broadcasts/components/AddBroadcast/AddBroadcast.svelte';
-  import { fadeDefault } from 'consts/animations';
   import SectionDescription from 'components/SectionDescription/SectionDescription.svelte';
+  import { fadeDefault } from 'consts/animations';
+  import { user } from 'modules/authentication/store/auth';
+  import AddBroadcast from 'modules/broadcasts/components/AddBroadcast/AddBroadcast.svelte';
   import BroadcastFaq from 'modules/broadcasts/components/AddBroadcast/BroadcastFaq.svelte';
+  import {
+    getBroadcastById,
+    getOrganisationId,
+  } from 'modules/broadcasts/store/broadcastStore';
+  import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
+
+  export let postId;
+
+  onMount(() => {
+    getOrganisationId($user.id);
+  });
 </script>
 
 <section in:fade={fadeDefault} class="grid broadcast-add">

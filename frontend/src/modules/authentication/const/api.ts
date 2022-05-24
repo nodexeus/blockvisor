@@ -35,3 +35,6 @@ export const CREATE_BROADCAST = `${API.URL}/broadcast_filters`;
 
 export const BROADCASTS = (id: string) =>
   `${API.URL}/orgs/${id}/broadcast_filters`;
+
+export const SINGLE_BROADCAST = (id: string) =>
+  `${API.URL}/broadcast_filters/${id}`;

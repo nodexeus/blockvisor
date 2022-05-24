@@ -1,15 +1,14 @@
 <script lang="ts">
-  import { toast } from '@zerodevx/svelte-toast';
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-  import { user } from 'modules/authentication/store';
+  import { toast } from 'components/Toast/Toast';
   import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
+  import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
     blockchains,
     getAllBlockchains,
     getAllBroadcasts,
-    getOrganisationId,
     organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
@@ -19,37 +18,20 @@
 
   let isSubmitting: boolean;
 
+  onMount(() => {
+    getAllBlockchains();
+  });
+
   const form = useForm({
     interval: { initial: 'anytime' },
   });
 
-  onMount(() => {
-    if ($organisationId) {
-      getOrganisationId($user.id);
-    }
-  });
-
-  const BroadcastEvents = [
-    { id: 'add_gateway_v1', value: 'Add Gateway' },
-    { id: 'assert_location_v2', value: 'Assert Location' },
-    { id: 'concensus_group_failure_v1', value: 'Consensus Group Failure' },
-    { id: 'concensus_group_v1', value: 'Consensus Group' },
-    { id: 'payment_v2', value: 'Payments' },
-    { id: 'rewards_v2', value: 'Rewards' },
-    { id: 'stake_validator_v1', value: 'Stake Validator' },
-    { id: 'transfer_hotspot_v1', value: 'Transfer Hotspot' },
-    { id: 'transfer_validator_stake_v1', value: 'Transfer Validator Stake' },
-    { id: 'unstake_validator_v1', value: 'Unstake Validator' },
-    { id: 'validator_heartbeat_v1', value: 'Validator Heartbeat' },
-  ];
-
-  onMount(() => {
-    getAllBlockchains();
-    getOrganisationId($user.id);
-  });
-
   async function handleSubmit() {
     isSubmitting = true;
+
+    if (!$organisationId) {
+      return toast.warning('Failed to fetch user organisation id!');
+    }
 
     /** Filter out just values and join in comma separated list. */
     const txn_types = BroadcastEvents.filter(
@@ -70,7 +52,7 @@
     });
 
     if (res.statusText === 'OK') {
-      toast.push('Succesfully added');
+      toast.success('Succesfully added');
       getAllBroadcasts($organisationId);
     }
 
