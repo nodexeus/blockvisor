@@ -64,52 +64,38 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 #[async_trait]
 impl NodeContainer for LinuxNode {
     async fn create(id: &str, machine_index: usize) -> Result<Self> {
-        let jailer = firec::config::Jailer {
-            chroot_base_dir: Path::new(CHROOT_PATH).into(),
-            exec_file: Path::new(FC_BIN_PATH).into(),
-            ..Default::default()
-        };
+        let jailer = firec::config::Jailer::builder()
+            .chroot_base_dir(Path::new(CHROOT_PATH))
+            .exec_file(Path::new(FC_BIN_PATH))
+            .build();
 
-        let root_drive = firec::config::Drive {
-            drive_id: "root".into(),
-            path_on_host: Path::new(ROOT_FS).into(),
-            is_root_device: true,
-            ..Default::default()
-        };
+        let root_drive = firec::config::Drive::builder("root", Path::new(ROOT_FS))
+            .is_root_device(true)
+            .build();
 
-        let kernel_args = Some(
-            format!(
-                "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
+        let kernel_args = Some(format!(
+            "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
             ip=74.50.82.8{}::74.50.82.81:255.255.255.240::eth0:on",
-                machine_index + 3,
-            )
-            .into(),
-        );
+            machine_index + 3,
+        ));
 
-        let cni = firec::config::network::Cni {
-            network_name: "eth0".into(),
-            if_name: Some(format!("bv{}", machine_index).into()),
-            ..Default::default()
-        };
-        let iface = firec::config::network::Interface::Cni(cni);
+        let if_name = format!("bv{}", machine_index);
+        let iface = firec::config::network::Interface::new("eth0", if_name);
 
-        let machine_cfg = firec::config::Machine {
-            vcpu_count: 1,
-            mem_size_mib: 8192,
-            ..Default::default()
-        };
+        let machine_cfg = firec::config::Machine::builder()
+            .vcpu_count(1)
+            .mem_size_mib(8192)
+            .build();
 
-        let config = firec::config::Config {
-            vm_id: Some(Uuid::parse_str(id)?),
-            jailer_cfg: Some(jailer),
-            kernel_image_path: Path::new(KERNEL_PATH).into(),
-            kernel_args,
-            machine_cfg,
-            drives: vec![root_drive],
-            network_interfaces: vec![iface],
-            socket_path: Path::new(FC_SOCKET_PATH).into(),
-            ..Default::default()
-        };
+        let config = firec::config::Config::builder(Path::new(KERNEL_PATH))
+            .vm_id(Uuid::parse_str(id)?)
+            .jailer_cfg(Some(jailer))
+            .kernel_args(kernel_args)
+            .machine_cfg(machine_cfg)
+            .add_drive(root_drive)
+            .add_network_interface(iface)
+            .socket_path(Path::new(FC_SOCKET_PATH))
+            .build();
         let machine = firec::Machine::new(config).await?;
 
         Ok(Self {
