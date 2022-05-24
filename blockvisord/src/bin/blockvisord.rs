@@ -2,12 +2,17 @@ use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     hosts::{dummy_apply_config, read_config, HostConfig},
+    logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
+use tracing::{info, Level};
 
 #[allow(unreachable_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
+    setup_logging(Level::INFO)?;
+    info!("Starting...");
+
     loop {
         let config = read_config()?;
 
@@ -21,6 +26,7 @@ async fn main() -> Result<()> {
         sleep(Duration::from_secs(5)).await;
     }
 
+    info!("Stopping...");
     Ok(())
 }
 
@@ -28,12 +34,12 @@ async fn process_pending_commands(config: &HostConfig) -> Result<()> {
     let timeout = Duration::from_secs(10);
     let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
 
-    println!("Getting pending commands for host: {}", &config.id);
+    info!("Getting pending commands for host: {}", &config.id);
     for command in client
         .get_pending_commands(&config.token, &config.id)
         .await?
     {
-        println!("Processing command: {}", &command.cmd);
+        info!("Processing command: {}", &command.cmd);
 
         let update = CommandStatusUpdate {
             response: "Done".to_string(),

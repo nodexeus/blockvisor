@@ -535,6 +535,8 @@ dependencies = [
  "sysinfo",
  "tokio 1.18.1",
  "toml",
+ "tracing",
+ "tracing-subscriber",
  "uuid 1.0.0",
 ]
 

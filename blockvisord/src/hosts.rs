@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use sysinfo::{DiskExt, System, SystemExt};
+use tracing::info;
 
 const CONFIG_FILENAME: &str = "blockvisor.toml";
 
@@ -72,13 +73,13 @@ pub fn get_ip_address(ifa_name: &str) -> String {
 
 // TODO: probably should get into config type
 pub fn read_config() -> Result<HostConfig> {
-    println!("Reading config: {}", CONFIG_FILE.display());
+    info!("Reading config: {}", CONFIG_FILE.display());
     let config = fs::read_to_string(&*CONFIG_FILE)?;
     Ok(toml::from_str(&config)?)
 }
 
 pub fn write_config(config: HostConfig) -> Result<()> {
-    println!("Writing config: {}", CONFIG_FILE.display());
+    info!("Writing config: {}", CONFIG_FILE.display());
     let config = toml::Value::try_from(&config)?;
     let config = toml::to_string(&config)?;
     fs::write(&*CONFIG_FILE, &*config)?;
@@ -109,7 +110,7 @@ pub async fn dummy_apply_config(config: &HostConfig, machine_index: &mut usize) 
             let mut node = DummyNodeRegistry::get(id)?;
             let state = node.state().await?;
             if state != container_config.status {
-                println!(
+                info!(
                     "Changing state from {:?} to {:?}: {}",
                     state, container_config.status, id
                 );
