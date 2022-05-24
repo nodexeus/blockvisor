@@ -26,20 +26,13 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
 
-  let isLoading = false;
-
   onMount(() => {
-    isLoading = true;
     getOrganisationId($user.id);
   });
 
   $: {
     if ($organisationId) {
-      getAllBroadcasts($organisationId)
-        .then(() => {
-          isLoading = false;
-        })
-        .catch((err) => toast.push(err));
+      getAllBroadcasts($organisationId).catch((err) => toast.push(err));
     }
   }
 </script>
