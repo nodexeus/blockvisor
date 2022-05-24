@@ -2,12 +2,17 @@ use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     hosts::{dummy_apply_config, read_config, HostConfig},
+    logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
+use tracing::{info, Level};
 
 #[allow(unreachable_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
+    setup_logging(Level::INFO)?;
+    info!("Starting...");
+
     loop {
         let config = read_config()?;
 
@@ -21,6 +26,7 @@ async fn main() -> Result<()> {
         sleep(Duration::from_secs(5)).await;
     }
 
+    info!("Stopping...");
     Ok(())
 }
 
