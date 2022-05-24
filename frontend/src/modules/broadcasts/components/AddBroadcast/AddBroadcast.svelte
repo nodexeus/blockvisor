@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { toast } from '@zerodevx/svelte-toast';
+  import { goto } from '$app/navigation';
+
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-  import { user } from 'modules/authentication/store';
+  import { toast } from 'components/Toast/Toast';
+  import { ROUTES } from 'consts/routes';
   import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
+  import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
     blockchains,
+    broadcasts,
     getAllBlockchains,
     getAllBroadcasts,
-    getOrganisationId,
     organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
@@ -18,38 +21,42 @@
   import { Hint, required, useForm } from 'svelte-use-form';
 
   let isSubmitting: boolean;
+  export let initial: Broadcast;
 
   const form = useForm({
     interval: { initial: 'anytime' },
   });
 
   onMount(() => {
-    if ($organisationId) {
-      getOrganisationId($user.id);
+    getAllBlockchains();
+
+    if (initial) {
+      initFormValues(initial);
     }
   });
 
-  const BroadcastEvents = [
-    { id: 'add_gateway_v1', value: 'Add Gateway' },
-    { id: 'assert_location_v2', value: 'Assert Location' },
-    { id: 'concensus_group_failure_v1', value: 'Consensus Group Failure' },
-    { id: 'concensus_group_v1', value: 'Consensus Group' },
-    { id: 'payment_v2', value: 'Payments' },
-    { id: 'rewards_v2', value: 'Rewards' },
-    { id: 'stake_validator_v1', value: 'Stake Validator' },
-    { id: 'transfer_hotspot_v1', value: 'Transfer Hotspot' },
-    { id: 'transfer_validator_stake_v1', value: 'Transfer Validator Stake' },
-    { id: 'unstake_validator_v1', value: 'Unstake Validator' },
-    { id: 'validator_heartbeat_v1', value: 'Validator Heartbeat' },
-  ];
+  function initFormValues(initial: Broadcast) {
+    $form.name.value = initial.name;
+    $form.blockchain.value = initial.blockchain_id;
+    $form.callback_url.value = initial.callback_url;
+    $form.auth_token.value = initial.auth_token;
+    $form.addresses.value = initial.addresses;
 
-  onMount(() => {
-    getAllBlockchains();
-    getOrganisationId($user.id);
-  });
+    const selectedTokens = initial.txn_types
+      .split(',')
+      .map((item) => item.trim());
+
+    selectedTokens.forEach((item) => {
+      $form[item].value = 'checked';
+    });
+  }
 
   async function handleSubmit() {
     isSubmitting = true;
+
+    if (!$organisationId) {
+      return toast.warning('Failed to fetch user organisation id!');
+    }
 
     /** Filter out just values and join in comma separated list. */
     const txn_types = BroadcastEvents.filter(
@@ -58,20 +65,38 @@
       .map((item) => item.id)
       .join(', ');
 
-    const res = await axios.post('/api/broadcast/createNewBroadcast', {
+    const broadcast: Broadcast = {
       org_id: $organisationId,
       name: $form.name?.value,
       blockchain_id: $form.blockchain?.value,
       callback_url: $form.callback_url?.value,
       auth_token: $form.auth_token?.value,
       txn_types: txn_types,
-      is_active: $form.is_active?.value,
+      is_active: true,
       addresses: $form.addresses?.value,
-    });
+    };
 
-    if (res.statusText === 'OK') {
-      toast.push('Succesfully added');
-      getAllBroadcasts($organisationId);
+    if (initial) {
+      const res = await axios.post('/api/broadcast/updateBroadcast', {
+        broadcast,
+        id: initial.id,
+      });
+
+      if (res.statusText === 'OK') {
+        toast.success('Succesfully updated');
+        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+      } else {
+        toast.warning('An error occured');
+      }
+    } else {
+      const res = await axios.post('/api/broadcast/createNewBroadcast', {
+        broadcast,
+      });
+
+      if (res.statusText === 'OK') {
+        toast.success('Succesfully added');
+        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+      }
     }
 
     isSubmitting = false;
@@ -126,8 +151,8 @@
       <Input
         name="addresses"
         size="medium"
-        value={$form?.address?.value}
-        field={$form?.address}
+        value={$form?.addresses?.value}
+        field={$form?.addresses}
         description="One or more wallet, hotspot, or validator addresses"
       >
         <svelte:fragment slot="label">Address</svelte:fragment>
@@ -141,8 +166,8 @@
         <Input
           name="callback_url"
           size="medium"
-          value={$form?.callback?.value}
-          field={$form?.callback}
+          value={$form?.callback_url?.value}
+          field={$form?.callback_url}
           validate={[required]}
           description="ex: POST https://api.myproject.com/helium/events"
           required
@@ -158,8 +183,8 @@
         <Input
           name="auth_token"
           size="medium"
-          value={$form?.token?.value}
-          field={$form?.token}
+          value={$form?.auth_token?.value}
+          field={$form?.auth_token}
           validate={[required]}
           description="Authorization: Bearer <Auth Token>"
           required
@@ -173,7 +198,7 @@
       <div class="add-broadcast__label">Match these Events</div>
 
       {#each BroadcastEvents as item}
-        <BroadcastEvent name={item.id} value={item?.value} />
+        <BroadcastEvent name={item.id} value={item?.value} {form} />
       {/each}
     </li>
   </ul>
@@ -187,7 +212,7 @@
       &nbsp;
       <LoadingSpinner size="button" id="js-form-submit" />
     {:else}
-      Add Broadcast
+      {initial ? 'Save Changes' : 'Add Broadcast'}
     {/if}</Button
   >
 </form>

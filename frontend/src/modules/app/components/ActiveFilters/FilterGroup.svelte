@@ -5,16 +5,16 @@
 
 <ul class="u-list-reset filter-group">
   <li>
-    <Pill removable={false} transition={null}>
+    <Pill removable={false}>
       <IconPerson slot="icon" />
       [Type]
     </Pill>
   </li>
   <li>
-    <Pill removable={false} disabled transition={null}>[is]</Pill>
+    <Pill removable={false} disabled>[is]</Pill>
   </li>
   <li>
-    <Pill removable transition={null}>[Something]</Pill>
+    <Pill removable>[Something]</Pill>
   </li>
 </ul>
 

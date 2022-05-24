@@ -1,17 +1,39 @@
 <script lang="ts">
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { browser } from '$app/env';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-
-  import IconPerson from 'icons/person-12.svg';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { ROUTES } from 'consts/routes';
+  import { formatDistanceToNow } from 'date-fns';
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
+  import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-  import { formatDistanceToNow } from 'date-fns';
+  import SimpleConfirmDeleteModal from 'modules/app/components/SimpleConfirmDeleteModal/SimpleConfirmDeleteModal.svelte';
+  import { deleteBroadcastById } from 'modules/broadcasts/store/broadcastStore';
+  import { fade } from 'svelte/transition';
 
+  let isModalOpen: boolean = false;
+  let deleting: boolean = false;
   export let item: Broadcast;
+  export let index: number;
+
+  function handleModalClose() {
+    isModalOpen = false;
+  }
+  function handleConfirm() {
+    deleting = true;
+
+    deleteBroadcastById(item.id, item.org_id).then((res) => {
+      deleting = false;
+      handleModalClose();
+    });
+  }
 </script>
 
-<tr class="table__row broadcast">
+<tr
+  in:fade={{ duration: 250, delay: index * 200 }}
+  class="table__row broadcast"
+>
   <td class="broadcast__col">
     <span class="t-line-clamp--2" title="My Broadcast really long name "
       >{item.name}
@@ -39,13 +61,18 @@
       </svelte:fragment>
       <DropdownLinkList slot="content">
         <li>
-          <DropdownItem href="#">
-            <IconPerson />
-            Permissions</DropdownItem
+          <DropdownItem href={ROUTES.BROADCAST_EDIT(item.id)}>
+            <IconEdit />
+            Edit</DropdownItem
           >
         </li>
         <li class="node__item-divider">
-          <DropdownItem href="#">
+          <DropdownItem
+            as="button"
+            on:click={() => {
+              isModalOpen = true;
+            }}
+          >
             <IconDelete />
             Delete</DropdownItem
           >
@@ -54,6 +81,19 @@
     </ButtonWithDropdown>
   </td>
 </tr>
+
+{#if browser && isModalOpen}
+  <SimpleConfirmDeleteModal
+    isModalOpen={true}
+    {handleModalClose}
+    id="delete-broadcast"
+    on:cancel={handleModalClose}
+    on:confirm={handleConfirm}
+    loading={deleting}
+  >
+    <p slot="content">This action will delete {item.name} broadcast.</p>
+  </SimpleConfirmDeleteModal>
+{/if}
 
 <style>
   .broadcast {
@@ -65,6 +105,7 @@
     }
   }
   .broadcast__col {
+    position: relative;
     vertical-align: middle;
     padding: 24px 40px 20px 0;
 
@@ -80,12 +121,6 @@
     &:last-child {
       padding-right: 0;
     }
-  }
-
-  .broadcast__col--controls {
-    position: absolute;
-    top: 0;
-    right: 0;
   }
 
   .broadcast__col--trunc {

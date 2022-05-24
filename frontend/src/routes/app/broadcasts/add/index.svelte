@@ -1,14 +1,50 @@
+<script context="module" lang="ts">
+  export async function load({ url }) {
+    const id = url.searchParams.get('id');
+
+    if (id) {
+      const thisBroadcast: Broadcast = await getBroadcastById(id);
+
+      return {
+        props: {
+          broadcast: thisBroadcast,
+        },
+      };
+    }
+
+    return {};
+  }
+</script>
+
 <script>
-  import { fade } from 'svelte/transition';
-  import AddBroadcast from 'modules/broadcasts/components/AddBroadcast/AddBroadcast.svelte';
-  import { fadeDefault } from 'consts/animations';
   import SectionDescription from 'components/SectionDescription/SectionDescription.svelte';
+  import { fadeDefault } from 'consts/animations';
+  import { user } from 'modules/authentication/store/auth';
+  import AddBroadcast from 'modules/broadcasts/components/AddBroadcast/AddBroadcast.svelte';
   import BroadcastFaq from 'modules/broadcasts/components/AddBroadcast/BroadcastFaq.svelte';
+  import {
+    getBroadcastById,
+    getOrganisationId,
+  } from 'modules/broadcasts/store/broadcastStore';
+  import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
+
+  export let broadcast;
+
+  onMount(() => {
+    getOrganisationId($user.id);
+  });
 </script>
 
 <section in:fade={fadeDefault} class="grid broadcast-add">
   <div class="container-medium broadcast-add__wrapper">
-    <h2 class="t-xxlarge-fluid">Add a Broadcast</h2>
+    <h2 class="t-xxlarge-fluid">
+      {#if broadcast}
+        Edit {broadcast.name}
+      {:else}
+        Add a Broadcast
+      {/if}
+    </h2>
 
     <SectionDescription>
       Broadcast allows you to be instantly notified of any transaction matching
@@ -18,7 +54,7 @@
       callback.
     </SectionDescription>
 
-    <AddBroadcast />
+    <AddBroadcast initial={broadcast} />
   </div>
   <div class="divider" />
   <div class="container-medium faq">

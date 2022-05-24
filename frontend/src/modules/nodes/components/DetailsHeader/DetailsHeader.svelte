@@ -113,7 +113,6 @@
     id="delete-node-modal"
     form={deleteForm}
     on:submit={(e) => {
-      console.log($deleteForm);
       e.preventDefault();
     }}
     {isModalOpen}

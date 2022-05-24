@@ -18,6 +18,7 @@ export const ROUTES = {
   VERIFY: '/verify',
   BROADCASTS: '/app/broadcasts',
   BROADCAST_CREATE: '/app/broadcasts/add',
+  BROADCAST_EDIT: (id: string) => `/app/broadcasts/add/?id=${id}`,
   ADMIN_CONSOLE_DASHBOARD: '/app/admin-console',
   ADMIN_CONSOLE_USER_MANAGEMENT: '/app/admin-console/user-management',
   ADMIN_CONSOLE_USER_EDIT: (id: string) =>

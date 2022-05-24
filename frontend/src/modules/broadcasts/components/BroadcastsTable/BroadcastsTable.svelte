@@ -16,7 +16,7 @@
     <col width="260px" />
     <col width="200px" />
     <col width="140px" />
-    <col />
+    <col width="140px" />
   </colgroup>
   <thead>
     <tr>
@@ -46,8 +46,8 @@
     </tr>
   </thead>
   <tbody>
-    {#each broadcasts as item}
-      <BroadcastDataRow {item} />
+    {#each broadcasts as item, i}
+      <BroadcastDataRow {item} index={i} />
     {/each}
   </tbody>
 </table>
