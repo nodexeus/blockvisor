@@ -17,8 +17,6 @@ export const post: RequestHandler = async ({ request }) => {
     txn_types,
   } = data;
 
-  console.log({ data });
-
   try {
     const res = await httpClient.post(
       CREATE_BROADCAST,

@@ -4,8 +4,6 @@
 
     const broadcast = await getBroadcastById(id);
 
-    console.log(broadcast);
-
     return {
       props: {
         postId: id,

@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { toast } from 'components/Toast/Toast';
+  import { ROUTES } from 'consts/routes';
   import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
   import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
@@ -53,7 +56,7 @@
 
     if (res.statusText === 'OK') {
       toast.success('Succesfully added');
-      getAllBroadcasts($organisationId);
+      getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
     }
 
     isSubmitting = false;

@@ -5,7 +5,7 @@ export interface PillSlots {
 }
 
 export default class Pill extends SvelteComponentTyped<
-  { removable?: boolean; transition: SvelteTransitionConfig },
+  { removable?: boolean; transition?: SvelteTransitionConfig },
   Record<string, unknown>,
   PillSlots
 > {}

@@ -51,6 +51,21 @@ export const getBroadcastById = async (postId: string) => {
     });
 };
 
+export const deleteBroadcastById = async (postId: string, orgId: string) => {
+  return axios
+    .get('/api/broadcast/deleteBroadcastById', {
+      params: {
+        post_id: postId,
+      },
+    })
+    .then(() => {
+      getAllBroadcasts(orgId).then((res) => res);
+    })
+    .catch((err) => {
+      return err;
+    });
+};
+
 export const getOrganisationId = async (userId: string) => {
   axios
     .get('/api/broadcast/getOrganisationId', { params: { id: userId } })

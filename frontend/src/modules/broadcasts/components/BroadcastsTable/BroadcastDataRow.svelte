@@ -9,6 +9,7 @@
   import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import SimpleConfirmDeleteModal from 'modules/app/components/SimpleConfirmDeleteModal/SimpleConfirmDeleteModal.svelte';
+  import { deleteBroadcastById } from 'modules/broadcasts/store/broadcastStore';
 
   let isModalOpen: boolean = false;
   let deleting: boolean = false;
@@ -20,13 +21,10 @@
   function handleConfirm() {
     deleting = true;
 
-    setTimeout(() => {
+    deleteBroadcastById(item.id, item.org_id).then((res) => {
       deleting = false;
       handleModalClose();
-    }, 1000);
-  }
-  function handleCancel() {
-    handleModalClose();
+    });
   }
 </script>
 
@@ -84,7 +82,7 @@
     isModalOpen={true}
     {handleModalClose}
     id="delete-broadcast"
-    on:cancel={handleCancel}
+    on:cancel={handleModalClose}
     on:confirm={handleConfirm}
     loading={deleting}
   >
