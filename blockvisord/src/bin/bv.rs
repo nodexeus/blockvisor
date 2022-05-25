@@ -2,14 +2,11 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
-    containers::ContainerStatus,
-    hosts::{
-        config_exists, get_host_info, get_ip_address, read_config, write_config, ContainerConfig,
-        HostConfig,
-    },
+    config::Config,
+    containers::{ContainerData, ContainerStatus, Containers},
+    hosts::{get_host_info, get_ip_address},
 };
 use clap::Parser;
-use std::collections::HashMap;
 use tokio::time::Duration;
 use uuid::Uuid;
 
@@ -44,18 +41,19 @@ async fn main() -> Result<()> {
             let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
             let host = client.register_host(&cmd_args.otp, &create).await?;
 
-            let config = HostConfig {
-                data_dir: ".".to_string(),
-                pool_dir: ".".to_string(),
+            Config {
                 id: host.id.to_string(),
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
-                containers: HashMap::new(),
-            };
-            write_config(config)?;
+            }
+            .save()?;
+
+            if !Containers::exists() {
+                Containers::default().save()?;
+            }
         }
         Command::Start(_) => {
-            if !config_exists() {
+            if !Config::exists() {
                 bail!("Error: not configured, please run `configure` first");
             }
 
@@ -101,7 +99,7 @@ async fn process_chain_command(command: &ChainCommand) -> Result<()> {
 }
 
 async fn process_node_command(command: &NodeCommand) -> Result<()> {
-    let mut config = read_config()?;
+    let mut config = Containers::load()?;
 
     match command {
         NodeCommand::List { all, chain } => {
@@ -122,19 +120,19 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4().to_string();
-            let container_config = ContainerConfig {
+            let container_config = ContainerData {
                 id: id.clone(),
                 chain: chain.to_owned(),
                 status: ContainerStatus::Created,
             };
             println!("Container added: {:?}", &container_config);
             config.containers.insert(id, container_config);
-            write_config(config)?;
+            config.save()?;
         }
         NodeCommand::Start { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Started;
-                write_config(config)?;
+                config.save()?;
             } else {
                 println!("Container not found: {}", id);
             }
@@ -142,7 +140,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Stop { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Stopped;
-                write_config(config)?;
+                config.save()?;
             } else {
                 println!("Container not found: {}", id);
             }
@@ -150,7 +148,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Delete { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Deleted;
-                write_config(config)?;
+                config.save()?;
             } else {
                 println!("Container not found: {}", id);
             }

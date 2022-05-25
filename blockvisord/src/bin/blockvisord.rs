@@ -1,7 +1,9 @@
 use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
-    hosts::{dummy_apply_config, read_config, HostConfig},
+    config::Config,
+    containers::Containers,
+    hosts::dummy_apply_config,
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
@@ -14,13 +16,15 @@ async fn main() -> Result<()> {
     info!("Starting...");
 
     loop {
-        let config = read_config()?;
+        let containers = Containers::load()?;
 
         let mut machine_index: usize = 0;
         let vmm = std::env::var("VMM").unwrap_or_else(|_| "dummy".into());
         if vmm == "dummy" {
-            dummy_apply_config(&config, &mut machine_index).await?;
+            dummy_apply_config(&containers, &mut machine_index).await?;
         }
+
+        let config = Config::load()?;
         process_pending_commands(&config).await?;
 
         sleep(Duration::from_secs(5)).await;
@@ -30,7 +34,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn process_pending_commands(config: &HostConfig) -> Result<()> {
+async fn process_pending_commands(config: &Config) -> Result<()> {
     let timeout = Duration::from_secs(10);
     let client = APIClient::new(&config.blockjoy_api_url, timeout)?;
 
