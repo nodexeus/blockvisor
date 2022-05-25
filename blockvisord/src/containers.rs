@@ -2,10 +2,21 @@ use anyhow::{Ok, Result};
 use async_trait::async_trait;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::info;
 use uuid::Uuid;
+
+const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
+
+lazy_static::lazy_static! {
+    static ref REGISTRY_CONFIG_FILE: PathBuf = home::home_dir()
+        .map(|p| p.join(".cache"))
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("blockvisor")
+        .join(CONTAINERS_CONFIG_FILENAME);
+}
 
 #[derive(Clone, Debug)]
 pub enum ServiceStatus {
@@ -206,5 +217,43 @@ impl NodeRegistry for DummyNodeRegistry {
             id: id.to_string(),
             state: node.state,
         }))
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+pub struct Containers {
+    pub containers: HashMap<String, ContainerData>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ContainerData {
+    pub id: String,
+    pub chain: String,
+    pub status: ContainerStatus,
+}
+
+impl Containers {
+    pub fn load() -> Result<Containers> {
+        info!(
+            "Reading containers config: {}",
+            REGISTRY_CONFIG_FILE.display()
+        );
+        let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE)?;
+        Ok(toml::from_str(&config)?)
+    }
+
+    pub fn save(&self) -> Result<()> {
+        info!(
+            "Writing containers config: {}",
+            REGISTRY_CONFIG_FILE.display()
+        );
+        let config = toml::Value::try_from(self)?;
+        let config = toml::to_string(&config)?;
+        fs::write(&*REGISTRY_CONFIG_FILE, &*config)?;
+        Ok(())
+    }
+
+    pub fn exists() -> bool {
+        Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 }

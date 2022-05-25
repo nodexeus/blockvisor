@@ -1,16 +1,9 @@
-use crate::{
-    config::HostConfig,
-    containers::{ContainerStatus, DummyNode, DummyNodeRegistry, NodeContainer, NodeRegistry},
+use crate::containers::{
+    ContainerStatus, Containers, DummyNode, DummyNodeRegistry, NodeContainer, NodeRegistry,
 };
 use anyhow::Result;
-use std::collections::HashMap;
 use sysinfo::{DiskExt, System, SystemExt};
 use tracing::info;
-
-pub struct Host {
-    pub containers: HashMap<String, Box<dyn NodeContainer>>,
-    pub config: HostConfig,
-}
 
 #[derive(Debug)]
 pub struct HostInfo {
@@ -42,8 +35,8 @@ pub fn get_ip_address(ifa_name: &str) -> String {
 }
 
 // used for testing purposes
-pub async fn dummy_apply_config(config: &HostConfig, machine_index: &mut usize) -> Result<()> {
-    for (id, container_config) in &config.containers {
+pub async fn dummy_apply_config(containers: &Containers, machine_index: &mut usize) -> Result<()> {
+    for (id, container_config) in &containers.containers {
         // remove deleted nodes
         if container_config.status == ContainerStatus::Deleted {
             if DummyNodeRegistry::contains(id) {
