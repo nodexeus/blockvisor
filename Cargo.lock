@@ -1118,7 +1118,7 @@ dependencies = [
 [[package]]
 name = "firec"
 version = "0.1.0"
-source = "git+https://github.com/blockjoy/firec.git#3e2e9a54c203f65651c053dd6d99b8af7a52e953"
+source = "git+https://github.com/blockjoy/firec.git?rev=3e2e9a54c203f65#3e2e9a54c203f65651c053dd6d99b8af7a52e953"
 dependencies = [
  "derivative",
  "hyper 0.14.18",
