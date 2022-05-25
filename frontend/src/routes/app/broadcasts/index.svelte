@@ -17,14 +17,14 @@
   import {
     broadcasts,
     getAllBroadcasts,
-    organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
+  import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { fade } from 'svelte/transition';
 
   $: {
-    if ($organisationId) {
-      getAllBroadcasts($organisationId).catch((err) => toast.push(err));
+    if ($activeOrganisation.id) {
+      getAllBroadcasts($activeOrganisation.id).catch((err) => toast.push(err));
     }
   }
 </script>
