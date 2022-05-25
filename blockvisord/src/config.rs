@@ -18,8 +18,6 @@ lazy_static::lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
     pub id: String,
-    pub data_dir: String,
-    pub pool_dir: String,
     pub token: String,
     pub blockjoy_api_url: String,
 }

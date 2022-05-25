@@ -42,8 +42,6 @@ async fn main() -> Result<()> {
             let host = client.register_host(&cmd_args.otp, &create).await?;
 
             Config {
-                data_dir: ".".to_string(),
-                pool_dir: ".".to_string(),
                 id: host.id.to_string(),
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
