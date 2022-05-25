@@ -7,7 +7,8 @@
   import { ROUTES } from 'consts/routes';
   import { FEATURE_FLAGS } from 'consts/featureFlags';
 
-  export let type = 'blockvisor-small';
+  export let type: 'blockvisor-small' | 'faded' | 'blockjoy-large' =
+    'blockvisor-small';
   export let center = false;
 
   $: href = isUserVerified($user)
@@ -22,9 +23,15 @@
     {#if type === 'blockjoy-large'}
       <span class="visually-hidden">BlockJoy</span>
       <BlockJoyLogo />
+    {:else if type === 'faded'}
+      <span class="logo__faded">
+        <BlockJoyLogoSmall />
+      </span>
     {:else}
-      <span class="visually-hidden">BlockJoy</span>
-      <BlockJoyLogoSmall />
+      <span class="logo__primary">
+        <span class="visually-hidden">BlockJoy</span>
+        <BlockJoyLogoSmall />
+      </span>
     {/if}
   </a>
 </h1>
@@ -47,5 +54,14 @@
       display: flex;
       justify-content: center;
     }
+  }
+
+  .logo__primary {
+    fill: var(--color-primary);
+  }
+
+  .logo__faded {
+    fill: #f8faf6;
+    opacity: 0.3;
   }
 </style>

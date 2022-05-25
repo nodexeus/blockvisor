@@ -8,6 +8,7 @@
   import { APPS } from 'models/App';
   import { goto } from '$app/navigation';
   import { ROUTES } from 'consts/routes';
+  import OrganisationSelector from '../OrganisationSelector/OrganisationSelector.svelte';
 
   export let handleClickOutside;
   export let callback;
@@ -39,7 +40,8 @@
 <aside bind:this={element} class="sidenav__wrapper">
   <div class="sidenav">
     <header class="sidenav__header">
-      <Logo />
+      <OrganisationSelector />
+      <Logo type="faded" />
     </header>
     <div class="sidenav__nav-wrapper">
       <AppNav callback={handleAppNav} />
@@ -99,7 +101,9 @@
     flex-shrink: 0;
 
     @media (--screen-medium-large) {
-      display: block;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
   }
 

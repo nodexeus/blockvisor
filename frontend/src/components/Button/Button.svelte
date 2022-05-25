@@ -156,4 +156,9 @@
       box-shadow: 0px 0px 0px 3px var(--color-primary-o30);
     }
   }
+
+  .basic {
+    color: theme(--color-text-5);
+    padding: 0;
+  }
 </style>

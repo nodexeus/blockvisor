@@ -1,8 +1,14 @@
 type ButtonSize = 'small' | 'medium' | 'normal';
 
-type ButtonStyle = 'primary' | 'secondary' | 'outline' | 'ghost' | 'warning';
+type ButtonStyle =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'warning'
+  | 'basic';
 
-type ButtonBorder = 'rounded';
+type ButtonBorder = 'rounded' | 'round';
 
 type ButtonDisplay = 'inline' | 'block';
 
