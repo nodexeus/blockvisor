@@ -54,7 +54,7 @@
     position: relative;
 
     & :global(.dropdown) {
-      right: 0;
+      left: 0;
       min-width: 160px;
       margin-top: 8px;
     }
