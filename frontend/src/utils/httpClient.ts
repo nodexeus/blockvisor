@@ -21,7 +21,6 @@ httpClient.interceptors.response.use(
   async (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    console.log('Interceptor res', error);
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       const userInfo = getUserInfo();
