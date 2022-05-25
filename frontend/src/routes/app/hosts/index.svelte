@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { session } from '$app/stores';
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
@@ -28,7 +27,7 @@
     ]);
   });
 
-  fetchAllHosts($session.token);
+  fetchAllHosts();
 </script>
 
 <ActionTitleHeader className="container--pull-back">

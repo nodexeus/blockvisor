@@ -2,13 +2,14 @@ import axios from 'axios';
 import { ROUTES } from 'consts/routes';
 import { HOSTS, SINGLE_HOST } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
 export const provisionedHostId = writable('');
 export const isLoading = writable(false);
 
-export const fetchAllHosts = async (token: string) => {
+export const fetchAllHosts = async () => {
   const all_hosts = [
     {
       title: 'All Hosts',
@@ -17,11 +18,7 @@ export const fetchAllHosts = async (token: string) => {
     },
   ];
 
-  const res = await axios.get(HOSTS, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const res = await httpClient.get(HOSTS);
 
   const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
@@ -38,24 +35,16 @@ export const fetchAllHosts = async (token: string) => {
   hosts.set(all_hosts);
 };
 
-export const fetchHostById = async (id: string, token: string) => {
+export const fetchHostById = async (id: string) => {
   isLoading.set(true);
-  const res = await axios.get(SINGLE_HOST(id), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const res = await httpClient.get(SINGLE_HOST(id));
 
   isLoading.set(false);
   selectedHosts.set(res.data);
 };
 
-export const getHostById = async (id: string, token: string) => {
-  const res = await axios.get(SINGLE_HOST(id), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export const getHostById = async (id: string) => {
+  const res = await httpClient.get(SINGLE_HOST(id));
 
   return res.data;
 };

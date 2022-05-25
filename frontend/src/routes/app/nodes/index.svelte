@@ -12,7 +12,6 @@
   import { app } from 'modules/app/store';
   import { fetchAllNodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
-  import { session } from '$app/stores';
 
   onMount(() => {
     app.setBreadcrumbs([
@@ -27,7 +26,7 @@
     ]);
   });
 
-  fetchAllNodes($session.token);
+  fetchAllNodes();
 </script>
 
 <ActionTitleHeader className="container--pull-back">

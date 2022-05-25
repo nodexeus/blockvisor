@@ -5,13 +5,14 @@
     isUserVerified,
     checkAndRedirect,
   } from 'modules/authorization/utils';
+import { getUserInfo } from 'utils';
 
   $: {
-    checkAndRedirect($user, 'private');
+    checkAndRedirect(getUserInfo(), 'private');
   }
 </script>
 
-{#if isUserVerified($user)}
+{#if isUserVerified(getUserInfo())}
   <slot />
 {:else}
   <LoadingSpinner size="page" id="js-private-spinner" />

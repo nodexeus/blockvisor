@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { session } from '$app/stores';
   import HierarchyList from 'components/HierarchyList/HierarchyList.svelte';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
   import { fetchAllHosts, hosts } from 'modules/hosts/store/hostsStore';
@@ -15,7 +14,7 @@
   const handleAddGroup = () => (isAddingNewGroup = true);
 
   onMount(() => {
-    fetchAllHosts($session.token);
+    fetchAllHosts();
   });
 </script>
 

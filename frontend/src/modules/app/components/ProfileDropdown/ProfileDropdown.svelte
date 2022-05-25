@@ -2,7 +2,7 @@
   import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-  import { clickOutside } from 'utils';
+  import { clickOutside, deleteUserInfo } from 'utils';
   import Avatar from 'components/Avatar/Avatar.svelte';
 
   import IconAccount from 'icons/person-12.svg';
@@ -11,7 +11,6 @@
   import IconDoor from 'icons/door-12.svg';
   import { ROUTES } from 'consts/routes';
   import { user } from 'modules/authentication/store';
-  import axios from 'axios';
 
   let isActive = false;
 
@@ -32,9 +31,8 @@
   };
 
   const handleLogout = async () => {
-    axios.post(ROUTES.AUTH_LOGOUT).then(() => {
-      location.reload();
-    });
+    deleteUserInfo();
+    location.reload();
   };
 
   $: fullName =

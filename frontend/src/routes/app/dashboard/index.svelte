@@ -17,7 +17,6 @@
   import IconCog from 'icons/cog-12.svg';
   import IconPlus from 'icons/plus-12.svg';
   import EarningsSummary from 'modules/dashboard/components/EarningsSummary/EarningsSummary.svelte';
-import { session } from '$app/stores';
 
   const hasNoNodes = false;
   const hasNoHosts = false;

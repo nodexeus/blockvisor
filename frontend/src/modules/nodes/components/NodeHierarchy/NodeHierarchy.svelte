@@ -4,7 +4,6 @@
   import { fetchAllNodes, nodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
   import NodeGroupAdd from '../NodeGroupAdd/NodeGroupAdd.svelte';
-  import { session } from '$app/stores';
 
 
   let isAddingNewGroup = false;
@@ -15,7 +14,7 @@
   const handleAddConfirm = () => (isAddingNewGroup = false);
   const handleAddGroup = () => (isAddingNewGroup = true);
   onMount(() => {
-    fetchAllNodes($session.token);
+    fetchAllNodes();
   });
 </script>
 

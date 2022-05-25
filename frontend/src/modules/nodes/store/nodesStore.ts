@@ -6,6 +6,7 @@ import {
   VALIDATOR,
 } from 'modules/authentication/const';
 import { derived, writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 
 export const nodes = writable([]);
 export const selectedUser = writable();
@@ -14,7 +15,7 @@ export const selectedValidator = writable({});
 export const isLoading = writable(false);
 export const installedNode = writable({});
 
-export const fetchAllNodes = async (token: string) => {
+export const fetchAllNodes = async () => {
   const all_nodes = [
     {
       title: 'All Nodes',
@@ -23,11 +24,7 @@ export const fetchAllNodes = async (token: string) => {
     },
   ];
 
-  const res = await axios.get(NODE_GROUPS, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const res = await httpClient.get(NODE_GROUPS);
   const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
   all_nodes[0].children = sorted.map((item) => {
@@ -41,34 +38,22 @@ export const fetchAllNodes = async (token: string) => {
   nodes.set(all_nodes);
 };
 
-export const fetchNodeById = async (id: string, token: string) => {
-  const res = await axios.get(USER_NODES(id), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export const fetchNodeById = async (id: string) => {
+  const res = await httpClient.get(USER_NODES(id));
 
   selectedNode.set(res.data);
 };
 
-export const fetchUserById = async (id: string, token: string) => {
-  const res = await axios.get(USER_NODES(id), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+export const fetchUserById = async (id: string) => {
+  const res = await httpClient.get(USER_NODES(id));
 
   const foundUser = res.data.find((item) => item.id === id);
   selectedUser.set(foundUser);
 };
 
-export const fetchValidatorById = async (id: string, token: string) => {
+export const fetchValidatorById = async (id: string) => {
   isLoading.set(true);
-  const res = await axios.get(VALIDATOR(id), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const res = await httpClient.get(VALIDATOR(id));
   selectedValidator.set(res.data);
   isLoading.set(false);
 };

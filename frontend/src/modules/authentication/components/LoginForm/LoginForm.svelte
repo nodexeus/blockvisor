@@ -11,6 +11,7 @@ import axios from 'axios';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
   import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
   import { required, Hint, useForm, email, minLength } from 'svelte-use-form';
+  import { saveUserinfo } from 'utils';
 
   const form = useForm();
 
@@ -28,12 +29,7 @@ import axios from 'axios';
 
     try {
       const res = await axios.post(ROUTES.AUTH_LOGIN, {email, password})
-      const {token, ...rest} = res.data
-      $session.user = {
-        ...rest,
-        verified: true
-      };
-		  $session.token = token;
+      saveUserinfo({...res.data, verified: true});
       isSubmitting = false;
 		  goto(ROUTES.DASHBOARD);
     } catch (error) {
