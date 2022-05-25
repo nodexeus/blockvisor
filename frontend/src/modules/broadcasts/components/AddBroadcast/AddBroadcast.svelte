@@ -88,7 +88,7 @@
       }
     } else {
       const res = await axios.post('/api/broadcast/createNewBroadcast', {
-        broadcast,
+        ...broadcast,
       });
 
       if (res.statusText === 'OK') {
