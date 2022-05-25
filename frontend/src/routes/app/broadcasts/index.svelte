@@ -1,6 +1,5 @@
 <script lang="ts">
   import { toast } from '@zerodevx/svelte-toast';
-
   import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
@@ -14,21 +13,14 @@
   import IconPlus from 'icons/plus-12.svg';
   import ActiveFilters from 'modules/app/components/ActiveFilters/ActiveFilters.svelte';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-  import { user } from 'modules/authentication/store';
   import BroadcastsTable from 'modules/broadcasts/components/BroadcastsTable/BroadcastsTable.svelte';
   import {
     broadcasts,
     getAllBroadcasts,
-    getOrganisationId,
     organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import EmptyColumn from 'modules/dashboard/components/EmptyStates/EmptyColumn.svelte';
-  import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
-
-  onMount(() => {
-    getOrganisationId($user.id);
-  });
 
   $: {
     if ($organisationId) {

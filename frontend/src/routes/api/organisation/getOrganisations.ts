@@ -16,14 +16,10 @@ export const get: RequestHandler = async ({ request, url }) => {
     });
 
     if (res.statusText === 'OK') {
-      const privateOrg = res.data.find((item) => item.is_personal);
-
-      if (privateOrg) {
-        return {
-          status: res.status,
-          body: privateOrg.id,
-        };
-      }
+      return {
+        status: res.status,
+        body: res.data,
+      };
     }
 
     return {

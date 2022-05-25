@@ -5,8 +5,20 @@
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import IconCaret from 'icons/caret-micro.svg';
+  import { user } from 'modules/authentication/store';
+  import {} from 'modules/broadcasts/store/broadcastStore';
+  import {
+    activeOrganisation,
+    getOrganisations,
+    organisations,
+  } from 'modules/organisation/store/organisationStore';
+  import { onMount } from 'svelte';
 
   let dropdownActive: boolean = false;
+
+  onMount(() => {
+    getOrganisations($user.id);
+  });
 </script>
 
 <div class="organisation-selector">
@@ -16,25 +28,23 @@
     style="basic"
   >
     <span class="organisation-selector__letter"
-      ><span class="t-tiny">B</span></span
+      ><span class="t-tiny"
+        >{$activeOrganisation?.name.substring(0, 1)?.toUpperCase()}</span
+      ></span
     >
     <span class="organisation-selector__name t-smaller t-normal"
-      >Acme Corporation</span
+      >{$activeOrganisation?.name || ''}</span
     >
     <IconCaret /></Button
   >
 
   <Dropdown isActive={dropdownActive}>
     <DropdownLinkList>
-      <li>
-        <DropdownItem href="#">jedan</DropdownItem>
-      </li>
-      <li>
-        <DropdownItem href="#">jedan</DropdownItem>
-      </li>
-      <li>
-        <DropdownItem href="#">jedan</DropdownItem>
-      </li>
+      {#each $organisations as item}
+        <li>
+          <DropdownItem href="#">{item.name || ''}</DropdownItem>
+        </li>
+      {/each}
     </DropdownLinkList>
   </Dropdown>
 </div>
