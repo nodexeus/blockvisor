@@ -11,10 +11,10 @@
     blockchains,
     getAllBlockchains,
     getAllBroadcasts,
-    organisationId,
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import Select from 'modules/forms/components/Select/Select.svelte';
+  import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
 
@@ -52,7 +52,7 @@
   async function handleSubmit() {
     isSubmitting = true;
 
-    if (!$organisationId) {
+    if (!$activeOrganisation.id) {
       return toast.warning('Failed to fetch user organisation id!');
     }
 
@@ -64,7 +64,7 @@
       .join(', ');
 
     const broadcast: Broadcast = {
-      org_id: $organisationId,
+      org_id: $activeOrganisation.id,
       name: $form.name?.value,
       blockchain_id: $form.network?.value,
       callback_url: $form.callback_url?.value,
@@ -82,7 +82,9 @@
 
       if (res.statusText === 'OK') {
         toast.success('Succesfully updated');
-        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+        getAllBroadcasts($activeOrganisation.id).then(() =>
+          goto(ROUTES.BROADCASTS),
+        );
       } else {
         toast.warning('An error occured');
       }
@@ -93,7 +95,9 @@
 
       if (res.statusText === 'OK') {
         toast.success('Succesfully added');
-        getAllBroadcasts($organisationId).then(() => goto(ROUTES.BROADCASTS));
+        getAllBroadcasts($activeOrganisation.id).then(() =>
+          goto(ROUTES.BROADCASTS),
+        );
       }
     }
 

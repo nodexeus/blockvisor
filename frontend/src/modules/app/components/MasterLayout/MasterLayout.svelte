@@ -23,54 +23,6 @@
   import { FEATURE_FLAGS } from 'consts/featureFlags';
   import BlockVisorFeature from 'modules/feature-flags/components/BlockVisorFeature/BlockVisorFeature.svelte';
 
-  const TEMP_NODES = [
-    {
-      title: 'All Nodes',
-      href: ROUTES.NODES,
-      children: [
-        {
-          title: 'Group 1',
-          href: ROUTES.NODE_GROUP('group-1'),
-          id: 'id1',
-        },
-        {
-          title: 'Group 2',
-          href: ROUTES.NODE_GROUP('group-2'),
-          id: 'id2',
-        },
-        {
-          title: 'Group 3',
-          href: ROUTES.NODE_GROUP('group-3'),
-          id: 'id3',
-        },
-      ],
-    },
-  ];
-
-  const TEMP_HOSTS = [
-    {
-      title: 'All Hosts',
-      href: ROUTES.HOSTS,
-      children: [
-        {
-          title: 'Group 1',
-          href: '#',
-          id: 'host1',
-        },
-        {
-          title: 'Group 2',
-          href: '#',
-          id: 'host2',
-        },
-        {
-          title: 'Group 2',
-          href: '#',
-          id: 'host3',
-        },
-      ],
-    },
-  ];
-
   const MENU_CLOSED = 'menu';
   const MENU_OPENED = 'menu menu--active';
 
@@ -177,7 +129,7 @@
         </SubMenu>
 
         <SubMenu isActive={activeSubNav === 'hosts'} {changeSubNav}>
-          <HostsHierarchy on:click={handleClickOutside} nodes={TEMP_HOSTS} />
+          <HostsHierarchy on:click={handleClickOutside} />
         </SubMenu>
 
         <SubMenu isActive={activeSubNav === 'admin-console'} {changeSubNav}>
