@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
@@ -10,7 +9,6 @@
   import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
     blockchains,
-    broadcasts,
     getAllBlockchains,
     getAllBroadcasts,
     organisationId,
@@ -37,7 +35,7 @@
 
   function initFormValues(initial: Broadcast) {
     $form.name.value = initial.name;
-    $form.blockchain.value = initial.blockchain_id;
+    $form.network.value = initial.blockchain_id;
     $form.callback_url.value = initial.callback_url;
     $form.auth_token.value = initial.auth_token;
     $form.addresses.value = initial.addresses;
@@ -68,7 +66,7 @@
     const broadcast: Broadcast = {
       org_id: $organisationId,
       name: $form.name?.value,
-      blockchain_id: $form.blockchain?.value,
+      blockchain_id: $form.network?.value,
       callback_url: $form.callback_url?.value,
       auth_token: $form.auth_token?.value,
       txn_types: txn_types,
@@ -90,7 +88,7 @@
       }
     } else {
       const res = await axios.post('/api/broadcast/createNewBroadcast', {
-        broadcast,
+        ...broadcast,
       });
 
       if (res.statusText === 'OK') {
@@ -134,14 +132,14 @@
               value: item.id,
             };
           })}
-        value={$form.blockchain?.value}
-        name="blockchain"
-        field={$form?.blockchain}
+        value={$form.network?.value}
+        name="network"
+        field={$form?.network}
         style="outline"
         size="medium"
         label="Select a date"
       >
-        <svelte:fragment slot="label">Blockchain</svelte:fragment>
+        <svelte:fragment slot="label">Network</svelte:fragment>
       </Select>
     </li>
 

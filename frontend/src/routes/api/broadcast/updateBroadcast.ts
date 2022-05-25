@@ -17,8 +17,6 @@ export const post: RequestHandler = async ({ request }) => {
     txn_types,
   } = data.broadcast;
 
-  console.log(data);
-
   try {
     const res = await httpClient.put(
       SINGLE_BROADCAST(data.id),
