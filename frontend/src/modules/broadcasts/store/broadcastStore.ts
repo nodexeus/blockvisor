@@ -1,61 +1,51 @@
-import axios from 'axios';
+import {
+  BLOCKCHAINS,
+  BROADCASTS,
+  SINGLE_BROADCAST,
+} from 'modules/authentication/const';
 import { writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 
 export const blockchains = writable<Blockchain[]>([]);
 export const broadcasts = writable<Broadcast[]>();
 
 export const getAllBlockchains = async () => {
-  axios.get('/api/nodes/getBlockchains').then((res) => {
-    if (res.statusText === 'OK') {
-      const active = res.data.filter(
-        (item: Blockchain) => item.status === 'production',
-      );
-      const inactive = res.data.filter(
-        (item: Blockchain) => item.status !== 'production',
-      );
-      blockchains.set([...active, ...inactive]);
-    }
-  });
+  try {
+    const res = await httpClient.get(BLOCKCHAINS);
+
+    const active = res.data.filter(
+      (item: Blockchain) => item.status === 'production',
+    );
+    const inactive = res.data.filter(
+      (item: Blockchain) => item.status !== 'production',
+    );
+    blockchains.set([...active, ...inactive]);
+  } catch (error) {
+    blockchains.set([]);
+  }
 };
 
 export const getAllBroadcasts = async (orgId: string) => {
-  return axios
-    .get('/api/broadcast/getBroadcasts', {
-      params: {
-        org_id: orgId,
-      },
-    })
-    .then((res) => {
-      broadcasts.set(res.data);
-    })
-    .catch((err) => {
-      blockchains.set([]);
-      return err;
-    });
+  try {
+    const res = await httpClient.get(BROADCASTS(orgId));
+    broadcasts.set(res.data);
+  } catch (error) {
+    blockchains.set([]);
+  }
 };
 
 export const getBroadcastById = async (postId: string) => {
-  return axios
-    .get('/api/broadcast/getBroadcastById', {
-      params: {
-        post_id: postId,
-      },
-    })
-    .then((res) => {
-      return res.data;
-    })
-    .catch((err) => {
-      return err;
-    });
+  try {
+    const res = await httpClient.get(SINGLE_BROADCAST(postId));
+    return res.data;
+  } catch (error) {
+    return error;
+  }
 };
 
 export const deleteBroadcastById = async (postId: string, orgId: string) => {
-  return axios
-    .get('/api/broadcast/deleteBroadcastById', {
-      params: {
-        post_id: postId,
-      },
-    })
+  return httpClient
+    .delete(SINGLE_BROADCAST(postId))
     .then(() => {
       getAllBroadcasts(orgId).then((res) => res);
     })

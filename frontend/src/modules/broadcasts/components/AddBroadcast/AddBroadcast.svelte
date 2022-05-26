@@ -5,6 +5,10 @@
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { toast } from 'components/Toast/Toast';
   import { ROUTES } from 'consts/routes';
+  import {
+    CREATE_BROADCAST,
+    SINGLE_BROADCAST,
+  } from 'modules/authentication/const';
   import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
   import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
@@ -17,6 +21,8 @@
   import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
+  import { claim_svg_element } from 'svelte/internal';
+  import { httpClient } from 'utils/httpClient';
 
   let isSubmitting: boolean;
   export let initial: Broadcast;
@@ -75,12 +81,11 @@
     };
 
     if (initial) {
-      const res = await axios.post('/api/broadcast/updateBroadcast', {
-        broadcast,
-        id: initial.id,
+      const res = await httpClient.put(SINGLE_BROADCAST(initial.id), {
+        ...broadcast,
       });
 
-      if (res.statusText === 'OK') {
+      if (res.status === 200) {
         toast.success('Succesfully updated');
         getAllBroadcasts($activeOrganisation.id).then(() =>
           goto(ROUTES.BROADCASTS),
@@ -89,11 +94,11 @@
         toast.warning('An error occured');
       }
     } else {
-      const res = await axios.post('/api/broadcast/createNewBroadcast', {
+      const res = await httpClient.post(CREATE_BROADCAST, {
         ...broadcast,
       });
 
-      if (res.statusText === 'OK') {
+      if (res.status === 200) {
         toast.success('Succesfully added');
         getAllBroadcasts($activeOrganisation.id).then(() =>
           goto(ROUTES.BROADCASTS),

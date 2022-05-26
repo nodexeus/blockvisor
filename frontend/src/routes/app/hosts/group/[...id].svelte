@@ -19,7 +19,6 @@
     selectedHosts,
     fetchHostById,
     isLoading,
-    hosts,
   } from 'modules/hosts/store/hostsStore';
   import { page } from '$app/stores';
   import DetailsTable from 'modules/hosts/components/DetailsTable/DetailsTable.svelte';

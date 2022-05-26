@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+
+  import { session } from '$app/stores';
+  import axios from 'axios';
+
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { ROUTES } from 'consts/routes';
@@ -6,6 +11,7 @@
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
   import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
   import { required, Hint, useForm, email, minLength } from 'svelte-use-form';
+  import { saveUserinfo } from 'utils';
 
   const form = useForm();
 
@@ -13,19 +19,27 @@
 
   let isSubmitting = false;
 
-  const handleSubmit = () => {
-    isSubmitting = true;
-  };
-
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
+  };
+
+  const handleLogin = async () => {
+    isSubmitting = true;
+    const { email, password } = $form.values;
+
+    try {
+      const res = await axios.post(ROUTES.AUTH_LOGIN, { email, password });
+      saveUserinfo({ ...res.data, verified: true });
+      isSubmitting = false;
+      goto(ROUTES.DASHBOARD);
+    } catch (error) {}
   };
 </script>
 
 <form
-  on:submit={handleSubmit}
-  method="post"
-  action={ROUTES.AUTH_LOGIN}
+  method="POST"
+  action="#"
+  on:submit|preventDefault={handleLogin}
   class="login-form"
   use:form
 >

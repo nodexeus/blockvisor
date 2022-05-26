@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
+import { HOSTS, SINGLE_HOST } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 
 export const hosts = writable([]);
 export const selectedHosts = writable([]);
@@ -16,9 +18,9 @@ export const fetchAllHosts = async () => {
     },
   ];
 
-  const res = await axios.get('/api/hosts/fetchHosts');
+  const res = await httpClient.get(HOSTS);
 
-  const sorted = res.data.hosts.sort((a, b) => b.node_count - a.node_count);
+  const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
   all_hosts[0].children = sorted.map((item) => {
     return {
@@ -35,14 +37,14 @@ export const fetchAllHosts = async () => {
 
 export const fetchHostById = async (id: string) => {
   isLoading.set(true);
-  const res = await axios.get('/api/hosts/fetchHostById', { params: { id } });
+  const res = await httpClient.get(SINGLE_HOST(id));
 
   isLoading.set(false);
-  selectedHosts.set(res.data.host);
+  selectedHosts.set(res.data);
 };
 
 export const getHostById = async (id: string) => {
-  const res = await axios.get('/api/hosts/fetchHostById', { params: { id } });
+  const res = await httpClient.get(SINGLE_HOST(id));
 
-  return res.data.host;
+  return res.data;
 };

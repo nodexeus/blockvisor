@@ -2,9 +2,10 @@ import { browser } from '$app/env';
 import { goto } from '$app/navigation';
 import { FEATURE_FLAGS } from 'consts/featureFlags';
 import { ROUTES } from 'consts/routes';
+import type { UserInfo } from 'utils';
 
 export const checkAndRedirect = (
-  user: UserSession,
+  user: UserSession | UserInfo,
   type: 'private' | 'public',
 ) => {
   const shouldRedirect =

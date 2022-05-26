@@ -1,6 +1,12 @@
 import axios from 'axios';
 import { ROUTES } from 'consts/routes';
+import {
+  NODE_GROUPS,
+  USER_NODES,
+  VALIDATOR,
+} from 'modules/authentication/const';
 import { derived, writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 
 export const nodes = writable([]);
 export const selectedUser = writable();
@@ -18,9 +24,8 @@ export const fetchAllNodes = async () => {
     },
   ];
 
-  const res = await axios.get('/api/nodes/fetchNodes');
-
-  const sorted = res.data.nodes.sort((a, b) => b.node_count - a.node_count);
+  const res = await httpClient.get(NODE_GROUPS);
+  const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
   all_nodes[0].children = sorted.map((item) => {
     return {
@@ -34,21 +39,22 @@ export const fetchAllNodes = async () => {
 };
 
 export const fetchNodeById = async (id: string) => {
-  const res = await axios.get('/api/nodes/fetchNodeById', { params: { id } });
+  const res = await httpClient.get(USER_NODES(id));
 
-  selectedNode.set(res.data.node);
+  selectedNode.set(res.data);
 };
 
 export const fetchUserById = async (id: string) => {
-  const res = await axios.get('/api/nodes/fetchUserById', { params: { id } });
+  const res = await httpClient.get(USER_NODES(id));
 
-  selectedUser.set(res.data.user);
+  const foundUser = res.data.find((item) => item.id === id);
+  selectedUser.set(foundUser);
 };
 
 export const fetchValidatorById = async (id: string) => {
   isLoading.set(true);
-  const res = await axios.get('/api/nodes/fetchValidator', { params: { id } });
-  selectedValidator.set(res.data.validator);
+  const res = await httpClient.get(VALIDATOR(id));
+  selectedValidator.set(res.data);
   isLoading.set(false);
 };
 

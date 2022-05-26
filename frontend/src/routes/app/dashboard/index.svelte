@@ -1,9 +1,7 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
   import { MetaTags } from 'svelte-meta-tags';
-  import { app } from 'modules/app/store';
   import Summary from 'modules/dashboard/components/Summary/Summary.svelte';
-  import { onMount } from 'svelte';
   import RecentNodes from 'modules/dashboard/components/RecentNodes/RecentNodes.svelte';
   import HostsList from 'modules/dashboard/components/HostList/HostsList.svelte';
   import Button from 'components/Button/Button.svelte';
@@ -112,6 +110,7 @@
       url: 'placeholder-node',
     },
   ];
+
 </script>
 
 <MetaTags title="Dashboard | BlockVisor" />

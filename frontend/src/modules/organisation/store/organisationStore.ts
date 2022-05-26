@@ -1,24 +1,25 @@
-import axios from 'axios';
+import { ORGANISATIONS } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
+import { httpClient } from 'utils/httpClient';
 import type { Organisation } from '../models/Organisation';
 
 export const organisations = writable<Organisation[]>();
 export const activeOrganisation = writable<Organisation>();
 
 export const getOrganisations = async (userId: string) => {
-  axios
-    .get('/api/organisation/getOrganisations', { params: { id: userId } })
-    .then((res) => {
-      if (res.statusText === 'OK') {
-        organisations.set(res.data);
+  try {
+    const res = await httpClient.get(ORGANISATIONS(userId));
 
-        const privateOrg = res.data.find((item) => item.is_personal);
+    organisations.set(res.data);
 
-        if (privateOrg) {
-          activeOrganisation.set(privateOrg);
-        } else {
-          activeOrganisation.set(res.data[0]);
-        }
-      }
-    });
+    const privateOrg = res.data.find((item) => item.is_personal);
+
+    if (privateOrg) {
+      activeOrganisation.set(privateOrg);
+    } else {
+      activeOrganisation.set(res.data[0]);
+    }
+  } catch (error) {
+    organisations.set([]);
+  }
 };

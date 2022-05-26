@@ -11,7 +11,6 @@
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { app } from 'modules/app/store';
   import GroupTable from 'modules/hosts/components/GroupTable/GroupTable.svelte';
-  import HostGroup from 'modules/hosts/components/HostGroup/HostGroup.svelte';
   import { fetchAllHosts, hosts } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
 
@@ -27,8 +26,6 @@
       },
     ]);
   });
-
-  fetchAllHosts();
 </script>
 
 <ActionTitleHeader className="container--pull-back">
