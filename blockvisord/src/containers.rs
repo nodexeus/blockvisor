@@ -108,7 +108,7 @@ impl NodeContainer for LinuxNode {
             .add_network_interface(iface)
             .socket_path(Path::new(FC_SOCKET_PATH))
             .build();
-        let machine = firec::Machine::new(config).await?;
+        let machine = firec::Machine::create(config).await?;
 
         Ok(Self {
             id: id.to_string(),
