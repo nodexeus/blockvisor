@@ -61,7 +61,7 @@
       </svelte:fragment>
       <DropdownLinkList slot="content">
         <li>
-          <DropdownItem href={ROUTES.BROADCAST_EDIT(item.id)}>
+          <DropdownItem href={ROUTES.BROADCAST_EDIT(item?.id)}>
             <IconEdit />
             Edit</DropdownItem
           >
