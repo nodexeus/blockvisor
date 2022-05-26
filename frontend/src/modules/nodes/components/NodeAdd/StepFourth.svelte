@@ -9,11 +9,13 @@
     provisionedHostId,
   } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
+  import { httpClient } from 'utils/httpClient';
+  import { PROVISION_HOST } from 'modules/authentication/const';
 
   export let setStep;
   export let form;
 
-  let install_cmd = 'curl http://bvs.sh | bash -s -- jhmKuTwF';
+  let install_cmd;
   let host_id;
   let retrying;
   let claimed_at;
@@ -22,13 +24,13 @@
   let isChecking = false;
 
   onMount(async () => {
-    const res = await axios.post('/api/nodes/provisionNewHost', {
+    const res = await httpClient.post(PROVISION_HOST, {
       org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
     });
 
-    if (res.request.statusText === 'OK') {
-      host_id = res.data?.node?.id;
-      install_cmd = res.data?.node?.install_cmd;
+    if (res.status === 200) {
+      host_id = res.data?.id;
+      install_cmd = res.data?.install_cmd;
     }
   });
 
