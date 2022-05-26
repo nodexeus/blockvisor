@@ -1120,13 +1120,14 @@ dependencies = [
 [[package]]
 name = "firec"
 version = "0.1.0"
-source = "git+https://github.com/blockjoy/firec.git?rev=3e2e9a54c203f65#3e2e9a54c203f65651c053dd6d99b8af7a52e953"
+source = "git+https://github.com/blockjoy/firec.git#d082eb00b74a303df1b4286ae77a0d74636b917b"
 dependencies = [
  "derivative",
  "hyper 0.14.18",
  "hyperlocal",
  "serde",
  "serde_json",
+ "sysinfo",
  "thiserror",
  "tokio 1.18.1",
  "tracing",
