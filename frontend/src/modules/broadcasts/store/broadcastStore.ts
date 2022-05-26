@@ -38,35 +38,23 @@ export const getAllBroadcasts = async (orgId: string) => {
 export const getBroadcastById = async (postId: string) => {
   try {
     const res = await httpClient.get(SINGLE_BROADCAST(postId));
+    console.log(res.data);
     return res.data;
   } catch (error) {
     return error;
   }
-  /* return axios
-    .get('/api/broadcast/getBroadcastById', {
-      params: {
-        post_id: postId,
-      },
-    })
-    .then((res) => {
-      return res.data;
-    })
-    .catch((err) => {
-      return err;
-    }); */
 };
 
 export const deleteBroadcastById = async (postId: string, orgId: string) => {
-  return axios
-    .get('/api/broadcast/deleteBroadcastById', {
-      params: {
-        post_id: postId,
-      },
-    })
-    .then(() => {
+  console.log('a');
+  return httpClient
+    .delete(SINGLE_BROADCAST(postId))
+    .then((res) => {
+      console.log(res);
       getAllBroadcasts(orgId).then((res) => res);
     })
     .catch((err) => {
+      console.log(err);
       return err;
     });
 };

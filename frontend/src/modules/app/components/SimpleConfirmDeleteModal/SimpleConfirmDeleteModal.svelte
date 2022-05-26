@@ -27,10 +27,8 @@
     {#if loading}
       <LoadingSpinner size="small" id="confirm-modal" />
     {:else}
-      <Button handleClick={handleCancel} size="small" style="ghost"
-        >Cancel</Button
-      >
-      <Button handleClick={handleConfirm} size="small" style="warning"
+      <Button on:click={handleCancel} size="small" style="ghost">Cancel</Button>
+      <Button on:click={handleConfirm} size="small" style="warning"
         >Delete</Button
       >
     {/if}
