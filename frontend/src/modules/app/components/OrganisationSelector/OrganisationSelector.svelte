@@ -13,7 +13,7 @@
     organisations,
   } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
-  import { clickOutside } from 'utils';
+  import { clickOutside, getUserInfo } from 'utils';
 
   let dropdownActive: boolean = false;
 
@@ -22,7 +22,7 @@
   }
 
   onMount(() => {
-    getOrganisations($user.id);
+    getOrganisations(getUserInfo().id);
   });
 </script>
 

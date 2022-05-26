@@ -23,7 +23,7 @@
   import { fade } from 'svelte/transition';
 
   $: {
-    if ($activeOrganisation.id) {
+    if ($activeOrganisation?.id) {
       getAllBroadcasts($activeOrganisation.id).catch((err) => toast.push(err));
     }
   }

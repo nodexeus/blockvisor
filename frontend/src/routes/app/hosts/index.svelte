@@ -26,8 +26,6 @@
       },
     ]);
   });
-
-  fetchAllHosts();
 </script>
 
 <ActionTitleHeader className="container--pull-back">
