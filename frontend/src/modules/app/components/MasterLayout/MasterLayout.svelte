@@ -32,7 +32,6 @@
   let disableClick = false;
 
   let isSearchOpen = false;
-  let isResultsOpen = true;
 
   const handleOpen = () => {
     isSearchOpen = true;
@@ -171,12 +170,7 @@
       </div>
       <div class="layout__util">
         {#if FEATURE_FLAGS.BLOCKVISOR}
-          <HeaderSearch
-            isOpen={isSearchOpen}
-            {isResultsOpen}
-            {handleOpen}
-            {handleClose}
-          />
+          <HeaderSearch isOpen={isSearchOpen} {handleOpen} {handleClose} />
         {/if}
         <ProfileDropdown />
       </div>

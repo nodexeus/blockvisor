@@ -1,20 +1,12 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
-  import {
-    blockchains,
-    getAllBlockchains,
-  } from 'modules/broadcasts/store/broadcastStore';
+  import { blockchains } from 'modules/broadcasts/store/broadcastStore';
   import CardSelector from 'modules/forms/components/CardSelector/CardSelector.svelte';
   import CardSelectorList from 'modules/forms/components/CardSelector/CardSelectorList.svelte';
-  import { onMount } from 'svelte';
   import FormState from './FormState.svelte';
 
   export let form;
   export let setStep;
-
-  onMount(() => {
-    getAllBlockchains();
-  });
 
   const nodeTypes = [];
 

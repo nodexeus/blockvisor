@@ -28,26 +28,28 @@
     <slot />
     <svelte:fragment slot="label">Select a network</svelte:fragment>
 
-    {#each $blockchains as item, i}
-      <CardSelector disabled={item.status !== 'production'} index={i}>
-        <svelte:fragment slot="label">
-          {#if item.token}
-            <TokenIcon icon={item.token.toLowerCase()} />
-          {/if}
-          {item.name}<br />
-          <small>{item.token || ''}</small></svelte:fragment
-        >
-        <!-- {#if item.status === 'production'} -->
-        <Button
-          value={item.name}
-          type="submit"
-          slot="action"
-          style="primary"
-          size="small">Select</Button
-        >
-        <!-- {/if} -->
-      </CardSelector>
-    {/each}
+    {#if $blockchains?.length}
+      {#each $blockchains as item, i}
+        <CardSelector disabled={item.status !== 'production'} index={i}>
+          <svelte:fragment slot="label">
+            {#if item.token}
+              <TokenIcon icon={item.token.toLowerCase()} />
+            {/if}
+            {item.name}<br />
+            <small>{item.token || ''}</small></svelte:fragment
+          >
+          <!-- {#if item.status === 'production'} -->
+          <Button
+            value={item.name}
+            type="submit"
+            slot="action"
+            style="primary"
+            size="small">Select</Button
+          >
+          <!-- {/if} -->
+        </CardSelector>
+      {/each}
+    {/if}
   </CardSelectorList>
 </div>
 

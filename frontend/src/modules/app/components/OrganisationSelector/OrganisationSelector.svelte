@@ -35,7 +35,9 @@
   >
     <span class="organisation-selector__letter"
       ><span class="t-tiny"
-        >{$activeOrganisation?.name.substring(0, 1)?.toUpperCase()}</span
+        >{$activeOrganisation
+          ? $activeOrganisation?.name.substring(0, 1)?.toUpperCase()
+          : ''}</span
       ></span
     >
     <span class="organisation-selector__name t-smaller t-normal"
@@ -44,15 +46,17 @@
     <IconCaret /></Button
   >
 
-  <Dropdown isActive={dropdownActive}>
-    <DropdownLinkList>
-      {#each $organisations as item}
-        <li>
-          <DropdownItem href="#">{item.name || ''}</DropdownItem>
-        </li>
-      {/each}
-    </DropdownLinkList>
-  </Dropdown>
+  {#if $organisations}
+    <Dropdown isActive={dropdownActive}>
+      <DropdownLinkList>
+        {#each $organisations as item}
+          <li>
+            <DropdownItem href="#">{item.name || ''}</DropdownItem>
+          </li>
+        {/each}
+      </DropdownLinkList>
+    </Dropdown>
+  {/if}
 </div>
 
 <style>
