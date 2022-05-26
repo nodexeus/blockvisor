@@ -3,8 +3,10 @@
 
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { INSTALL_NODE } from 'modules/authentication/const';
   import { provisionedHostId } from 'modules/hosts/store/hostsStore';
   import { installedNode } from 'modules/nodes/store/nodesStore';
+  import { httpClient } from 'utils/httpClient';
 
   export let setStep;
   export let form;
@@ -20,20 +22,39 @@
     success = false;
     installing = true;
 
-    axios
-      .get('/api/nodes/installNode', {
-        params: {
-          host_id: $provisionedHostId,
-          node_type: $form.nodeType.value,
-        },
+    let realNodeType;
+    const nodeType = $form.nodeType.value;
+    const hostId = $provisionedHostId;
+
+    switch (nodeType) {
+      case 'ETL':
+        realNodeType = 'etl';
+        break;
+      case 'Node/api':
+        realNodeType = 'node';
+        break;
+      case 'Validator':
+        realNodeType = 'validator';
+        break;
+    }
+
+    httpClient
+      .post(INSTALL_NODE, {
+        org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
+        host_id: hostId,
+        chain_type: 'solana',
+        node_type: realNodeType,
+        status: 'installing',
+        is_online: false,
       })
       .then((res) => {
-        if (res.statusText === 'OK') {
+        if (res.status === 200) {
           installedNode.set(res.data.node);
           success = true;
           installing = false;
         }
-      });
+      })
+      .catch((err) => console.log(err));
 
     setTimeout(() => {
       installing = false;

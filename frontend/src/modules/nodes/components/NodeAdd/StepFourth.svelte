@@ -10,7 +10,10 @@
   } from 'modules/hosts/store/hostsStore';
   import { onMount } from 'svelte';
   import { httpClient } from 'utils/httpClient';
-  import { PROVISION_HOST } from 'modules/authentication/const';
+  import {
+    CONFIRM_PROVISION,
+    PROVISION_HOST,
+  } from 'modules/authentication/const';
 
   export let setStep;
   export let form;
@@ -52,28 +55,27 @@
       }, 2000);
     }
 
-    axios
-      .get('/api/nodes/confirmProvision', { params: { host_id } })
-      .then((res) => {
-        if (res.request.statusText === 'OK') {
-          if (!res.data.host_id) {
-            setTimeout(() => {
-              checkProvision(true);
-            }, 5000);
-          } else {
-            claimed_at = res.data.claimed_at;
-            claimed_host_id = res.data.host_id;
-            retrying = false;
-            isChecking = false;
+    httpClient.get(CONFIRM_PROVISION(host_id)).then((res) => {
+      console.log(res);
+      if (res.status === 200) {
+        if (!res.data.host_id) {
+          setTimeout(() => {
+            checkProvision(true);
+          }, 5000);
+        } else {
+          claimed_at = res.data.claimed_at;
+          claimed_host_id = res.data.host_id;
+          retrying = false;
+          isChecking = false;
 
-            $provisionedHostId = claimed_host_id;
+          $provisionedHostId = claimed_host_id;
 
-            getHostById(claimed_host_id).then((res) => {
-              new_host = res;
-            });
-          }
+          getHostById(claimed_host_id).then((res) => {
+            new_host = res;
+          });
         }
-      });
+      }
+    });
   };
 
   const handleCheck = () => {
