@@ -24,17 +24,6 @@ export const getAllBlockchains = async () => {
   } catch (error) {
     blockchains.set([]);
   }
-  /*   axios.get('/api/nodes/getBlockchains').then((res) => {
-    if (res.statusText === 'OK') {
-      const active = res.data.filter(
-        (item: Blockchain) => item.status === 'production',
-      );
-      const inactive = res.data.filter(
-        (item: Blockchain) => item.status !== 'production',
-      );
-      blockchains.set([...active, ...inactive]);
-    }
-  }); */
 };
 
 export const getAllBroadcasts = async (orgId: string) => {
@@ -51,7 +40,7 @@ export const getBroadcastById = async (postId: string) => {
     const res = await httpClient.get(SINGLE_BROADCAST(postId));
     return res.data;
   } catch (error) {
-    blockchains.set([]);
+    return error;
   }
   /* return axios
     .get('/api/broadcast/getBroadcastById', {
