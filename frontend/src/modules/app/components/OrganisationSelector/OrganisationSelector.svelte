@@ -13,15 +13,24 @@
     organisations,
   } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
+  import { clickOutside } from 'utils';
 
   let dropdownActive: boolean = false;
+
+  function handleClickOutside() {
+    dropdownActive = false;
+  }
 
   onMount(() => {
     getOrganisations($user.id);
   });
 </script>
 
-<div class="organisation-selector">
+<div
+  class="organisation-selector"
+  use:clickOutside
+  on:click_outside={handleClickOutside}
+>
   <Button
     on:click={() => (dropdownActive = !dropdownActive)}
     size="small"
