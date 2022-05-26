@@ -22,9 +22,9 @@
     issue: IconExclamation,
   };
 
-  export let state: StateIconProps['status'];
+  export let status: StateIconProps['status'];
 
-  $: icon = icons[state];
+  $: icon = icons[status];
 </script>
 
 <svelte:component this={icon} />

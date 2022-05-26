@@ -6,7 +6,7 @@
   import SwipeListener from 'swipe-listener';
   import { afterUpdate, onDestroy, onMount } from 'svelte';
 
-  export let onSwipeDown;
+  export let onSwipeDown = undefined;
 
   let mobileElement;
   let swipeListener;
@@ -38,7 +38,7 @@
     <slot />
   </aside>
 
-  <Portal hidden={true} target="body">
+  <Portal target="body">
     <aside
       bind:this={mobileElement}
       transition:fade|local={fadeDefault}

@@ -42,7 +42,7 @@
     </Button>
   {/if}
 
-  <Dropdown onSwipeDown={handleClickOutside} {isActive}>
+  <Dropdown {isActive}>
     <slot name="content" />
   </Dropdown>
 </div>

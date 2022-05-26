@@ -10,7 +10,6 @@
   import IconPerson from 'icons/person-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
-  import { userDetails } from 'modules/nodes/store/nodesStore';
 
   export let isParent;
   export let href;
