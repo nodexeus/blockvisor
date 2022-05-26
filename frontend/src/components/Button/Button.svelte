@@ -7,7 +7,6 @@
   export let display: ButtonProps['display'] = 'inline';
   export let cssCustom: ButtonProps['cssCustom'] = '';
   export let asLink = false;
-  export let handleClick;
 
   const rootClass = 'u-button-reset button';
   $: cssClass = [rootClass, border, size, display, style, cssCustom].join(' ');
@@ -18,7 +17,7 @@
     <slot />
   </a>
 {:else}
-  <button class={cssClass} on:click|preventDefault={handleClick}>
+  <button class={cssClass} on:click {...$$props}>
     <slot />
   </button>
 {/if}

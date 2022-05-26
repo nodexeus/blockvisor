@@ -8,7 +8,6 @@ export interface ButtonProps
   display?: ButtonDisplay;
   cssCustom?: string;
   asLink?: boolean;
-  handleClick: () => void;
 }
 
 export interface ButtonEvents {

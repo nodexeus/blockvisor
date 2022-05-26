@@ -1,8 +1,8 @@
 <script lang="ts">
-import { goto } from '$app/navigation';
+  import { goto } from '$app/navigation';
 
-import { session } from '$app/stores';
-import axios from 'axios';
+  import { session } from '$app/stores';
+  import axios from 'axios';
 
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
@@ -18,29 +18,28 @@ import axios from 'axios';
   let activeType: 'password' | 'text' = 'password';
 
   let isSubmitting = false;
-  
+
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
 
   const handleLogin = async () => {
     isSubmitting = true;
-    const {email, password} = $form.values
+    const { email, password } = $form.values;
 
     try {
-      const res = await axios.post(ROUTES.AUTH_LOGIN, {email, password})
-      saveUserinfo({...res.data, verified: true});
+      const res = await axios.post(ROUTES.AUTH_LOGIN, { email, password });
+      saveUserinfo({ ...res.data, verified: true });
       isSubmitting = false;
-		  goto(ROUTES.DASHBOARD);
-    } catch (error) {
-      
-    }
-  }
+      goto(ROUTES.DASHBOARD);
+    } catch (error) {}
+  };
 </script>
 
 <form
   method="POST"
   action="#"
+  on:submit|preventDefault={handleLogin}
   class="login-form"
   use:form
 >
@@ -80,12 +79,7 @@ import axios from 'axios';
     </li>
   </ul>
 
-  <Button 
-    size="medium" 
-    display="block" 
-    style="primary" 
-    type="submit" 
-    handleClick={handleLogin}>
+  <Button size="medium" display="block" style="primary" type="submit">
     {#if isSubmitting}
       &nbsp;
       <LoadingSpinner size="button" id="js-form-submit" />

@@ -25,10 +25,12 @@
   <slot name="content" />
   <div slot="footer" class="t-right">
     {#if loading}
-      <LoadingSpinner size="small" />
+      <LoadingSpinner size="small" id="confirm-modal" />
     {:else}
-      <Button on:click={handleCancel} size="small" style="ghost">Cancel</Button>
-      <Button on:click={handleConfirm} size="small" style="warning"
+      <Button handleClick={handleCancel} size="small" style="ghost"
+        >Cancel</Button
+      >
+      <Button handleClick={handleConfirm} size="small" style="warning"
         >Delete</Button
       >
     {/if}
