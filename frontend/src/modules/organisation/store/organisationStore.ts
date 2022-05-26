@@ -3,7 +3,7 @@ import { writable } from 'svelte/store';
 import { httpClient } from 'utils/httpClient';
 import type { Organisation } from '../models/Organisation';
 
-export const organisations = writable<Organisation[]>();
+export const organisations = writable<Organisation[]>(undefined);
 export const activeOrganisation = writable<Organisation>();
 
 export const getOrganisations = async (userId: string) => {
