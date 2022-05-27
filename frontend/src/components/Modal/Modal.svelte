@@ -109,6 +109,7 @@
     gap: 40px;
     padding: 20px 28px;
     border-bottom: 1px solid theme(--color-text-5-o10);
+    font-weight: bold;
 
     & :global(.button) {
       min-width: 44px;

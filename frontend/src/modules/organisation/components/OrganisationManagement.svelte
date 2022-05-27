@@ -9,39 +9,28 @@
   const handleSort = (id: string, value: SorterValues) => {
     sortActive = { id, value };
   };
-
-  console.log($organisations);
 </script>
 
 <section class="review">
   <table class="table">
-    <colspan>
-      <col width="80px" />
+    <colgroup>
+      <col width="200" />
       <col />
-    </colspan>
+      <col width="68" />
+    </colgroup>
     <thead class="table__head">
       <tr>
         <th class="table__heading">
-          <Sorter callback={handleSort} active={sortActive} id="first-name"
+          <Sorter callback={handleSort} active={sortActive} id="name"
             >Full name</Sorter
           >
         </th>
         <th class="table__heading">
-          <Sorter callback={handleSort} active={sortActive} id="e-mail"
-            >E-mail</Sorter
+          <Sorter callback={handleSort} active={sortActive} id="members"
+            >Members</Sorter
           >
         </th>
-        <th class="table__heading">
-          <Sorter callback={handleSort} active={sortActive} id="organization"
-            >Organization Name</Sorter
-          >
-        </th>
-        <th class="table__heading">
-          <span class="visually-hidden">Status</span>
-        </th>
-        <th class="table__heading">
-          <span class="visually-hidden">Actions</span>
-        </th>
+        <th class="table__heading" />
       </tr>
     </thead>
     <tbody>

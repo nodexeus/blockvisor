@@ -1,12 +1,14 @@
 <script lang="ts">
+  import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import IconDots from 'icons/dots-12.svg';
   import IconDelete from 'icons/close-12.svg';
+  import IconDots from 'icons/dots-12.svg';
   import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-  import type { Organisation } from '../models/Organisation';
   import { fade } from 'svelte/transition';
+  import type { Organisation } from '../models/Organisation';
+  import OrganisationMembersManagement from './OrganisationMembersManagement.svelte';
 
   export let item: Organisation;
   export let index: number;
@@ -18,8 +20,10 @@
 >
   <td class="organisation-data-row__col">{item.name}</td>
   <td class="organisation-data-row__col">Number of members</td>
-  <td class="user-data-row__col user-data-row__col--action t-right">
-    members button
+  <td
+    class="organisation-data-row__col organisation-data-row__col--action t-right"
+  >
+    <Button size="small" style="outline">Members</Button>
     <ButtonWithDropdown
       iconButton
       position="right"
@@ -51,41 +55,42 @@
     </ButtonWithDropdown>
   </td>
 </tr>
+<OrganisationMembersManagement />
 
 <style>
   .organisation-data-row {
-    @media (--screen-large-max) {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      padding: 32px 0 18px;
+    @media (--screen-smaller-max) {
+      display: block;
       position: relative;
     }
-
-    & :global(.dropdown) {
-      margin-top: 0;
-    }
+  }
+  .organisation-data-row__col {
+    padding-bottom: 10px;
   }
 
-  .organisation-data-row__col {
-    padding: 30px 28px 18px 0;
+  .organisation-data-row__col--action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .organisation-data-row {
+    padding-top: 32px;
+    padding-bottom: 18px;
+    padding-right: 28px;
+
+    @media (--screen-smaller-max) {
+      padding: 16px 72px 16px 0;
+      display: block;
+    }
 
     &:last-child {
       padding-right: 0;
     }
-
-    @media (--screen-large-max) {
-      padding: 0 40px 0 0;
-      display: block;
-    }
   }
 
-  .organisation-data-row__col--action {
-    @media (--screen-large-max) {
-      padding-right: 0;
-      position: absolute;
-      top: 32px;
-      right: 0;
-    }
+  .organisation-data-row__link {
+    display: inline-block;
+    padding: 2px 8px;
   }
 </style>
