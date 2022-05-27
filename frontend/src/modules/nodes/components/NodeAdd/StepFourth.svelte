@@ -1,19 +1,15 @@
 <script lang="ts">
-  import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
-  import DataRow from 'modules/nodes/components/DetailsTable/DataRow.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { ENDPOINTS } from 'consts/endpoints';
   import { format } from 'date-fns';
   import {
     getHostById,
     provisionedHostId,
   } from 'modules/hosts/store/hostsStore';
+  import DataRow from 'modules/nodes/components/DetailsTable/DataRow.svelte';
   import { onMount } from 'svelte';
   import { httpClient } from 'utils/httpClient';
-  import {
-    CONFIRM_PROVISION,
-    PROVISION_HOST,
-  } from 'modules/authentication/const';
 
   export let setStep;
   export let form;
@@ -27,9 +23,12 @@
   let isChecking = false;
 
   onMount(async () => {
-    const res = await httpClient.post(PROVISION_HOST, {
-      org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
-    });
+    const res = await httpClient.post(
+      ENDPOINTS.HOST_PROVISIONS.CREATE_HOST_PROVISION_POST,
+      {
+        org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
+      },
+    );
 
     if (res.status === 200) {
       host_id = res.data?.id;
@@ -55,27 +54,29 @@
       }, 2000);
     }
 
-    httpClient.get(CONFIRM_PROVISION(host_id)).then((res) => {
-      console.log(res);
-      if (res.status === 200) {
-        if (!res.data.host_id) {
-          setTimeout(() => {
-            checkProvision(true);
-          }, 5000);
-        } else {
-          claimed_at = res.data.claimed_at;
-          claimed_host_id = res.data.host_id;
-          retrying = false;
-          isChecking = false;
+    httpClient
+      .get(ENDPOINTS.HOST_PROVISIONS.GET_HOST_PROVISION(host_id))
+      .then((res) => {
+        console.log(res);
+        if (res.status === 200) {
+          if (!res.data.host_id) {
+            setTimeout(() => {
+              checkProvision(true);
+            }, 5000);
+          } else {
+            claimed_at = res.data.claimed_at;
+            claimed_host_id = res.data.host_id;
+            retrying = false;
+            isChecking = false;
 
-          $provisionedHostId = claimed_host_id;
+            $provisionedHostId = claimed_host_id;
 
-          getHostById(claimed_host_id).then((res) => {
-            new_host = res;
-          });
+            getHostById(claimed_host_id).then((res) => {
+              new_host = res;
+            });
+          }
         }
-      }
-    });
+      });
   };
 
   const handleCheck = () => {

@@ -1,14 +1,10 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { toast } from 'components/Toast/Toast';
+  import { ENDPOINTS } from 'consts/endpoints';
   import { ROUTES } from 'consts/routes';
-  import {
-    CREATE_BROADCAST,
-    SINGLE_BROADCAST,
-  } from 'modules/authentication/const';
   import BroadcastEvent from 'modules/broadcasts/components/AddBroadcast/BroadcastEvent.svelte';
   import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import {
@@ -21,7 +17,6 @@
   import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
-  import { claim_svg_element } from 'svelte/internal';
   import { httpClient } from 'utils/httpClient';
 
   let isSubmitting: boolean;
@@ -81,9 +76,12 @@
     };
 
     if (initial) {
-      const res = await httpClient.put(SINGLE_BROADCAST(initial.id), {
-        ...broadcast,
-      });
+      const res = await httpClient.put(
+        ENDPOINTS.BROADCAST.UPDATE_BROADCAST_FILTER(initial.id),
+        {
+          ...broadcast,
+        },
+      );
 
       if (res.status === 200) {
         toast.success('Succesfully updated');
@@ -94,9 +92,12 @@
         toast.warning('An error occured');
       }
     } else {
-      const res = await httpClient.post(CREATE_BROADCAST, {
-        ...broadcast,
-      });
+      const res = await httpClient.post(
+        ENDPOINTS.BROADCAST.CREATE_BROADCAST_FILTER,
+        {
+          ...broadcast,
+        },
+      );
 
       if (res.status === 200) {
         toast.success('Succesfully added');

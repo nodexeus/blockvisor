@@ -1,10 +1,5 @@
-import axios from 'axios';
+import { ENDPOINTS } from 'consts/endpoints';
 import { ROUTES } from 'consts/routes';
-import {
-  NODE_GROUPS,
-  USER_NODES,
-  VALIDATOR,
-} from 'modules/authentication/const';
 import { derived, writable } from 'svelte/store';
 import { httpClient } from 'utils/httpClient';
 
@@ -24,7 +19,7 @@ export const fetchAllNodes = async () => {
     },
   ];
 
-  const res = await httpClient.get(NODE_GROUPS);
+  const res = await httpClient.get(ENDPOINTS.GROUPS.LIST_NODE_GROUPS_GET);
   const sorted = res.data.sort((a, b) => b.node_count - a.node_count);
 
   all_nodes[0].children = sorted.map((item) => {
@@ -39,13 +34,17 @@ export const fetchAllNodes = async () => {
 };
 
 export const fetchNodeById = async (id: string) => {
-  const res = await httpClient.get(USER_NODES(id));
+  const res = await httpClient.get(
+    ENDPOINTS.VALIDATORS.LIST_VALIDATORS_BY_USER_GET(id),
+  );
 
   selectedNode.set(res.data);
 };
 
 export const fetchUserById = async (id: string) => {
-  const res = await httpClient.get(USER_NODES(id));
+  const res = await httpClient.get(
+    ENDPOINTS.VALIDATORS.LIST_VALIDATORS_BY_USER_GET(id),
+  );
 
   const foundUser = res.data.find((item) => item.id === id);
   selectedUser.set(foundUser);
@@ -53,7 +52,7 @@ export const fetchUserById = async (id: string) => {
 
 export const fetchValidatorById = async (id: string) => {
   isLoading.set(true);
-  const res = await httpClient.get(VALIDATOR(id));
+  const res = await httpClient.get(ENDPOINTS.VALIDATORS.GET_VALIDATOR(id));
   selectedValidator.set(res.data);
   isLoading.set(false);
 };
