@@ -6,6 +6,7 @@
   import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import type { Organisation } from '../models/Organisation';
+  import { fade } from 'svelte/transition';
 
   export let item: Organisation;
   export let index: number;
