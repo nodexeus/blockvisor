@@ -21,8 +21,6 @@
   onMount(() => {
     getOrganisations(getUserInfo().id);
   });
-
-  $: console.log($activeOrganisation);
 </script>
 
 <div
