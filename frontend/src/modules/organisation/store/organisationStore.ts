@@ -1,5 +1,6 @@
 import { ORGANISATIONS } from 'modules/authentication/const';
 import { writable } from 'svelte/store';
+import { getUserInfo } from 'utils';
 import { httpClient } from 'utils/httpClient';
 import type { Organisation } from '../models/Organisation';
 
@@ -10,14 +11,27 @@ export const getOrganisations = async (userId: string) => {
   try {
     const res = await httpClient.get(ORGANISATIONS(userId));
 
-    organisations.set(res.data);
+    if (res.status === 200) {
+      const orgs = res.data.map((item) => {
+        if (item.is_personal && item.name === getUserInfo().email) {
+          return {
+            ...item,
+            name: 'Personal Account',
+          };
+        }
 
-    const privateOrg = res.data.find((item) => item.is_personal);
+        return item;
+      });
 
-    if (privateOrg) {
-      activeOrganisation.set(privateOrg);
-    } else {
-      activeOrganisation.set(res.data[0]);
+      organisations.set(orgs);
+
+      const privateOrg = orgs.find((item) => item.name === 'Personal Account');
+
+      if (privateOrg) {
+        activeOrganisation.set(privateOrg);
+      } else {
+        activeOrganisation.set(res.data[0]);
+      }
     }
   } catch (error) {
     organisations.set([]);

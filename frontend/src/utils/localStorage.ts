@@ -1,15 +1,5 @@
 import { browser } from '$app/env';
 
-export interface UserInfo {
-  id: string;
-  email: string;
-  refresh: string;
-  token: string;
-  created_at: string;
-  role: string;
-  verified: boolean;
-}
-
 export const AUTH_KEY = 'auth';
 
 export const getUserInfo = (): UserInfo | undefined => {
