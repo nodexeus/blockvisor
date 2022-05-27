@@ -4,7 +4,8 @@ use blockvisord::{
     client::{APIClient, HostCreateRequest},
     config::Config,
     containers::{ContainerData, ContainerStatus, Containers},
-    hosts::{get_host_info, get_ip_address}, systemd::{ManagerProxy, UnitStartMode},
+    hosts::{get_host_info, get_ip_address},
+    systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use tokio::time::Duration;
@@ -74,8 +75,11 @@ async fn main() -> Result<()> {
             println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            println!("Stopping blockvisord");
-            todo!()
+            println!("Stopping blockvisor service");
+            systemd_manager_proxy
+                .stop_unit("blockvisor.service", UnitStopMode::Fail)
+                .await?;
+            println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
             todo!()
