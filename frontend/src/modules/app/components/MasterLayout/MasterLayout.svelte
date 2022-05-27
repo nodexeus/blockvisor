@@ -159,7 +159,7 @@
       <div class="t-tiny layout__breadcrumbs hide--from-medium-large">
         <Breadcrumbs />
       </div>
-      <div class="layout__menu display--to-medium-large">
+      <div class="layout__menu">
         <Menu handleClick={onMenuOpen} {menuClass} />
         <div class="layout__organisation"><OrganisationSelector /></div>
       </div>
@@ -292,6 +292,10 @@
   .layout__menu {
     display: flex;
     align-items: center;
+
+    @media (--screen-medium-large) {
+      display: none;
+    }
   }
 
   .layout__organisation {
