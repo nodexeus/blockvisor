@@ -40,6 +40,14 @@ pub trait NodeContainer {
     where
         Self: Sized;
 
+    /// Checks if container exists on this host.
+    async fn exists(id: &str) -> bool;
+
+    /// Returns container previously created on this host.
+    async fn connect(id: &str, machine_index: usize) -> Result<Self>
+    where
+        Self: Sized;
+
     /// Returns the container's `id`.
     fn id(&self) -> &str;
 
@@ -54,11 +62,6 @@ pub trait NodeContainer {
 
     /// Deletes the container.
     async fn delete(&mut self) -> Result<()>;
-}
-
-pub trait NodeRegistry {
-    fn contains(id: &str) -> bool;
-    fn get(id: &str) -> Result<Box<dyn NodeContainer>>;
 }
 
 pub struct LinuxNode {
@@ -116,6 +119,14 @@ impl NodeContainer for LinuxNode {
         })
     }
 
+    async fn exists(_id: &str) -> bool {
+        todo!()
+    }
+
+    async fn connect(_id: &str, _machine_index: usize) -> Result<Self> {
+        todo!()
+    }
+
     fn id(&self) -> &str {
         &self.id
     }
@@ -156,6 +167,20 @@ impl NodeContainer for DummyNode {
         Ok(node)
     }
 
+    async fn exists(id: &str) -> bool {
+        Path::new(&format!("/tmp/{}.txt", id)).exists()
+    }
+
+    async fn connect(id: &str, _machine_index: usize) -> Result<Self> {
+        let node = fs::read_to_string(format!("/tmp/{}.txt", id))?;
+        let node: DummyNode = toml::from_str(&node)?;
+
+        Ok(DummyNode {
+            id: id.to_string(),
+            state: node.state,
+        })
+    }
+
     fn id(&self) -> &str {
         &self.id
     }
@@ -185,24 +210,6 @@ impl NodeContainer for DummyNode {
         self.kill().await?;
         fs::remove_file(format!("/tmp/{}.txt", self.id))?;
         Ok(())
-    }
-}
-
-pub struct DummyNodeRegistry {}
-
-impl NodeRegistry for DummyNodeRegistry {
-    fn contains(id: &str) -> bool {
-        Path::new(&format!("/tmp/{}.txt", id)).exists()
-    }
-
-    fn get(id: &str) -> Result<Box<dyn NodeContainer>> {
-        let node = fs::read_to_string(format!("/tmp/{}.txt", id))?;
-        let node: DummyNode = toml::from_str(&node)?;
-
-        Ok(Box::new(DummyNode {
-            id: id.to_string(),
-            state: node.state,
-        }))
     }
 }
 
