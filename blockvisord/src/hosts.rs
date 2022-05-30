@@ -1,6 +1,4 @@
-use crate::containers::{
-    ContainerStatus, Containers, DummyNode, DummyNodeRegistry, NodeContainer, NodeRegistry,
-};
+use crate::containers::{ContainerStatus, Containers, DummyNode, NodeContainer};
 use anyhow::Result;
 use sysinfo::{DiskExt, System, SystemExt};
 use tracing::info;
@@ -39,19 +37,19 @@ pub async fn dummy_apply_config(containers: &Containers, machine_index: &mut usi
     for (id, container_config) in &containers.containers {
         // remove deleted nodes
         if container_config.status == ContainerStatus::Deleted {
-            if DummyNodeRegistry::contains(id) {
-                let mut node = DummyNodeRegistry::get(id)?;
+            if DummyNode::exists(id).await {
+                let mut node = DummyNode::connect(id, *machine_index).await?;
                 node.delete().await?;
             }
         } else {
             // create non existing nodes
-            if !DummyNodeRegistry::contains(id) {
+            if !DummyNode::exists(id).await {
                 DummyNode::create(id, *machine_index).await?;
                 *machine_index += 1;
             }
 
             // fix nodes status
-            let mut node = DummyNodeRegistry::get(id)?;
+            let mut node = DummyNode::connect(id, *machine_index).await?;
             let state = node.state().await?;
             if state != container_config.status {
                 info!(
