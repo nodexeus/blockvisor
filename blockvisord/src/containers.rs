@@ -1,5 +1,6 @@
 use anyhow::{Ok, Result};
 use async_trait::async_trait;
+use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -82,6 +83,7 @@ impl NodeContainer for LinuxNode {
         let jailer = firec::config::Jailer::builder()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
+            .mode(JailerMode::Daemon)
             .build();
 
         let root_drive = firec::config::Drive::builder("root", Path::new(ROOT_FS))
