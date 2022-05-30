@@ -4,3 +4,4 @@ pub mod config;
 pub mod containers;
 pub mod hosts;
 pub mod logging;
+pub mod systemd;

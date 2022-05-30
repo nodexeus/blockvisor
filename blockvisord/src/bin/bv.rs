@@ -5,16 +5,21 @@ use blockvisord::{
     config::Config,
     containers::{ContainerData, ContainerStatus, Containers},
     hosts::{get_host_info, get_ip_address},
+    systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use tokio::time::Duration;
 use uuid::Uuid;
+use zbus::Connection;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = App::parse();
     println!("{:?}", args);
     let timeout = Duration::from_secs(10);
+
+    let conn = Connection::system().await?;
+    let systemd_manager_proxy = ManagerProxy::new(&conn).await?;
 
     match args.command {
         Command::Init(cmd_args) => {
@@ -57,12 +62,24 @@ async fn main() -> Result<()> {
                 bail!("Error: not configured, please run `configure` first");
             }
 
-            println!("Starting blockvisor in background");
-            todo!()
+            // Enable the service to start on host bootup and start it.
+            println!("Enabling blockvisor service to start on host boot.");
+            systemd_manager_proxy
+                .enable_unit_files(&["blockvisor.service"], false, false)
+                .await?;
+            println!("Starting blockvisor service");
+            systemd_manager_proxy
+                .start_unit("blockvisor.service", UnitStartMode::Fail)
+                .await?;
+
+            println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            println!("Stopping blockvisord");
-            todo!()
+            println!("Stopping blockvisor service");
+            systemd_manager_proxy
+                .stop_unit("blockvisor.service", UnitStopMode::Fail)
+                .await?;
+            println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
             todo!()
