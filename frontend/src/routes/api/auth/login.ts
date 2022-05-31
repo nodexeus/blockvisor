@@ -15,10 +15,9 @@ export const post = async ({ request }) => {
       body: response.data,
     };
   } catch (error) {
-    // TODO: Handle API error messages once a real API is set up. Mock API doesn't return errors.
     return {
-      status: error?.response?.status ?? 500,
-      body: error?.response?.statusText,
+      status: error.response.status,
+      body: error.response.data,
     };
   }
 };

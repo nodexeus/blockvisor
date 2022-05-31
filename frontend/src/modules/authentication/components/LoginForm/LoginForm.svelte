@@ -15,21 +15,25 @@
   let activeType: 'password' | 'text' = 'password';
 
   let isSubmitting = false;
+  let errorMessage: string = undefined;
 
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
 
   const handleLogin = async () => {
+    errorMessage = undefined;
     isSubmitting = true;
     const { email, password } = $form.values;
 
     try {
       const res = await axios.post(ROUTES.AUTH_LOGIN, { email, password });
       saveUserinfo({ ...res.data, verified: true });
-      isSubmitting = false;
       goto(ROUTES.DASHBOARD);
-    } catch (error) {}
+    } catch (error) {
+      isSubmitting = false;
+      errorMessage = error.response.data;
+    }
   };
 </script>
 
@@ -73,6 +77,9 @@
           <Hint on="required">This is a mandatory field</Hint>
         </svelte:fragment>
       </PasswordField>
+      {#if errorMessage}
+        <p class="t-smaller t-warning s-top--small">{errorMessage}</p>
+      {/if}
     </li>
   </ul>
 
