@@ -1,16 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-
-  import { session } from '$app/stores';
   import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { ROUTES } from 'consts/routes';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
   import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
-  import { required, Hint, useForm, email, minLength } from 'svelte-use-form';
+  import { email, Hint, required, useForm } from 'svelte-use-form';
   import { saveUserinfo } from 'utils';
 
   const form = useForm();

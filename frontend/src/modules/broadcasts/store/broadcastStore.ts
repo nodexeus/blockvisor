@@ -1,8 +1,4 @@
-import {
-  BLOCKCHAINS,
-  BROADCASTS,
-  SINGLE_BROADCAST,
-} from 'modules/authentication/const';
+import { ENDPOINTS } from 'consts/endpoints';
 import { writable } from 'svelte/store';
 import { httpClient } from 'utils/httpClient';
 
@@ -27,7 +23,9 @@ export const getAllBlockchains = async () => {
 
 export const getAllBroadcasts = async (orgId: string) => {
   try {
-    const res = await httpClient.get(BROADCASTS(orgId));
+    const res = await httpClient.get(
+      ENDPOINTS.BROADCAST.LIST_BROADCAST_FILTERS_GET(orgId),
+    );
     broadcasts.set(res.data);
   } catch (error) {
     blockchains.set([]);
@@ -36,7 +34,9 @@ export const getAllBroadcasts = async (orgId: string) => {
 
 export const getBroadcastById = async (postId: string) => {
   try {
-    const res = await httpClient.get(SINGLE_BROADCAST(postId));
+    const res = await httpClient.get(
+      ENDPOINTS.BROADCAST.GET_BROADCAST_FILTER(postId),
+    );
     return res.data;
   } catch (error) {
     return error;
@@ -45,7 +45,7 @@ export const getBroadcastById = async (postId: string) => {
 
 export const deleteBroadcastById = async (postId: string, orgId: string) => {
   return httpClient
-    .delete(SINGLE_BROADCAST(postId))
+    .delete(ENDPOINTS.BROADCAST.DELETE_BROADCAST_FILTER(postId))
     .then(() => {
       getAllBroadcasts(orgId).then((res) => res);
     })

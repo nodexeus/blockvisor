@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { REFRESH_TOKEN } from 'modules/authentication/const';
+import { ENDPOINTS } from 'consts/endpoints';
 import { getUserInfo, saveUserinfo } from './localStorage';
 
 const httpClient = axios.create();
@@ -26,9 +26,12 @@ httpClient.interceptors.response.use(
       const userInfo = getUserInfo();
 
       try {
-        const res = await httpClient.post(REFRESH_TOKEN, {
-          refresh: userInfo.refresh,
-        });
+        const res = await httpClient.post(
+          ENDPOINTS.AUTHENTICATION.REFRESH_TOKEN_POST,
+          {
+            refresh: userInfo.refresh,
+          },
+        );
         const data = res.data;
         saveUserinfo({ ...res.data, verified: true });
         originalRequest.headers['Authorization'] = 'Bearer ' + data.token;

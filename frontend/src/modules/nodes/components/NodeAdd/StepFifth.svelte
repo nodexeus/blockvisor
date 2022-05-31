@@ -1,9 +1,7 @@
 <script lang="ts">
-  import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-  import { INSTALL_NODE } from 'modules/authentication/const';
+  import { ENDPOINTS } from 'consts/endpoints';
   import { provisionedHostId } from 'modules/hosts/store/hostsStore';
   import { installedNode } from 'modules/nodes/store/nodesStore';
   import { httpClient } from 'utils/httpClient';
@@ -39,7 +37,7 @@
     }
 
     httpClient
-      .post(INSTALL_NODE, {
+      .post(ENDPOINTS.NODES.CREATE_NODE_POST, {
         org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
         host_id: hostId,
         chain_type: 'solana',

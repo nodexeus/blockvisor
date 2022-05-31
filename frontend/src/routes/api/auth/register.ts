@@ -1,13 +1,13 @@
 import axios from 'axios';
+import { ENDPOINTS } from 'consts/endpoints';
 import { ROUTES } from 'consts/routes';
-import { CREATE_USER } from 'modules/authentication/const';
 
 export const post = async ({ request }) => {
   const data = await request.formData();
   const { email, password, confirmPassword } = Object.fromEntries(data);
 
   try {
-    const user = await axios.post(CREATE_USER, {
+    const user = await axios.post(ENDPOINTS.USERS.CREATE_USER_POST, {
       email,
       password,
       password_confirm: confirmPassword,
