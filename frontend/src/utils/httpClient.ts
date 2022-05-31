@@ -30,7 +30,7 @@ httpClient.interceptors.response.use(
           refresh: userInfo.refresh,
         });
         const data = res.data;
-        saveUserinfo(res.data);
+        saveUserinfo({ ...res.data, verified: true });
         originalRequest.headers['Authorization'] = 'Bearer ' + data.token;
 
         return httpClient(originalRequest);
