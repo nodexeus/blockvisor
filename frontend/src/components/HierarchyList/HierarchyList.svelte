@@ -17,6 +17,7 @@
         on:click
         {...node}
         isParent={Boolean(children?.length)}
+        href={node.href}
       >
         {#if !hideList}
           {#if Boolean(children?.length) || $$slots.action}
@@ -29,6 +30,9 @@
                   on:click
                   {...child}
                   isParent={false}
+                  href={child.href}
+                  id={child.id}
+                  title={child.title}
                 />
               {/each}
               {#if $$slots.default}

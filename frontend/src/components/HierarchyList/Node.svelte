@@ -13,11 +13,11 @@
 
   export let isParent;
   export let href;
-  export let id;
+  export let id = undefined;
   export let title;
-  export let isEditing;
-  export let handleConfirm;
-  export let handleEdit;
+  export let isEditing = undefined;
+  export let handleConfirm = undefined;
+  export let handleEdit = undefined;
 </script>
 
 <li
