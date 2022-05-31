@@ -15,6 +15,7 @@ async fn main() -> Result<()> {
     setup_logging(Level::INFO)?;
     info!("Starting...");
 
+    let config = Config::load()?;
     loop {
         let containers = Containers::load()?;
 
@@ -24,7 +25,6 @@ async fn main() -> Result<()> {
             dummy_apply_config(&containers, &mut machine_index).await?;
         }
 
-        let config = Config::load()?;
         process_pending_commands(&config).await?;
 
         sleep(Duration::from_secs(5)).await;
