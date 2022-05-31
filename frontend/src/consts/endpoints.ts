@@ -32,7 +32,7 @@ export const VALIDATORS = {
 
 export const GROUPS = {
   GET_NODES_IN_GROUP: (id: string) => `${API.URL}/groups/nodes/${id}`,
-  LIST_NODE_GROUPS_GET: `${API.URL}/groups/nodes/`,
+  LIST_NODE_GROUPS_GET: `${API.URL}/groups/nodes`,
 };
 
 export const HOST_PROVISIONS = {
