@@ -16,26 +16,28 @@
     <span class="pending">Pending</span>
   </p>
   <div class="organisation-user__action">
-    <ButtonWithDropdown
-      slot="action"
-      buttonProps={{ style: 'ghost', size: 'small' }}
-    >
-      <svelte:fragment slot="label">
-        <span class="visually-hidden">Open action dropdown</span>
-        <span class="organisation-user__action" aria-hidden="true">
-          <span class="s-right--medium-small">Owner</span>
-          <IconCaret />
-        </span>
-      </svelte:fragment>
-      <DropdownLinkList slot="content">
-        <li>
-          <DropdownItem href="">Change Password</DropdownItem>
-        </li>
-        <li>
-          <DropdownItem href="">Remove User</DropdownItem>
-        </li>
-      </DropdownLinkList>
-    </ButtonWithDropdown>
+    <div class="s-right--small">
+      <ButtonWithDropdown
+        slot="action"
+        buttonProps={{ style: 'ghost', size: 'small' }}
+      >
+        <svelte:fragment slot="label">
+          <span class="visually-hidden">Open action dropdown</span>
+          <span class="organisation-user__action" aria-hidden="true">
+            <span class="s-right--medium-small">Owner</span>
+            <IconCaret />
+          </span>
+        </svelte:fragment>
+        <DropdownLinkList slot="content">
+          <li>
+            <DropdownItem href="">Change Password</DropdownItem>
+          </li>
+          <li>
+            <DropdownItem href="">Remove User</DropdownItem>
+          </li>
+        </DropdownLinkList>
+      </ButtonWithDropdown>
+    </div>
     <Button size="small" style="outline"
       >{pending ? 'Revoke Invitation' : 'Revoke'}</Button
     >

@@ -12,6 +12,16 @@
 
   export let item: Organisation;
   export let index: number;
+
+  let isModalOpen: boolean = false;
+
+  function handleModalClose() {
+    isModalOpen = false;
+  }
+
+  function handleModalOpen() {
+    isModalOpen = true;
+  }
 </script>
 
 <tr
@@ -23,7 +33,9 @@
   <td
     class="organisation-data-row__col organisation-data-row__col--action t-right"
   >
-    <Button size="small" style="outline">Members</Button>
+    <Button on:click={handleModalOpen} size="small" style="outline"
+      >Members</Button
+    >
     <ButtonWithDropdown
       iconButton
       position="right"
@@ -55,7 +67,7 @@
     </ButtonWithDropdown>
   </td>
 </tr>
-<OrganisationMembersManagement />
+<OrganisationMembersManagement {handleModalClose} {isModalOpen} />
 
 <style>
   .organisation-data-row {

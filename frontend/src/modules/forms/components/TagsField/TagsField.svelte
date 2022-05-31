@@ -14,6 +14,7 @@
   export let description = '';
   export let field;
   export let multiline: boolean = false;
+  export let showFull: boolean = false;
 
   export let limit = 3;
 
@@ -109,7 +110,9 @@
   <PillBox>
     {#each submittedValues as value (value)}
       <li>
-        <Pill data-pill-value={value} on:click={handleDelete}>{value}</Pill>
+        <Pill data-pill-value={value} on:click={handleDelete} showFull
+          >{value}</Pill
+        >
       </li>
     {/each}
   </PillBox>
@@ -148,6 +151,7 @@
 
 <style>
   .tagsfield__wrapper {
+    width: 100%;
     display: flex;
     gap: 8px;
     position: relative;

@@ -9,6 +9,7 @@
   import IconButton from 'components/IconButton/IconButton.svelte';
 
   export let form = null;
+  export let size: 'normal' | 'large' = 'normal';
   export let isActive = false;
   export let handleModalClose;
   export let id = 'js-modal';
@@ -43,7 +44,7 @@
     >
       <section
         in:fly={{ y: 16, duration: 300, delay: 100 }}
-        class="modal"
+        class={`modal ${size === 'large' ? 'modal--large' : 'modal--normal'}`}
         use:clickOutside
         on:click_outside={handleCloseClick}
       >
@@ -89,6 +90,13 @@
       max-width: 540px;
     }
   }
+
+  .modal--large {
+    @media (--screen-medium-large) {
+      max-width: 750px;
+    }
+  }
+
   .modal-wrapper {
     padding: 20px;
     position: fixed;
