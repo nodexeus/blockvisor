@@ -3,8 +3,11 @@ use async_trait::async_trait;
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
@@ -218,6 +221,7 @@ impl NodeContainer for DummyNode {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Containers {
     pub containers: HashMap<String, ContainerData>,
+    pub machine_index: Arc<Mutex<usize>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -250,5 +254,18 @@ impl Containers {
 
     pub fn exists() -> bool {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
+    }
+
+    /// Get the next machine index.
+    pub fn machine_index(&self) -> usize {
+        *self.machine_index.lock().expect("lock poisoned")
+    }
+
+    /// Get the next machine index and increment it.
+    pub fn next_machine_index(&self) -> usize {
+        let mut machine_index = self.machine_index.lock().expect("lock poisoned");
+        *machine_index += 1;
+
+        *machine_index
     }
 }
