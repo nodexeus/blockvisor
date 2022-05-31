@@ -4,8 +4,8 @@ use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
+use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
 
@@ -165,7 +165,7 @@ impl NodeContainer for DummyNode {
             state: ContainerStatus::Created,
         };
         let contents = toml::to_string(&node)?;
-        fs::write(format!("/tmp/{}.txt", id), &contents)?;
+        fs::write(format!("/tmp/{}.txt", id), &contents).await?;
         Ok(node)
     }
 
@@ -174,7 +174,7 @@ impl NodeContainer for DummyNode {
     }
 
     async fn connect(id: &str, _machine_index: usize) -> Result<Self> {
-        let node = fs::read_to_string(format!("/tmp/{}.txt", id))?;
+        let node = fs::read_to_string(format!("/tmp/{}.txt", id)).await?;
         let node: DummyNode = toml::from_str(&node)?;
 
         Ok(DummyNode {
@@ -191,7 +191,7 @@ impl NodeContainer for DummyNode {
         info!("Starting node: {}", self.id());
         self.state = ContainerStatus::Started;
         let contents = toml::to_string(&self)?;
-        fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
+        fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
         Ok(())
     }
 
@@ -203,14 +203,14 @@ impl NodeContainer for DummyNode {
         info!("Killing node: {}", self.id());
         self.state = ContainerStatus::Stopped;
         let contents = toml::to_string(&self)?;
-        fs::write(format!("/tmp/{}.txt", self.id), &contents)?;
+        fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
         Ok(())
     }
 
     async fn delete(&mut self) -> Result<()> {
         info!("Deleting node: {}", self.id());
         self.kill().await?;
-        fs::remove_file(format!("/tmp/{}.txt", self.id))?;
+        fs::remove_file(format!("/tmp/{}.txt", self.id)).await?;
         Ok(())
     }
 }
@@ -228,23 +228,23 @@ pub struct ContainerData {
 }
 
 impl Containers {
-    pub fn load() -> Result<Containers> {
+    pub async fn load() -> Result<Containers> {
         info!(
             "Reading containers config: {}",
             REGISTRY_CONFIG_FILE.display()
         );
-        let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE)?;
+        let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE).await?;
         Ok(toml::from_str(&config)?)
     }
 
-    pub fn save(&self) -> Result<()> {
+    pub async fn save(&self) -> Result<()> {
         info!(
             "Writing containers config: {}",
             REGISTRY_CONFIG_FILE.display()
         );
         let config = toml::Value::try_from(self)?;
         let config = toml::to_string(&config)?;
-        fs::write(&*REGISTRY_CONFIG_FILE, &*config)?;
+        fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
         Ok(())
     }
 
