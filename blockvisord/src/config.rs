@@ -1,9 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use tokio::fs;
 use tracing::info;
 
 const HOST_CONFIG_FILENAME: &str = "blockvisor.toml";
@@ -23,17 +21,17 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Config> {
+    pub async fn load() -> Result<Config> {
         info!("Reading host config: {}", HOST_CONFIG_FILE.display());
-        let config = fs::read_to_string(&*HOST_CONFIG_FILE)?;
+        let config = fs::read_to_string(&*HOST_CONFIG_FILE).await?;
         Ok(toml::from_str(&config)?)
     }
 
-    pub fn save(&self) -> Result<()> {
+    pub async fn save(&self) -> Result<()> {
         info!("Writing host config: {}", HOST_CONFIG_FILE.display());
         let config = toml::Value::try_from(self)?;
         let config = toml::to_string(&config)?;
-        fs::write(&*HOST_CONFIG_FILE, &*config)?;
+        fs::write(&*HOST_CONFIG_FILE, &*config).await?;
         Ok(())
     }
 

@@ -51,10 +51,11 @@ async fn main() -> Result<()> {
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
             }
-            .save()?;
+            .save()
+            .await?;
 
             if !Containers::exists() {
-                Containers::default().save()?;
+                Containers::default().save().await?;
             }
         }
         Command::Start(_) => {
@@ -116,7 +117,7 @@ async fn process_chain_command(command: &ChainCommand) -> Result<()> {
 }
 
 async fn process_node_command(command: &NodeCommand) -> Result<()> {
-    let mut config = Containers::load()?;
+    let mut config = Containers::load().await?;
 
     match command {
         NodeCommand::List { all, chain } => {
@@ -144,12 +145,12 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             };
             println!("Container added: {:?}", &container_config);
             config.containers.insert(id, container_config);
-            config.save()?;
+            config.save().await?;
         }
         NodeCommand::Start { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Started;
-                config.save()?;
+                config.save().await?;
             } else {
                 println!("Container not found: {}", id);
             }
@@ -157,7 +158,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Stop { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Stopped;
-                config.save()?;
+                config.save().await?;
             } else {
                 println!("Container not found: {}", id);
             }
@@ -165,7 +166,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Delete { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
                 container_config.status = ContainerStatus::Deleted;
-                config.save()?;
+                config.save().await?;
             } else {
                 println!("Container not found: {}", id);
             }
