@@ -1,27 +1,27 @@
 <script lang="ts">
-  import { fade } from 'svelte/transition';
-  import SideNav from 'modules/app/components/SideNav/SideNav.svelte';
-  import Breadcrumbs from 'modules/app/components/Breadcrumbs/Breadcrumbs.svelte';
-  import HeaderSearch from 'modules/search/components/HeaderSearch/HeaderSearch.svelte';
+  import { browser } from '$app/env';
+  import { page } from '$app/stores';
   import Logo from 'components/Logo/Logo.svelte';
   import Menu from 'components/Menu/Menu.svelte';
-  import { browser } from '$app/env';
-  import ProfileDropdown from '../ProfileDropdown/ProfileDropdown.svelte';
-  import BlockVisorLinks from '../Navigation/BlockVisorLinks.svelte';
-  import { onMount } from 'svelte';
-  import { page } from '$app/stores';
-  import { ROUTES } from 'consts/routes';
-  import SubMenu from '../Navigation/SubMenu.svelte';
-  import ParentMenu from '../Navigation/ParentMenu.svelte';
-  import SettingsNav from 'modules/admin-console/components/SettingsNav/SettingsNav.svelte';
   import { fadeDefault, pageTransition } from 'consts/animations';
-  import NodeHierarchy from 'modules/nodes/components/NodeHierarchy/NodeHierarchy.svelte';
-  import HostsHierarchy from 'modules/hosts/components/HostsHierarchy/HostsHierarchy.svelte';
-  import { app } from 'modules/app/store';
-  import BroadcastLinks from '../Navigation/BroadcastLinks.svelte';
-  import { APPS } from 'models/App';
   import { FEATURE_FLAGS } from 'consts/featureFlags';
+  import { APPS } from 'models/App';
+  import SettingsNav from 'modules/admin-console/components/SettingsNav/SettingsNav.svelte';
+  import Breadcrumbs from 'modules/app/components/Breadcrumbs/Breadcrumbs.svelte';
+  import SideNav from 'modules/app/components/SideNav/SideNav.svelte';
+  import { app } from 'modules/app/store';
   import BlockVisorFeature from 'modules/feature-flags/components/BlockVisorFeature/BlockVisorFeature.svelte';
+  import HostsHierarchy from 'modules/hosts/components/HostsHierarchy/HostsHierarchy.svelte';
+  import NodeHierarchy from 'modules/nodes/components/NodeHierarchy/NodeHierarchy.svelte';
+  import HeaderSearch from 'modules/search/components/HeaderSearch/HeaderSearch.svelte';
+  import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
+  import BlockVisorLinks from '../Navigation/BlockVisorLinks.svelte';
+  import BroadcastLinks from '../Navigation/BroadcastLinks.svelte';
+  import ParentMenu from '../Navigation/ParentMenu.svelte';
+  import SubMenu from '../Navigation/SubMenu.svelte';
+  import OrganisationSelector from '../OrganisationSelector/OrganisationSelector.svelte';
+  import ProfileDropdown from '../ProfileDropdown/ProfileDropdown.svelte';
 
   const MENU_CLOSED = 'menu';
   const MENU_OPENED = 'menu menu--active';
@@ -159,8 +159,9 @@
       <div class="t-tiny layout__breadcrumbs hide--from-medium-large">
         <Breadcrumbs />
       </div>
-      <div class="layout__menu display--to-medium-large">
+      <div class="layout__menu">
         <Menu handleClick={onMenuOpen} {menuClass} />
+        <div class="layout__organisation"><OrganisationSelector /></div>
       </div>
       <div
         class="layout__logo display--to-medium-large"
@@ -199,92 +200,109 @@
     @media (--screen-medium-large) {
       overflow: hidden;
     }
+  }
 
-    &__content {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
+  .layout__content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+
+    @media (--screen-medium-large) {
       overflow-x: hidden;
+      overflow-y: auto;
+      max-height: 100vh;
+    }
+  }
 
-      @media (--screen-medium-large) {
-        overflow-x: hidden;
-        overflow-y: auto;
-        max-height: 100vh;
+  .layout__util {
+    min-width: 32px;
+    align-items: center;
+    display: flex;
+    gap: 12px;
+
+    & :global(.avatar) {
+      flex-basis: 32px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    @media (--screen-medium-large) {
+      max-width: 210px;
+    }
+  }
+
+  .layout__breadcrumbs {
+    padding-top: 26px;
+    padding-bottom: 22px;
+  }
+
+  .layout__logo {
+    text-align: center;
+
+    @media (--screen-smaller-custom-max) {
+      transition: opacity 0.15s var(--transition-easing-cubic);
+
+      &--hidden {
+        opacity: 0;
       }
     }
+  }
 
-    &__util {
-      min-width: 32px;
-      align-items: center;
-      display: flex;
-      gap: 12px;
+  .layout__overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: var(--level-3);
+    background-color: theme(--color-shadow-o10);
+    backdrop-filter: blur(8px);
+    height: 100vh;
+    width: calc(100% - 300px);
 
-      & :global(.avatar) {
-        flex-basis: 32px;
-        flex-shrink: 0;
-        cursor: pointer;
-      }
-
-      @media (--screen-medium-large) {
-        max-width: 210px;
-      }
+    @media (--screen-medium-large) {
+      display: none;
     }
+  }
 
-    &__breadcrumbs {
-      padding-top: 26px;
-      padding-bottom: 22px;
+  .layout__logo :global(a) {
+    display: inline-block;
+  }
+
+  .layout__header {
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+
+    @media (--screen-medium-large) {
+      padding-top: 0;
+      border-bottom: 1px solid theme(--color-text-5-o10);
+      padding-left: 28px;
+      padding-right: 16px;
     }
+  }
 
-    &__logo {
-      text-align: center;
+  .layout > :global(.sidenav) {
+    flex-grow: 1;
+  }
 
-      @media (--screen-smaller-custom-max) {
-        transition: opacity 0.15s var(--transition-easing-cubic);
+  .layout__menu {
+    display: flex;
+    align-items: center;
 
-        &--hidden {
-          opacity: 0;
-        }
-      }
+    @media (--screen-medium-large) {
+      display: none;
     }
+  }
 
-    &__overlay {
-      position: fixed;
-      top: 0;
-      right: 0;
-      z-index: var(--level-3);
-      background-color: theme(--color-shadow-o10);
-      backdrop-filter: blur(8px);
-      height: 100vh;
-      width: calc(100% - 300px);
+  .layout__organisation {
+    margin-left: 22px;
 
-      @media (--screen-medium-large) {
-        display: none;
-      }
-    }
-
-    &__logo :global(a) {
-      display: inline-block;
-    }
-
-    &__header {
-      display: flex;
-      gap: 16px;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 20px;
-      padding-left: 20px;
-      padding-right: 20px;
-
-      @media (--screen-medium-large) {
-        padding-top: 0;
-        border-bottom: 1px solid theme(--color-text-5-o10);
-        padding-left: 28px;
-        padding-right: 16px;
-      }
-    }
-
-    & > :global(.sidenav) {
-      flex-grow: 1;
+    :global(.organisation-selector__name) {
+      display: none;
     }
   }
 </style>

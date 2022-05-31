@@ -1,12 +1,9 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
-
   import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import IconCaret from 'icons/caret-micro.svg';
-  import { user } from 'modules/authentication/store';
-  import {} from 'modules/broadcasts/store/broadcastStore';
   import {
     activeOrganisation,
     getOrganisations,

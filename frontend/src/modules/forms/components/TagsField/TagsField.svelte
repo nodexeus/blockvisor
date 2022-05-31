@@ -13,6 +13,8 @@
   export let labelClass = '';
   export let description = '';
   export let field;
+  export let multiline: boolean = false;
+  export let showFull: boolean = false;
 
   export let limit = 3;
 
@@ -102,13 +104,15 @@
   class:tagsfield--is-disabled={$$props.disabled}
   class={`tagsfield__wrapper tagsfield--${size} tagsfield--${
     isValid ? 'valid' : 'error'
-  }`}
+  } ${multiline ? 'tagsfield--multiline' : 'tagsfield--singleline'}`}
   on:click={handleClick}
 >
   <PillBox>
     {#each submittedValues as value (value)}
       <li>
-        <Pill data-pill-value={value} on:click={handleDelete}>{value}</Pill>
+        <Pill data-pill-value={value} on:click={handleDelete} showFull
+          >{value}</Pill
+        >
       </li>
     {/each}
   </PillBox>
@@ -147,9 +151,11 @@
 
 <style>
   .tagsfield__wrapper {
+    width: 100%;
     display: flex;
     gap: 8px;
     position: relative;
+    flex-direction: row;
     color: theme(--color-text-3);
     background-color: theme(--color-input-background);
     border-radius: 4px;
@@ -206,5 +212,9 @@
     opacity: 0.4;
     cursor: not-allowed;
     user-select: none;
+  }
+
+  .tagsfield--multiline {
+    flex-flow: row wrap;
   }
 </style>

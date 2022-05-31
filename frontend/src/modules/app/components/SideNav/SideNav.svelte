@@ -96,7 +96,7 @@
 
   .sidenav__header {
     display: none;
-    padding: 20px;
+    padding: 19px;
     border-bottom: 1px solid theme(--color-text-5-o10);
     flex-shrink: 0;
 

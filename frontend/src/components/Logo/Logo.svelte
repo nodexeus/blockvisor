@@ -57,7 +57,13 @@
   }
 
   .logo__primary {
-    fill: var(--color-primary);
+    fill: #f8faf6;
+    opacity: 0.3;
+
+    @media (--screen-medium-large) {
+      fill: var(--color-primary);
+      opacity: 1;
+    }
   }
 
   .logo__faded {

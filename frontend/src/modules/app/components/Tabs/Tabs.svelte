@@ -5,7 +5,7 @@
   import { fade } from 'svelte/transition';
   import { updateQueryParam } from 'utils/updateQueryParam';
 
-  export let items = [];
+  export let items;
   export let activeTabValue = 1;
 
   let container;
@@ -55,30 +55,29 @@
     position: relative;
     overflow: hidden;
     max-width: 100wv;
+  }
+  .tabs__list {
+    overflow: auto;
+    display: flex;
+    gap: 32px;
+    max-width: 100%;
 
-    &__list {
-      overflow: auto;
-      display: flex;
-      gap: 32px;
-      max-width: 100%;
-
-      &::-webkit-scrollbar-track {
-        border-top: 1px solid theme(--color-text-5-o10);
-      }
+    &::-webkit-scrollbar-track {
+      border-top: 1px solid theme(--color-text-5-o10);
     }
+  }
 
-    &__button {
-      white-space: nowrap;
-      padding: 20px 0;
-      color: theme(--color-text-2);
-      border-bottom: 1px solid transparent;
-      transition: color 0.15s var(--transition-easing-cubic),
-        border-color 0.15s var(--transition-easing-cubic);
+  .tabs__button {
+    white-space: nowrap;
+    padding: 20px 0;
+    color: theme(--color-text-2);
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s var(--transition-easing-cubic),
+      border-color 0.15s var(--transition-easing-cubic);
+  }
 
-      &--active {
-        color: theme(--color-text-5);
-        border-bottom: 1px solid theme(--color-text-5);
-      }
-    }
+  .tabs__button--active {
+    color: theme(--color-text-5);
+    border-bottom: 1px solid theme(--color-text-5);
   }
 </style>

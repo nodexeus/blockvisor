@@ -2,10 +2,12 @@ import { writable } from 'svelte/store';
 import type { Updater } from 'svelte/store';
 import { APPS } from 'models/App';
 import type { App } from '../models/App';
+import { getUserInfo } from 'utils';
 
 const INITIAL_STATE: App = {
   breadcrumbs: [],
   activeApp: APPS.BROADCAST,
+  user: getUserInfo(),
 };
 
 const createActions = (
