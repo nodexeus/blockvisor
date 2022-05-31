@@ -1,16 +1,13 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-
-  import { session } from '$app/stores';
   import axios from 'axios';
-
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { ROUTES } from 'consts/routes';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
   import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
-  import { required, Hint, useForm, email, minLength } from 'svelte-use-form';
+  import { email, Hint, required, useForm } from 'svelte-use-form';
   import { saveUserinfo } from 'utils';
 
   const form = useForm();
@@ -18,21 +15,25 @@
   let activeType: 'password' | 'text' = 'password';
 
   let isSubmitting = false;
+  let errorMessage: string = undefined;
 
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
 
   const handleLogin = async () => {
+    errorMessage = undefined;
     isSubmitting = true;
     const { email, password } = $form.values;
 
     try {
       const res = await axios.post(ROUTES.AUTH_LOGIN, { email, password });
       saveUserinfo({ ...res.data, verified: true });
-      isSubmitting = false;
       goto(ROUTES.DASHBOARD);
-    } catch (error) {}
+    } catch (error) {
+      isSubmitting = false;
+      errorMessage = error.response.data;
+    }
   };
 </script>
 
@@ -76,6 +77,9 @@
           <Hint on="required">This is a mandatory field</Hint>
         </svelte:fragment>
       </PasswordField>
+      {#if errorMessage}
+        <p class="t-smaller t-warning s-top--small">{errorMessage}</p>
+      {/if}
     </li>
   </ul>
 
