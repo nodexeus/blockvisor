@@ -46,6 +46,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 0px;
+    position: relative;
   }
 
   .add-broadcast__action {
