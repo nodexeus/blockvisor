@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::{
     collections::HashMap,
@@ -40,7 +41,7 @@ pub enum ContainerStatus {
 pub trait NodeContainer {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
-    async fn create(id: &str, machine_index: usize) -> Result<Self>
+    async fn create(id: &str, network_interface: &NetworkInterface) -> Result<Self>
     where
         Self: Sized;
 
@@ -48,7 +49,7 @@ pub trait NodeContainer {
     async fn exists(id: &str) -> bool;
 
     /// Returns container previously created on this host.
-    async fn connect(id: &str, machine_index: usize) -> Result<Self>
+    async fn connect(id: &str, network_interface: &NetworkInterface) -> Result<Self>
     where
         Self: Sized;
 
@@ -82,7 +83,7 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 #[async_trait]
 impl NodeContainer for LinuxNode {
-    async fn create(id: &str, machine_index: usize) -> Result<Self> {
+    async fn create(id: &str, network_interface: &NetworkInterface) -> Result<Self> {
         let jailer = firec::config::Jailer::builder()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
@@ -92,15 +93,13 @@ impl NodeContainer for LinuxNode {
         let root_drive = firec::config::Drive::builder("root", Path::new(ROOT_FS))
             .is_root_device(true)
             .build();
-
         let kernel_args = Some(format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
-            ip=74.50.82.8{}::74.50.82.81:255.255.255.240::eth0:on",
-            machine_index + 3,
+            ip={}::74.50.82.81:255.255.255.240::eth0:on",
+            network_interface.ip,
         ));
 
-        let if_name = format!("bv{}", machine_index);
-        let iface = firec::config::network::Interface::new("eth0", if_name);
+        let iface = firec::config::network::Interface::new("eth0", network_interface.name.clone());
 
         let machine_cfg = firec::config::Machine::builder()
             .vcpu_count(1)
@@ -128,7 +127,7 @@ impl NodeContainer for LinuxNode {
         todo!()
     }
 
-    async fn connect(_id: &str, _machine_index: usize) -> Result<Self> {
+    async fn connect(_id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
         todo!()
     }
 
@@ -161,7 +160,7 @@ pub struct DummyNode {
 
 #[async_trait]
 impl NodeContainer for DummyNode {
-    async fn create(id: &str, _machine_index: usize) -> Result<Self> {
+    async fn create(id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
         info!("Creating node: {}", id);
         let node = Self {
             id: id.to_owned(),
@@ -176,7 +175,7 @@ impl NodeContainer for DummyNode {
         Path::new(&format!("/tmp/{}.txt", id)).exists()
     }
 
-    async fn connect(id: &str, _machine_index: usize) -> Result<Self> {
+    async fn connect(id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
         let node = fs::read_to_string(format!("/tmp/{}.txt", id)).await?;
         let node: DummyNode = toml::from_str(&node)?;
 
@@ -221,7 +220,7 @@ impl NodeContainer for DummyNode {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Containers {
     pub containers: HashMap<String, ContainerData>,
-    pub machine_index: Arc<Mutex<usize>>,
+    pub machine_index: Arc<Mutex<u32>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -256,16 +255,59 @@ impl Containers {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
-    /// Get the next machine index.
-    pub fn machine_index(&self) -> usize {
-        *self.machine_index.lock().expect("lock poisoned")
-    }
-
     /// Get the next machine index and increment it.
-    pub fn next_machine_index(&self) -> usize {
+    pub fn next_network_interface(&self) -> NetworkInterface {
         let mut machine_index = self.machine_index.lock().expect("lock poisoned");
+
+        let idx_bytes = machine_index.to_be_bytes();
+        let iface = NetworkInterface {
+            name: format!("bv{}", *machine_index),
+            // FIXME: Hardcoding address for now.
+            ip: IpAddr::V4(Ipv4Addr::new(
+                idx_bytes[0] + 74,
+                idx_bytes[1] + 50,
+                idx_bytes[2] + 82,
+                idx_bytes[3] + 83,
+            )),
+        };
         *machine_index += 1;
 
-        *machine_index
+        iface
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NetworkInterface {
+    pub name: String,
+    pub ip: IpAddr,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn network_interface_gen() {
+        let containers = super::Containers::default();
+        let iface = containers.next_network_interface();
+        assert_eq!(iface.name, "bv0");
+        assert_eq!(
+            iface.ip,
+            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 83))
+        );
+
+        let iface = containers.next_network_interface();
+        assert_eq!(iface.name, "bv1");
+        assert_eq!(
+            iface.ip,
+            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 84))
+        );
+
+        // Let's take the machine_index beyond u8 boundry.
+        *containers.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
+        let iface = containers.next_network_interface();
+        assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
+        assert_eq!(
+            iface.ip,
+            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 83, 83))
+        );
     }
 }
