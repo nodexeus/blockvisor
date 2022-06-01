@@ -35,7 +35,7 @@ pub fn get_ip_address(ifa_name: &str) -> String {
 // used for testing purposes
 pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
     for (id, container_config) in &containers.containers {
-        let machine_index = containers.machine_index();
+        let machine_index = containers.next_machine_index();
         // remove deleted nodes
         if container_config.status == ContainerStatus::Deleted {
             if DummyNode::exists(id).await {
@@ -45,8 +45,7 @@ pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
         } else {
             // create non existing nodes
             if !DummyNode::exists(id).await {
-                let next_index = containers.next_machine_index();
-                DummyNode::create(id, next_index).await?;
+                DummyNode::create(id, machine_index).await?;
             }
 
             // fix nodes status
