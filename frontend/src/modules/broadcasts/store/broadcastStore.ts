@@ -7,7 +7,9 @@ export const broadcasts = writable<Broadcast[]>();
 
 export const getAllBlockchains = async () => {
   try {
-    const res = await httpClient.get(BLOCKCHAINS);
+    const res = await httpClient.get(
+      ENDPOINTS.BLOCKCHAINS.LIST_BLOCKCHAINS_GET,
+    );
 
     const active = res.data.filter(
       (item: Blockchain) => item.status === 'production',
@@ -53,3 +55,6 @@ export const deleteBroadcastById = async (postId: string, orgId: string) => {
       return err;
     });
 };
+function LIST_BLOCKCHAINS_GET(LIST_BLOCKCHAINS_GET: any) {
+  throw new Error('Function not implemented.');
+}
