@@ -13,13 +13,14 @@
   function toggleDetails() {
     details = !details;
   }
+
 </script>
 
 <div>
   <div class="add-broadcast__checkbox">
     <Checkbox
       {name}
-      field={$form?.[name]}
+      field={$form.values[name]}
       checked={$form.values[name] === 'checked' ? 'checked' : ''}
     >
       {value}
@@ -46,6 +47,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 0px;
+    position: relative;
   }
 
   .add-broadcast__action {

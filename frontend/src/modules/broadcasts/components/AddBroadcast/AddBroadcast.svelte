@@ -39,10 +39,9 @@
     $form.network.value = initial.blockchain_id;
     $form.callback_url.value = initial.callback_url;
     $form.auth_token.value = initial.auth_token;
-    $form.addresses.value = initial.addresses;
+    $form.addresses.value = initial.addresses.join(',');
 
     const selectedTokens = initial.txn_types
-      .split(',')
       .map((item) => item.trim());
 
     selectedTokens.forEach((item) => {
@@ -61,8 +60,7 @@
     const txn_types = BroadcastEvents.filter(
       (item) => $form?.[item.id].value === 'checked',
     )
-      .map((item) => item.id)
-      .join(', ');
+      .map((item) => item.id);
 
     const broadcast: Broadcast = {
       org_id: $activeOrganisation.id,
@@ -72,7 +70,7 @@
       auth_token: $form.auth_token?.value,
       txn_types: txn_types,
       is_active: true,
-      addresses: $form.addresses?.value,
+      addresses: $form.addresses?.value.split(','),
     };
 
     if (initial) {
