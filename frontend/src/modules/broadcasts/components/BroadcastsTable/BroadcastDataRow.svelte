@@ -9,6 +9,7 @@
   import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import SimpleConfirmDeleteModal from 'modules/app/components/SimpleConfirmDeleteModal/SimpleConfirmDeleteModal.svelte';
+import { BroadcastEvents } from 'modules/broadcasts/consts/BroadcastEvents';
   import { deleteBroadcastById } from 'modules/broadcasts/store/broadcastStore';
   import { fade } from 'svelte/transition';
 
@@ -45,7 +46,11 @@
   <td class="t-small t-color-text-2 broadcast__col broadcast__col--trunc"
     >{item.addresses}</td
   >
-  <td class="t-small t-color-text-2 broadcast__col">{item.txn_types}</td>
+  <td class="t-small t-color-text-2 broadcast__col">
+      {#each item.txn_types as item}
+        {BroadcastEvents.find((event) => event.id === item).value}<br>
+      {/each}
+  </td>
   <td class="t-right broadcast__col broadcast__col--controls">
     <ButtonWithDropdown
       position="right"
