@@ -10,15 +10,14 @@
   import IconPerson from 'icons/person-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import GroupEdit from 'modules/forms/components/GroupEdit/GroupEdit.svelte';
-  import { userDetails } from 'modules/nodes/store/nodesStore';
 
   export let isParent;
   export let href;
-  export let id;
+  export let id = undefined;
   export let title;
-  export let isEditing;
-  export let handleConfirm;
-  export let handleEdit;
+  export let isEditing = undefined;
+  export let handleConfirm = undefined;
+  export let handleEdit = undefined;
 </script>
 
 <li

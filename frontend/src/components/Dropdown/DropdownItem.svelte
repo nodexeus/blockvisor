@@ -3,6 +3,7 @@
 </script>
 
 {#if as === 'a'}
+  <!-- svelte-ignore a11y-missing-attribute -->
   <a {...$$restProps} class="t-tiny link dropdown-item"><slot /></a>
 {:else}
   <button on:click {...$$restProps} class="t-tiny u-button-reset dropdown-item">

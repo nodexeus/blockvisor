@@ -5,10 +5,7 @@
 
 <ul class="u-list-reset filter-group">
   <li>
-    <Pill removable={false}>
-      <IconPerson slot="icon" />
-      [Type]
-    </Pill>
+    <Pill removable={false}>[Type]</Pill>
   </li>
   <li>
     <Pill removable={false} disabled>[is]</Pill>

@@ -65,7 +65,7 @@
     </button>
     <svelte:fragment slot="label">Search</svelte:fragment>
   </Input>
-  <SearchResultsSidebar isActive={isSearchSidebarActive} />
+  <SearchResultsSidebar isActive={isSearchSidebarActive} {handleClose} />
 </form>
 
 <style>

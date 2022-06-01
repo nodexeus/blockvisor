@@ -7,13 +7,18 @@
   export let handleConfirm;
   export let handleEdit;
   export let editingId;
-  export let hideList;
+  export let hideList = false;
 </script>
 
 {#if Boolean(nodes.length)}
   <ul class="u-list-reset hierarchy-list">
     {#each nodes as { children, ...node }}
-      <Node on:click {...node} isParent={Boolean(children?.length)}>
+      <Node
+        on:click
+        {...node}
+        isParent={Boolean(children?.length)}
+        href={node.href}
+      >
         {#if !hideList}
           {#if Boolean(children?.length) || $$slots.action}
             <ul class="u-list-reset hierarchy-list__list">
@@ -25,6 +30,9 @@
                   on:click
                   {...child}
                   isParent={false}
+                  href={child.href}
+                  id={child.id}
+                  title={child.title}
                 />
               {/each}
               {#if $$slots.default}

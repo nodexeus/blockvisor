@@ -34,7 +34,7 @@
   };
 </script>
 
-<Portal hidden={true} target="body">
+<Portal target="body">
   {#if isActive}
     <aside
       {id}

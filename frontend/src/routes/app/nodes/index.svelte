@@ -10,7 +10,6 @@
   import IconPlus from 'icons/plus-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
   import { app } from 'modules/app/store';
-  import { fetchAllNodes } from 'modules/nodes/store/nodesStore';
   import { onMount } from 'svelte';
 
   onMount(() => {
@@ -25,8 +24,6 @@
       },
     ]);
   });
-
-  fetchAllNodes();
 </script>
 
 <ActionTitleHeader className="container--pull-back">
@@ -64,15 +61,11 @@
 </ul>
 
 <style>
-  .nodes {
-    &__group {
-      &-item {
-        margin-bottom: 60px;
+  .nodes__group-item {
+    margin-bottom: 60px;
 
-        @media (--screen-medium-large) {
-          margin-bottom: 120px;
-        }
-      }
+    @media (--screen-medium-large) {
+      margin-bottom: 120px;
     }
   }
 </style>

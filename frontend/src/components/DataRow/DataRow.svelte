@@ -20,7 +20,7 @@
   </div>
   <div class="data__state">
     <div class="t-uppercase data__label">
-      <DataState {state} />
+      <DataState status={state} />
     </div>
     <slot name="action" />
   </div>

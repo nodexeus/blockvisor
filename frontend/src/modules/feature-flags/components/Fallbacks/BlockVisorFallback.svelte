@@ -7,7 +7,7 @@
 </script>
 
 {#if browser}
-  <Portal hidden={true} target="#content">
+  <Portal target="#content">
     <aside out:fade={{ delay: 200, duration: 200 }} class="fallback">
       <div class="fallback__wrapper">
         <h2 class="t-xlarge-fluid s-bottom--large">
