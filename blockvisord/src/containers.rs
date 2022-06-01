@@ -256,11 +256,6 @@ impl Containers {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
-    /// Get the next machine index.
-    pub fn machine_index(&self) -> usize {
-        *self.machine_index.lock().expect("lock poisoned")
-    }
-
     /// Get the next machine index and increment it.
     pub fn next_machine_index(&self) -> usize {
         let mut machine_index = self.machine_index.lock().expect("lock poisoned");
