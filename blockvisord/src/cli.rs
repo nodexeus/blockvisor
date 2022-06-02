@@ -1,4 +1,5 @@
 use clap::{ArgEnum, Args, Parser, Subcommand};
+use uuid::Uuid;
 
 #[derive(Debug, Parser)]
 #[clap(name = "bv", author, version, about)]
@@ -91,42 +92,42 @@ pub enum NodeCommand {
     Start {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 
     /// Stop node
     Stop {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 
     /// Restart node
     Restart {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 
     /// Delete node and clean up resources
     Delete {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 
     /// Attach to node console
     Console {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 
     /// Display node logs
     Logs {
         /// Node id
         #[clap(long)]
-        id: String,
+        id: Uuid,
     },
 }
 

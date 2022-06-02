@@ -41,20 +41,20 @@ pub enum ContainerStatus {
 pub trait NodeContainer {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
-    async fn create(id: &str, network_interface: &NetworkInterface) -> Result<Self>
+    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
     where
         Self: Sized;
 
     /// Checks if container exists on this host.
-    async fn exists(id: &str) -> bool;
+    async fn exists(id: Uuid) -> bool;
 
     /// Returns container previously created on this host.
-    async fn connect(id: &str, network_interface: &NetworkInterface) -> Result<Self>
+    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
     where
         Self: Sized;
 
     /// Returns the container's `id`.
-    fn id(&self) -> &str;
+    fn id(&self) -> &Uuid;
 
     /// Starts the container.
     async fn start(&mut self) -> Result<()>;
@@ -70,7 +70,7 @@ pub trait NodeContainer {
 }
 
 pub struct LinuxNode {
-    id: String,
+    id: Uuid,
     machine: Machine<'static>,
 }
 
@@ -83,7 +83,7 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 #[async_trait]
 impl NodeContainer for LinuxNode {
-    async fn create(id: &str, network_interface: &NetworkInterface) -> Result<Self> {
+    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let jailer = firec::config::Jailer::builder()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
@@ -107,7 +107,7 @@ impl NodeContainer for LinuxNode {
             .build();
 
         let config = firec::config::Config::builder(Path::new(KERNEL_PATH))
-            .vm_id(Uuid::parse_str(id)?)
+            .vm_id(id)
             .jailer_cfg(Some(jailer))
             .kernel_args(kernel_args)
             .machine_cfg(machine_cfg)
@@ -117,21 +117,18 @@ impl NodeContainer for LinuxNode {
             .build();
         let machine = firec::Machine::create(config).await?;
 
-        Ok(Self {
-            id: id.to_string(),
-            machine,
-        })
+        Ok(Self { id, machine })
     }
 
-    async fn exists(_id: &str) -> bool {
+    async fn exists(_id: Uuid) -> bool {
         todo!()
     }
 
-    async fn connect(_id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
+    async fn connect(_id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
         todo!()
     }
 
-    fn id(&self) -> &str {
+    fn id(&self) -> &Uuid {
         &self.id
     }
 
@@ -154,16 +151,16 @@ impl NodeContainer for LinuxNode {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DummyNode {
-    pub id: String,
+    pub id: Uuid,
     pub state: ContainerStatus,
 }
 
 #[async_trait]
 impl NodeContainer for DummyNode {
-    async fn create(id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
+    async fn create(id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
         info!("Creating node: {}", id);
         let node = Self {
-            id: id.to_owned(),
+            id,
             state: ContainerStatus::Created,
         };
         let contents = toml::to_string(&node)?;
@@ -171,21 +168,21 @@ impl NodeContainer for DummyNode {
         Ok(node)
     }
 
-    async fn exists(id: &str) -> bool {
+    async fn exists(id: Uuid) -> bool {
         Path::new(&format!("/tmp/{}.txt", id)).exists()
     }
 
-    async fn connect(id: &str, _network_interface: &NetworkInterface) -> Result<Self> {
+    async fn connect(id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
         let node = fs::read_to_string(format!("/tmp/{}.txt", id)).await?;
         let node: DummyNode = toml::from_str(&node)?;
 
         Ok(DummyNode {
-            id: id.to_string(),
+            id,
             state: node.state,
         })
     }
 
-    fn id(&self) -> &str {
+    fn id(&self) -> &Uuid {
         &self.id
     }
 
@@ -219,13 +216,13 @@ impl NodeContainer for DummyNode {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Containers {
-    pub containers: HashMap<String, ContainerData>,
-    pub machine_index: Arc<Mutex<u32>>,
+    pub containers: HashMap<Uuid, ContainerData>,
+    machine_index: Arc<Mutex<u32>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ContainerData {
-    pub id: String,
+    pub id: Uuid,
     pub chain: String,
     pub status: ContainerStatus,
 }
