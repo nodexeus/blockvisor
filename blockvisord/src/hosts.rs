@@ -35,6 +35,7 @@ pub fn get_ip_address(ifa_name: &str) -> String {
 // used for testing purposes
 pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
     for (id, container_config) in &containers.containers {
+        let id = *id;
         let network_interface = containers.next_network_interface();
         // remove deleted nodes
         if container_config.status == ContainerStatus::Deleted {

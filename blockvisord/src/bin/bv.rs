@@ -137,9 +137,9 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             }
         }
         NodeCommand::Create { chain } => {
-            let id = Uuid::new_v4().to_string();
+            let id = Uuid::new_v4();
             let container_config = ContainerData {
-                id: id.clone(),
+                id,
                 chain: chain.to_owned(),
                 status: ContainerStatus::Created,
             };
