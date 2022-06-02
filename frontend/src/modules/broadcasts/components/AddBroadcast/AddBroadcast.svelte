@@ -23,9 +23,7 @@
   let isSubmitting: boolean;
   export let initial: Broadcast;
 
-  const form = useForm({
-    interval: { initial: 'anytime' },
-  });
+  const form = useForm();
 
   onMount(() => {
     getAllBlockchains();
@@ -42,9 +40,7 @@
     $form.auth_token.value = initial.auth_token;
     $form.addresses.value = initial.addresses.join(',');
 
-    const selectedTokens = initial.txn_types.map((item) => item.trim());
-
-    selectedTokens.forEach((item) => {
+    initial.txn_types.forEach((item) => {
       $form[item].value = 'checked';
     });
   }
@@ -208,7 +204,12 @@
       <div class="add-broadcast__label">Match these Events</div>
 
       {#each BroadcastEvents as item}
-        <BroadcastEvent name={item.id} value={item?.value} {form} />
+        <BroadcastEvent 
+          name={item.id} 
+          value={item?.value} 
+          field={$form.values[item.id]} 
+          checked={$form.values[item.id] === 'checked' ? true : false}
+        />
       {/each}
     </li>
   </ul>
