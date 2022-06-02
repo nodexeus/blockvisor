@@ -220,7 +220,7 @@ impl NodeContainer for DummyNode {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Containers {
     pub containers: HashMap<String, ContainerData>,
-    pub machine_index: Arc<Mutex<u32>>,
+    machine_index: Arc<Mutex<u32>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
