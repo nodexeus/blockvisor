@@ -14,6 +14,7 @@
   } from 'modules/broadcasts/store/broadcastStore';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import Select from 'modules/forms/components/Select/Select.svelte';
+  import TagsField from 'modules/forms/components/TagsField/TagsField.svelte';
   import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
@@ -41,8 +42,7 @@
     $form.auth_token.value = initial.auth_token;
     $form.addresses.value = initial.addresses.join(',');
 
-    const selectedTokens = initial.txn_types
-      .map((item) => item.trim());
+    const selectedTokens = initial.txn_types.map((item) => item.trim());
 
     selectedTokens.forEach((item) => {
       $form[item].value = 'checked';
@@ -59,8 +59,9 @@
     /** Filter out just values and join in comma separated list. */
     const txn_types = BroadcastEvents.filter(
       (item) => $form?.[item.id].value === 'checked',
-    )
-      .map((item) => item.id);
+    ).map((item) => item.id);
+
+    console.log($form.addresses?.value);
 
     const broadcast: Broadcast = {
       org_id: $activeOrganisation.id,
@@ -72,6 +73,8 @@
       is_active: true,
       addresses: $form.addresses?.value.split(','),
     };
+
+    console.log($form.addresses?.value.split(','));
 
     if (initial) {
       const res = await httpClient.put(
@@ -153,16 +156,17 @@
 
     <li class="add-broadcast__item">
       <div class="add-broadcast__label">Watch Address</div>
-
-      <Input
+      <TagsField
+        field={$form?.addresses}
         name="addresses"
         size="medium"
-        value={$form?.addresses?.value}
-        field={$form?.addresses}
-        description="One or more wallet, hotspot, or validator addresses"
+        limit={10}
+        multiline
+        showFull
+        placeholder="One or more wallet, hotspot, or validator addresses"
       >
         <svelte:fragment slot="label">Address</svelte:fragment>
-      </Input>
+      </TagsField>
     </li>
 
     <li class="add-broadcast__item">
