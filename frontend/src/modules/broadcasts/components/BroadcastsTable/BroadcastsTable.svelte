@@ -54,6 +54,8 @@
 
 <style>
   .broadcast-table {
+    margin-bottom: 60px;
+
     @media (--screen-smaller-max) {
       &,
       & tbody {
