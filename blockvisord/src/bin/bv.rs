@@ -3,7 +3,7 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{ContainerData, ContainerStatus, Containers},
+    containers::{ContainerData, ContainerState, Containers},
     hosts::{get_host_info, get_ip_address},
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
@@ -127,11 +127,11 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 } else {
                     true
                 };
-                let is_status_visible = *all
-                    || c.status == ContainerStatus::Created
-                    || c.status == ContainerStatus::Started;
+                let is_state_visible = *all
+                    || c.state == ContainerState::Created
+                    || c.state == ContainerState::Started;
 
-                if is_chain_visible && is_status_visible {
+                if is_chain_visible && is_state_visible {
                     println!("{:?}", &c);
                 }
             }
@@ -141,7 +141,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             let container_config = ContainerData {
                 id,
                 chain: chain.to_owned(),
-                status: ContainerStatus::Created,
+                state: ContainerState::Created,
             };
             println!("Container added: {:?}", &container_config);
             config.containers.insert(id, container_config);
@@ -149,7 +149,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Start { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.status = ContainerStatus::Started;
+                container_config.state = ContainerState::Started;
                 config.save().await?;
             } else {
                 println!("Container not found: {}", id);
@@ -157,7 +157,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Stop { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.status = ContainerStatus::Stopped;
+                container_config.state = ContainerState::Stopped;
                 config.save().await?;
             } else {
                 println!("Container not found: {}", id);
@@ -165,7 +165,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Delete { id } => {
             if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.status = ContainerStatus::Deleted;
+                container_config.state = ContainerState::Deleted;
                 config.save().await?;
             } else {
                 println!("Container not found: {}", id);

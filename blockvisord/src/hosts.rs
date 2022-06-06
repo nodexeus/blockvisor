@@ -1,4 +1,4 @@
-use crate::containers::{ContainerStatus, Containers, DummyNode, NodeContainer};
+use crate::containers::{ContainerState, Containers, DummyNode, NodeContainer};
 use anyhow::Result;
 use sysinfo::{DiskExt, System, SystemExt};
 use tracing::info;
@@ -38,7 +38,7 @@ pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
         let id = *id;
         let network_interface = containers.next_network_interface();
         // remove deleted nodes
-        if container_config.status == ContainerStatus::Deleted {
+        if container_config.state == ContainerState::Deleted {
             if DummyNode::exists(id).await {
                 let mut node = DummyNode::connect(id, &network_interface).await?;
                 node.delete().await?;
@@ -49,17 +49,17 @@ pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
                 DummyNode::create(id, &network_interface).await?;
             }
 
-            // fix nodes status
+            // fix nodes state
             let mut node = DummyNode::connect(id, &network_interface).await?;
             let state = node.state().await?;
-            if state != container_config.status {
+            if state != container_config.state {
                 info!(
                     "Changing state from {:?} to {:?}: {}",
-                    state, container_config.status, id
+                    state, container_config.state, id
                 );
-                match container_config.status {
-                    ContainerStatus::Started => node.start().await?,
-                    ContainerStatus::Stopped => node.kill().await?,
+                match container_config.state {
+                    ContainerState::Started => node.start().await?,
+                    ContainerState::Stopped => node.kill().await?,
                     _ => {}
                 }
             }
