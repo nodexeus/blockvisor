@@ -22,6 +22,8 @@
   function handleModalOpen() {
     isModalOpen = true;
   }
+
+  console.log(item);
 </script>
 
 <tr
@@ -29,7 +31,7 @@
   in:fade={{ duration: 250, delay: index * 100 }}
 >
   <td class="organisation-data-row__col">{item.name}</td>
-  <td class="organisation-data-row__col">Number of members</td>
+  <td class="organisation-data-row__col">{item.member_count}</td>
   <td
     class="organisation-data-row__col organisation-data-row__col--action t-right"
   >

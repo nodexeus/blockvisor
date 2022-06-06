@@ -11,8 +11,6 @@
   import OrganisationUser from './OrganisationUser.svelte';
 
   const form = useForm();
-
-  $: console.log($form.values.emails);
 </script>
 
 <Modal id="org-members" {handleModalClose} isActive={isModalOpen} size="large">
