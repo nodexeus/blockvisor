@@ -1,4 +1,4 @@
-use anyhow::{Ok, Result};
+use anyhow::{bail, Ok, Result};
 use async_trait::async_trait;
 use firec::config::JailerMode;
 use firec::Machine;
@@ -9,6 +9,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
@@ -79,6 +80,7 @@ const KERNEL_PATH: &str = "/var/demo/debian-vmlinux";
 const ROOT_FS: &str = "/var/demo/debian.ext4";
 const CHROOT_PATH: &str = "/var/demo/helium";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
+const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 #[async_trait]
@@ -94,8 +96,13 @@ impl NodeContainer for LinuxNode {
         todo!()
     }
 
-    async fn connect(_id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
-        todo!()
+    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
+        let config = LinuxNode::create_config(id, network_interface)?;
+        let cmd = id.to_string();
+        let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
+        let machine = firec::Machine::connect(config, pid).await;
+
+        Ok(Self { id, machine })
     }
 
     fn id(&self) -> &Uuid {
@@ -288,6 +295,23 @@ impl Containers {
 pub struct NetworkInterface {
     pub name: String,
     pub ip: IpAddr,
+}
+
+/// Get the pid of the running VM process knowing its process name and part of command line.
+fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
+    let mut sys = System::new();
+    // TODO: would be great to save the System and not do a full refresh each time
+    sys.refresh_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::everything()));
+    let processes: Vec<_> = sys
+        .processes_by_name(process_name)
+        .filter(|&process| process.cmd().contains(&cmd.to_string()))
+        .collect();
+
+    match processes.len() {
+        0 => bail!("No {process_name} processes running for id: {cmd}"),
+        1 => processes[0].pid().as_u32().try_into().map_err(Into::into),
+        _ => bail!("More then 1 {process_name} process running for id: {cmd}"),
+    }
 }
 
 #[cfg(test)]
