@@ -84,37 +84,7 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 #[async_trait]
 impl NodeContainer for LinuxNode {
     async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let jailer = firec::config::Jailer::builder()
-            .chroot_base_dir(Path::new(CHROOT_PATH))
-            .exec_file(Path::new(FC_BIN_PATH))
-            .mode(JailerMode::Daemon)
-            .build();
-
-        let root_drive = firec::config::Drive::builder("root", Path::new(ROOT_FS))
-            .is_root_device(true)
-            .build();
-        let kernel_args = Some(format!(
-            "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
-            ip={}::74.50.82.81:255.255.255.240::eth0:on",
-            network_interface.ip,
-        ));
-
-        let iface = firec::config::network::Interface::new("eth0", network_interface.name.clone());
-
-        let machine_cfg = firec::config::Machine::builder()
-            .vcpu_count(1)
-            .mem_size_mib(8192)
-            .build();
-
-        let config = firec::config::Config::builder(Path::new(KERNEL_PATH))
-            .vm_id(id)
-            .jailer_cfg(Some(jailer))
-            .kernel_args(kernel_args)
-            .machine_cfg(machine_cfg)
-            .add_drive(root_drive)
-            .add_network_interface(iface)
-            .socket_path(Path::new(FC_SOCKET_PATH))
-            .build();
+        let config = LinuxNode::create_config(id, network_interface);
         let machine = firec::Machine::create(config).await?;
 
         Ok(Self { id, machine })
@@ -146,6 +116,47 @@ impl NodeContainer for LinuxNode {
 
     async fn delete(&mut self) -> Result<()> {
         unimplemented!()
+    }
+}
+
+impl LinuxNode {
+    fn create_config(
+        id: Uuid,
+        network_interface: &NetworkInterface,
+    ) -> firec::config::Config<'static> {
+        let jailer = firec::config::Jailer::builder()
+            .chroot_base_dir(Path::new(CHROOT_PATH))
+            .exec_file(Path::new(FC_BIN_PATH))
+            .mode(JailerMode::Daemon)
+            .build();
+
+        let root_drive = firec::config::Drive::builder("root", Path::new(ROOT_FS))
+            .is_root_device(true)
+            .build();
+        let kernel_args = Some(format!(
+            "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
+            ip={}::74.50.82.81:255.255.255.240::eth0:on",
+            network_interface.ip,
+        ));
+
+        let iface = firec::config::network::Interface::new("eth0", network_interface.name.clone());
+
+        let machine_cfg = firec::config::Machine::builder()
+            .vcpu_count(1)
+            .mem_size_mib(8192)
+            .build();
+
+        let config = firec::config::Config::builder(Path::new(KERNEL_PATH))
+            .vm_id(id)
+            .jailer_cfg(Some(jailer))
+            .kernel_args(kernel_args)
+            .machine_cfg(machine_cfg)
+            .add_drive(root_drive)
+            .add_network_interface(iface)
+            .socket_path(Path::new(FC_SOCKET_PATH))
+            .build();
+
+        config
     }
 }
 
