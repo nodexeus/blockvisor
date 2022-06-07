@@ -3,6 +3,7 @@
   import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import IconCaret from 'icons/caret-micro.svg';
   import {
     activeOrganisation,
@@ -14,9 +15,14 @@
   import IconAdd from 'icons/plus-12.svg';
 
   let dropdownActive: boolean = false;
+  let createNewActive: boolean = false;
 
   function handleClickOutside() {
     dropdownActive = false;
+  }
+
+  function handleClickOutsideCreateNew() {
+    createNewActive = false;
   }
 
   onMount(() => {
@@ -61,7 +67,12 @@
           </li>
         {/each}
         <li class="organisation-selector__new organisation-selector__divider">
-          <DropdownItem size="large" as="button"
+          <DropdownItem
+            on:click={() => {
+              createNewActive = true;
+            }}
+            size="large"
+            as="button"
             ><IconAdd />
             Add&nbsp;Organisation</DropdownItem
           >
@@ -69,6 +80,10 @@
       </DropdownLinkList>
     </Dropdown>
   {/if}
+  <CreateNewOrganisation
+    isModalOpen={createNewActive}
+    handleModalClose={handleClickOutsideCreateNew}
+  />
 </div>
 
 <style>
