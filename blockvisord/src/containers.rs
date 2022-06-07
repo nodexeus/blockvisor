@@ -92,8 +92,9 @@ impl NodeContainer for LinuxNode {
         Ok(Self { id, machine })
     }
 
-    async fn exists(_id: Uuid) -> bool {
-        todo!()
+    async fn exists(id: Uuid) -> bool {
+        let cmd = id.to_string();
+        get_process_pid(FC_BIN_NAME, &cmd).is_ok()
     }
 
     async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
