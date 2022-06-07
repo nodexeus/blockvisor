@@ -11,7 +11,7 @@ use std::{
 };
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
-use tracing::info;
+use tracing::{info, instrument};
 use uuid::Uuid;
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
@@ -85,6 +85,7 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 #[async_trait]
 impl NodeContainer for LinuxNode {
+    #[instrument]
     async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
@@ -97,6 +98,7 @@ impl NodeContainer for LinuxNode {
         get_process_pid(FC_BIN_NAME, &cmd).is_ok()
     }
 
+    #[instrument]
     async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let cmd = id.to_string();
@@ -110,6 +112,7 @@ impl NodeContainer for LinuxNode {
         &self.id
     }
 
+    #[instrument(skip(self))]
     async fn start(&mut self) -> Result<()> {
         self.machine.start().await.map_err(Into::into)
     }
@@ -118,10 +121,12 @@ impl NodeContainer for LinuxNode {
         unimplemented!()
     }
 
+    #[instrument(skip(self))]
     async fn kill(&mut self) -> Result<()> {
         self.machine.shutdown().await.map_err(Into::into)
     }
 
+    #[instrument(skip(self))]
     async fn delete(&mut self) -> Result<()> {
         unimplemented!()
     }
