@@ -84,7 +84,7 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 #[async_trait]
 impl NodeContainer for LinuxNode {
     async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = LinuxNode::create_config(id, network_interface);
+        let config = LinuxNode::create_config(id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
 
         Ok(Self { id, machine })
@@ -123,7 +123,7 @@ impl LinuxNode {
     fn create_config(
         id: Uuid,
         network_interface: &NetworkInterface,
-    ) -> firec::config::Config<'static> {
+    ) -> Result<firec::config::Config<'static>> {
         let jailer = firec::config::Jailer::builder()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
@@ -154,9 +154,9 @@ impl LinuxNode {
             .add_drive(root_drive)
             .add_network_interface(iface)
             .socket_path(Path::new(FC_SOCKET_PATH))
-            .build();
+            .build()?;
 
-        config
+        Ok(config)
     }
 }
 
