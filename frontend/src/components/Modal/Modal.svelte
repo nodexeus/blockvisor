@@ -93,7 +93,7 @@
 
   .modal--large {
     @media (--screen-medium-large) {
-      max-width: 750px;
+      max-width: 760px;
     }
   }
 

@@ -22,8 +22,6 @@
   function handleModalOpen() {
     isModalOpen = true;
   }
-
-  console.log(item);
 </script>
 
 <tr
@@ -69,7 +67,11 @@
     </ButtonWithDropdown>
   </td>
 </tr>
-<OrganisationMembersManagement {handleModalClose} {isModalOpen} />
+<OrganisationMembersManagement
+  {handleModalClose}
+  {isModalOpen}
+  organisationId={item.id}
+/>
 
 <style>
   .organisation-data-row {

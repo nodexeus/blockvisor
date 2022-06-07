@@ -4,15 +4,30 @@
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import IconCaret from 'icons/caret-micro.svg';
   import Button from 'components/Button/Button.svelte';
+  import type { OrgUser } from '../models/OrgUser';
+  import { httpClient } from 'utils/httpClient';
+  import { ENDPOINTS } from 'consts/endpoints';
 
   export let pending: boolean = false;
+  export let item: OrgUser;
+
+  const { user_id, org_id, is_personal, role, created_at, updated_at } = item;
+
+  console.log(item);
+
+  function handleChange(type: 'user' | 'owner') {
+    httpClient.put(ENDPOINTS.ORGANISATIONS.UPDATE_ORGANISATION(item.org_id), {
+      ...item,
+      role: type,
+    });
+  }
 </script>
 
 <article
   class={`organisation-user ${pending ? 'organisation-user--pending' : ''}`}
 >
   <p>
-    <span class="organisation-user__initials">JD</span>James Dean (You)
+    <span class="organisation-user__initials">JD</span>{item.user_id} (You)
     <span class="pending">Pending</span>
   </p>
   <div class="organisation-user__action">
@@ -30,10 +45,20 @@
         </svelte:fragment>
         <DropdownLinkList slot="content">
           <li>
-            <DropdownItem href="">Change Password</DropdownItem>
+            <DropdownItem
+              as="button"
+              on:click={() => {
+                handleChange('owner');
+              }}>Owner</DropdownItem
+            >
           </li>
           <li>
-            <DropdownItem href="">Remove User</DropdownItem>
+            <DropdownItem
+              as="button"
+              on:click={() => {
+                handleChange('user');
+              }}>User</DropdownItem
+            >
           </li>
         </DropdownLinkList>
       </ButtonWithDropdown>
