@@ -41,7 +41,7 @@
 </script>
 
 <Modal id="new-org" {handleModalClose} isActive={isModalOpen} size="large">
-  <svelte:fragment slot="header">Create new organisation</svelte:fragment>
+  <svelte:fragment slot="header">Create New Organisation</svelte:fragment>
 
   <form use:form on:submit|preventDefault={handleSubmit}>
     <Input
@@ -56,6 +56,8 @@
         <Hint on="required">This is a mandatory field</Hint>
       </svelte:fragment>
     </Input>
-    <Button size="medium" style="secondary">Create</Button>
   </form>
+  <div slot="footer">
+    <Button size="small" style="primary">Create</Button>
+  </div>
 </Modal>
