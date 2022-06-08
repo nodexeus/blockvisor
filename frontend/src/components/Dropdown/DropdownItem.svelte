@@ -31,6 +31,7 @@
     justify-content: flex-start;
     gap: 12px;
     align-items: center;
+    min-width: 160px;
 
     transition: background-color 0.18s var(--transition-easing-cubic);
     cursor: pointer;

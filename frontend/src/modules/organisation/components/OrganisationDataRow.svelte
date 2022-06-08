@@ -2,18 +2,27 @@
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { toast } from 'components/Toast/Toast';
+  import { ENDPOINTS } from 'consts/endpoints';
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
   import IconEdit from 'icons/pencil-12.svg';
   import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
+  import ConfirmDeleteModal from 'modules/app/components/ConfirmDeleteModal/ConfirmDeleteModal.svelte';
+  import { useForm } from 'svelte-use-form';
   import { fade } from 'svelte/transition';
+  import { getUserInfo } from 'utils';
+  import { httpClient } from 'utils/httpClient';
   import type { Organisation } from '../models/Organisation';
+  import { getOrganisations } from '../store/organisationStore';
   import OrganisationMembersManagement from './OrganisationMembersManagement.svelte';
 
   export let item: Organisation;
   export let index: number;
 
   let isModalOpen: boolean = false;
+  let deleteModalOpen = false;
+  let deleting: boolean = false;
 
   function handleModalClose() {
     isModalOpen = false;
@@ -21,6 +30,36 @@
 
   function handleModalOpen() {
     isModalOpen = true;
+  }
+
+  const handleDeleteModalOpen = () => {
+    deleteModalOpen = true;
+  };
+
+  const handleDeleteModalClose = () => {
+    deleteModalOpen = false;
+  };
+
+  const deleteForm = useForm({
+    targetValue: {
+      initial: 'DELETE',
+    },
+  });
+
+  function handleConfirm() {
+    deleting = true;
+
+    httpClient
+      .delete(ENDPOINTS.ORGANISATIONS.DELETE_ORGANISATION(item.id))
+      .then((res) => {
+        deleting = false;
+        getOrganisations(getUserInfo().id);
+        handleDeleteModalClose();
+      })
+      .catch((err) => {
+        toast.warning(err);
+        deleting = false;
+      });
   }
 </script>
 
@@ -33,9 +72,11 @@
   <td
     class="organisation-data-row__col organisation-data-row__col--action t-right"
   >
-    <Button on:click={handleModalOpen} size="small" style="outline"
-      >Members</Button
-    >
+    <div class="s-right--small">
+      <Button on:click={handleModalOpen} size="small" style="outline"
+        >Members</Button
+      >
+    </div>
     <ButtonWithDropdown
       iconButton
       position="right"
@@ -52,13 +93,17 @@
       </svelte:fragment>
       <DropdownLinkList slot="content">
         <li>
-          <DropdownItem href="#">
+          <DropdownItem size="large" href="#">
             <IconEdit />
             Rename</DropdownItem
           >
         </li>
         <li>
-          <DropdownItem href="#">
+          <DropdownItem
+            size="large"
+            as="button"
+            on:click={() => handleDeleteModalOpen()}
+          >
             <IconDelete />
             Delete</DropdownItem
           >
@@ -71,7 +116,27 @@
   {handleModalClose}
   {isModalOpen}
   organisationId={item.id}
+  organisationName={item.name}
 />
+{#if deleteModalOpen}
+  <ConfirmDeleteModal
+    id="delete-organisation-modal"
+    form={deleteForm}
+    on:submit={(e) => {
+      e.preventDefault();
+      handleConfirm();
+    }}
+    isLoading={deleting}
+    isModalOpen={deleteModalOpen}
+    handleModalClose={handleDeleteModalClose}
+  >
+    <svelte:fragment slot="label">
+      Type “DELETE” to confirm deletion of organisation <strong
+        >{item.name}</strong
+      >. All users will be removed and all data will be lost.
+    </svelte:fragment>
+  </ConfirmDeleteModal>
+{/if}
 
 <style>
   .organisation-data-row {
@@ -81,7 +146,8 @@
     }
   }
   .organisation-data-row__col {
-    padding-bottom: 10px;
+    padding-bottom: 18px;
+    padding-top: 12px;
   }
 
   .organisation-data-row__col--action {
@@ -91,12 +157,7 @@
   }
 
   .organisation-data-row {
-    padding-top: 32px;
-    padding-bottom: 18px;
-    padding-right: 28px;
-
     @media (--screen-smaller-max) {
-      padding: 16px 72px 16px 0;
       display: block;
     }
 

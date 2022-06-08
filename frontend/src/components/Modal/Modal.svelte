@@ -131,6 +131,5 @@
   .modal__content {
     padding: 32px 28px 12px;
     max-height: calc(100vh - 200px);
-    overflow: auto;
   }
 </style>

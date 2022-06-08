@@ -5,7 +5,9 @@
   import { ENDPOINTS } from 'consts/endpoints';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
+  import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
+  import { getOrganisations } from '../store/organisationStore';
 
   const form = useForm();
   export let handleModalClose;
@@ -29,6 +31,7 @@
 
       if (res.status === 200) {
         handleModalClose();
+        getOrganisations(getUserInfo().id);
         toast.success('Organisation created successfully');
       }
     } catch (error) {

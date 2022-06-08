@@ -15,6 +15,7 @@
   export let isModalOpen;
   export let loading: boolean = false;
   export let organisationId: string;
+  export let organisationName: string;
   let organisationUsers: OrgUser[] = [];
 
   onMount(async () => {
@@ -32,14 +33,12 @@
       loading = false;
     }
   });
-
-  $: {
-    console.log($form.values);
-  }
 </script>
 
 <Modal id="org-members" {handleModalClose} isActive={isModalOpen} size="large">
-  <svelte:fragment slot="header">Manage "BlockJoy" Members</svelte:fragment>
+  <svelte:fragment slot="header"
+    >Manage {organisationName} Members</svelte:fragment
+  >
   {#if loading}
     <LoadingSpinner id="blockjoy" size="small" />
   {:else}
