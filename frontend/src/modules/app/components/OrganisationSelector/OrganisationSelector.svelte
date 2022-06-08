@@ -3,6 +3,7 @@
   import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { toast } from 'components/Toast/Toast';
   import IconCaret from 'icons/caret-micro.svg';
   import IconAdd from 'icons/plus-12.svg';
   import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
@@ -10,6 +11,7 @@
     activeOrganisation,
     getOrganisations,
     organisations,
+    setActiveOrganisation,
   } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { clickOutside, getUserInfo } from 'utils';
@@ -28,6 +30,16 @@
   onMount(() => {
     getOrganisations(getUserInfo().id);
   });
+
+  function handleSelectOrganisation(orgId: string) {
+    setActiveOrganisation(orgId).then(() => {
+      dropdownActive = false;
+
+      toast.success(
+        `Your active organisation is set to  ${$activeOrganisation.name}`,
+      );
+    });
+  }
 </script>
 
 <div
@@ -63,7 +75,11 @@
         </p>
         {#each $organisations as item}
           <li>
-            <DropdownItem href="#">{item.name || ''}</DropdownItem>
+            <DropdownItem
+              as="button"
+              on:click={() => handleSelectOrganisation(item.id)}
+              >{item.name || ''}</DropdownItem
+            >
           </li>
         {/each}
         <li class="organisation-selector__new organisation-selector__divider">

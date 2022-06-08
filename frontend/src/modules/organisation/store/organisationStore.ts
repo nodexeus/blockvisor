@@ -1,5 +1,5 @@
 import { ENDPOINTS } from 'consts/endpoints';
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { getUserInfo } from 'utils';
 import { httpClient } from 'utils/httpClient';
 import type { Organisation } from '../models/Organisation';
@@ -38,4 +38,12 @@ export const getOrganisations = async (userId: string) => {
   } catch (error) {
     organisations.set([]);
   }
+};
+
+export const setActiveOrganisation = async (orgId: string) => {
+  const orgs = get(organisations);
+
+  const org = orgs.find((item) => item.id === orgId);
+
+  activeOrganisation.set(org);
 };
