@@ -13,9 +13,11 @@
   import { onMount } from 'svelte';
   import { clickOutside, getUserInfo } from 'utils';
   import IconAdd from 'icons/plus-12.svg';
+  import RenameOrganisation from 'modules/organisation/components/RenameOrganisation.svelte';
 
   let dropdownActive: boolean = false;
   let createNewActive: boolean = false;
+  let renameActive: boolean = false;
 
   function handleClickOutside() {
     dropdownActive = false;

@@ -4,6 +4,7 @@
   import { toast } from 'components/Toast/Toast';
   import { ENDPOINTS } from 'consts/endpoints';
   import Input from 'modules/forms/components/Input/Input.svelte';
+  import { onMount } from 'svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
   import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
@@ -12,18 +13,22 @@
   const form = useForm();
   export let handleModalClose: VoidFunction;
   export let isModalOpen: boolean = false;
-  export let loading: boolean = false;
-  export let loadingCreate: boolean = false;
+  export let organisationName: string;
+  export let organisationId: string;
+
+  onMount(() => {
+    $form.orgName.value = organisationName;
+  });
 
   async function handleSubmit() {
     if (!$form.values.orgName) {
-      toast.warning('Organisation name is required');
+      toast.warning('Organisation name is cannot be empty.');
       return;
     }
 
     try {
-      const res = await httpClient.post(
-        ENDPOINTS.ORGANISATIONS.CREATE_ORGANISATION_POST,
+      const res = await httpClient.put(
+        ENDPOINTS.ORGANISATIONS.UPDATE_ORGANISATION(organisationId),
         {
           name: $form.values.orgName,
         },
@@ -41,13 +46,14 @@
 </script>
 
 <Modal id="new-org" {handleModalClose} isActive={isModalOpen} size="large">
-  <svelte:fragment slot="header">Create New Organisation</svelte:fragment>
+  <svelte:fragment slot="header">Rename {organisationName}</svelte:fragment>
 
-  <form use:form on:submit|preventDefault={handleSubmit}>
+  <form use:form>
     <Input
       size="large"
       validate={[required]}
       name="orgName"
+      value={$form.orgName?.value}
       placeholder="BlockJoy"
       field={$form?.orgName}
     >
@@ -58,6 +64,6 @@
     </Input>
   </form>
   <div slot="footer">
-    <Button size="small" style="primary">Create</Button>
+    <Button on:click={handleSubmit} size="small" style="primary">Update</Button>
   </div>
 </Modal>

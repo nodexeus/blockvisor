@@ -16,29 +16,15 @@
   import type { Organisation } from '../models/Organisation';
   import { getOrganisations } from '../store/organisationStore';
   import OrganisationMembersManagement from './OrganisationMembersManagement.svelte';
+  import RenameOrganisation from './RenameOrganisation.svelte';
 
   export let item: Organisation;
   export let index: number;
 
   let isModalOpen: boolean = false;
+  let renameModalOpen: boolean = false;
   let deleteModalOpen = false;
   let deleting: boolean = false;
-
-  function handleModalClose() {
-    isModalOpen = false;
-  }
-
-  function handleModalOpen() {
-    isModalOpen = true;
-  }
-
-  const handleDeleteModalOpen = () => {
-    deleteModalOpen = true;
-  };
-
-  const handleDeleteModalClose = () => {
-    deleteModalOpen = false;
-  };
 
   const deleteForm = useForm({
     targetValue: {
@@ -54,7 +40,7 @@
       .then((res) => {
         deleting = false;
         getOrganisations(getUserInfo().id);
-        handleDeleteModalClose();
+        deleteModalOpen = false;
       })
       .catch((err) => {
         toast.warning(err);
@@ -73,8 +59,12 @@
     class="organisation-data-row__col organisation-data-row__col--action t-right"
   >
     <div class="s-right--small">
-      <Button on:click={handleModalOpen} size="small" style="outline"
-        >Members</Button
+      <Button
+        on:click={() => {
+          isModalOpen = true;
+        }}
+        size="small"
+        style="outline">Members</Button
       >
     </div>
     <ButtonWithDropdown
@@ -93,7 +83,11 @@
       </svelte:fragment>
       <DropdownLinkList slot="content">
         <li>
-          <DropdownItem size="large" href="#">
+          <DropdownItem
+            size="large"
+            as="button"
+            on:click={() => (renameModalOpen = true)}
+          >
             <IconEdit />
             Rename</DropdownItem
           >
@@ -102,7 +96,7 @@
           <DropdownItem
             size="large"
             as="button"
-            on:click={() => handleDeleteModalOpen()}
+            on:click={() => (deleteModalOpen = true)}
           >
             <IconDelete />
             Delete</DropdownItem
@@ -113,7 +107,7 @@
   </td>
 </tr>
 <OrganisationMembersManagement
-  {handleModalClose}
+  handleModalClose={() => (isModalOpen = false)}
   {isModalOpen}
   organisationId={item.id}
   organisationName={item.name}
@@ -128,7 +122,7 @@
     }}
     isLoading={deleting}
     isModalOpen={deleteModalOpen}
-    handleModalClose={handleDeleteModalClose}
+    handleModalClose={() => (deleteModalOpen = false)}
   >
     <svelte:fragment slot="label">
       Type “DELETE” to confirm deletion of organisation <strong
@@ -136,6 +130,14 @@
       >. All users will be removed and all data will be lost.
     </svelte:fragment>
   </ConfirmDeleteModal>
+{/if}
+{#if renameModalOpen}
+  <RenameOrganisation
+    isModalOpen={renameModalOpen}
+    organisationId={item.id}
+    organisationName={item.name}
+    handleModalClose={() => (renameModalOpen = false)}
+  />
 {/if}
 
 <style>
