@@ -1,7 +1,10 @@
 <script lang="ts">
+  import Button from 'components/Button/Button.svelte';
+
   import Sorter from 'components/Sorter/Sorter.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { organisations } from '../store/organisationStore';
+  import CreateNewOrganisation from './CreateNewOrganisation.svelte';
   import OrganisationDataRow from './OrganisationDataRow.svelte';
 
   let sortActive;
@@ -9,9 +12,17 @@
   const handleSort = (id: string, value: SorterValues) => {
     sortActive = { id, value };
   };
+  let createNewActive: boolean = false;
+
+  function handleClickOutsideCreateNew() {
+    createNewActive = false;
+  }
 </script>
 
-<section class="review">
+<section class="organisation-management">
+  <header class="organisation-management__header">
+    <Button on:click={() => createNewActive = true} style="secondary" size="small">Create New Organisation</Button>
+  </header>
   <table class="table">
     <colgroup>
       <col width="200" />
@@ -22,7 +33,7 @@
       <tr>
         <th class="table__heading">
           <Sorter callback={handleSort} active={sortActive} id="name"
-            >Full name</Sorter
+            >Org. name</Sorter
           >
         </th>
         <th class="table__heading">
@@ -44,17 +55,26 @@
     </tbody>
   </table>
 </section>
+<CreateNewOrganisation
+  isModalOpen={createNewActive}
+  handleModalClose={handleClickOutsideCreateNew}
+/>
 
 <style>
-  .review {
+  .organisation-management {
     padding-bottom: 100px;
     & :global(button) {
       position: relative;
     }
   }
 
+  .organisation-management__header {
+    text-align: right;
+    margin-top: 40px;
+  }
+
   .table {
     margin-bottom: 20px;
-    margin-top: 64px;
+    margin-top: 24px;
   }
 </style>
