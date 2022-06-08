@@ -16,6 +16,8 @@
   export let loadingCreate: boolean = false;
 
   async function handleSubmit() {
+    console.log($form.values.orgName);
+
     if (!$form.values.orgName) {
       toast.warning('Organisation name is required');
       return;
@@ -58,6 +60,6 @@
     </Input>
   </form>
   <div slot="footer">
-    <Button size="small" style="primary">Create</Button>
+    <Button on:click={handleSubmit} size="small" style="primary">Create</Button>
   </div>
 </Modal>

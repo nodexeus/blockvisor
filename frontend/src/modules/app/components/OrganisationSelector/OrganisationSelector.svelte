@@ -3,8 +3,9 @@
   import Dropdown from 'components/Dropdown/Dropdown.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import IconCaret from 'icons/caret-micro.svg';
+  import IconAdd from 'icons/plus-12.svg';
+  import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import {
     activeOrganisation,
     getOrganisations,
@@ -12,12 +13,9 @@
   } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { clickOutside, getUserInfo } from 'utils';
-  import IconAdd from 'icons/plus-12.svg';
-  import RenameOrganisation from 'modules/organisation/components/RenameOrganisation.svelte';
 
   let dropdownActive: boolean = false;
   let createNewActive: boolean = false;
-  let renameActive: boolean = false;
 
   function handleClickOutside() {
     dropdownActive = false;
