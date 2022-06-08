@@ -47,13 +47,13 @@
     </svelte:fragment>
     <DropdownLinkList slot="content">
       <li>
-        <DropdownItem href="">
+        <DropdownItem as="button" size="large">
           <IconLock />
           Change Password</DropdownItem
         >
       </li>
       <li>
-        <DropdownItem href="">
+        <DropdownItem as="button" size="large">
           <IconTrash />
           Remove User</DropdownItem
         >

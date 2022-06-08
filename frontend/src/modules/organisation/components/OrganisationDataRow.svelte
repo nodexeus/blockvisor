@@ -55,55 +55,55 @@
 >
   <td class="organisation-data-row__col">{item.name}</td>
   <td class="organisation-data-row__col">{item.member_count}</td>
-  <td
-    class="organisation-data-row__col organisation-data-row__col--action t-right"
-  >
-    <div class="s-right--small">
-      <Button
-        on:click={() => {
-          isModalOpen = true;
-        }}
-        size="small"
-        style="outline">Members</Button
-      >
-    </div>
-    <ButtonWithDropdown
-      iconButton
-      position="right"
-      buttonProps={{ style: 'ghost', size: 'tiny' }}
-    >
-      <svelte:fragment slot="label">
-        <span class="visually-hidden">Open action dropdown</span>
-        <span
-          class="organisation-data-row__action-icon t-color-text-2"
-          aria-hidden="true"
+  <td class="organisation-data-row__col  t-right">
+    <div class="organisation-data-row__col--action">
+      <div class="s-right--small">
+        <Button
+          on:click={() => {
+            isModalOpen = true;
+          }}
+          size="small"
+          style="outline">Members</Button
         >
-          <IconDots />
-        </span>
-      </svelte:fragment>
-      <DropdownLinkList slot="content">
-        <li>
-          <DropdownItem
-            size="large"
-            as="button"
-            on:click={() => (renameModalOpen = true)}
+      </div>
+      <ButtonWithDropdown
+        iconButton
+        position="right"
+        buttonProps={{ style: 'ghost', size: 'tiny' }}
+      >
+        <svelte:fragment slot="label">
+          <span class="visually-hidden">Open action dropdown</span>
+          <span
+            class="organisation-data-row__action-icon t-color-text-2"
+            aria-hidden="true"
           >
-            <IconEdit />
-            Rename</DropdownItem
-          >
-        </li>
-        <li>
-          <DropdownItem
-            size="large"
-            as="button"
-            on:click={() => (deleteModalOpen = true)}
-          >
-            <IconDelete />
-            Delete</DropdownItem
-          >
-        </li>
-      </DropdownLinkList>
-    </ButtonWithDropdown>
+            <IconDots />
+          </span>
+        </svelte:fragment>
+        <DropdownLinkList slot="content">
+          <li>
+            <DropdownItem
+              size="large"
+              as="button"
+              on:click={() => (renameModalOpen = true)}
+            >
+              <IconEdit />
+              Rename</DropdownItem
+            >
+          </li>
+          <li>
+            <DropdownItem
+              size="large"
+              as="button"
+              on:click={() => (deleteModalOpen = true)}
+            >
+              <IconDelete />
+              Delete</DropdownItem
+            >
+          </li>
+        </DropdownLinkList>
+      </ButtonWithDropdown>
+    </div>
   </td>
 </tr>
 <OrganisationMembersManagement
