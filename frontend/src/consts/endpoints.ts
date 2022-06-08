@@ -54,6 +54,13 @@ export const BLOCKCHAINS = {
 
 export const ORGANISATIONS = {
   LIST_USER_ORGANISATIONS_GET: (id: string) => `${API.URL}/users/${id}/orgs`,
+  LIST_ORGANISATIONS_GET: `${API.URL}/orgs`,
+  CREATE_ORGANISATION_POST: `${API.URL}/orgs`,
+  GET_ORGANISATION: (id: string) => `${API.URL}/orgs/${id}`,
+  DELETE_ORGANISATION: (id: string) => `${API.URL}/orgs/${id}`,
+  UPDATE_ORGANISATION: (id: string) => `${API.URL}/orgs/${id}`,
+  LIST_ORGANISATION_MEMBERS_GET: (id: string) =>
+    `${API.URL}/orgs/${id}/members`,
 };
 
 export const BROADCAST = {

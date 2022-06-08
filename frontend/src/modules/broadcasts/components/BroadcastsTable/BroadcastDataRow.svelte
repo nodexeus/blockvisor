@@ -29,8 +29,6 @@
       handleModalClose();
     });
   }
-
-  console.log(item);
 </script>
 
 <tr

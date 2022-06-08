@@ -2,12 +2,14 @@
   import Button from 'components/Button/Button.svelte';
 
   import Modal from 'components/Modal/Modal.svelte';
+  import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import { onMount } from 'svelte';
   import { valueMatch } from 'utils/valueMatch';
 
   export let targetValue = 'DELETE';
   export let isModalOpen = false;
+  export let isLoading;
   export let handleModalClose;
   export let id = 'js-confirm-delete';
 
@@ -45,8 +47,22 @@
 
   <slot />
 
-  <div slot="footer" class="t-right">
-    <Button disabled={!$form.valid} size="small" style="primary">Confirm</Button
+  <div slot="footer" class="t-right modal-footer">
+    <Button disabled={!$form.valid || isLoading} size="small" style="primary"
+      >{#if isLoading}
+        Loading
+        <LoadingSpinner id="confirm-modal-delete" size="button" />
+      {:else}
+        Confirm
+      {/if}</Button
     >
   </div>
 </Modal>
+
+<style>
+  .modal-footer {
+    & :global(button) {
+      position: relative;
+    }
+  }
+</style>

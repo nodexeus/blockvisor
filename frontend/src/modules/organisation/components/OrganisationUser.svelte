@@ -1,18 +1,24 @@
 <script lang="ts">
-  import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
-  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
-  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
-  import IconCaret from 'icons/caret-micro.svg';
   import Button from 'components/Button/Button.svelte';
+  import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
+  import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
+  import { ENDPOINTS } from 'consts/endpoints';
+  import IconCaret from 'icons/caret-micro.svg';
+  import ButtonWithDropdown from 'modules/app/components/ButtonWithDropdown/ButtonWithDropdown.svelte';
+  import ConfirmDeleteModal from 'modules/app/components/ConfirmDeleteModal/ConfirmDeleteModal.svelte';
+  import { useForm } from 'svelte-use-form';
+  import { httpClient } from 'utils/httpClient';
+  import type { OrgUser } from '../models/OrgUser';
 
   export let pending: boolean = false;
+  export let item: OrgUser;
 </script>
 
 <article
   class={`organisation-user ${pending ? 'organisation-user--pending' : ''}`}
 >
   <p>
-    <span class="organisation-user__initials">JD</span>James Dean (You)
+    <span class="organisation-user__initials">JD</span>{item.user_id} (You)
     <span class="pending">Pending</span>
   </p>
   <div class="organisation-user__action">
@@ -24,16 +30,28 @@
         <svelte:fragment slot="label">
           <span class="visually-hidden">Open action dropdown</span>
           <span class="organisation-user__action" aria-hidden="true">
-            <span class="s-right--medium-small">Owner</span>
+            <span class="s-right--medium-small t-capitalize">{item.role}</span>
             <IconCaret />
           </span>
         </svelte:fragment>
         <DropdownLinkList slot="content">
           <li>
-            <DropdownItem href="">Change Password</DropdownItem>
+            <DropdownItem
+              size="large"
+              as="button"
+              on:click={() => {
+                handleChange('owner');
+              }}>Owner</DropdownItem
+            >
           </li>
           <li>
-            <DropdownItem href="">Remove User</DropdownItem>
+            <DropdownItem
+              size="large"
+              as="button"
+              on:click={() => {
+                handleChange('user');
+              }}>User</DropdownItem
+            >
           </li>
         </DropdownLinkList>
       </ButtonWithDropdown>

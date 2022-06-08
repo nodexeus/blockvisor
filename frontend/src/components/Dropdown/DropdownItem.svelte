@@ -1,12 +1,24 @@
 <script lang="ts">
   export let as: 'a' | 'button' = 'a';
+  export let size: 'large' | 'small' = 'small';
 </script>
 
 {#if as === 'a'}
   <!-- svelte-ignore a11y-missing-attribute -->
-  <a {...$$restProps} class="t-tiny link dropdown-item"><slot /></a>
+  <a
+    {...$$restProps}
+    class={`t-tiny link dropdown-item ${
+      size === 'large' ? 'dropdown-item--large' : 'dropdown-item--small'
+    }`}><slot /></a
+  >
 {:else}
-  <button on:click {...$$restProps} class="t-tiny u-button-reset dropdown-item">
+  <button
+    on:click
+    {...$$restProps}
+    class={`t-tiny u-button-reset dropdown-item ${
+      size === 'large' ? 'dropdown-item--large' : 'dropdown-item--small'
+    }`}
+  >
     <slot />
   </button>
 {/if}
@@ -19,7 +31,8 @@
     justify-content: flex-start;
     gap: 12px;
     align-items: center;
-    padding: 8px 12px;
+    min-width: 160px;
+
     transition: background-color 0.18s var(--transition-easing-cubic);
     cursor: pointer;
 
@@ -45,5 +58,13 @@
         color: theme(--color-text-5);
       }
     }
+  }
+
+  .dropdown-item--large {
+    padding: 16px 12px;
+  }
+
+  .dropdown-item--small {
+    padding: 8px 12px;
   }
 </style>

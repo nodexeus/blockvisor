@@ -93,7 +93,7 @@
 
   .modal--large {
     @media (--screen-medium-large) {
-      max-width: 750px;
+      max-width: 760px;
     }
   }
 
@@ -131,6 +131,5 @@
   .modal__content {
     padding: 32px 28px 12px;
     max-height: calc(100vh - 200px);
-    overflow: auto;
   }
 </style>

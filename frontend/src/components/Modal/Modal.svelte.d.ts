@@ -5,6 +5,7 @@ export interface ModalProps {
   isActive: boolean;
   handleModalClose: (e: MouseEvent) => void;
   id?: string;
+  size: 'normal' | 'large';
 }
 
 export interface ModalSlots {
