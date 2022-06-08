@@ -34,7 +34,7 @@
       </tr>
     </thead>
     <tbody>
-      {#if !organisations}
+      {#if !$organisations}
         <LoadingSpinner size="medium" id="organisations" />
       {:else}
         {#each $organisations as item, i}
