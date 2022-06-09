@@ -5,13 +5,15 @@ use firec::Machine;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
-use tracing::{info, instrument};
+use tokio::time::sleep;
+use tracing::{info, instrument, trace};
 use uuid::Uuid;
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
@@ -123,7 +125,22 @@ impl NodeContainer for LinuxNode {
 
     #[instrument(skip(self))]
     async fn kill(&mut self) -> Result<()> {
-        self.machine.shutdown().await.map_err(Into::into)
+        match self.machine.state() {
+            firec::MachineState::SHUTOFF => {}
+            firec::MachineState::RUNNING { .. } => {
+                if let Err(err) = self.machine.shutdown().await {
+                    trace!("Shutdown error: {err}");
+                } else {
+                    sleep(Duration::from_secs(10)).await;
+                }
+
+                if let Err(err) = self.machine.force_shutdown().await {
+                    trace!("Forced shutdown error: {err}");
+                }
+            }
+        }
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
