@@ -30,7 +30,7 @@ pub enum ServiceStatus {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Clone, Copy, Debug)]
-pub enum ContainerStatus {
+pub enum ContainerState {
     Created,
     Started,
     Stopped,
@@ -60,7 +60,7 @@ pub trait NodeContainer {
     async fn start(&mut self) -> Result<()>;
 
     /// Returns the state of the container.
-    async fn state(&self) -> Result<ContainerStatus>;
+    async fn state(&self) -> Result<ContainerState>;
 
     /// Kills the running container.
     async fn kill(&mut self) -> Result<()>;
@@ -136,7 +136,7 @@ impl NodeContainer for LinuxNode {
         self.machine.start().await.map_err(Into::into)
     }
 
-    async fn state(&self) -> Result<ContainerStatus> {
+    async fn state(&self) -> Result<ContainerState> {
         unimplemented!()
     }
 
@@ -152,7 +152,7 @@ impl NodeContainer for LinuxNode {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DummyNode {
     pub id: Uuid,
-    pub state: ContainerStatus,
+    pub state: ContainerState,
 }
 
 #[async_trait]
@@ -161,7 +161,7 @@ impl NodeContainer for DummyNode {
         info!("Creating node: {}", id);
         let node = Self {
             id,
-            state: ContainerStatus::Created,
+            state: ContainerState::Created,
         };
         let contents = toml::to_string(&node)?;
         fs::write(format!("/tmp/{}.txt", id), &contents).await?;
@@ -188,19 +188,19 @@ impl NodeContainer for DummyNode {
 
     async fn start(&mut self) -> Result<()> {
         info!("Starting node: {}", self.id());
-        self.state = ContainerStatus::Started;
+        self.state = ContainerState::Started;
         let contents = toml::to_string(&self)?;
         fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
         Ok(())
     }
 
-    async fn state(&self) -> Result<ContainerStatus> {
+    async fn state(&self) -> Result<ContainerState> {
         Ok(self.state)
     }
 
     async fn kill(&mut self) -> Result<()> {
         info!("Killing node: {}", self.id());
-        self.state = ContainerStatus::Stopped;
+        self.state = ContainerState::Stopped;
         let contents = toml::to_string(&self)?;
         fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
         Ok(())
@@ -224,7 +224,7 @@ pub struct Containers {
 pub struct ContainerData {
     pub id: Uuid,
     pub chain: String,
-    pub status: ContainerStatus,
+    pub state: ContainerState,
 }
 
 impl Containers {
