@@ -285,6 +285,10 @@ impl Containers {
         );
         let config = toml::Value::try_from(self)?;
         let config = toml::to_string(&config)?;
+        let parent = REGISTRY_CONFIG_FILE
+            .parent()
+            .expect("config file has no parent");
+        fs::create_dir_all(parent).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
         Ok(())
     }
