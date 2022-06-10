@@ -1,99 +1,96 @@
-protocol = "helium"
+urn  = "helium:validator"
 
-[babel]
-version = "beta1"
+# Create a list of methods you will export 
+export = [
+    "start",
+    "stop",
+    "height",
+    "name",
+    "address",
+    "status"
+]
 
-[turnstile]
-enabled = true
-    [turnstile.red]
-    cores = 3
-    ram = "6G"
-    nice = 10
-    command =  "write command here for config change"
+[env]
+path_append = "/blockjoy/bin/"
 
-    [turnstile.green]
-    cores = 6
-    ram = "11G"
-    nice = -10
-    command =  "write command here for config change"
-
-[meta]
-version = "1.8.3-beta1"
+[config]
+babel_version = "0.0.1"
+node_version = "1.8.3-beta1"
 node_type = "validator"
-artifact = "https://storage.blockjoy.com/proto/helium/MS44LjMtYmV0YTEK"
-checksum = "72581bda0586561dd7397e983059c186"
 description = "blockchain for p2p wireless services"
+jrpc_host = "http://localhost:4467/"
+
+[bootstrap]
+## 
+# ignore bootstrap for now
+##
+tarball = "https://storage.blockjoy.com/proto/helium/secret_url"
+extract_to = "/blockjoy/miner"
+symlink = "/blockjoy/miner/bin/miner->/blockjoy/bin/miner"
+checksum = "72581bda0586561dd7397e983059c186"
 
 [monitor]
-pid_file = "/blockjoy/var/run/validator.pid"
+pid_file = "/var/run/helium.pid"
 
-
-[commands]
-
-    [commands.start]
-    type = "sh"
+[methods]
+    [methods.start]
+    transport = "sh"
     desc = "start the helium validator"
-    body = "/blockjoy/bin/miner daemon"
+    body = "miner daemon"
 
-        [commands.start.response]
-        response = "sh" 
-        code = 0 #must match 
-        field = "blob"
-        validate = "none"
-        check = "none"
+        [methods.start.response]
+        response = "sh"
+        status = 0
+        field = ["stdout","stderr"]
 
-    [commands.stop]
-    type = "sh"
+
+    [methods.stop]
+    transport = "sh"
     desc = "stop the helium validator"
-    body = "/blockjoy/bin/miner stop"
+    body = "miner stop"
 
-        [commands.stop.response]
-        response = "sh" 
-        code = 0 #must match 
-        field = "blob"
-        validate = "none"
-        check = "none"
+        [methods.stop.response]
+        response = "sh"
+        status = 0
+        field = ["stdout","stderr"]
 
-    [commands.height]
-    type = "jrpc"
+    [methods.height]
+    transport = "jrpc"
     desc = "get the blockchain height from this node"
-    body = "http://localhost:4467/block_height"
+    method = "block_height"
 
-    [commands.name]
-    type = "jrpc"
+        [methods.height.response]
+        response = "jrpc"
+        status = 200
+        field = ["epoch", "height"]
+
+    [methods.name]
+    transport = "jrpc"
     desc = "get the name of the validator"
-    body = "http://localhost:4467/info_name"
+    method = "info_name"
 
-    [commands.address]
-    type = "jrpc"
+        [methods.name.response]
+        response = "jrpc"
+        status = 200
+        field = ["name"]
+
+    [methods.address]
+    transport = "jrpc"
     desc = "get the address of the validator"
-    body = "http://localhost:4467/peer_addr"
+    body = "peer_addr"
     
-        [commands.address.response]
+        [methods.address.response]
         response = "jrpc"
         code = 200
-        field = "address"
-        validate = "regex"
-        check = "[a-zA-Z]{0,255}"
-
-    [commands.kill]
-    type = "sh"
-    desc = "send the kill command to the helium validator"
-    body = "kill `pidof beam.smp`"
-
-    [commands.kill9]
-    type = "sh"
-    desc = "send kill -9 to the helium validator"
-    body = "kill -9 `pidof beam.smp`"
+        field = ["address"]
 
 
-    [commands.status]
-    type = "jrpc"
+    [methods.status]
+    transport = "sh"
     desc = "get the status of the helium valiator"
-    body = "http://localhost:4467/ping"
+    method = "miner ping"
 
-
-
-
-
-
+    [methods.status.response]
+    response = "sh"
+    status = 0
+    field = ["stdout","stderr"]
