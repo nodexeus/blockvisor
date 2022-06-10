@@ -1,36 +1,19 @@
 <script lang="ts">
-  import FormSection from 'modules/settings/components/FormSection/FormSection.svelte';
+  import ActionTitleHeader from 'components/ActionTitleHeader/ActionTitleHeader.svelte';
+  import { pageTransition } from 'consts/animations';
+  import { fade } from 'svelte/transition';
+  import EditUser from 'modules/admin-console/components/EditUser/EditUser.svelte';
 </script>
 
-<section class="settings__header grid grid-spacing--small-only">
-  <div class="settings__header-wrapper">
-    <h1 class="t-xxlarge-fluid s-bottom--large settings__title">Settings</h1>
-    <p class="s-bottom-xlarge t-color-text-4 t-tiny">
-      You successfully recovered your account. Please change your password
-      within the next 15.00 minutes.
-    </p>
-  </div>
+<section in:fade|local={pageTransition}>
+  <ActionTitleHeader className="container--pull-back">
+    <h2 class="t-large" slot="title">Edit User</h2>
+  </ActionTitleHeader>
 </section>
-<section class="settings__content grid grid-spacing--small-only">
-  <FormSection title="Personal Information" />
-  <FormSection title="Password">Password form</FormSection>
+
+<section in:fade|local={pageTransition} class="edit container--medium-large">
+  <EditUser />
 </section>
 
 <style>
-  .settings {
-    &__title {
-      margin-top: 0;
-    }
-
-    &__header {
-      margin-bottom: 60px;
-      &-wrapper {
-        grid-column: 2/10;
-
-        @media (--screen-large) {
-          grid-column: 2/6;
-        }
-      }
-    }
-  }
 </style>

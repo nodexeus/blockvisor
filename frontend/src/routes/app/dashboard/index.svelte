@@ -110,7 +110,6 @@
       url: 'placeholder-node',
     },
   ];
-
 </script>
 
 <MetaTags title="Dashboard | BlockVisor" />
