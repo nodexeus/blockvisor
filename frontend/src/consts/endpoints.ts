@@ -4,6 +4,7 @@ export const AUTHENTICATION = {
   LOGIN_POST: `${API.URL}/login`,
   REFRESH_TOKEN_POST: `${API.URL}/refresh`,
   USER_DETAILS_GET: `${API.URL}/whoami`,
+  FORGOT_PASSWORD: `${API.URL}/reset`,
 };
 
 export const HOSTS = {
