@@ -37,7 +37,7 @@
       if (res.status === 200) {
         handleModalClose();
         getOrganisations(getUserInfo().id);
-        toast.success('Organisation created successfully');
+        toast.success('Organisation renamed successfully.');
       }
     } catch (error) {
       toast.warning('Something went wrong');
@@ -48,7 +48,7 @@
 <Modal id="new-org" {handleModalClose} isActive={isModalOpen} size="large">
   <svelte:fragment slot="header">Rename {organisationName}</svelte:fragment>
 
-  <form use:form>
+  <form use:form on:submit|preventDefault={handleSubmit}>
     <Input
       size="large"
       validate={[required]}
