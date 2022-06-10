@@ -1,0 +1,80 @@
+urn  = "solana:validator"
+
+# Create a list of methods you will export 
+export = [
+    "start",
+    "stop",
+    "height",
+    "address",
+    "status"
+]
+
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+babel_version = "0.0.1"
+node_version = "0.4" #fix
+node_type = "validator"
+description = "solana blockchain validator"
+jrpc_host = "http://localhost:8899/"
+
+[bootstrap]
+#TBD
+
+[monitor]
+pid_file = "/var/run/solana.pid"
+
+[methods]
+    [methods.start]
+    transport = "sh"
+    desc = "start the soland validator"
+    body = "systemctl start sol"
+
+        [methods.start.response]
+        response = "sh"
+        status = 0
+        field = ["stdout","stderr"]
+
+
+    [methods.stop]
+    transport = "sh"
+    desc = "stop the solana validator"
+    body = "systemctl stop sol"
+
+        [methods.stop.response]
+        response = "sh"
+        status = 0
+        field = ["stdout","stderr"]
+
+    [methods.height]
+    transport = "jrpc"
+    desc = "get the blockchain height from this node"
+    method = "getBlockHeight"
+
+        [methods.height.response]
+        response = "jrpc"
+        status = 200
+        field = ["result"]
+
+
+    [methods.address]
+    transport = "jrpc"
+    desc = "get the address of the validator"
+    method = "getClusterNodes"
+    
+        [methods.address.response]
+        response = "jrpc"
+        code = 200
+        field = ["pubkey"]
+
+
+    [methods.status]
+    type = "jrpc"
+    desc = "get the status of the solana valiator"
+    method = "getHealth"
+
+        [methods.status.response]
+        response = "jrpc"
+        code = 200
+        field = ["result"]
