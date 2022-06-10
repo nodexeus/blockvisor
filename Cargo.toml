@@ -2,7 +2,6 @@
 
 members = [
   "api",
-  "babel",
   "blockvisord",
   "turnstile",
 ]
