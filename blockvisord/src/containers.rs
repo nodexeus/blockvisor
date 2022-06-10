@@ -1,5 +1,4 @@
 use anyhow::{bail, Ok, Result};
-use async_trait::async_trait;
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
@@ -41,38 +40,6 @@ pub enum ContainerState {
     Deleted,
 }
 
-#[async_trait]
-pub trait NodeContainer {
-    /// Creates a new container with `id`.
-    /// TODO: machine_index is a hack. Remove after demo.
-    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
-    where
-        Self: Sized;
-
-    /// Checks if container exists on this host.
-    async fn exists(id: Uuid) -> bool;
-
-    /// Returns container previously created on this host.
-    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
-    where
-        Self: Sized;
-
-    /// Returns the container's `id`.
-    fn id(&self) -> &Uuid;
-
-    /// Starts the container.
-    async fn start(&mut self) -> Result<()>;
-
-    /// Returns the state of the container.
-    async fn state(&self) -> Result<ContainerState>;
-
-    /// Kills the running container.
-    async fn kill(&mut self) -> Result<()>;
-
-    /// Deletes the container.
-    async fn delete(&mut self) -> Result<()>;
-}
-
 pub struct LinuxNode {
     id: Uuid,
     machine: Machine<'static>,
@@ -86,23 +53,26 @@ const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
-#[async_trait]
-impl NodeContainer for LinuxNode {
+impl LinuxNode {
+    /// Creates a new container with `id`.
+    /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
-    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
+    pub async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
 
         Ok(Self { id, machine })
     }
 
-    async fn exists(id: Uuid) -> bool {
+    /// Checks if container exists on this host.
+    pub async fn exists(id: Uuid) -> bool {
         let cmd = id.to_string();
         get_process_pid(FC_BIN_NAME, &cmd).is_ok()
     }
 
+    /// Returns container previously created on this host.
     #[instrument]
-    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
+    pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let cmd = id.to_string();
         let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
@@ -111,21 +81,25 @@ impl NodeContainer for LinuxNode {
         Ok(Self { id, machine })
     }
 
-    fn id(&self) -> &Uuid {
+    /// Returns the container's `id`.
+    pub fn id(&self) -> &Uuid {
         &self.id
     }
 
+    /// Starts the container.
     #[instrument(skip(self))]
-    async fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await.map_err(Into::into)
     }
 
-    async fn state(&self) -> Result<ContainerState> {
+    /// Returns the state of the container.
+    pub async fn state(&self) -> Result<ContainerState> {
         unimplemented!()
     }
 
+    /// Kills the running container.
     #[instrument(skip(self))]
-    async fn kill(&mut self) -> Result<()> {
+    pub async fn kill(&mut self) -> Result<()> {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
@@ -144,13 +118,12 @@ impl NodeContainer for LinuxNode {
         Ok(())
     }
 
+    /// Deletes the container.
     #[instrument(skip(self))]
-    async fn delete(&mut self) -> Result<()> {
+    pub async fn delete(&mut self) -> Result<()> {
         unimplemented!()
     }
-}
 
-impl LinuxNode {
     fn create_config(
         id: Uuid,
         network_interface: &NetworkInterface,
