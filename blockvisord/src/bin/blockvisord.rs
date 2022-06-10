@@ -16,9 +16,8 @@ async fn main() -> Result<()> {
     info!("Starting...");
 
     let config = Config::load().await?;
+    let _containers = Containers::load().await?;
     loop {
-        let containers = Containers::load().await?;
-
         let vmm = std::env::var("VMM").unwrap_or_else(|_| "dummy".into());
         if vmm == "dummy" {
             dummy_apply_config(&containers).await?;
