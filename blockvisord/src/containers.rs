@@ -13,8 +13,9 @@ use std::{
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
 use tokio::time::sleep;
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument, trace};
 use uuid::Uuid;
+use zbus::{dbus_interface, fdo, zvariant::Type};
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
 
@@ -32,7 +33,7 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
     Created,
     Started,
@@ -261,11 +262,104 @@ pub struct Containers {
     machine_index: Arc<Mutex<u32>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Type)]
 pub struct ContainerData {
     pub id: Uuid,
     pub chain: String,
     pub state: ContainerState,
+}
+
+#[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
+impl Containers {
+    #[instrument(skip(self))]
+    async fn create(&mut self, chain: String) -> fdo::Result<Uuid> {
+        let id = Uuid::new_v4();
+        let container = ContainerData {
+            id,
+            chain,
+            state: ContainerState::Created,
+        };
+
+        let network_interface = self.next_network_interface();
+        LinuxNode::create(id, &network_interface)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+
+        self.containers.insert(id, container);
+        self.save()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("Container with id `{}` created", id);
+
+        fdo::Result::Ok(id)
+    }
+
+    #[instrument(skip(self))]
+    async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
+        self.containers.remove(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.delete()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        self.save()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("deleted");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn start(&self, id: Uuid) -> fdo::Result<()> {
+        self.containers.get(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        debug!("found container");
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.start()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("started");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn stop(&self, id: Uuid) -> fdo::Result<()> {
+        self.containers.get(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        debug!("found container");
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.kill()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("stopped");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn list(&self) -> fdo::Result<HashMap<Uuid, ContainerData>> {
+        debug!("listing {} containers", self.containers.len());
+        fdo::Result::Ok(self.containers.clone())
+    }
+
+    // TODO: Rest of the NodeCommand variants.
 }
 
 impl Containers {
@@ -315,6 +409,13 @@ impl Containers {
         *machine_index += 1;
 
         iface
+    }
+
+    async fn get_node(&self, id: &Uuid) -> Result<LinuxNode> {
+        // FIXME: This is wrong and bad to create the interface just to delete the VMM but until we keep the Nodes in the
+        // memory and don't save the machine config, we need to do this.
+        let network_interface = self.next_network_interface();
+        LinuxNode::connect(*id, &network_interface).await
     }
 }
 
