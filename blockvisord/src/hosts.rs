@@ -1,7 +1,4 @@
-use crate::containers::{ContainerState, Containers, DummyNode, NodeContainer};
-use anyhow::Result;
 use sysinfo::{DiskExt, System, SystemExt};
-use tracing::info;
 
 #[derive(Debug)]
 pub struct HostInfo {
@@ -30,41 +27,4 @@ pub fn get_ip_address(ifa_name: &str) -> String {
     let ifas = local_ip_address::list_afinet_netifas().unwrap();
     let (_, ip) = local_ip_address::find_ifa(ifas, ifa_name).unwrap();
     ip.to_string()
-}
-
-// used for testing purposes
-pub async fn dummy_apply_config(containers: &Containers) -> Result<()> {
-    for (id, container_config) in &containers.containers {
-        let id = *id;
-        let network_interface = containers.next_network_interface();
-        // remove deleted nodes
-        if container_config.state == ContainerState::Deleted {
-            if DummyNode::exists(id).await {
-                let mut node = DummyNode::connect(id, &network_interface).await?;
-                node.delete().await?;
-            }
-        } else {
-            // create non existing nodes
-            if !DummyNode::exists(id).await {
-                DummyNode::create(id, &network_interface).await?;
-            }
-
-            // fix nodes state
-            let mut node = DummyNode::connect(id, &network_interface).await?;
-            let state = node.state().await?;
-            if state != container_config.state {
-                info!(
-                    "Changing state from {:?} to {:?}: {}",
-                    state, container_config.state, id
-                );
-                match container_config.state {
-                    ContainerState::Started => node.start().await?,
-                    ContainerState::Stopped => node.kill().await?,
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    Ok(())
 }

@@ -3,7 +3,6 @@ use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
     containers::Containers,
-    hosts::dummy_apply_config,
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
@@ -18,11 +17,6 @@ async fn main() -> Result<()> {
     let config = Config::load().await?;
     let _containers = Containers::load().await?;
     loop {
-        let vmm = std::env::var("VMM").unwrap_or_else(|_| "dummy".into());
-        if vmm == "dummy" {
-            dummy_apply_config(&containers).await?;
-        }
-
         process_pending_commands(&config).await?;
 
         sleep(Duration::from_secs(5)).await;
