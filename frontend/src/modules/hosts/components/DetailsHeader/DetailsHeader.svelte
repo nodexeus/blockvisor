@@ -38,6 +38,8 @@
       toast.success(res.data);
       fetchAllHosts();
       goto(ROUTES.HOSTS);
+    } else {
+      toast.warning(res.data);
     }
   }
 
