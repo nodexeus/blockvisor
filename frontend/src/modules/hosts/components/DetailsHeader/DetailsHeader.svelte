@@ -1,18 +1,20 @@
 <script lang="ts">
-  import DataState from 'components/DataState/DataState.svelte';
-  import { fadeDefault } from 'consts/animations';
-
-  import Pill from 'components/Pill/Pill.svelte';
-
-  import PillBox from 'components/PillBox/PillBox.svelte';
-
-  import Select from 'modules/forms/components/Select/Select.svelte';
-  import ConfirmDeleteModal from 'modules/app/components/ConfirmDeleteModal/ConfirmDeleteModal.svelte';
   import { browser } from '$app/env';
-  import { useForm } from 'svelte-use-form';
-
-  import IconDelete from 'icons/trash-12.svg';
+  import { goto } from '$app/navigation';
+  import DataState from 'components/DataState/DataState.svelte';
   import IconButton from 'components/IconButton/IconButton.svelte';
+  import Pill from 'components/Pill/Pill.svelte';
+  import PillBox from 'components/PillBox/PillBox.svelte';
+  import { toast } from 'components/Toast/Toast';
+  import { fadeDefault } from 'consts/animations';
+  import { ENDPOINTS } from 'consts/endpoints';
+  import { ROUTES } from 'consts/routes';
+  import IconDelete from 'icons/trash-12.svg';
+  import ConfirmDeleteModal from 'modules/app/components/ConfirmDeleteModal/ConfirmDeleteModal.svelte';
+  import Select from 'modules/forms/components/Select/Select.svelte';
+  import { fetchAllHosts } from 'modules/hosts/store/hostsStore';
+  import { useForm } from 'svelte-use-form';
+  import { httpClient } from 'utils/httpClient';
 
   export let state = '';
   export let form;
@@ -28,9 +30,16 @@
     isModalOpen = true;
   };
 
-  const handleDeleteModalClose = (e) => {
-    isModalOpen = false;
-  };
+  async function handleHostDelete() {
+    const res = await httpClient.delete(ENDPOINTS.HOSTS.DELETE_HOST(data.id));
+
+    if (res.status === 200) {
+      isModalOpen = false;
+      toast.success(res.data);
+      fetchAllHosts();
+      goto(ROUTES.HOSTS);
+    }
+  }
 
   const deleteForm = useForm({
     targetValue: {
@@ -90,14 +99,14 @@
     id="delete-node-modal"
     form={deleteForm}
     on:submit={(e) => {
-      console.log($deleteForm);
+      handleHostDelete();
       e.preventDefault();
     }}
     {isModalOpen}
-    handleModalClose={handleDeleteModalClose}
+    handleModalClose={() => (isModalOpen = false)}
   >
     <svelte:fragment slot="label">
-      Type “DELETE” to confirm deletion of “HostFox” host.
+      Type “DELETE” to confirm deletion of <strong>{data.name}</strong> host.
     </svelte:fragment>
   </ConfirmDeleteModal>
 {/if}

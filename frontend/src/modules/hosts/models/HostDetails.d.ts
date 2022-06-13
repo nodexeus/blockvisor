@@ -1,4 +1,5 @@
 interface HostDetails {
+  id: string;
   ip_addr: string;
   cpu_count: number;
   disk_size: number;
