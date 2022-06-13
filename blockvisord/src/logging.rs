@@ -6,7 +6,6 @@ use tracing_subscriber::{self, FmtSubscriber};
 pub fn setup_logging(level: Level) -> Result<()> {
     FmtSubscriber::builder()
         .with_max_level(level)
-        .with_ansi(false)
         .finish()
         .init();
 
