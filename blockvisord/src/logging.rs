@@ -1,11 +1,10 @@
 use anyhow::Result;
-use tracing::Level;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{self, FmtSubscriber};
+use tracing_subscriber::{self, EnvFilter, FmtSubscriber};
 
-pub fn setup_logging(level: Level) -> Result<()> {
+pub fn setup_logging() -> Result<()> {
     FmtSubscriber::builder()
-        .with_max_level(level)
+        .with_env_filter(EnvFilter::from_default_env())
         .finish()
         .init();
 

@@ -7,12 +7,12 @@ use blockvisord::{
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
-use tracing::{info, Level};
+use tracing::info;
 
 #[allow(unreachable_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
-    setup_logging(Level::INFO)?;
+    setup_logging()?;
     info!("Starting...");
 
     let config = Config::load().await?;
