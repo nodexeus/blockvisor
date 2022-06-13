@@ -32,7 +32,7 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone, Copy, Debug, Type)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
     Created,
     Started,
