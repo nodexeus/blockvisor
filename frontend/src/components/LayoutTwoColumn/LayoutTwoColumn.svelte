@@ -65,7 +65,7 @@
       flex-grow: 1;
       flex-shrink: 1;
       overflow-x: hidden;
-      padding: 0 20px 80px 20px;
+      padding: 0 80px 80px 20px;
 
       @media (--screen-medium-large) {
         padding-left: 28px;
