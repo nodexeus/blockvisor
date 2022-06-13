@@ -15,7 +15,13 @@ async fn main() -> Result<()> {
     info!("Starting...");
 
     let config = Config::load().await?;
-    let _containers = Containers::load().await?;
+    let containers = Containers::load().await?;
+    let _conn = zbus::ConnectionBuilder::system()?
+        .name("com.BlockJoy.blockvisor")?
+        .serve_at("/com/BlockJoy/blockvisor/Node", containers)?
+        .build()
+        .await?;
+
     loop {
         process_pending_commands(&config).await?;
 
