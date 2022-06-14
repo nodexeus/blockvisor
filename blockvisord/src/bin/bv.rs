@@ -122,21 +122,20 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
 
     match command {
         NodeCommand::List { all, chain } => {
-            let containers = node_proxy.list().await?;
-            for (_id, c) in containers {
-                let is_chain_visible = if let Some(chain) = chain {
-                    c.chain.contains(chain)
-                } else {
-                    true
-                };
-                let is_state_visible = *all
-                    || c.state == ContainerState::Created
-                    || c.state == ContainerState::Started;
-
-                if is_chain_visible && is_state_visible {
-                    println!("{:?}", &c);
-                }
-            }
+            node_proxy
+                .list()
+                .await?
+                .values()
+                .filter(|c| {
+                    chain
+                        .as_ref()
+                        .map(|chain| c.chain.contains(chain))
+                        .unwrap_or(true)
+                        && (*all
+                            || c.state == ContainerState::Created
+                            || c.state == ContainerState::Started)
+                })
+                .for_each(|c| println!("{:?}", c));
         }
         NodeCommand::Create { chain } => {
             let id = node_proxy.create(chain).await?;
