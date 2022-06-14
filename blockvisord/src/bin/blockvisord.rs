@@ -3,10 +3,12 @@ use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
     containers::Containers,
+    dbus::NodeProxy,
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
 use tracing::info;
+use zbus::{ConnectionBuilder, ProxyDefault};
 
 #[allow(unreachable_code)]
 #[tokio::main]
@@ -16,9 +18,9 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await?;
     let containers = Containers::load().await?;
-    let _conn = zbus::ConnectionBuilder::system()?
-        .name("com.BlockJoy.blockvisor")?
-        .serve_at("/com/BlockJoy/blockvisor/Node", containers)?
+    let _conn = ConnectionBuilder::system()?
+        .name(NodeProxy::DESTINATION)?
+        .serve_at(NodeProxy::PATH, containers)?
         .build()
         .await?;
 
