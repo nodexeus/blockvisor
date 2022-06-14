@@ -37,10 +37,9 @@ pub enum ContainerState {
     Created,
     Started,
     Stopped,
-    Deleted,
 }
 
-pub struct LinuxNode {
+pub struct Node {
     id: Uuid,
     machine: Machine<'static>,
 }
@@ -53,12 +52,12 @@ const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
-impl LinuxNode {
+impl Node {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
     pub async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = LinuxNode::create_config(id, network_interface)?;
+        let config = Node::create_config(id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
 
         Ok(Self { id, machine })
@@ -73,7 +72,7 @@ impl LinuxNode {
     /// Returns container previously created on this host.
     #[instrument]
     pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = LinuxNode::create_config(id, network_interface)?;
+        let config = Node::create_config(id, network_interface)?;
         let cmd = id.to_string();
         let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
         let machine = firec::Machine::connect(config, pid).await;
@@ -189,7 +188,7 @@ impl Containers {
         };
 
         let network_interface = self.next_network_interface();
-        LinuxNode::create(id, &network_interface)
+        Node::create(id, &network_interface)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
 
@@ -319,11 +318,11 @@ impl Containers {
         iface
     }
 
-    async fn get_node(&self, id: &Uuid) -> Result<LinuxNode> {
+    async fn get_node(&self, id: &Uuid) -> Result<Node> {
         // FIXME: This is wrong and bad to create the interface just to delete the VMM but until we keep the Nodes in the
         // memory and don't save the machine config, we need to do this.
         let network_interface = self.next_network_interface();
-        LinuxNode::connect(*id, &network_interface).await
+        Node::connect(*id, &network_interface).await
     }
 }
 
