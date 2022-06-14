@@ -19,11 +19,13 @@ use zbus::{dbus_interface, fdo, zvariant::Type};
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
 
 lazy_static::lazy_static! {
-    static ref REGISTRY_CONFIG_FILE: PathBuf = home::home_dir()
+    static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
         .map(|p| p.join(".cache"))
         .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("blockvisor")
-        .join(CONTAINERS_CONFIG_FILENAME);
+        .join("blockvisor");
+}
+lazy_static::lazy_static! {
+    static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(CONTAINERS_CONFIG_FILENAME);
 }
 
 #[derive(Clone, Debug)]
@@ -283,10 +285,7 @@ impl Containers {
         );
         let config = toml::Value::try_from(self)?;
         let config = toml::to_string(&config)?;
-        let parent = REGISTRY_CONFIG_FILE
-            .parent()
-            .expect("config file has no parent");
-        fs::create_dir_all(parent).await?;
+        fs::create_dir_all(REGISTRY_CONFIG_DIR.as_path()).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
         Ok(())
     }
