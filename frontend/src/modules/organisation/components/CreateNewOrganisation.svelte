@@ -16,8 +16,6 @@
   export let loadingCreate: boolean = false;
 
   async function handleSubmit() {
-    console.log($form.values.orgName);
-
     if (!$form.values.orgName) {
       toast.warning('Organisation name is required');
       return;
