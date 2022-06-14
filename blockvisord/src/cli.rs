@@ -208,7 +208,7 @@ pub enum ChainCommand {
     },
 }
 
-#[derive(ArgEnum, PartialEq, Debug, Clone)]
+#[derive(ArgEnum, PartialEq, Eq, Debug, Clone)]
 pub enum FormatArg {
     Text,
     Json,

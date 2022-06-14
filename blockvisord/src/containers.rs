@@ -1,5 +1,4 @@
 use anyhow::{bail, Ok, Result};
-use async_trait::async_trait;
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
@@ -13,8 +12,9 @@ use std::{
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
 use tokio::time::sleep;
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument, trace};
 use uuid::Uuid;
+use zbus::{dbus_interface, fdo, zvariant::Type};
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
 
@@ -32,44 +32,12 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Clone, Copy, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
     Created,
     Started,
     Stopped,
     Deleted,
-}
-
-#[async_trait]
-pub trait NodeContainer {
-    /// Creates a new container with `id`.
-    /// TODO: machine_index is a hack. Remove after demo.
-    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
-    where
-        Self: Sized;
-
-    /// Checks if container exists on this host.
-    async fn exists(id: Uuid) -> bool;
-
-    /// Returns container previously created on this host.
-    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self>
-    where
-        Self: Sized;
-
-    /// Returns the container's `id`.
-    fn id(&self) -> &Uuid;
-
-    /// Starts the container.
-    async fn start(&mut self) -> Result<()>;
-
-    /// Returns the state of the container.
-    async fn state(&self) -> Result<ContainerState>;
-
-    /// Kills the running container.
-    async fn kill(&mut self) -> Result<()>;
-
-    /// Deletes the container.
-    async fn delete(&mut self) -> Result<()>;
 }
 
 pub struct LinuxNode {
@@ -85,23 +53,26 @@ const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
-#[async_trait]
-impl NodeContainer for LinuxNode {
+impl LinuxNode {
+    /// Creates a new container with `id`.
+    /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
-    async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
+    pub async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
 
         Ok(Self { id, machine })
     }
 
-    async fn exists(id: Uuid) -> bool {
+    /// Checks if container exists on this host.
+    pub async fn exists(id: Uuid) -> bool {
         let cmd = id.to_string();
         get_process_pid(FC_BIN_NAME, &cmd).is_ok()
     }
 
+    /// Returns container previously created on this host.
     #[instrument]
-    async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
+    pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = LinuxNode::create_config(id, network_interface)?;
         let cmd = id.to_string();
         let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
@@ -110,21 +81,25 @@ impl NodeContainer for LinuxNode {
         Ok(Self { id, machine })
     }
 
-    fn id(&self) -> &Uuid {
+    /// Returns the container's `id`.
+    pub fn id(&self) -> &Uuid {
         &self.id
     }
 
+    /// Starts the container.
     #[instrument(skip(self))]
-    async fn start(&mut self) -> Result<()> {
+    pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await.map_err(Into::into)
     }
 
-    async fn state(&self) -> Result<ContainerState> {
+    /// Returns the state of the container.
+    pub async fn state(&self) -> Result<ContainerState> {
         unimplemented!()
     }
 
+    /// Kills the running container.
     #[instrument(skip(self))]
-    async fn kill(&mut self) -> Result<()> {
+    pub async fn kill(&mut self) -> Result<()> {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
@@ -143,13 +118,12 @@ impl NodeContainer for LinuxNode {
         Ok(())
     }
 
+    /// Deletes the container.
     #[instrument(skip(self))]
-    async fn delete(&mut self) -> Result<()> {
+    pub async fn delete(&mut self) -> Result<()> {
         unimplemented!()
     }
-}
 
-impl LinuxNode {
     fn create_config(
         id: Uuid,
         network_interface: &NetworkInterface,
@@ -190,82 +164,110 @@ impl LinuxNode {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct DummyNode {
-    pub id: Uuid,
-    pub state: ContainerState,
-}
-
-#[async_trait]
-impl NodeContainer for DummyNode {
-    async fn create(id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
-        info!("Creating node: {}", id);
-        let node = Self {
-            id,
-            state: ContainerState::Created,
-        };
-        let contents = toml::to_string(&node)?;
-        fs::write(format!("/tmp/{}.txt", id), &contents).await?;
-        Ok(node)
-    }
-
-    async fn exists(id: Uuid) -> bool {
-        Path::new(&format!("/tmp/{}.txt", id)).exists()
-    }
-
-    async fn connect(id: Uuid, _network_interface: &NetworkInterface) -> Result<Self> {
-        let node = fs::read_to_string(format!("/tmp/{}.txt", id)).await?;
-        let node: DummyNode = toml::from_str(&node)?;
-
-        Ok(DummyNode {
-            id,
-            state: node.state,
-        })
-    }
-
-    fn id(&self) -> &Uuid {
-        &self.id
-    }
-
-    async fn start(&mut self) -> Result<()> {
-        info!("Starting node: {}", self.id());
-        self.state = ContainerState::Started;
-        let contents = toml::to_string(&self)?;
-        fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
-        Ok(())
-    }
-
-    async fn state(&self) -> Result<ContainerState> {
-        Ok(self.state)
-    }
-
-    async fn kill(&mut self) -> Result<()> {
-        info!("Killing node: {}", self.id());
-        self.state = ContainerState::Stopped;
-        let contents = toml::to_string(&self)?;
-        fs::write(format!("/tmp/{}.txt", self.id), &contents).await?;
-        Ok(())
-    }
-
-    async fn delete(&mut self) -> Result<()> {
-        info!("Deleting node: {}", self.id());
-        self.kill().await?;
-        fs::remove_file(format!("/tmp/{}.txt", self.id)).await?;
-        Ok(())
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Containers {
     pub containers: HashMap<Uuid, ContainerData>,
     machine_index: Arc<Mutex<u32>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Type)]
 pub struct ContainerData {
     pub id: Uuid,
     pub chain: String,
     pub state: ContainerState,
+}
+
+#[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
+impl Containers {
+    #[instrument(skip(self))]
+    async fn create(&mut self, chain: String) -> fdo::Result<Uuid> {
+        let id = Uuid::new_v4();
+        let container = ContainerData {
+            id,
+            chain,
+            state: ContainerState::Created,
+        };
+
+        let network_interface = self.next_network_interface();
+        LinuxNode::create(id, &network_interface)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+
+        self.containers.insert(id, container);
+        self.save()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("Container with id `{}` created", id);
+
+        fdo::Result::Ok(id)
+    }
+
+    #[instrument(skip(self))]
+    async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
+        self.containers.remove(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.delete()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        self.save()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("deleted");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn start(&self, id: Uuid) -> fdo::Result<()> {
+        self.containers.get(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        debug!("found container");
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.start()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("started");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn stop(&self, id: Uuid) -> fdo::Result<()> {
+        self.containers.get(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        debug!("found container");
+        let mut node = self
+            .get_node(&id)
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.kill()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        debug!("stopped");
+
+        fdo::Result::Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn list(&self) -> fdo::Result<HashMap<Uuid, ContainerData>> {
+        debug!("listing {} containers", self.containers.len());
+        fdo::Result::Ok(self.containers.clone())
+    }
+
+    // TODO: Rest of the NodeCommand variants.
 }
 
 impl Containers {
@@ -285,6 +287,10 @@ impl Containers {
         );
         let config = toml::Value::try_from(self)?;
         let config = toml::to_string(&config)?;
+        let parent = REGISTRY_CONFIG_FILE
+            .parent()
+            .expect("config file has no parent");
+        fs::create_dir_all(parent).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
         Ok(())
     }
@@ -311,6 +317,13 @@ impl Containers {
         *machine_index += 1;
 
         iface
+    }
+
+    async fn get_node(&self, id: &Uuid) -> Result<LinuxNode> {
+        // FIXME: This is wrong and bad to create the interface just to delete the VMM but until we keep the Nodes in the
+        // memory and don't save the machine config, we need to do this.
+        let network_interface = self.next_network_interface();
+        LinuxNode::connect(*id, &network_interface).await
     }
 }
 

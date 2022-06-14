@@ -3,27 +3,28 @@ use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
     containers::Containers,
-    hosts::dummy_apply_config,
+    dbus::NodeProxy,
     logging::setup_logging,
 };
 use tokio::time::{sleep, Duration};
-use tracing::{info, Level};
+use tracing::info;
+use zbus::{ConnectionBuilder, ProxyDefault};
 
 #[allow(unreachable_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
-    setup_logging(Level::INFO)?;
+    setup_logging()?;
     info!("Starting...");
 
     let config = Config::load().await?;
+    let containers = Containers::load().await?;
+    let _conn = ConnectionBuilder::system()?
+        .name(NodeProxy::DESTINATION)?
+        .serve_at(NodeProxy::PATH, containers)?
+        .build()
+        .await?;
+
     loop {
-        let containers = Containers::load().await?;
-
-        let vmm = std::env::var("VMM").unwrap_or_else(|_| "dummy".into());
-        if vmm == "dummy" {
-            dummy_apply_config(&containers).await?;
-        }
-
         process_pending_commands(&config).await?;
 
         sleep(Duration::from_secs(5)).await;

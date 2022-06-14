@@ -3,13 +3,13 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{ContainerData, ContainerState, Containers},
+    containers::{ContainerState, Containers},
+    dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use tokio::time::Duration;
-use uuid::Uuid;
 use zbus::Connection;
 
 #[tokio::main]
@@ -117,11 +117,13 @@ async fn process_chain_command(command: &ChainCommand) -> Result<()> {
 }
 
 async fn process_node_command(command: &NodeCommand) -> Result<()> {
-    let mut config = Containers::load().await?;
+    let conn = Connection::system().await?;
+    let node_proxy = NodeProxy::new(&conn).await?;
 
     match command {
         NodeCommand::List { all, chain } => {
-            for (_id, c) in config.containers {
+            let containers = node_proxy.list().await?;
+            for (_id, c) in containers {
                 let is_chain_visible = if let Some(chain) = chain {
                     c.chain.contains(chain)
                 } else {
@@ -137,39 +139,20 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             }
         }
         NodeCommand::Create { chain } => {
-            let id = Uuid::new_v4();
-            let container_config = ContainerData {
-                id,
-                chain: chain.to_owned(),
-                state: ContainerState::Created,
-            };
-            println!("Container added: {:?}", &container_config);
-            config.containers.insert(id, container_config);
-            config.save().await?;
+            let id = node_proxy.create(chain).await?;
+            println!("Created new node for `{}` chain with ID `{}`", chain, id);
         }
         NodeCommand::Start { id } => {
-            if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.state = ContainerState::Started;
-                config.save().await?;
-            } else {
-                println!("Container not found: {}", id);
-            }
+            node_proxy.start(id).await?;
+            println!("Started node with ID `{}`", id);
         }
         NodeCommand::Stop { id } => {
-            if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.state = ContainerState::Stopped;
-                config.save().await?;
-            } else {
-                println!("Container not found: {}", id);
-            }
+            node_proxy.stop(id).await?;
+            println!("Stopped node with ID `{}`", id);
         }
         NodeCommand::Delete { id } => {
-            if let Some(container_config) = config.containers.get_mut(id) {
-                container_config.state = ContainerState::Deleted;
-                config.save().await?;
-            } else {
-                println!("Container not found: {}", id);
-            }
+            node_proxy.delete(id).await?;
+            println!("Deleted node with ID `{}`", id);
         }
         NodeCommand::Restart { id: _ } => todo!(),
         NodeCommand::Console { id: _ } => todo!(),
