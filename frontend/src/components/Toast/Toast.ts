@@ -4,25 +4,22 @@ export const toast = {
   success: (text: string) =>
     showToast.push(text, {
       theme: {
-        '--toastBackground': 'hsl(143, 61%, 37%)',
-        '--toastColor': 'white',
-        '--toastBarBackground': 'hsl(143, 61%, 25%)',
+        '--toastBackground': '#BFF589',
+        '--toastColor': '#212423',
       },
     }),
   warning: (text: string) =>
     showToast.push(text, {
       theme: {
-        '--toastBackground': 'hsl(0, 79%, 69%)',
-        '--toastColor': 'white',
-        '--toastBarBackground': 'hsl(0, 69%, 59%)',
+        '--toastBackground': '#EE7070',
+        '--toastColor': '#212423',
       },
     }),
   message: (text: string) =>
     showToast.push(text, {
       theme: {
-        '--toastBackground': 'hsl(40, 80%, 57%)',
-        '--toastColor': 'white',
-        '--toastBarBackground': 'hsl(40, 80%, 37%)',
+        '--toastBackground': '#E9AD39',
+        '--toastColor': '#212423',
       },
     }),
 };
