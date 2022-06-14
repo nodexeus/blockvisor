@@ -37,7 +37,6 @@ pub enum ContainerState {
     Created,
     Started,
     Stopped,
-    Deleted,
 }
 
 pub struct LinuxNode {
