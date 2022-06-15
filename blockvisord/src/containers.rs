@@ -63,12 +63,6 @@ impl Node {
         Ok(Self { id, machine })
     }
 
-    /// Checks if container exists on this host.
-    pub async fn exists(id: Uuid) -> bool {
-        let cmd = id.to_string();
-        get_process_pid(FC_BIN_NAME, &cmd).is_ok()
-    }
-
     /// Returns container previously created on this host.
     #[instrument]
     pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
