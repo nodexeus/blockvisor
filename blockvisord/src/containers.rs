@@ -74,8 +74,11 @@ impl Node {
     pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = Node::create_config(id, network_interface)?;
         let cmd = id.to_string();
-        let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
-        let machine = firec::Machine::connect(config, pid).await;
+        let state = match get_process_pid(FC_BIN_NAME, &cmd) {
+            Ok(pid) => firec::MachineState::RUNNING { pid },
+            Err(_) => firec::MachineState::SHUTOFF,
+        };
+        let machine = firec::Machine::connect(config, state).await;
 
         Ok(Self { id, machine })
     }
