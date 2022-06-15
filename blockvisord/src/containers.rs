@@ -1,4 +1,4 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{bail, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
