@@ -139,7 +139,7 @@ impl Node {
             network_interface.ip,
         ));
 
-        let iface = firec::config::network::Interface::new("eth0", network_interface.name.clone());
+        let iface = firec::config::network::Interface::new(network_interface.name.clone(), "eth0");
 
         let machine_cfg = firec::config::Machine::builder()
             .vcpu_count(1)
