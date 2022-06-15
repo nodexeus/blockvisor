@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
@@ -180,6 +180,38 @@ pub struct ContainerData {
     pub state: ContainerState,
 }
 
+impl ContainerData {
+    async fn load(path: &Path) -> Result<Self> {
+        info!("Reading containers config file: {}", path.display());
+        fs::read_to_string(&path)
+            .await
+            .and_then(|s| toml::from_str::<Self>(&s).map_err(Into::into))
+            .with_context(|| format!("Failed to read container file `{}`", path.display()))
+    }
+
+    async fn save(&self) -> Result<()> {
+        let path = self.file_path();
+        info!("Writing container config: {}", path.display());
+        let config = toml::to_string(self)?;
+        fs::write(&path, &*config).await?;
+
+        Ok(())
+    }
+
+    async fn delete(self) -> Result<()> {
+        let path = self.file_path();
+        info!("Deleting container config: {}", path.display());
+        fs::remove_file(&*path)
+            .await
+            .with_context(|| format!("Failed to delete container file `{}`", path.display()))
+    }
+
+    fn file_path(&self) -> PathBuf {
+        let filename = format!("{}.toml", self.id);
+        REGISTRY_CONFIG_DIR.join(filename)
+    }
+}
+
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Containers {
     #[instrument(skip(self))]
@@ -196,10 +228,11 @@ impl Containers {
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
 
-        self.containers.insert(id, container);
-        self.save()
+        container
+            .save()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        self.containers.insert(id, container);
         debug!("Container with id `{}` created", id);
 
         fdo::Result::Ok(id)
@@ -207,7 +240,7 @@ impl Containers {
 
     #[instrument(skip(self))]
     async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        self.containers.remove(&id).ok_or_else(|| {
+        let data = self.containers.remove(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
@@ -218,7 +251,7 @@ impl Containers {
         node.delete()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        self.save()
+        data.delete()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("deleted");
@@ -227,11 +260,11 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn start(&self, id: Uuid) -> fdo::Result<()> {
-        self.containers.get(&id).ok_or_else(|| {
+    async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
+        if !self.containers.contains_key(&id) {
             let msg = format!("Container with id {} not found", id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+            return Err(fdo::Error::FileNotFound(msg));
+        }
         debug!("found container");
         let mut node = self
             .get_node(&id)
@@ -240,23 +273,39 @@ impl Containers {
         node.start()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        let data = self.containers.get_mut(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        data.state = ContainerState::Started;
+        data.save()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("started");
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn stop(&self, id: Uuid) -> fdo::Result<()> {
-        self.containers.get(&id).ok_or_else(|| {
+    async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
+        if !self.containers.contains_key(&id) {
             let msg = format!("Container with id {} not found", id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+            return Err(fdo::Error::FileNotFound(msg));
+        }
         debug!("found container");
         let mut node = self
             .get_node(&id)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         node.kill()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        let data = self.containers.get_mut(&id).ok_or_else(|| {
+            let msg = format!("Container with id {} not found", id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+        data.state = ContainerState::Stopped;
+        data.save()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("stopped");
@@ -298,11 +347,7 @@ impl Containers {
                 // Skip the common data file.
                 continue;
             }
-            info!("Reading containers config file: {}", path.display());
-            match fs::read_to_string(&path)
-                .await
-                .and_then(|s| toml::from_str::<ContainerData>(&s).map_err(Into::into))
-            {
+            match ContainerData::load(&*path).await {
                 Ok(container) => {
                     containers.insert(container.id, container);
                 }
@@ -316,7 +361,7 @@ impl Containers {
     }
 
     pub async fn save(&self) -> Result<()> {
-        // First save the common data file.
+        // We only save the common data file. The individual container data files save themselves.
         info!(
             "Writing containers common config file: {}",
             REGISTRY_CONFIG_FILE.display()
@@ -325,15 +370,6 @@ impl Containers {
         let config = toml::to_string(&config)?;
         fs::create_dir_all(REGISTRY_CONFIG_DIR.as_path()).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
-
-        // Now the individual container data files.
-        for (id, container) in &self.containers {
-            let filename = format!("{}.toml", id);
-            let path = REGISTRY_CONFIG_DIR.join(filename);
-            info!("Writing container config: {}", path.display());
-            let config = toml::to_string(&container)?;
-            fs::write(&path, &*config).await?;
-        }
 
         Ok(())
     }
