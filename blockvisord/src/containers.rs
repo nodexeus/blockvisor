@@ -1,4 +1,4 @@
-use anyhow::{bail, Ok, Result};
+use anyhow::{bail, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
@@ -63,19 +63,16 @@ impl Node {
         Ok(Self { id, machine })
     }
 
-    /// Checks if container exists on this host.
-    pub async fn exists(id: Uuid) -> bool {
-        let cmd = id.to_string();
-        get_process_pid(FC_BIN_NAME, &cmd).is_ok()
-    }
-
     /// Returns container previously created on this host.
     #[instrument]
     pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
         let config = Node::create_config(id, network_interface)?;
         let cmd = id.to_string();
-        let pid = get_process_pid(FC_BIN_NAME, &cmd)?;
-        let machine = firec::Machine::connect(config, pid).await;
+        let state = match get_process_pid(FC_BIN_NAME, &cmd) {
+            Ok(pid) => firec::MachineState::RUNNING { pid },
+            Err(_) => firec::MachineState::SHUTOFF,
+        };
+        let machine = firec::Machine::connect(config, state).await;
 
         Ok(Self { id, machine })
     }
