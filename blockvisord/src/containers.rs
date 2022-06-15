@@ -10,9 +10,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
-use tokio::fs;
+use tokio::fs::{self, read_dir};
 use tokio::time::sleep;
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
 use zbus::{dbus_interface, fdo, zvariant::Type};
 
@@ -162,9 +162,14 @@ impl Node {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Containers {
     pub containers: HashMap<Uuid, ContainerData>,
+    data: CommonData,
+}
+
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+pub struct CommonData {
     machine_index: Arc<Mutex<u32>>,
 }
 
@@ -270,23 +275,66 @@ impl Containers {
 
 impl Containers {
     pub async fn load() -> Result<Containers> {
+        // First load the common data file.
         info!(
-            "Reading containers config: {}",
+            "Reading containers common config file: {}",
             REGISTRY_CONFIG_FILE.display()
         );
         let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE).await?;
-        Ok(toml::from_str(&config)?)
+        let containers_data = toml::from_str(&config)?;
+
+        // Now the individual container data files.
+        info!(
+            "Reading containers config dir: {}",
+            REGISTRY_CONFIG_DIR.display()
+        );
+        let mut containers = HashMap::new();
+        let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
+        while let Some(entry) = dir.next_entry().await? {
+            // blockvisord should not bail on problems with individual container files.
+            // It should log warnings though.
+            let path = entry.path();
+            if path == *REGISTRY_CONFIG_FILE {
+                // Skip the common data file.
+                continue;
+            }
+            info!("Reading containers config file: {}", path.display());
+            match fs::read_to_string(&path)
+                .await
+                .and_then(|s| toml::from_str::<ContainerData>(&s).map_err(Into::into))
+            {
+                Ok(container) => {
+                    containers.insert(container.id, container);
+                }
+                Err(e) => warn!("Failed to read container file `{}`: {}", path.display(), e),
+            }
+        }
+        Ok(Containers {
+            containers,
+            data: containers_data,
+        })
     }
 
     pub async fn save(&self) -> Result<()> {
+        // First save the common data file.
         info!(
-            "Writing containers config: {}",
+            "Writing containers common config file: {}",
             REGISTRY_CONFIG_FILE.display()
         );
-        let config = toml::Value::try_from(self)?;
+        let config = toml::Value::try_from(&self.data)?;
         let config = toml::to_string(&config)?;
         fs::create_dir_all(REGISTRY_CONFIG_DIR.as_path()).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
+
+        // Now the individual container data files.
+        for (id, container) in &self.containers {
+            let filename = format!("{}.toml", id);
+            let path = REGISTRY_CONFIG_DIR.join(filename);
+            info!("Writing container config: {}", path.display());
+            let config = toml::to_string(&container)?;
+            fs::write(&path, &*config).await?;
+        }
+
         Ok(())
     }
 
@@ -296,7 +344,7 @@ impl Containers {
 
     /// Get the next machine index and increment it.
     pub fn next_network_interface(&self) -> NetworkInterface {
-        let mut machine_index = self.machine_index.lock().expect("lock poisoned");
+        let mut machine_index = self.data.machine_index.lock().expect("lock poisoned");
 
         let idx_bytes = machine_index.to_be_bytes();
         let iface = NetworkInterface {
@@ -365,7 +413,7 @@ mod tests {
         );
 
         // Let's take the machine_index beyond u8 boundry.
-        *containers.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
+        *containers.data.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
         let iface = containers.next_network_interface();
         assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
         assert_eq!(
