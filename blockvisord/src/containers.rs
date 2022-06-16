@@ -118,8 +118,8 @@ impl Node {
 
     /// Deletes the container.
     #[instrument(skip(self))]
-    pub async fn delete(&mut self) -> Result<()> {
-        unimplemented!()
+    pub async fn delete(self) -> Result<()> {
+        self.machine.delete().await.map_err(Into::into)
     }
 
     fn create_config(
