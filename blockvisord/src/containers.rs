@@ -289,13 +289,9 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn list(&self) -> fdo::Result<HashMap<Uuid, ContainerData>> {
+    async fn list(&self) -> fdo::Result<Vec<ContainerData>> {
         debug!("listing {} containers", self.containers.len());
-        let nodes = self
-            .containers
-            .iter()
-            .map(|(id, node)| (*id, node.data.clone()))
-            .collect();
+        let nodes = self.containers.values().map(|n| n.data.clone()).collect();
 
         fdo::Result::Ok(nodes)
     }

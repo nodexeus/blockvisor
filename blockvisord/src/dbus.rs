@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use uuid::Uuid;
 use zbus::{dbus_proxy, Result};
 
@@ -14,7 +13,7 @@ trait Node {
     async fn delete(&self, id: &Uuid) -> Result<()>;
     async fn start(&self, id: &Uuid) -> Result<()>;
     async fn stop(&self, id: &Uuid) -> Result<()>;
-    async fn list(&self) -> Result<HashMap<Uuid, ContainerData>>;
+    async fn list(&self) -> Result<Vec<ContainerData>>;
 
     // TODO: Rest of the NodeCommand variants.
 }

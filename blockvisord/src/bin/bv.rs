@@ -125,7 +125,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             node_proxy
                 .list()
                 .await?
-                .values()
+                .iter()
                 .filter(|c| {
                     chain
                         .as_ref()
