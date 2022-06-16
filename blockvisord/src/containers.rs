@@ -383,10 +383,6 @@ impl Containers {
 
         iface
     }
-
-    async fn get_node(&self, id: &Uuid) -> Option<&Node> {
-        self.containers.get(id)
-    }
 }
 
 #[derive(Debug, Clone)]
