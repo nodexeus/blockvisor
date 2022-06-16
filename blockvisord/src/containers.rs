@@ -14,6 +14,7 @@ use tokio::fs::{self, read_dir};
 use tokio::time::sleep;
 use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
+use zbus::export::futures_util::TryFutureExt;
 use zbus::{dbus_interface, fdo, zvariant::Type};
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
@@ -43,7 +44,7 @@ pub enum ContainerState {
 
 #[derive(Debug)]
 pub struct Node {
-    id: Uuid,
+    data: ContainerData,
     machine: Machine<'static>,
 }
 
@@ -59,36 +60,42 @@ impl Node {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
-    pub async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = Node::create_config(id, network_interface)?;
+    pub async fn create(data: ContainerData, network_interface: &NetworkInterface) -> Result<Self> {
+        let config = Node::create_config(data.id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
+        data.save().await?;
 
-        Ok(Self { id, machine })
+        Ok(Self { data, machine })
     }
 
     /// Returns container previously created on this host.
     #[instrument]
-    pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = Node::create_config(id, network_interface)?;
-        let cmd = id.to_string();
+    pub async fn connect(
+        data: ContainerData,
+        network_interface: &NetworkInterface,
+    ) -> Result<Self> {
+        let config = Node::create_config(data.id, network_interface)?;
+        let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => firec::MachineState::RUNNING { pid },
             Err(_) => firec::MachineState::SHUTOFF,
         };
         let machine = firec::Machine::connect(config, state).await;
 
-        Ok(Self { id, machine })
+        Ok(Self { data, machine })
     }
 
     /// Returns the container's `id`.
     pub fn id(&self) -> &Uuid {
-        &self.id
+        &self.data.id
     }
 
     /// Starts the container.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
-        self.machine.start().await.map_err(Into::into)
+        self.machine.start().await?;
+        self.data.state = ContainerState::Started;
+        self.data.save().await
     }
 
     /// Returns the state of the container.
@@ -113,6 +120,8 @@ impl Node {
                 }
             }
         }
+        self.data.state = ContainerState::Stopped;
+        self.data.save().await?;
 
         Ok(())
     }
@@ -120,7 +129,8 @@ impl Node {
     /// Deletes the container.
     #[instrument(skip(self))]
     pub async fn delete(self) -> Result<()> {
-        self.machine.delete().await.map_err(Into::into)
+        self.machine.delete().await?;
+        self.data.delete().await
     }
 
     fn create_config(
@@ -163,9 +173,9 @@ impl Node {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Containers {
-    pub containers: HashMap<Uuid, ContainerData>,
+    pub containers: HashMap<Uuid, Node>,
     data: CommonData,
 }
 
@@ -225,15 +235,10 @@ impl Containers {
         };
 
         let network_interface = self.next_network_interface();
-        Node::create(id, &network_interface)
+        let node = Node::create(container, &network_interface)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-
-        container
-            .save()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        self.containers.insert(id, container);
+        self.containers.insert(id, node);
         debug!("Container with id `{}` created", id);
 
         fdo::Result::Ok(id)
@@ -241,18 +246,11 @@ impl Containers {
 
     #[instrument(skip(self))]
     async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        let data = self.containers.remove(&id).ok_or_else(|| {
+        let node = self.containers.remove(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         node.delete()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        data.delete()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("deleted");
@@ -262,24 +260,12 @@ impl Containers {
 
     #[instrument(skip(self))]
     async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
-        if !self.containers.contains_key(&id) {
-            let msg = format!("Container with id {} not found", id);
-            return Err(fdo::Error::FileNotFound(msg));
-        }
-        debug!("found container");
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        node.start()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        let data = self.containers.get_mut(&id).ok_or_else(|| {
+        let node = self.containers.get_mut(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
-        data.state = ContainerState::Started;
-        data.save()
+        debug!("found container");
+        node.start()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("started");
@@ -289,24 +275,12 @@ impl Containers {
 
     #[instrument(skip(self))]
     async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
-        if !self.containers.contains_key(&id) {
-            let msg = format!("Container with id {} not found", id);
-            return Err(fdo::Error::FileNotFound(msg));
-        }
-        debug!("found container");
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        node.kill()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        let data = self.containers.get_mut(&id).ok_or_else(|| {
+        let node = self.containers.get_mut(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
-        data.state = ContainerState::Stopped;
-        data.save()
+        debug!("found container");
+        node.kill()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("stopped");
@@ -317,7 +291,13 @@ impl Containers {
     #[instrument(skip(self))]
     async fn list(&self) -> fdo::Result<HashMap<Uuid, ContainerData>> {
         debug!("listing {} containers", self.containers.len());
-        fdo::Result::Ok(self.containers.clone())
+        let nodes = self
+            .containers
+            .iter()
+            .map(|(id, node)| (*id, node.data.clone()))
+            .collect();
+
+        fdo::Result::Ok(nodes)
     }
 
     // TODO: Rest of the NodeCommand variants.
@@ -338,7 +318,10 @@ impl Containers {
             "Reading containers config dir: {}",
             REGISTRY_CONFIG_DIR.display()
         );
-        let mut containers = HashMap::new();
+        let mut this = Containers {
+            containers: HashMap::new(),
+            data: containers_data,
+        };
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {
             // blockvisord should not bail on problems with individual container files.
@@ -348,17 +331,19 @@ impl Containers {
                 // Skip the common data file.
                 continue;
             }
-            match ContainerData::load(&*path).await {
+            let network_interface = this.next_network_interface();
+            match ContainerData::load(&*path)
+                .and_then(|container| Node::connect(container, &network_interface))
+                .await
+            {
                 Ok(container) => {
-                    containers.insert(container.id, container);
+                    this.containers.insert(container.data.id, container);
                 }
                 Err(e) => warn!("Failed to read container file `{}`: {}", path.display(), e),
             }
         }
-        Ok(Containers {
-            containers,
-            data: containers_data,
-        })
+
+        Ok(this)
     }
 
     pub async fn save(&self) -> Result<()> {
@@ -399,11 +384,8 @@ impl Containers {
         iface
     }
 
-    async fn get_node(&self, id: &Uuid) -> Result<Node> {
-        // FIXME: This is wrong and bad to create the interface just to delete the VMM but until we keep the Nodes in the
-        // memory and don't save the machine config, we need to do this.
-        let network_interface = self.next_network_interface();
-        Node::connect(*id, &network_interface).await
+    async fn get_node(&self, id: &Uuid) -> Option<&Node> {
+        self.containers.get(id)
     }
 }
 
