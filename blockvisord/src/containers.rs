@@ -289,11 +289,10 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn list(&self) -> fdo::Result<Vec<ContainerData>> {
+    async fn list(&self) -> Vec<ContainerData> {
         debug!("listing {} containers", self.containers.len());
-        let nodes = self.containers.values().map(|n| n.data.clone()).collect();
 
-        fdo::Result::Ok(nodes)
+        self.containers.values().map(|n| n.data.clone()).collect()
     }
 
     // TODO: Rest of the NodeCommand variants.
