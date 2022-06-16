@@ -37,7 +37,6 @@ pub enum ServiceStatus {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
-    Created,
     Started,
     Stopped,
 }
@@ -231,7 +230,7 @@ impl Containers {
         let container = ContainerData {
             id,
             chain,
-            state: ContainerState::Created,
+            state: ContainerState::Stopped,
         };
 
         let network_interface = self.next_network_interface();
