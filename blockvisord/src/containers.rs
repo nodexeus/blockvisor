@@ -41,6 +41,7 @@ pub enum ContainerState {
     Stopped,
 }
 
+#[derive(Debug)]
 pub struct Node {
     id: Uuid,
     machine: Machine<'static>,
