@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
@@ -10,20 +10,23 @@ use std::{
     sync::{Arc, Mutex},
 };
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
-use tokio::fs;
+use tokio::fs::{self, read_dir};
 use tokio::time::sleep;
-use tracing::{debug, info, instrument, trace};
+use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
+use zbus::export::futures_util::TryFutureExt;
 use zbus::{dbus_interface, fdo, zvariant::Type};
 
 const CONTAINERS_CONFIG_FILENAME: &str = "containers.toml";
 
 lazy_static::lazy_static! {
-    static ref REGISTRY_CONFIG_FILE: PathBuf = home::home_dir()
+    static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
         .map(|p| p.join(".cache"))
         .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("blockvisor")
-        .join(CONTAINERS_CONFIG_FILENAME);
+        .join("blockvisor");
+}
+lazy_static::lazy_static! {
+    static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(CONTAINERS_CONFIG_FILENAME);
 }
 
 #[derive(Clone, Debug)]
@@ -34,13 +37,13 @@ pub enum ServiceStatus {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
-    Created,
     Started,
     Stopped,
 }
 
+#[derive(Debug)]
 pub struct Node {
-    id: Uuid,
+    data: ContainerData,
     machine: Machine<'static>,
 }
 
@@ -56,36 +59,42 @@ impl Node {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
-    pub async fn create(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = Node::create_config(id, network_interface)?;
+    pub async fn create(data: ContainerData, network_interface: &NetworkInterface) -> Result<Self> {
+        let config = Node::create_config(data.id, network_interface)?;
         let machine = firec::Machine::create(config).await?;
+        data.save().await?;
 
-        Ok(Self { id, machine })
+        Ok(Self { data, machine })
     }
 
     /// Returns container previously created on this host.
     #[instrument]
-    pub async fn connect(id: Uuid, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = Node::create_config(id, network_interface)?;
-        let cmd = id.to_string();
+    pub async fn connect(
+        data: ContainerData,
+        network_interface: &NetworkInterface,
+    ) -> Result<Self> {
+        let config = Node::create_config(data.id, network_interface)?;
+        let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => firec::MachineState::RUNNING { pid },
             Err(_) => firec::MachineState::SHUTOFF,
         };
         let machine = firec::Machine::connect(config, state).await;
 
-        Ok(Self { id, machine })
+        Ok(Self { data, machine })
     }
 
     /// Returns the container's `id`.
     pub fn id(&self) -> &Uuid {
-        &self.id
+        &self.data.id
     }
 
     /// Starts the container.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
-        self.machine.start().await.map_err(Into::into)
+        self.machine.start().await?;
+        self.data.state = ContainerState::Started;
+        self.data.save().await
     }
 
     /// Returns the state of the container.
@@ -110,14 +119,17 @@ impl Node {
                 }
             }
         }
+        self.data.state = ContainerState::Stopped;
+        self.data.save().await?;
 
         Ok(())
     }
 
     /// Deletes the container.
     #[instrument(skip(self))]
-    pub async fn delete(&mut self) -> Result<()> {
-        unimplemented!()
+    pub async fn delete(self) -> Result<()> {
+        self.machine.delete().await?;
+        self.data.delete().await
     }
 
     fn create_config(
@@ -160,9 +172,14 @@ impl Node {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct Containers {
-    pub containers: HashMap<Uuid, ContainerData>,
+    pub containers: HashMap<Uuid, Node>,
+    data: CommonData,
+}
+
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+pub struct CommonData {
     machine_index: Arc<Mutex<u32>>,
 }
 
@@ -173,6 +190,38 @@ pub struct ContainerData {
     pub state: ContainerState,
 }
 
+impl ContainerData {
+    async fn load(path: &Path) -> Result<Self> {
+        info!("Reading containers config file: {}", path.display());
+        fs::read_to_string(&path)
+            .await
+            .and_then(|s| toml::from_str::<Self>(&s).map_err(Into::into))
+            .with_context(|| format!("Failed to read container file `{}`", path.display()))
+    }
+
+    async fn save(&self) -> Result<()> {
+        let path = self.file_path();
+        info!("Writing container config: {}", path.display());
+        let config = toml::to_string(self)?;
+        fs::write(&path, &*config).await?;
+
+        Ok(())
+    }
+
+    async fn delete(self) -> Result<()> {
+        let path = self.file_path();
+        info!("Deleting container config: {}", path.display());
+        fs::remove_file(&*path)
+            .await
+            .with_context(|| format!("Failed to delete container file `{}`", path.display()))
+    }
+
+    fn file_path(&self) -> PathBuf {
+        let filename = format!("{}.toml", self.id);
+        REGISTRY_CONFIG_DIR.join(filename)
+    }
+}
+
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Containers {
     #[instrument(skip(self))]
@@ -181,18 +230,14 @@ impl Containers {
         let container = ContainerData {
             id,
             chain,
-            state: ContainerState::Created,
+            state: ContainerState::Stopped,
         };
 
         let network_interface = self.next_network_interface();
-        Node::create(id, &network_interface)
+        let node = Node::create(container, &network_interface)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-
-        self.containers.insert(id, container);
-        self.save()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        self.containers.insert(id, node);
         debug!("Container with id `{}` created", id);
 
         fdo::Result::Ok(id)
@@ -200,18 +245,11 @@ impl Containers {
 
     #[instrument(skip(self))]
     async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        self.containers.remove(&id).ok_or_else(|| {
+        let node = self.containers.remove(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         node.delete()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        self.save()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("deleted");
@@ -220,16 +258,12 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn start(&self, id: Uuid) -> fdo::Result<()> {
-        self.containers.get(&id).ok_or_else(|| {
+    async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
+        let node = self.containers.get_mut(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found container");
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         node.start()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
@@ -239,16 +273,12 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn stop(&self, id: Uuid) -> fdo::Result<()> {
-        self.containers.get(&id).ok_or_else(|| {
+    async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
+        let node = self.containers.get_mut(&id).ok_or_else(|| {
             let msg = format!("Container with id {} not found", id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found container");
-        let mut node = self
-            .get_node(&id)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         node.kill()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
@@ -258,9 +288,10 @@ impl Containers {
     }
 
     #[instrument(skip(self))]
-    async fn list(&self) -> fdo::Result<HashMap<Uuid, ContainerData>> {
+    async fn list(&self) -> Vec<ContainerData> {
         debug!("listing {} containers", self.containers.len());
-        fdo::Result::Ok(self.containers.clone())
+
+        self.containers.values().map(|n| n.data.clone()).collect()
     }
 
     // TODO: Rest of the NodeCommand variants.
@@ -268,26 +299,58 @@ impl Containers {
 
 impl Containers {
     pub async fn load() -> Result<Containers> {
+        // First load the common data file.
         info!(
-            "Reading containers config: {}",
+            "Reading containers common config file: {}",
             REGISTRY_CONFIG_FILE.display()
         );
         let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE).await?;
-        Ok(toml::from_str(&config)?)
+        let containers_data = toml::from_str(&config)?;
+
+        // Now the individual container data files.
+        info!(
+            "Reading containers config dir: {}",
+            REGISTRY_CONFIG_DIR.display()
+        );
+        let mut this = Containers {
+            containers: HashMap::new(),
+            data: containers_data,
+        };
+        let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
+        while let Some(entry) = dir.next_entry().await? {
+            // blockvisord should not bail on problems with individual container files.
+            // It should log warnings though.
+            let path = entry.path();
+            if path == *REGISTRY_CONFIG_FILE {
+                // Skip the common data file.
+                continue;
+            }
+            let network_interface = this.next_network_interface();
+            match ContainerData::load(&*path)
+                .and_then(|container| Node::connect(container, &network_interface))
+                .await
+            {
+                Ok(container) => {
+                    this.containers.insert(container.data.id, container);
+                }
+                Err(e) => warn!("Failed to read container file `{}`: {}", path.display(), e),
+            }
+        }
+
+        Ok(this)
     }
 
     pub async fn save(&self) -> Result<()> {
+        // We only save the common data file. The individual container data files save themselves.
         info!(
-            "Writing containers config: {}",
+            "Writing containers common config file: {}",
             REGISTRY_CONFIG_FILE.display()
         );
-        let config = toml::Value::try_from(self)?;
+        let config = toml::Value::try_from(&self.data)?;
         let config = toml::to_string(&config)?;
-        let parent = REGISTRY_CONFIG_FILE
-            .parent()
-            .expect("config file has no parent");
-        fs::create_dir_all(parent).await?;
+        fs::create_dir_all(REGISTRY_CONFIG_DIR.as_path()).await?;
         fs::write(&*REGISTRY_CONFIG_FILE, &*config).await?;
+
         Ok(())
     }
 
@@ -297,7 +360,7 @@ impl Containers {
 
     /// Get the next machine index and increment it.
     pub fn next_network_interface(&self) -> NetworkInterface {
-        let mut machine_index = self.machine_index.lock().expect("lock poisoned");
+        let mut machine_index = self.data.machine_index.lock().expect("lock poisoned");
 
         let idx_bytes = machine_index.to_be_bytes();
         let iface = NetworkInterface {
@@ -313,13 +376,6 @@ impl Containers {
         *machine_index += 1;
 
         iface
-    }
-
-    async fn get_node(&self, id: &Uuid) -> Result<Node> {
-        // FIXME: This is wrong and bad to create the interface just to delete the VMM but until we keep the Nodes in the
-        // memory and don't save the machine config, we need to do this.
-        let network_interface = self.next_network_interface();
-        Node::connect(*id, &network_interface).await
     }
 }
 
@@ -366,7 +422,7 @@ mod tests {
         );
 
         // Let's take the machine_index beyond u8 boundry.
-        *containers.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
+        *containers.data.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
         let iface = containers.next_network_interface();
         assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
         assert_eq!(

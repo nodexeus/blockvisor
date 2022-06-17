@@ -125,15 +125,13 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             node_proxy
                 .list()
                 .await?
-                .values()
+                .iter()
                 .filter(|c| {
                     chain
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all
-                            || c.state == ContainerState::Created
-                            || c.state == ContainerState::Started)
+                        && (*all || c.state == ContainerState::Started)
                 })
                 .for_each(|c| println!("{:?}", c));
         }
