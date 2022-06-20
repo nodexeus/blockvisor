@@ -29,6 +29,22 @@
       (item) => item.name === $form.network.value,
     );
 
+    let nodeType = $form.nodeType.value;
+
+    if (nodeType) {
+      switch (nodeType) {
+        case 'ETL':
+          nodeType = 'etl';
+          break;
+        case 'Node/api':
+          nodeType = 'node';
+          break;
+        case 'Validator':
+          nodeType = 'validator';
+          break;
+      }
+    }
+
     const res = await httpClient.post(
       ENDPOINTS.HOST_PROVISIONS.CREATE_HOST_PROVISION_POST,
       {
@@ -36,7 +52,7 @@
         nodes: [
           {
             blockchain_id: thisBlockchain.id,
-            node_type: $form.nodeType.value,
+            node_type: nodeType,
           },
         ],
       },
@@ -104,6 +120,8 @@
   const handleNextStep = () => {
     setStep(5);
   };
+
+  console.log($form.nodeType.value);
 </script>
 
 <section class="provision-host">
