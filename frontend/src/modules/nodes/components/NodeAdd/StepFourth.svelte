@@ -3,11 +3,13 @@
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { ENDPOINTS } from 'consts/endpoints';
   import { format } from 'date-fns';
+  import { blockchains } from 'modules/broadcasts/store/broadcastStore';
   import {
     getHostById,
     provisionedHostId,
   } from 'modules/hosts/store/hostsStore';
   import DataRow from 'modules/nodes/components/DetailsTable/DataRow.svelte';
+  import { activeOrganisation } from 'modules/organisation/store/organisationStore';
   import { onMount } from 'svelte';
   import { httpClient } from 'utils/httpClient';
 
@@ -23,10 +25,20 @@
   let isChecking = false;
 
   onMount(async () => {
+    const thisBlockchain = $blockchains.find(
+      (item) => item.name === $form.network.value,
+    );
+
     const res = await httpClient.post(
       ENDPOINTS.HOST_PROVISIONS.CREATE_HOST_PROVISION_POST,
       {
-        org_id: '24f00a6c-1cb6-4660-8670-a9a7466699b2',
+        org_id: $activeOrganisation.id,
+        nodes: [
+          {
+            blockchain_id: thisBlockchain.id,
+            node_type: $form.nodeType.value,
+          },
+        ],
       },
     );
 

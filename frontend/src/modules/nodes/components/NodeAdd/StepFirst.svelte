@@ -21,8 +21,6 @@
   onMount(() => {
     getAllBlockchains();
   });
-
-  $: console.log($blockchains);
 </script>
 
 <div class="network">
