@@ -10,6 +10,7 @@ use blockvisord::{
 };
 use clap::Parser;
 use tokio::time::Duration;
+use uuid::Uuid;
 use zbus::Connection;
 
 #[tokio::main]
@@ -136,7 +137,8 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .for_each(|c| println!("{:?}", c));
         }
         NodeCommand::Create { chain } => {
-            let id = node_proxy.create(chain).await?;
+            let id = Uuid::new_v4();
+            node_proxy.create(&id, chain).await?;
             println!("Created new node for `{}` chain with ID `{}`", chain, id);
         }
         NodeCommand::Start { id } => {

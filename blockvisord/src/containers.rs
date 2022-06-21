@@ -223,8 +223,7 @@ impl ContainerData {
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Containers {
     #[instrument(skip(self))]
-    async fn create(&mut self, chain: String) -> fdo::Result<Uuid> {
-        let id = Uuid::new_v4();
+    async fn create(&mut self, id: Uuid, chain: String) -> fdo::Result<()> {
         let container = ContainerData {
             id,
             chain,
@@ -238,7 +237,7 @@ impl Containers {
         self.containers.insert(id, node);
         debug!("Container with id `{}` created", id);
 
-        fdo::Result::Ok(id)
+        fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
