@@ -9,7 +9,7 @@ use crate::containers::ContainerData;
     default_service = "com.BlockJoy.blockvisor"
 )]
 trait Node {
-    async fn create(&self, chain: &str) -> Result<Uuid>;
+    async fn create(&self, id: &Uuid, chain: &str) -> Result<()>;
     async fn delete(&self, id: &Uuid) -> Result<()>;
     async fn start(&self, id: &Uuid) -> Result<()>;
     async fn stop(&self, id: &Uuid) -> Result<()>;
