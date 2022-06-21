@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { ENDPOINTS } from 'consts/endpoints';
 
 export const post = async ({ request }) => {
@@ -6,18 +5,32 @@ export const post = async ({ request }) => {
   const { email, password } = data;
 
   try {
-    const response = await axios.post(ENDPOINTS.AUTHENTICATION.LOGIN_POST, {
-      email,
-      password,
+    const data = await fetch(ENDPOINTS.AUTHENTICATION.LOGIN_POST, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
     });
 
+    if (data.ok) {
+      const res = await data.json();
+
+      return {
+        status: 200,
+        body: res,
+      };
+    }
+
     return {
-      body: response.data,
+      status: data.status,
+      body: data.statusText,
     };
   } catch (error) {
     return {
-      status: error.response.status,
-      body: error.response.data,
+      status: error?.response?.status ?? 500,
+      body: error?.response?.data ?? JSON.stringify(error.message),
     };
   }
 };

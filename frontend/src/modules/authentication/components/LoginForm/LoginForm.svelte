@@ -38,8 +38,6 @@
 </script>
 
 <form
-  method="POST"
-  action="#"
   on:submit|preventDefault={handleLogin}
   class="login-form"
   use:form
