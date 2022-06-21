@@ -132,7 +132,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.state == ContainerState::Started)
+                        && (*all || c.state == ContainerState::Running)
                 })
                 .for_each(|c| println!("{:?}", c));
         }

@@ -37,7 +37,7 @@ pub enum ServiceStatus {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum ContainerState {
-    Started,
+    Running,
     Stopped,
 }
 
@@ -93,7 +93,7 @@ impl Node {
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await?;
-        self.data.state = ContainerState::Started;
+        self.data.state = ContainerState::Running;
         self.data.save().await
     }
 
