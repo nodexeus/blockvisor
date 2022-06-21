@@ -35,7 +35,7 @@
 </script>
 
 <form
-  on:submit={handleSubmit}
+  on:submit|preventDefault={handleSubmit}
   use:form
   class="register-form"
 >
