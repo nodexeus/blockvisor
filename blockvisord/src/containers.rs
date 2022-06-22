@@ -70,8 +70,8 @@ impl Node {
     /// Creates a new container with `id`.
     /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
-    pub async fn create(data: ContainerData, network_interface: &NetworkInterface) -> Result<Self> {
-        let config = Node::create_config(data.id, network_interface)?;
+    pub async fn create(data: ContainerData) -> Result<Self> {
+        let config = Node::create_config(data.id, &data.network_interface)?;
         let machine = firec::Machine::create(config).await?;
         data.save().await?;
 
@@ -80,11 +80,8 @@ impl Node {
 
     /// Returns container previously created on this host.
     #[instrument]
-    pub async fn connect(
-        data: ContainerData,
-        network_interface: &NetworkInterface,
-    ) -> Result<Self> {
-        let config = Node::create_config(data.id, network_interface)?;
+    pub async fn connect(data: ContainerData) -> Result<Self> {
+        let config = Node::create_config(data.id, &data.network_interface)?;
         let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => firec::MachineState::RUNNING { pid },
@@ -200,6 +197,8 @@ pub struct ContainerData {
     pub chain: String,
     #[table(title = "State")]
     pub state: ContainerState,
+    #[table(title = "IP Address")]
+    pub network_interface: NetworkInterface,
 }
 
 impl ContainerData {
@@ -238,14 +237,15 @@ impl ContainerData {
 impl Containers {
     #[instrument(skip(self))]
     async fn create(&mut self, id: Uuid, chain: String) -> fdo::Result<()> {
+        let network_interface = self.next_network_interface();
         let container = ContainerData {
             id,
             chain,
             state: ContainerState::Stopped,
+            network_interface,
         };
 
-        let network_interface = self.next_network_interface();
-        let node = Node::create(container, &network_interface)
+        let node = Node::create(container)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         self.containers.insert(id, node);
@@ -336,11 +336,7 @@ impl Containers {
                 // Skip the common data file.
                 continue;
             }
-            let network_interface = this.next_network_interface();
-            match ContainerData::load(&*path)
-                .and_then(|container| Node::connect(container, &network_interface))
-                .await
-            {
+            match ContainerData::load(&*path).and_then(Node::connect).await {
                 Ok(container) => {
                     this.containers.insert(container.data.id, container);
                 }
@@ -418,7 +414,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Type)]
 pub struct NetworkInterface {
     pub name: String,
     pub ip: IpAddr,
