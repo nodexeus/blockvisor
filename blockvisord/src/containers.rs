@@ -424,6 +424,12 @@ pub struct NetworkInterface {
     pub ip: IpAddr,
 }
 
+impl fmt::Display for NetworkInterface {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.ip)
+    }
+}
+
 /// Get the pid of the running VM process knowing its process name and part of command line.
 fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
     let mut sys = System::new();
