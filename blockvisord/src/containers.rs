@@ -1,7 +1,12 @@
 use anyhow::{bail, Context, Result};
+use cli_table::{
+    format::{Border, HorizontalLine, Justify, Separator},
+    Table, TableStruct, WithTitle,
+};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -39,6 +44,12 @@ pub enum ServiceStatus {
 pub enum ContainerState {
     Running,
     Stopped,
+}
+
+impl fmt::Display for ContainerState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug)]
@@ -181,10 +192,13 @@ pub struct CommonData {
     machine_index: Arc<Mutex<u32>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Type)]
+#[derive(Deserialize, Serialize, Debug, Clone, Type, Table)]
 pub struct ContainerData {
+    #[table(title = "VM ID", justify = "Justify::Right")]
     pub id: Uuid,
+    #[table(title = "Chain")]
     pub chain: String,
+    #[table(title = "State")]
     pub state: ContainerState,
 }
 
@@ -373,6 +387,34 @@ impl Containers {
         *machine_index += 1;
 
         iface
+    }
+}
+
+/// Converts into a [`cli_table::TableStruct`] table that could be displayed on command line
+///
+/// We are putting derives on [`ContainerData`] to convert anything that iterates
+/// over this type into a CLI table.
+///
+/// See <https://docs.rs/cli-table/latest/cli_table/#derive-macro>
+pub trait PrettyTable {
+    fn to_pretty_table(self) -> TableStruct;
+}
+
+impl<T> PrettyTable for T
+where
+    Self: WithTitle,
+{
+    fn to_pretty_table(self) -> TableStruct {
+        // this will build a table w/o title, w/o borders between the rows and columns
+        // and w/ horizontal lines before and after the table
+        self.with_title()
+            .separator(Separator::builder().build())
+            .border(
+                Border::builder()
+                    .bottom(HorizontalLine::default())
+                    .top(HorizontalLine::default())
+                    .build(),
+            )
     }
 }
 

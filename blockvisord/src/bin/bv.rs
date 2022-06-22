@@ -3,12 +3,13 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{ContainerState, Containers},
+    containers::{ContainerState, Containers, PrettyTable},
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
+use cli_table::print_stdout;
 use tokio::time::Duration;
 use uuid::Uuid;
 use zbus::Connection;
@@ -123,9 +124,8 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
 
     match command {
         NodeCommand::List { all, chain } => {
-            node_proxy
-                .list()
-                .await?
+            let containers = node_proxy.list().await?;
+            let mut containers = containers
                 .iter()
                 .filter(|c| {
                     chain
@@ -134,7 +134,10 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .unwrap_or(true)
                         && (*all || c.state == ContainerState::Running)
                 })
-                .for_each(|c| println!("{:?}", c));
+                .peekable();
+            if containers.peek().is_some() {
+                print_stdout(containers.to_pretty_table())?;
+            }
         }
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4();
