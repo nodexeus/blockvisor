@@ -1,7 +1,9 @@
 use anyhow::{bail, Context, Result};
 use cli_table::{
     format::{Border, HorizontalLine, Justify, Separator},
-    Table, TableStruct, WithTitle,
+    CellStruct,
+    Color::{Blue, Cyan, Green, Red, Yellow},
+    Style, Table, TableStruct, WithTitle,
 };
 use firec::config::JailerMode;
 use firec::Machine;
@@ -44,6 +46,13 @@ pub enum ServiceStatus {
 pub enum ContainerState {
     Running,
     Stopped,
+}
+
+fn style_container_state(cell: CellStruct, value: &ContainerState) -> CellStruct {
+    match value {
+        ContainerState::Running => cell.foreground_color(Some(Green)),
+        ContainerState::Stopped => cell.foreground_color(Some(Red)),
+    }
 }
 
 impl fmt::Display for ContainerState {
@@ -191,13 +200,13 @@ pub struct CommonData {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Type, Table)]
 pub struct ContainerData {
-    #[table(title = "VM ID", justify = "Justify::Right")]
+    #[table(title = "VM ID", justify = "Justify::Right", color = "Cyan")]
     pub id: Uuid,
-    #[table(title = "Chain")]
+    #[table(title = "Chain", color = "Blue")]
     pub chain: String,
-    #[table(title = "State")]
+    #[table(title = "State", customize_fn = "style_container_state")]
     pub state: ContainerState,
-    #[table(title = "IP Address")]
+    #[table(title = "IP Address", color = "Yellow")]
     pub network_interface: NetworkInterface,
 }
 
