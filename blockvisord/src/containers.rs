@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -39,6 +40,12 @@ pub enum ServiceStatus {
 pub enum ContainerState {
     Running,
     Stopped,
+}
+
+impl fmt::Display for ContainerState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug)]
