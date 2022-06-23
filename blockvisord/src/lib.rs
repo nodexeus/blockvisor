@@ -1,8 +1,12 @@
 pub mod cli;
 pub mod client;
 pub mod config;
-pub mod containers;
 pub mod dbus;
 pub mod hosts;
 pub mod logging;
+pub mod network_interface;
+pub mod node;
+pub mod node_data;
+pub mod nodes;
+pub mod pretty_table;
 pub mod systemd;

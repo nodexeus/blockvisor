@@ -2,9 +2,9 @@ use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
-    containers::Containers,
     dbus::NodeProxy,
     logging::setup_logging,
+    nodes::Nodes,
 };
 use tokio::time::{sleep, Duration};
 use tracing::info;
@@ -17,10 +17,10 @@ async fn main() -> Result<()> {
     info!("Starting...");
 
     let config = Config::load().await?;
-    let containers = Containers::load().await?;
+    let nodes = Nodes::load().await?;
     let _conn = ConnectionBuilder::system()?
         .name(NodeProxy::DESTINATION)?
-        .serve_at(NodeProxy::PATH, containers)?
+        .serve_at(NodeProxy::PATH, nodes)?
         .build()
         .await?;
 

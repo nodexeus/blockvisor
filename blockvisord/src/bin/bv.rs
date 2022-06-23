@@ -3,9 +3,11 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{ContainerState, Containers, PrettyTable},
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
+    node_data::NodeState,
+    nodes::Nodes,
+    pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
@@ -56,8 +58,8 @@ async fn main() -> Result<()> {
             .save()
             .await?;
 
-            if !Containers::exists() {
-                Containers::default().save().await?;
+            if !Nodes::exists() {
+                Nodes::default().save().await?;
             }
         }
         Command::Start(_) => {
@@ -124,19 +126,19 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
 
     match command {
         NodeCommand::List { all, chain } => {
-            let containers = node_proxy.list().await?;
-            let mut containers = containers
+            let nodes = node_proxy.list().await?;
+            let mut nodes = nodes
                 .iter()
                 .filter(|c| {
                     chain
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.state == ContainerState::Running)
+                        && (*all || c.state == NodeState::Running)
                 })
                 .peekable();
-            if containers.peek().is_some() {
-                print_stdout(containers.to_pretty_table())?;
+            if nodes.peek().is_some() {
+                print_stdout(nodes.to_pretty_table())?;
             } else {
                 println!("No nodes found.");
             }
