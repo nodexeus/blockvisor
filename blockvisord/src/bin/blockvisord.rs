@@ -2,9 +2,9 @@ use anyhow::Result;
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
-    containers::Nodes,
     dbus::NodeProxy,
     logging::setup_logging,
+    nodes::Nodes,
 };
 use tokio::time::{sleep, Duration};
 use tracing::info;

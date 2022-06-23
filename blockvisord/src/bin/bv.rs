@@ -3,9 +3,9 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{NodeState, Nodes},
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
+    nodes::{NodeState, Nodes},
     pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
