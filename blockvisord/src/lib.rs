@@ -4,6 +4,7 @@ pub mod config;
 pub mod dbus;
 pub mod hosts;
 pub mod logging;
+pub mod node;
 pub mod nodes;
 pub mod pretty_table;
 pub mod systemd;
