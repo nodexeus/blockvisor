@@ -137,6 +137,8 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .peekable();
             if containers.peek().is_some() {
                 print_stdout(containers.to_pretty_table())?;
+            } else {
+                println!("No nodes found.");
             }
         }
         NodeCommand::Create { chain } => {
