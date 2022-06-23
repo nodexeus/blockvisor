@@ -3,9 +3,10 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     client::{APIClient, HostCreateRequest},
     config::Config,
-    containers::{ContainerState, Containers, PrettyTable},
+    containers::{ContainerState, Containers},
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
+    pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;

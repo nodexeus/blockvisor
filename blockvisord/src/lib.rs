@@ -5,4 +5,5 @@ pub mod containers;
 pub mod dbus;
 pub mod hosts;
 pub mod logging;
+pub mod pretty_table;
 pub mod systemd;
