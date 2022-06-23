@@ -14,7 +14,8 @@ use zbus::{dbus_interface, fdo};
 
 use crate::{
     network_interface::NetworkInterface,
-    node::{Node, NodeData, NodeState},
+    node::Node,
+    node_data::{NodeData, NodeState},
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";

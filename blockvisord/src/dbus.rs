@@ -1,7 +1,7 @@
 use uuid::Uuid;
 use zbus::{dbus_proxy, Result};
 
-use crate::node::NodeData;
+use crate::node_data::NodeData;
 
 #[dbus_proxy(
     interface = "com.BlockJoy.blockvisor.Node",

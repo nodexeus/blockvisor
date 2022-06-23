@@ -5,7 +5,7 @@ use blockvisord::{
     config::Config,
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
-    node::NodeState,
+    node_data::NodeState,
     nodes::Nodes,
     pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
