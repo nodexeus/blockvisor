@@ -3,7 +3,7 @@ use cli_table::{
     format::{Border, HorizontalLine, Justify, Separator},
     CellStruct,
     Color::{Blue, Cyan, Green, Red, Yellow},
-    Style, Table, TableStruct, WithTitle,
+    ColorChoice, Style, Table, TableStruct, WithTitle,
 };
 use firec::config::JailerMode;
 use firec::Machine;
@@ -420,6 +420,7 @@ where
                     .top(HorizontalLine::default())
                     .build(),
             )
+            .color_choice(ColorChoice::Auto)
     }
 }
 
