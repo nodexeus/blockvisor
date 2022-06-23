@@ -1,6 +1,5 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::{
@@ -11,9 +10,12 @@ use tokio::fs::{self, read_dir};
 use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
-use zbus::{dbus_interface, fdo, zvariant::Type};
+use zbus::{dbus_interface, fdo};
 
-use crate::node::{Node, NodeData, NodeState};
+use crate::{
+    network_interface::NetworkInterface,
+    node::{Node, NodeData, NodeState},
+};
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
 
@@ -194,18 +196,6 @@ impl Nodes {
         *machine_index += 1;
 
         iface
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, Type)]
-pub struct NetworkInterface {
-    pub name: String,
-    pub ip: IpAddr,
-}
-
-impl fmt::Display for NetworkInterface {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.ip)
     }
 }
 

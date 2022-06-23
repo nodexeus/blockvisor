@@ -18,7 +18,7 @@ use tracing::{info, instrument, trace};
 use uuid::Uuid;
 use zbus::zvariant::Type;
 
-use crate::nodes::{NetworkInterface, REGISTRY_CONFIG_DIR};
+use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
 pub enum NodeState {
