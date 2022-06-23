@@ -28,7 +28,7 @@ impl Config {
     }
 
     pub async fn save(&self) -> Result<()> {
-        let parent = &*HOST_CONFIG_FILE.parent().unwrap();
+        let parent = HOST_CONFIG_FILE.parent().unwrap();
         info!("Ensuring config dir is present: {}", parent.display());
         DirBuilder::new().recursive(true).create(parent).await?;
         info!("Writing host config: {}", HOST_CONFIG_FILE.display());
