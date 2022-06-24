@@ -29,6 +29,12 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+      - name: Build
+        run: >
+          cargo build -p blockvisord
+      - name: Install
+        run: >
+          make install
       - name: Test
         run: >
           cargo test -p blockvisord
