@@ -25,6 +25,9 @@ fn test_bv_cmd_start_no_init() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_restart() {
+    // FIXME: investigate why test is not stable without sleeps
+    use std::{thread::sleep, time::Duration};
+
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("stop")
         .assert()
@@ -32,6 +35,7 @@ fn test_bv_cmd_restart() {
         .stdout(predicate::str::contains(
             "blockvisor service stopped successfully",
         ));
+    sleep(Duration::from_secs(1));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
@@ -40,6 +44,7 @@ fn test_bv_cmd_restart() {
         .stdout(predicate::str::contains(
             "blockvisor service started successfully",
         ));
+    sleep(Duration::from_secs(1));
 }
 
 #[test]
