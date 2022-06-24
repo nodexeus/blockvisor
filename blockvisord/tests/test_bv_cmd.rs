@@ -2,8 +2,11 @@
 use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
+#[cfg(target_os = "linux")]
+use serial_test::serial;
 
 #[test]
+#[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_start_no_init() {
     let tmp_dir = TempDir::new().unwrap();
@@ -17,6 +20,7 @@ fn test_bv_cmd_start_no_init() {
 }
 
 #[test]
+#[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_init_unknown_otp() {
     use predicates::prelude::*;
