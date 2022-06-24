@@ -3,6 +3,8 @@ use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
+use predicates::prelude::*;
+#[cfg(target_os = "linux")]
 use serial_test::serial;
 
 #[test]
@@ -22,9 +24,28 @@ fn test_bv_cmd_start_no_init() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
-fn test_bv_cmd_init_unknown_otp() {
-    use predicates::prelude::*;
+fn test_bv_cmd_restart() {
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("stop")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "blockvisor service stopped successfully",
+        ));
 
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("start")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "blockvisor service started successfully",
+        ));
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
+fn test_bv_cmd_init_unknown_otp() {
     let tmp_dir = TempDir::new().unwrap();
 
     let otp = "UNKNOWN";
