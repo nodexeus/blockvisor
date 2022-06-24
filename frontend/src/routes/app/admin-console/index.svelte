@@ -1,11 +1,14 @@
 <script>
   import { fade } from 'svelte/transition';
   import { pageTransition } from 'consts/animations';
-  import DashboardCard from './overview/DashboardCard.svelte';
+  import DatePicker from 'components/DatePicker/DatePicker.svelte';
+
+  let date = new Date()
 </script>
 
-<section in:fade|local={pageTransition} class="dashboard">
-  <DashboardCard type="full" important>
+<section in:fade|local={pageTransition}>
+  <DatePicker value={date} />
+<!--   <DashboardCard type="full" important>
     <p slot="title">test</p>
     <p slot="value">540</p>
   </DashboardCard>
@@ -20,7 +23,7 @@
   <DashboardCard type="quarter">
     <p slot="title">test</p>
     <p slot="value">540</p>
-  </DashboardCard>
+  </DashboardCard> -->
 </section>
 
 <style>
