@@ -104,7 +104,13 @@ fn test_bv_cmd_node_lifecycle() {
         .stdout(predicate::str::contains("Stopped node with ID"));
     sleep(Duration::from_secs(1));
 
-    // TODO: (re)start stopped node
+    println!("restart stopped node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "start", "--id", vm_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Started node with ID"));
+    sleep(Duration::from_secs(1));
 
     println!("delete started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
