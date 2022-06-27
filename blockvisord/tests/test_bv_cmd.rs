@@ -52,6 +52,8 @@ fn test_bv_cmd_restart() {
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     use std::str;
+    // FIXME: investigate why test is not stable without sleeps
+    use std::{thread::sleep, time::Duration};
     use uuid::Uuid;
 
     let chain_id = Uuid::new_v4().to_string();
@@ -64,6 +66,7 @@ fn test_bv_cmd_node_lifecycle() {
         .stdout(predicate::str::contains(
             "blockvisor service started successfully",
         ));
+    sleep(Duration::from_secs(1));
 
     println!("create a node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -75,6 +78,7 @@ fn test_bv_cmd_node_lifecycle() {
         &stdout.trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "));
     let vm_id = vm_id.trim().trim_matches('`');
     println!("create vm_id: {vm_id}");
+    sleep(Duration::from_secs(1));
 
     println!("stop stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -82,6 +86,7 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node with ID"));
+    sleep(Duration::from_secs(1));
 
     println!("start stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -89,6 +94,7 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Started node with ID"));
+    sleep(Duration::from_secs(1));
 
     println!("stop started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -96,6 +102,7 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node with ID"));
+    sleep(Duration::from_secs(1));
 
     // TODO: (re)start stopped node
 
