@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { DatePicker } from 'date-picker-svelte';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import IconCalendar from 'icons/calendar-12.svg';
@@ -7,8 +7,11 @@
   import { flyDefault } from 'consts/animations';
   import { fly } from 'svelte/transition';
   import { clickOutside } from 'utils';
-  export let value;
+  import type { FormControl } from 'svelte-use-form';
+  
+  export let value: Date;
   export let dropdownActive = false;
+  export let field: FormControl;
 </script>
 
 <div
@@ -19,6 +22,7 @@
   <div class="datepicker-input-wrapper">
     <Input
       value={format(value, 'MM/dd/yyyy HH:mm')}
+      field={field}
       size="small"
       name="start"
       on:focus={() => (dropdownActive = !dropdownActive)}

@@ -3,6 +3,7 @@
   import { pageTransition } from 'consts/animations';
   import DatePicker from 'components/DatePicker/DatePicker.svelte';
 
+
   let date = new Date()
 </script>
 

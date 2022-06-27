@@ -1,11 +1,12 @@
 import { SvelteComponentTyped } from 'svelte';
 
-export interface DatepickerProps {
+export interface DatePickerProps {
   value: Date;
+  field?: FormControl;
 }
 
 export default class Datepicker extends SvelteComponentTyped<
-  MenuProps,
+  DatePickerProps,
   undefined,
   undefined
 > {}
