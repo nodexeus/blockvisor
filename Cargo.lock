@@ -1268,7 +1268,7 @@ dependencies = [
 [[package]]
 name = "firec"
 version = "0.1.1"
-source = "git+https://github.com/blockjoy/firec.git#e2395a8fa0fb294e847d4b1dee4edee0151f7fa2"
+source = "git+https://github.com/blockjoy/firec.git#24f70ad3f5e10766c5f1cc681edb51fcd130342c"
 dependencies = [
  "derivative",
  "hyper 0.14.18",
@@ -2011,7 +2011,7 @@ checksum = "480d9158c9977bff0bc024a11dcad04efcd3955c1e55301092b13fc439d41720"
 dependencies = [
  "async-channel",
  "castaway",
- "crossbeam-utils 0.8.8",
+ "crossbeam-utils 0.7.2",
  "curl",
  "curl-sys",
  "encoding_rs",
