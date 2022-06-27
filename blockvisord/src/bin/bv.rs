@@ -19,7 +19,6 @@ use zbus::Connection;
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = App::parse();
-    println!("{:?}", args);
     let timeout = Duration::from_secs(10);
 
     let conn = Connection::system().await?;
