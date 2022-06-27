@@ -14,7 +14,7 @@
   import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
   import type { Organisation } from '../models/Organisation';
-  import { getOrganisations } from '../store/organisationStore';
+  import { getOrganisationsByUserId } from '../store/organisationStore';
   import OrganisationMembersManagement from './OrganisationMembersManagement.svelte';
   import RenameOrganisation from './RenameOrganisation.svelte';
 
@@ -39,7 +39,7 @@
       .delete(ENDPOINTS.ORGANISATIONS.DELETE_ORGANISATION(item.id))
       .then((res) => {
         deleting = false;
-        getOrganisations(getUserInfo().id);
+        getOrganisationsByUserId(getUserInfo().id);
         deleteModalOpen = false;
       })
       .catch((err) => {

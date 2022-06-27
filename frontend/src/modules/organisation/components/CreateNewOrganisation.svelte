@@ -7,7 +7,7 @@
   import { Hint, required, useForm } from 'svelte-use-form';
   import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
-  import { getOrganisations } from '../store/organisationStore';
+  import { getOrganisationsByUserId } from '../store/organisationStore';
 
   const form = useForm();
   export let handleModalClose: VoidFunction;
@@ -31,7 +31,7 @@
 
       if (res.status === 200) {
         handleModalClose();
-        getOrganisations(getUserInfo().id);
+        getOrganisationsByUserId(getUserInfo().id);
         toast.success('Organisation created successfully');
       }
     } catch (error) {

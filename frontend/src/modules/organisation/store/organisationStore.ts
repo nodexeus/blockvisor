@@ -1,13 +1,21 @@
 import { ENDPOINTS } from 'consts/endpoints';
 import { get, writable } from 'svelte/store';
 import { getUserInfo } from 'utils';
+import { delay } from 'utils/delay';
 import { httpClient } from 'utils/httpClient';
 import type { Organisation } from '../models/Organisation';
+import { mockedOrganizations } from './mockedOrganizations';
 
 export const organisations = writable<Organisation[]>(undefined);
+export const allOrganisations = writable<Organisation[]>(undefined);
 export const activeOrganisation = writable<Organisation>();
 
-export const getOrganisations = async (userId: string) => {
+export const getAllOrganisations = async () => {
+  await delay(2000);
+  allOrganisations.set(mockedOrganizations);
+};
+
+export const getOrganisationsByUserId = async (userId: string) => {
   try {
     const res = await httpClient.get(
       ENDPOINTS.ORGANISATIONS.LIST_USER_ORGANISATIONS_GET(userId),
