@@ -50,6 +50,66 @@ fn test_bv_cmd_restart() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
+fn test_bv_cmd_node_lifecycle() {
+    use std::str;
+    use uuid::Uuid;
+
+    let chain_id = Uuid::new_v4().to_string();
+
+    println!("start service");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("start")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "blockvisor service started successfully",
+        ));
+
+    println!("create a node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    let cmd = cmd.args(&["node", "create", "--chain", &chain_id]);
+    let output = cmd.output().unwrap();
+    let stdout = str::from_utf8(&output.stdout).unwrap();
+    println!("create output: {stdout}");
+    let vm_id =
+        &stdout.trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "));
+    let vm_id = vm_id.trim().trim_matches('`');
+    println!("create vm_id: {vm_id}");
+
+    println!("stop stopped node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "stop", "--id", vm_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stopped node with ID"));
+
+    println!("start stopped node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "start", "--id", vm_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Started node with ID"));
+
+    println!("stop started node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "stop", "--id", vm_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stopped node with ID"));
+
+    // TODO: (re)start stopped node
+
+    println!("delete started node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "delete", "--id", vm_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Deleted node with ID"));
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_cmd_init_unknown_otp() {
     let tmp_dir = TempDir::new().unwrap();
 
