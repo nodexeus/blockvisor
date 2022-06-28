@@ -21,6 +21,7 @@ export const HOSTS = {
 
 export const USERS = {
   CREATE_USER_POST: `${API.URL}/users`,
+  GET_ALL_MEMBERS: `${API.URL}/users/summary`,
 };
 
 export const VALIDATORS = {

@@ -16,6 +16,7 @@
   import Invoices from './Invoices.svelte';
   import Billing from './Billing.svelte';
   import Notifications from './Notifications.svelte';
+  import ChangePassword from './ChangePassword.svelte';
 
   let items = [
     { label: 'Personal Information', value: 1, component: PersonalInformation },
@@ -24,6 +25,12 @@
     { label: 'Invoices', value: 4, component: Invoices },
     { label: 'Notifications', value: 5, component: Notifications },
   ];
+
+  let changePasswordModalVisible = false;
+
+  function handleClose() {
+    changePasswordModalVisible = false;
+  }
 </script>
 
 <GroupTitle>
@@ -47,7 +54,11 @@
     </svelte:fragment>
     <DropdownLinkList slot="content">
       <li>
-        <DropdownItem as="button" size="large">
+        <DropdownItem
+          as="button"
+          size="large"
+          on:click={() => (changePasswordModalVisible = true)}
+        >
           <IconLock />
           Change Password</DropdownItem
         >
@@ -64,6 +75,10 @@
 <article class="edit-user__content">
   <Tabs {items} />
 </article>
+<ChangePassword
+  handleModalClose={handleClose}
+  isModalOpen={changePasswordModalVisible}
+/>
 
 <style>
   .edit-user {
