@@ -1,9 +1,10 @@
 <script lang="ts">
+  import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
+  import { toast } from 'components/Toast/Toast';
+  import { ENDPOINTS } from 'consts/endpoints';
   import Input from 'modules/forms/components/Input/Input.svelte';
-  import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
-  import PasswordToggle from 'modules/forms/components/PasswordToggle/PasswordToggle.svelte';
-  import { required, Hint, useForm, email } from 'svelte-use-form';
+  import { email, Hint, required, useForm } from 'svelte-use-form';
 
   const form = useForm();
 
@@ -12,31 +13,41 @@
   const handleToggle = () => {
     activeType = activeType === 'password' ? 'text' : 'password';
   };
+
+  async function submitPasswordReset() {
+    const res = await axios.post(ENDPOINTS.AUTHENTICATION.FORGOT_PASSWORD, {
+      email: $form.email.value,
+    });
+
+    if (res.status === 200) {
+      toast.success(res.data);
+    } else {
+      toast.warning('An error occured');
+    }
+  }
 </script>
 
 <form
   use:form
   on:submit={(e) => {
-    // TODO: implement this once API supports password reset
+    submitPasswordReset();
     e.preventDefault();
   }}
 >
   <ul class="u-list-reset">
     <li class="s-bottom--medium">
-      <PasswordField
-        field={$form?.password}
-        name="password"
-        placeholder="Password"
-        labelClass="visually-hidden"
-        validate={[required]}
-        type={activeType}
+      <Input
+        size="medium"
+        placeholder="Your e-mail"
+        validate={[required, email]}
+        name="email"
+        field={$form?.email}
       >
-        <PasswordToggle on:click={handleToggle} {activeType} slot="utilRight" />
-        <svelte:fragment slot="label">Password</svelte:fragment>
         <svelte:fragment slot="hints">
           <Hint on="required">This is a mandatory field</Hint>
+          <Hint on="email" hideWhenRequired>Email is not valid</Hint>
         </svelte:fragment>
-      </PasswordField>
+      </Input>
     </li>
   </ul>
 
