@@ -61,6 +61,37 @@ async fn main() -> Result<()> {
                 Nodes::default().save().await?;
             }
         }
+        Command::Reset(cmd_args) => {
+            let confirm = if cmd_args.yes {
+                true
+            } else {
+                let mut input = String::new();
+                println!(
+                    "Are you sure you want to delete all nodes and remove the host from API? [y/N]:"
+                );
+                std::io::stdin().read_line(&mut input)?;
+                input.trim().to_lowercase() == "y"
+            };
+
+            if confirm {
+                let node_proxy = NodeProxy::new(&conn).await?;
+                let nodes = node_proxy.list().await?;
+                for node in nodes {
+                    let id = node.id;
+                    println!("Deleting node with ID `{}`", &id);
+                    node_proxy.delete(&id).await?;
+                }
+
+                let config = Config::load().await?;
+                let url = config.blockjoy_api_url;
+                let host_id = config.id;
+                let client = APIClient::new(&url, timeout)?;
+                println!("Deleting host `{host_id}` from API `{url}`");
+                client.delete_host(&config.token, &host_id).await?;
+
+                Config::remove().await?;
+            }
+        }
         Command::Start(_) => {
             if !Config::exists() {
                 bail!("Host is not registered, please run `init` first");

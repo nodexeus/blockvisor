@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -41,6 +41,29 @@ impl APIClient {
         let host: HostCreateResponse = serde_json::from_str(&text)?;
 
         Ok(host)
+    }
+
+    pub async fn delete_host(&self, token: &str, host_id: &str) -> Result<()> {
+        let url = format!(
+            "{}/hosts/{}",
+            self.base_url.as_str().trim_end_matches('/'),
+            host_id
+        );
+
+        let resp = self
+            .inner
+            .delete(url)
+            .header("Content-Type", "application/json")
+            .bearer_auth(token)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let error = resp.text().await?;
+            bail!("Cannot delete host `{host_id}`: {error}");
+        }
+
+        Ok(())
     }
 
     pub async fn get_pending_commands(&self, token: &str, host_id: &str) -> Result<Vec<Command>> {
