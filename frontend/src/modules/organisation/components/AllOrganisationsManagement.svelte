@@ -1,8 +1,8 @@
 <script lang="ts">
   import Button from 'components/Button/Button.svelte';
   import Sorter from 'components/Sorter/Sorter.svelte';
-  import { allOrganisations } from '../store/organisationStore';
-  import OrganisationDataRow from './OrganisationDataRow.svelte';
+  import { organisations } from '../store/organisationStore';
+  import AllOrganisationsDataRow from './AllOrganizationsDataRow.svelte';
 
   let sortActive;
 
@@ -34,9 +34,11 @@
       </tr>
     </thead>
     <tbody>
-      {#each $allOrganisations as item, i}
-        <OrganisationDataRow {item} index={i} />
-      {/each}
+      {#if $organisations}
+        {#each $organisations as item, i}
+          <AllOrganisationsDataRow {item} index={i} />
+        {/each}
+      {/if}
     </tbody>
   </table>
 </section>

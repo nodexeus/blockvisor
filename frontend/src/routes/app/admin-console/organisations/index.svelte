@@ -13,7 +13,7 @@
   import AllOrganisationsManagement from 'modules/organisation/components/AllOrganisationsManagement.svelte';
   import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-  import { allOrganisations, getAllOrganisations } from '../../../../modules/organisation/store/organisationStore';
+  import { isLoading } from '../../../../modules/organisation/store/organisationStore';
   const form = useForm();
 
   let createNewActive: boolean = false;
@@ -35,8 +35,6 @@
         },
       ]);
     }, 200);
-
-    getAllOrganisations();
   });
 </script>
 
@@ -57,13 +55,13 @@
 
     <svelte:fragment slot="stats">
       <IconUser />
-      52 users in 5 organization
+      52 users in 5 organizations
     </svelte:fragment>
   </GroupTitle>
 
   <HeaderControls />
 
-  {#if !$allOrganisations}
+  {#if $isLoading}
     <LoadingSpinner size="medium" id="organisations" />
   {:else}
     <AllOrganisationsManagement />
