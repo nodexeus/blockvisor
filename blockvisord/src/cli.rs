@@ -27,6 +27,13 @@ pub struct InitArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct ResetArgs {
+    /// Assume "yes" as answer to all prompts
+    #[clap(short, long)]
+    pub yes: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct StartArgs {}
 
 #[derive(Debug, Args)]
@@ -39,6 +46,9 @@ pub struct StatusArgs {}
 pub enum Command {
     /// Initialise blockvisor to run on this host
     Init(InitArgs),
+
+    /// Completelly remove all nodes, configs and unregister the host from the API
+    Reset(ResetArgs),
 
     /// Start blockvisor service
     Start(StartArgs),
