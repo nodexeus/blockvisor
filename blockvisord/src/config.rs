@@ -38,6 +38,12 @@ impl Config {
         Ok(())
     }
 
+    pub async fn remove() -> Result<()> {
+        info!("Removing host config: {}", HOST_CONFIG_FILE.display());
+        fs::remove_file(&*HOST_CONFIG_FILE).await?;
+        Ok(())
+    }
+
     pub fn exists() -> bool {
         Path::new(&*HOST_CONFIG_FILE).exists()
     }
