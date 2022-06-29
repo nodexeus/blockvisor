@@ -16,7 +16,7 @@
     <colgroup>
       <col width="200" />
       <col />
-      <col width="68" />
+      <col width="168" />
     </colgroup>
     <thead class="table__head">
       <tr>

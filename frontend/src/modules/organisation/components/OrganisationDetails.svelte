@@ -3,8 +3,7 @@
   import { toast } from 'components/Toast/Toast';
   import { ENDPOINTS } from 'consts/endpoints';
   import Input from 'modules/forms/components/Input/Input.svelte';
-  import { afterUpdate, onMount } from 'svelte';
-  import { Hint, required, useForm , validators} from 'svelte-use-form';
+  import { Hint, required, useForm } from 'svelte-use-form';
   import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
   import {
@@ -12,9 +11,6 @@
     selectedOrganization,
     getOrganisationById,
   } from '../store/organisationStore';
-
-  /*  export let organisationName: string;
-  export let organisationId: string; */
 
   const form = useForm();
 
@@ -41,11 +37,14 @@
       toast.warning('Something went wrong');
     }
   }
+
+  function handleReset() {
+    $form.orgName.reset({ value: $selectedOrganization.name });
+  }
 </script>
 
-<div>
+<div class="form-wrapper">
   <form use:form>
-    <!-- <input type="text" name="orgName" value={$selectedOrganization.name} use:validators={[required]} /> -->
     <Input
       size="large"
       validate={[required]}
@@ -59,5 +58,24 @@
       </svelte:fragment>
     </Input>
   </form>
-  <Button on:click={handleSubmit} size="small" style="primary">Update</Button>
+  <div class="form-buttons">
+    <Button on:click={handleSubmit} size="small" style="secondary">Save</Button>
+    <Button on:click={handleReset} style="ghost" size="medium" type="reset"
+      >Discard Changes</Button
+    >
+  </div>
 </div>
+
+<style>
+  .form-wrapper {
+    margin-top: 60px;
+    max-width: 400px;
+  }
+
+  .form-buttons {
+    margin-top: 40px;
+    display: flex;
+    gap: 36px;
+    align-items: center;
+  }
+</style>

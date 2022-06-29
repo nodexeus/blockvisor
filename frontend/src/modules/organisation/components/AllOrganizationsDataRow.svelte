@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-
+  import IconPerson from 'icons/person-12.svg';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
@@ -71,8 +71,11 @@
             isModalOpen = true;
           }}
           size="small"
-          style="outline">Members</Button
+          style="outline"
         >
+          <IconPerson />
+          Members
+        </Button>
       </div>
       <ButtonWithDropdown
         iconButton
