@@ -70,7 +70,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("create a node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", "--chain", &chain_id]);
+    let cmd = cmd.args(&["node", "create", &chain_id]);
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
     println!("create output: {stdout}");
@@ -82,7 +82,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("stop stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "stop", "--id", vm_id])
+    cmd.args(&["node", "stop", vm_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node with ID"));
@@ -90,7 +90,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("start stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "start", "--id", vm_id])
+    cmd.args(&["node", "start", vm_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Started node with ID"));
@@ -98,7 +98,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("stop started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "stop", "--id", vm_id])
+    cmd.args(&["node", "stop", vm_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node with ID"));
@@ -106,7 +106,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("restart stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "start", "--id", vm_id])
+    cmd.args(&["node", "start", vm_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Started node with ID"));
@@ -114,7 +114,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("delete started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "delete", "--id", vm_id])
+    cmd.args(&["node", "delete", vm_id])
         .assert()
         .success()
         .stdout(predicate::str::contains("Deleted node with ID"));
@@ -131,8 +131,7 @@ fn test_bv_cmd_init_unknown_otp() {
     let url = "https://api.blockvisor.dev";
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("init")
-        .args(&["--otp", otp])
+    cmd.args(&["init", otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
         .env("HOME", tmp_dir.as_os_str())
