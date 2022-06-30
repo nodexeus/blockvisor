@@ -70,7 +70,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("create a node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", "--chain", &chain_id]);
+    let cmd = cmd.args(&["node", "create", &chain_id]);
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
     println!("create output: {stdout}");

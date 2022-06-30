@@ -93,7 +93,6 @@ pub enum NodeCommand {
     /// Create node
     Create {
         /// Chain identifier
-        #[clap(long)]
         chain: String,
     },
 
