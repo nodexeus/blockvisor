@@ -102,7 +102,7 @@
               Rename</DropdownItem
             >
           </li>
-          <li>
+          <li class="divider">
             <DropdownItem
               size="large"
               as="button"
@@ -113,7 +113,7 @@
               Edit</DropdownItem
             >
           </li>
-          <li>
+          <li class="divider">
             <DropdownItem
               size="large"
               as="button"
@@ -193,5 +193,9 @@
   .organisation-data-row__link {
     display: inline-block;
     padding: 2px 8px;
+  }
+
+  .divider {
+    border-top: 1px solid theme(--color-text-5-o10);
   }
 </style>
