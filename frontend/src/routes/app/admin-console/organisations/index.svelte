@@ -6,17 +6,27 @@
   import IconUser from 'icons/person-12.svg';
   import HeaderControls from 'modules/admin-console/components/HeaderControls/HeaderControls.svelte';
   import Button from 'components/Button/Button.svelte';
-  import { Hint, required, useForm } from 'svelte-use-form';
+  import { useForm } from 'svelte-use-form';
   import { ROUTES } from 'consts/routes';
   import { onMount } from 'svelte';
   import { app } from 'modules/app/store';
   import AllOrganisationsManagement from 'modules/organisation/components/AllOrganisationsManagement.svelte';
   import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-  import { isLoading } from '../../../../modules/organisation/store/organisationStore';
+  import {
+    isLoading,
+    organisations,
+  } from '../../../../modules/organisation/store/organisationStore';
+  import { prevent_default } from 'svelte/internal';
   const form = useForm();
 
   let createNewActive: boolean = false;
+
+  let numberOfOrgs = $organisations.length;
+  let numberOfMembers = $organisations.reduce(
+    (acc, obj) => acc + obj.member_count,
+    0,
+  );
 
   function handleClickOutsideCreateNew() {
     createNewActive = false;
@@ -55,7 +65,7 @@
 
     <svelte:fragment slot="stats">
       <IconUser />
-      52 users in 5 organizations
+      {numberOfMembers} users in {numberOfOrgs} organizations
     </svelte:fragment>
   </GroupTitle>
 

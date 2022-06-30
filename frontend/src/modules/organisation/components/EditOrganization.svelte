@@ -30,7 +30,11 @@
   <svelte:fragment slot="title">{$selectedOrganization?.name}</svelte:fragment>
   <svelte:fragment slot="stats">
     <IconUser />
-    4 members
+    {#if $selectedOrganization.member_count > 1}
+      {$selectedOrganization.member_count} members
+    {:else}
+      {$selectedOrganization.member_count} member
+    {/if}
   </svelte:fragment>
 </GroupTitle>
 <article class="edit-organization__content">
@@ -38,10 +42,8 @@
 </article>
 
 <style>
-  .edit-organization {
-    &__content {
-      margin-top: 40px;
-      width: 100%;
-    }
+  .edit-organization__content {
+    margin-top: 40px;
+    width: 100%;
   }
 </style>
