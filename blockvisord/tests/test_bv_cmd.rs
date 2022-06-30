@@ -131,8 +131,7 @@ fn test_bv_cmd_init_unknown_otp() {
     let url = "https://api.blockvisor.dev";
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("init")
-        .args(&["--otp", otp])
+    cmd.args(&["init", otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
         .env("HOME", tmp_dir.as_os_str())

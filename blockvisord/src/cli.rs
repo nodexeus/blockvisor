@@ -14,7 +14,6 @@ pub struct App {
 #[derive(Debug, Args)]
 pub struct InitArgs {
     /// One-time password
-    #[clap(long)]
     pub otp: String,
 
     /// BlockJoy API url
