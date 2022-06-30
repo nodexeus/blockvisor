@@ -99,42 +99,36 @@ pub enum NodeCommand {
     /// Start node
     Start {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 
     /// Stop node
     Stop {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 
     /// Restart node
     Restart {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 
     /// Delete node and clean up resources
     Delete {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 
     /// Attach to node console
     Console {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 
     /// Display node logs
     Logs {
         /// Node id
-        #[clap(long)]
         id: Uuid,
     },
 }
