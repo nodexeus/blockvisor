@@ -117,7 +117,7 @@ impl Node {
             .jailer_cfg()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
-            .mode(JailerMode::Daemon)
+            .mode(JailerMode::Tmux)
             .build()
             // Machine configuration.
             .machine_cfg()
