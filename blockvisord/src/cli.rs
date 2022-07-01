@@ -44,6 +44,7 @@ pub struct StatusArgs {}
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Initialise blockvisor to run on this host
+    #[clap(alias = "i")]
     Init(InitArgs),
 
     /// Completelly remove all nodes, configs and unregister the host from the API
@@ -59,18 +60,21 @@ pub enum Command {
     Status(StatusArgs),
 
     /// Manage nodes on this host
+    #[clap(alias = "n")]
     Node {
         #[clap(subcommand)]
         command: NodeCommand,
     },
 
     /// Manage host configuration and collect host info
+    #[clap(alias = "h")]
     Host {
         #[clap(subcommand)]
         command: HostCommand,
     },
 
     /// Get information about chains
+    #[clap(alias = "c")]
     Chain {
         #[clap(subcommand)]
         command: ChainCommand,
@@ -80,17 +84,19 @@ pub enum Command {
 #[derive(Debug, Subcommand)]
 pub enum NodeCommand {
     /// Show nodes list
+    #[clap(alias = "ls")]
     List {
         /// Should we display all nodes including stopped
-        #[clap(long)]
+        #[clap(long, short)]
         all: bool,
 
         /// Display nodes of particular chain
-        #[clap(long)]
+        #[clap(long, short)]
         chain: Option<String>,
     },
 
     /// Create node
+    #[clap(alias = "c")]
     Create {
         /// Chain identifier
         chain: String,
@@ -115,18 +121,21 @@ pub enum NodeCommand {
     },
 
     /// Delete node and clean up resources
+    #[clap(alias = "d")]
     Delete {
         /// Node id
         id: Uuid,
     },
 
     /// Attach to node console
+    #[clap(alias = "c")]
     Console {
         /// Node id
         id: Uuid,
     },
 
     /// Display node logs
+    #[clap(alias = "l")]
     Logs {
         /// Node id
         id: Uuid,
@@ -136,9 +145,11 @@ pub enum NodeCommand {
 #[derive(Debug, Subcommand)]
 pub enum HostCommand {
     /// Collect host system information
+    #[clap(alias = "i")]
     Info,
 
     /// Manage host network configuration
+    #[clap(alias = "n")]
     Network {
         #[clap(subcommand)]
         command: HostNetworkCommand,
@@ -147,8 +158,10 @@ pub enum HostCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum HostNetworkCommand {
+    #[clap(alias = "i")]
     Info,
 
+    #[clap(alias = "b")]
     Bridge {
         #[clap(subcommand)]
         command: HostNetworkBridgeCommand,
@@ -162,13 +175,16 @@ pub enum HostNetworkCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum HostNetworkBridgeCommand {
+    #[clap(alias = "ls")]
     List,
 
+    #[clap(alias = "c")]
     Create {
         #[clap(long)]
         name: String,
     },
 
+    #[clap(alias = "d")]
     Delete {
         #[clap(long)]
         name: String,
@@ -177,13 +193,16 @@ pub enum HostNetworkBridgeCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum HostNetworkIpCommand {
+    #[clap(alias = "ls")]
     List,
 
+    #[clap(alias = "a")]
     Add {
         #[clap(long)]
         net: String,
     },
 
+    #[clap(alias = "d")]
     Delete {
         #[clap(long)]
         net: String,
@@ -193,6 +212,7 @@ pub enum HostNetworkIpCommand {
 #[derive(Debug, Subcommand)]
 pub enum ChainCommand {
     /// Show chains list
+    #[clap(alias = "ls")]
     List,
 
     /// Display chain status
