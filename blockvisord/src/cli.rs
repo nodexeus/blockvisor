@@ -179,16 +179,10 @@ pub enum HostNetworkBridgeCommand {
     List,
 
     #[clap(alias = "c")]
-    Create {
-        #[clap(long)]
-        name: String,
-    },
+    Create { name: String },
 
     #[clap(alias = "d")]
-    Delete {
-        #[clap(long)]
-        name: String,
-    },
+    Delete { name: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -197,16 +191,10 @@ pub enum HostNetworkIpCommand {
     List,
 
     #[clap(alias = "a")]
-    Add {
-        #[clap(long)]
-        net: String,
-    },
+    Add { net: String },
 
     #[clap(alias = "d")]
-    Delete {
-        #[clap(long)]
-        net: String,
-    },
+    Delete { net: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -218,14 +206,12 @@ pub enum ChainCommand {
     /// Display chain status
     Status {
         /// Chain identifier
-        #[clap(long)]
         id: String,
     },
 
     /// Run chain synchronization process
     Sync {
         /// Chain identifier
-        #[clap(long)]
         id: String,
     },
 }
