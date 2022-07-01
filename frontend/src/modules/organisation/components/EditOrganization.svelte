@@ -24,16 +24,18 @@
       component: OrganizationNotifications,
     },
   ];
+
+  let memberCount = $selectedOrganization?.member_count ?? 0;
 </script>
 
 <GroupTitle>
   <svelte:fragment slot="title">{$selectedOrganization?.name}</svelte:fragment>
   <svelte:fragment slot="stats">
     <IconUser />
-    {#if $selectedOrganization.member_count > 1}
-      {$selectedOrganization.member_count} members
+    {#if memberCount > 1}
+      {memberCount} members
     {:else}
-      {$selectedOrganization.member_count} member
+      {memberCount} member
     {/if}
   </svelte:fragment>
 </GroupTitle>

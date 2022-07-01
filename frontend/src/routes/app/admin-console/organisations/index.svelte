@@ -17,16 +17,14 @@
     isLoading,
     organisations,
   } from '../../../../modules/organisation/store/organisationStore';
-  import { prevent_default } from 'svelte/internal';
+
   const form = useForm();
 
   let createNewActive: boolean = false;
 
-  let numberOfOrgs = $organisations.length;
-  let numberOfMembers = $organisations.reduce(
-    (acc, obj) => acc + obj.member_count,
-    0,
-  );
+  let numberOfOrgs = $organisations?.length ?? 0;
+  let numberOfMembers =
+    $organisations?.reduce((acc, obj) => acc + obj.member_count, 0) ?? 0;
 
   function handleClickOutsideCreateNew() {
     createNewActive = false;
@@ -70,12 +68,7 @@
   </GroupTitle>
 
   <HeaderControls />
-
-  {#if $isLoading}
-    <LoadingSpinner size="medium" id="organisations" />
-  {:else}
-    <AllOrganisationsManagement />
-  {/if}
+  <AllOrganisationsManagement />
 </section>
 
 <CreateNewOrganisation

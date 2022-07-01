@@ -1,3 +1,4 @@
+import { toast } from 'components/Toast/Toast';
 import { ENDPOINTS } from 'consts/endpoints';
 import { get, writable } from 'svelte/store';
 import { getUserInfo } from 'utils';
@@ -17,7 +18,9 @@ export const getOrganisationById = async (orgId: string) => {
     );
     selectedOrganization.set(res.data);
     isLoading.set(false);
-  } catch (error) {}
+  } catch (error) {
+    toast.warning('Something went wrong');
+  }
 };
 
 export const getOrganisationsByUserId = async (userId: string) => {

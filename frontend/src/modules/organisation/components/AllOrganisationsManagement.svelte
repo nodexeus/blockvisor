@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Button from 'components/Button/Button.svelte';
   import Sorter from 'components/Sorter/Sorter.svelte';
+  import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
   import { organisations } from '../store/organisationStore';
   import AllOrganisationsDataRow from './AllOrganizationsDataRow.svelte';
 
@@ -34,7 +34,9 @@
       </tr>
     </thead>
     <tbody>
-      {#if $organisations}
+      {#if !$organisations}
+        <LoadingSpinner size="medium" id="organisations" />
+      {:else}
         {#each $organisations as item, i}
           <AllOrganisationsDataRow {item} index={i} />
         {/each}
