@@ -50,10 +50,11 @@ pub struct CommonData {
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Nodes {
     #[instrument(skip(self))]
-    async fn create(&mut self, id: Uuid, chain: String) -> fdo::Result<()> {
+    async fn create(&mut self, id: Uuid, name: String, chain: String) -> fdo::Result<()> {
         let network_interface = self.next_network_interface();
         let node = NodeData {
             id,
+            name,
             chain,
             state: NodeState::Stopped,
             network_interface,

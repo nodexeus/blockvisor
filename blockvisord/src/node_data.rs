@@ -38,6 +38,8 @@ impl fmt::Display for NodeState {
 pub struct NodeData {
     #[table(title = "ID", justify = "Justify::Right")]
     pub id: Uuid,
+    #[table(title = "Name", color = "Cyan")]
+    pub name: String,
     #[table(title = "Chain", color = "Blue")]
     pub chain: String,
     #[table(title = "State", customize_fn = "style_node_state")]

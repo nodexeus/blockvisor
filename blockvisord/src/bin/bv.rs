@@ -12,6 +12,7 @@ use blockvisord::{
 };
 use clap::Parser;
 use cli_table::print_stdout;
+use petname::Petnames;
 use tokio::time::Duration;
 use uuid::Uuid;
 use zbus::Connection;
@@ -175,7 +176,8 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4();
-            node_proxy.create(&id, chain).await?;
+            let name = Petnames::default().generate_one(3, "-");
+            node_proxy.create(&id, &name, chain).await?;
             println!("Created new node for `{}` chain with ID `{}`", chain, id);
         }
         NodeCommand::Start { id } => {
