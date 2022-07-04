@@ -63,7 +63,8 @@
     "svelte-meta-tags": "^2.1.0",
     "svelte-portal": "^2.1.2",
     "svelte-select": "^4.4.6",
-    "swipe-listener": "^1.3.0"
+    "swipe-listener": "^1.3.0",
+    "date-picker-svelte": "2.0.0"
   },
   "contributes": {
     "snippets": [

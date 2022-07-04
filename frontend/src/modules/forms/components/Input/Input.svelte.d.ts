@@ -11,6 +11,7 @@ export interface InputProps
 
 export interface InputEvents {
   keyup: (e: KeyboardEvent) => void;
+  focus: (e: MouseEvents) => void;
 }
 
 export interface InputSlots {
