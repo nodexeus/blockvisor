@@ -3,7 +3,7 @@
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
-import { ENDPOINTS } from 'consts/endpoints';
+  import { ENDPOINTS } from 'consts/endpoints';
   import { ROUTES } from 'consts/routes';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
