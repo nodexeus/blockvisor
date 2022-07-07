@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
                 for node in nodes {
                     let id = node.id;
                     println!("Deleting node with ID `{}`", &id);
-                    node_proxy.delete(&id).await?;
+                    node_proxy.delete(&id.to_string()).await?;
                 }
 
                 let config = Config::load().await?;
@@ -178,19 +178,22 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             let id = Uuid::new_v4();
             let name = Petnames::default().generate_one(3, "-");
             node_proxy.create(&id, &name, chain).await?;
-            println!("Created new node for `{}` chain with ID `{}`", chain, id);
+            println!(
+                "Created new node for `{}` chain with ID `{}` and name `{}`",
+                chain, id, name
+            );
         }
-        NodeCommand::Start { id } => {
-            node_proxy.start(id).await?;
-            println!("Started node with ID `{}`", id);
+        NodeCommand::Start { id: id_or_name } => {
+            node_proxy.start(id_or_name).await?;
+            println!("Started node `{}`", id_or_name);
         }
-        NodeCommand::Stop { id } => {
-            node_proxy.stop(id).await?;
-            println!("Stopped node with ID `{}`", id);
+        NodeCommand::Stop { id: id_or_name } => {
+            node_proxy.stop(id_or_name).await?;
+            println!("Stopped node `{}`", id_or_name);
         }
-        NodeCommand::Delete { id } => {
-            node_proxy.delete(id).await?;
-            println!("Deleted node with ID `{}`", id);
+        NodeCommand::Delete { id: id_or_name } => {
+            node_proxy.delete(id_or_name).await?;
+            println!("Deleted node `{}`", id_or_name);
         }
         NodeCommand::Restart { id: _ } => todo!(),
         NodeCommand::Console { id: _ } => todo!(),

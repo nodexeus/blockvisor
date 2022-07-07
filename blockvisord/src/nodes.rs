@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -72,9 +73,9 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.remove(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn delete(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.delete_node(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         node.delete()
@@ -86,9 +87,9 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn start(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.get_node_mut(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
@@ -101,9 +102,9 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn stop(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.get_node_mut(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
@@ -202,6 +203,21 @@ impl Nodes {
         *machine_index += 1;
 
         iface
+    }
+
+    fn get_node_mut(&mut self, id_or_name: &str) -> Option<&mut Node> {
+        self.node_ids
+            .get(id_or_name)
+            .cloned()
+            .or_else(|| Uuid::from_str(id_or_name).ok())
+            .and_then(|id| self.nodes.get_mut(&id))
+    }
+
+    fn delete_node(&mut self, id_or_name: &str) -> Option<Node> {
+        self.node_ids
+            .remove(id_or_name)
+            .or_else(|| Uuid::from_str(id_or_name).ok())
+            .and_then(|id| self.nodes.remove(&id))
     }
 }
 
