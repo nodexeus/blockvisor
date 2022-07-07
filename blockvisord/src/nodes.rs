@@ -39,6 +39,7 @@ pub enum ServiceStatus {
 #[derive(Debug, Default)]
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
+    pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
 }
 
@@ -54,7 +55,7 @@ impl Nodes {
         let network_interface = self.next_network_interface();
         let node = NodeData {
             id,
-            name,
+            name: name.clone(),
             chain,
             state: NodeState::Stopped,
             network_interface,
@@ -64,6 +65,7 @@ impl Nodes {
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         self.nodes.insert(id, node);
+        self.node_ids.insert(name, id);
         debug!("Container with id `{}` created", id);
 
         fdo::Result::Ok(())
@@ -140,6 +142,7 @@ impl Nodes {
         );
         let mut this = Nodes {
             nodes: HashMap::new(),
+            node_ids: HashMap::new(),
             data: nodes_data,
         };
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
@@ -153,6 +156,7 @@ impl Nodes {
             }
             match NodeData::load(&*path).and_then(Node::connect).await {
                 Ok(node) => {
+                    this.node_ids.insert(node.data.name.clone(), *node.id());
                     this.nodes.insert(node.data.id, node);
                 }
                 Err(e) => warn!("Failed to read node file `{}`: {}", path.display(), e),
