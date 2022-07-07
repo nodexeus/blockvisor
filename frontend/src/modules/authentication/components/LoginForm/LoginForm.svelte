@@ -3,6 +3,7 @@
   import axios from 'axios';
   import Button from 'components/Button/Button.svelte';
   import LoadingSpinner from 'components/Spinner/LoadingSpinner.svelte';
+  import { ENDPOINTS } from 'consts/endpoints';
   import { ROUTES } from 'consts/routes';
   import Input from 'modules/forms/components/Input/Input.svelte';
   import PasswordField from 'modules/forms/components/PasswordField/PasswordField.svelte';
@@ -27,7 +28,16 @@
     const { email, password } = $form.values;
 
     try {
-      const res = await axios.post(ROUTES.AUTH_LOGIN, { email, password });
+      const res = await axios.post(
+        ENDPOINTS.AUTHENTICATION.LOGIN_POST,
+        { email, password },
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+        },
+      );
       saveUserinfo({ ...res.data, verified: true });
       goto(ROUTES.DASHBOARD);
     } catch (error) {
@@ -37,13 +47,7 @@
   };
 </script>
 
-<form
-  method="POST"
-  action="#"
-  on:submit|preventDefault={handleLogin}
-  class="login-form"
-  use:form
->
+<form on:submit|preventDefault={handleLogin} class="login-form" use:form>
   <ul class="u-list-reset">
     <li class="s-bottom--medium-small">
       <Input
