@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  database:
+    image: 'postgres:latest'
+    ports:
+      - 25432:5432
+    environment:
+      POSTGRES_USER: blockvisor
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blockvisor_db
+
+  api:
+    image: 'registry.digitalocean.com/stakejoy/stakejoy-api:latest'
+    ports:
+      - 8080:8080
+    environment:
+      DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
+      JWT_SECRET: 123456
+      API_SERVICE_SECRET: abc123
+    depends_on:
+      - database
+
+  migrations:
+    image: 'registry.digitalocean.com/stakejoy/stakejoy-api-migrations:latest'
+    environment:
+      DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
+    depends_on:
+      - api
