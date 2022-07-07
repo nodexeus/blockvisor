@@ -40,7 +40,7 @@
     </ul>
   </nav>
 
-  {#each items as { value, component }}
+  {#each items as { value, component  }}
     {#if activeTabValue == value}
       <div in:fade|local={{ duration: 250 }}>
         <svelte:component this={component} />

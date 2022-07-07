@@ -9,7 +9,7 @@
   import CreateNewOrganisation from 'modules/organisation/components/CreateNewOrganisation.svelte';
   import {
     activeOrganisation,
-    getOrganisations,
+    getOrganisationsByUserId,
     organisations,
     setActiveOrganisation,
   } from 'modules/organisation/store/organisationStore';
@@ -28,7 +28,7 @@
   }
 
   onMount(() => {
-    getOrganisations(getUserInfo().id);
+    getOrganisationsByUserId(getUserInfo().id);
   });
 
   function handleSelectOrganisation(orgId: string) {

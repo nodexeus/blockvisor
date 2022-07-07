@@ -4,10 +4,11 @@
   import { toast } from 'components/Toast/Toast';
   import { ENDPOINTS } from 'consts/endpoints';
   import Input from 'modules/forms/components/Input/Input.svelte';
+  import TagsField from 'modules/forms/components/TagsField/TagsField.svelte';
   import { Hint, required, useForm } from 'svelte-use-form';
   import { getUserInfo } from 'utils';
   import { httpClient } from 'utils/httpClient';
-  import { getOrganisations } from '../store/organisationStore';
+  import { getOrganisationsByUserId } from '../store/organisationStore';
 
   const form = useForm();
   export let handleModalClose: VoidFunction;
@@ -31,7 +32,7 @@
 
       if (res.status === 200) {
         handleModalClose();
-        getOrganisations(getUserInfo().id);
+        getOrganisationsByUserId(getUserInfo().id);
         toast.success('Organisation created successfully');
       }
     } catch (error) {
@@ -56,8 +57,32 @@
         <Hint on="required">This is a mandatory field</Hint>
       </svelte:fragment>
     </Input>
+    <div class="divider" />
+    <TagsField
+      field={$form?.emails}
+      name="emails"
+      size="medium"
+      limit={10}
+      multiline
+      showFull
+      placeholder="Enter one or more e-mails"
+    >
+      <svelte:fragment slot="label">Invite Members</svelte:fragment>
+    </TagsField>
   </form>
-  <div slot="footer">
+  <div class="organisation-modal__footer" slot="footer">
     <Button on:click={handleSubmit} size="small" style="primary">Create</Button>
   </div>
 </Modal>
+
+<style>
+  .organisation-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .divider {
+    border-top: 1px solid var(--color-text-5-o10);
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
+</style>

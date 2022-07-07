@@ -4,6 +4,7 @@
 
   import IconGrid from 'icons/grid-12.svg';
   import IconUser from 'icons/person-12.svg';
+  import IconUnion from 'icons/union-16.svg';
 </script>
 
 <ul class="u-list-reset settings-nav">
@@ -27,6 +28,16 @@
     >
       <IconUser slot="icon" />
       <svelte:fragment slot="label">User Management</svelte:fragment>
+    </NavItem>
+  </li>
+  <li class="settings-nav__item">
+    <NavItem
+      on:click
+      class="nav-link__mobile-only"
+      href={ROUTES.ADMIN_CONSOLE_ORGANISATIONS}
+    >
+      <IconUnion slot="icon" />
+      <svelte:fragment slot="label">Organisations</svelte:fragment>
     </NavItem>
   </li>
 </ul>

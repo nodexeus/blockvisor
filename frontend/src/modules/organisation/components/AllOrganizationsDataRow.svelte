@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import IconPerson from 'icons/person-12.svg';
   import Button from 'components/Button/Button.svelte';
   import DropdownItem from 'components/Dropdown/DropdownItem.svelte';
   import DropdownLinkList from 'components/Dropdown/DropdownList.svelte';
   import { toast } from 'components/Toast/Toast';
   import { ENDPOINTS } from 'consts/endpoints';
+  import { ROUTES } from 'consts/routes';
   import IconDelete from 'icons/close-12.svg';
   import IconDots from 'icons/dots-12.svg';
   import IconEdit from 'icons/pencil-12.svg';
@@ -53,7 +56,12 @@
   class="table__row organisation-data-row"
   in:fade={{ duration: 250, delay: index * 100 }}
 >
-  <td class="organisation-data-row__col">{item.name}</td>
+  <td class="organisation-data-row__col"
+    ><a
+      class="u-link-reset"
+      href={ROUTES.ADMIN_CONSOLE_ORGANISATIONS_EDIT(item.id)}>{item.name}</a
+    ></td
+  >
   <td class="organisation-data-row__col">{item.member_count}</td>
   <td class="organisation-data-row__col  t-right">
     <div class="organisation-data-row__col--action">
@@ -63,8 +71,11 @@
             isModalOpen = true;
           }}
           size="small"
-          style="outline">Members</Button
+          style="outline"
         >
+          <IconPerson />
+          Members
+        </Button>
       </div>
       <ButtonWithDropdown
         iconButton
@@ -91,7 +102,18 @@
               Rename</DropdownItem
             >
           </li>
-          <li>
+          <li class="divider">
+            <DropdownItem
+              size="large"
+              as="button"
+              on:click={() =>
+                goto(ROUTES.ADMIN_CONSOLE_ORGANISATIONS_EDIT(item.id))}
+            >
+              <IconEdit />
+              Edit</DropdownItem
+            >
+          </li>
+          <li class="divider">
             <DropdownItem
               size="large"
               as="button"
@@ -171,5 +193,9 @@
   .organisation-data-row__link {
     display: inline-block;
     padding: 2px 8px;
+  }
+
+  .divider {
+    border-top: 1px solid theme(--color-text-5-o10);
   }
 </style>

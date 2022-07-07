@@ -21,6 +21,9 @@ export const ROUTES = {
   BROADCAST_EDIT: (id: string) => `/app/broadcasts/add/?id=${id}`,
   ADMIN_CONSOLE_DASHBOARD: '/app/admin-console',
   ADMIN_CONSOLE_USER_MANAGEMENT: '/app/admin-console/user-management',
+  ADMIN_CONSOLE_ORGANISATIONS: '/app/admin-console/organisations',
+  ADMIN_CONSOLE_ORGANISATIONS_EDIT: (organizationId: string) =>
+    `/app/admin-console/organisations/edit/${organizationId}`,
   ADMIN_CONSOLE_USER_EDIT: (id: string) =>
     `/app/admin-console/user-management/edit/${id}`,
   ADMIN_CONSOLE_INVOICE: (userId: string, id: string) =>

@@ -1,3 +1,4 @@
+import { toast } from 'components/Toast/Toast';
 import { ENDPOINTS } from 'consts/endpoints';
 import { get, writable } from 'svelte/store';
 import { getUserInfo } from 'utils';
@@ -6,8 +7,23 @@ import type { Organisation } from '../models/Organisation';
 
 export const organisations = writable<Organisation[]>(undefined);
 export const activeOrganisation = writable<Organisation>();
+export const selectedOrganization = writable<Organisation>();
+export const isLoading = writable(false);
 
-export const getOrganisations = async (userId: string) => {
+export const getOrganisationById = async (orgId: string) => {
+  isLoading.set(true);
+  try {
+    const res = await httpClient.get(
+      ENDPOINTS.ORGANISATIONS.GET_ORGANISATION(orgId),
+    );
+    selectedOrganization.set(res.data);
+    isLoading.set(false);
+  } catch (error) {
+    toast.warning('Something went wrong');
+  }
+};
+
+export const getOrganisationsByUserId = async (userId: string) => {
   try {
     const res = await httpClient.get(
       ENDPOINTS.ORGANISATIONS.LIST_USER_ORGANISATIONS_GET(userId),
