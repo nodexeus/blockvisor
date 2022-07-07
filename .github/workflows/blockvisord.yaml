@@ -14,6 +14,7 @@ on:
       - "master"
     paths:
       - "blockvisord/**.rs"
+      - ".github/workflows/**"
 
 env:
   RUST_LOG: trace
