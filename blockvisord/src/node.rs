@@ -8,10 +8,7 @@ use tokio::time::sleep;
 use tracing::{instrument, trace};
 use uuid::Uuid;
 
-use crate::{
-    network_interface::NetworkInterface,
-    node_data::{NodeData, NodeState},
-};
+use crate::node_data::{NodeData, NodeState};
 
 #[derive(Debug)]
 pub struct Node {
@@ -32,7 +29,7 @@ impl Node {
     /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
-        let config = Node::create_config(data.id, &data.network_interface)?;
+        let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         data.save().await?;
 
@@ -42,7 +39,7 @@ impl Node {
     /// Returns node previously created on this host.
     #[instrument]
     pub async fn connect(data: NodeData) -> Result<Self> {
-        let config = Node::create_config(data.id, &data.network_interface)?;
+        let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => firec::MachineState::RUNNING { pid },
@@ -101,23 +98,21 @@ impl Node {
         self.data.delete().await
     }
 
-    fn create_config(
-        id: Uuid,
-        network_interface: &NetworkInterface,
-    ) -> Result<firec::config::Config<'static>> {
+    fn create_config(data: &NodeData) -> Result<firec::config::Config<'static>> {
         let kernel_args = format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
             ip={}::74.50.82.81:255.255.255.240::eth0:on",
-            network_interface.ip,
+            data.network_interface.ip,
         );
-        let iface = firec::config::network::Interface::new(network_interface.name.clone(), "eth0");
+        let iface =
+            firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
 
-        let config = firec::config::Config::builder(Some(id), Path::new(KERNEL_PATH))
+        let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
             // Jailer configuration.
             .jailer_cfg()
             .chroot_base_dir(Path::new(CHROOT_PATH))
             .exec_file(Path::new(FC_BIN_PATH))
-            .mode(JailerMode::Tmux)
+            .mode(JailerMode::Tmux(Some(data.name.clone().into())))
             .build()
             // Machine configuration.
             .machine_cfg()
