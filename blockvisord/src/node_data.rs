@@ -36,8 +36,10 @@ impl fmt::Display for NodeState {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Type, Table)]
 pub struct NodeData {
-    #[table(title = "VM ID", justify = "Justify::Right", color = "Cyan")]
+    #[table(title = "ID", justify = "Justify::Right")]
     pub id: Uuid,
+    #[table(title = "Name", color = "Cyan")]
+    pub name: String,
     #[table(title = "Chain", color = "Blue")]
     pub chain: String,
     #[table(title = "State", customize_fn = "style_node_state")]

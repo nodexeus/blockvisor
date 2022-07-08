@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -39,6 +40,7 @@ pub enum ServiceStatus {
 #[derive(Debug, Default)]
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
+    pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
 }
 
@@ -50,10 +52,11 @@ pub struct CommonData {
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Nodes {
     #[instrument(skip(self))]
-    async fn create(&mut self, id: Uuid, chain: String) -> fdo::Result<()> {
+    async fn create(&mut self, id: Uuid, name: String, chain: String) -> fdo::Result<()> {
         let network_interface = self.next_network_interface();
         let node = NodeData {
             id,
+            name: name.clone(),
             chain,
             state: NodeState::Stopped,
             network_interface,
@@ -63,15 +66,16 @@ impl Nodes {
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         self.nodes.insert(id, node);
+        self.node_ids.insert(name, id);
         debug!("Container with id `{}` created", id);
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.remove(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn delete(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.delete_node(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         node.delete()
@@ -83,9 +87,9 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn start(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.get_node_mut(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
@@ -98,9 +102,9 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Container with id {} not found", id);
+    async fn stop(&mut self, id_or_name: &str) -> fdo::Result<()> {
+        let node = self.get_node_mut(id_or_name).ok_or_else(|| {
+            let msg = format!("Container with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
@@ -139,6 +143,7 @@ impl Nodes {
         );
         let mut this = Nodes {
             nodes: HashMap::new(),
+            node_ids: HashMap::new(),
             data: nodes_data,
         };
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
@@ -152,6 +157,7 @@ impl Nodes {
             }
             match NodeData::load(&*path).and_then(Node::connect).await {
                 Ok(node) => {
+                    this.node_ids.insert(node.data.name.clone(), *node.id());
                     this.nodes.insert(node.data.id, node);
                 }
                 Err(e) => warn!("Failed to read node file `{}`: {}", path.display(), e),
@@ -197,6 +203,21 @@ impl Nodes {
         *machine_index += 1;
 
         iface
+    }
+
+    fn get_node_mut(&mut self, id_or_name: &str) -> Option<&mut Node> {
+        self.node_ids
+            .get(id_or_name)
+            .cloned()
+            .or_else(|| Uuid::from_str(id_or_name).ok())
+            .and_then(|id| self.nodes.get_mut(&id))
+    }
+
+    fn delete_node(&mut self, id_or_name: &str) -> Option<Node> {
+        self.node_ids
+            .remove(id_or_name)
+            .or_else(|| Uuid::from_str(id_or_name).ok())
+            .and_then(|id| self.nodes.remove(&id))
     }
 }
 
