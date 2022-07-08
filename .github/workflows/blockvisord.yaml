@@ -18,6 +18,7 @@ on:
 
 env:
   RUST_LOG: trace
+  RUST_BACKTRACE: full
 
 jobs:
   test:
