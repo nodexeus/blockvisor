@@ -5,7 +5,7 @@ use cli_table::{
 
 /// Converts into a [`cli_table::TableStruct`] table that could be displayed on command line
 ///
-/// We are putting derives on [`ContainerData`] to convert anything that iterates
+/// We are putting derives on [`crate::node_data::NodeData`] to convert anything that iterates
 /// over this type into a CLI table.
 ///
 /// See <https://docs.rs/cli-table/latest/cli_table/#derive-macro>
