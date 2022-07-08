@@ -34,9 +34,9 @@ jobs:
       - name: Build
         run: >
           cargo build -p blockvisord
-      - name: Install
+      - name: Reinstall
         run: >
-          make install
+          make reinstall
       - name: Start test env
         run: >
           docker compose up -d
