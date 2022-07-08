@@ -78,9 +78,12 @@ fn test_bv_cmd_node_lifecycle() {
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
     println!("create output: {stdout}");
-    let vm_id =
-        &stdout.trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "));
-    let vm_id = vm_id.trim().trim_matches('`');
+    let vm_id = stdout
+        .trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "))
+        .split('`')
+        .skip(1)
+        .next()
+        .unwrap();
     println!("create vm_id: {vm_id}");
     sleep(Duration::from_secs(1));
 
@@ -89,7 +92,7 @@ fn test_bv_cmd_node_lifecycle() {
     cmd.args(&["node", "stop", vm_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Stopped node with ID"));
+        .stdout(predicate::str::contains("Stopped node"));
     sleep(Duration::from_secs(1));
 
     println!("start stopped node");
@@ -97,7 +100,7 @@ fn test_bv_cmd_node_lifecycle() {
     cmd.args(&["node", "start", vm_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Started node with ID"));
+        .stdout(predicate::str::contains("Started node"));
     sleep(Duration::from_secs(1));
 
     println!("stop started node");
@@ -105,7 +108,7 @@ fn test_bv_cmd_node_lifecycle() {
     cmd.args(&["node", "stop", vm_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Stopped node with ID"));
+        .stdout(predicate::str::contains("Stopped node"));
     sleep(Duration::from_secs(1));
 
     println!("restart stopped node");
@@ -113,7 +116,7 @@ fn test_bv_cmd_node_lifecycle() {
     cmd.args(&["node", "start", vm_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Started node with ID"));
+        .stdout(predicate::str::contains("Started node"));
     sleep(Duration::from_secs(1));
 
     println!("delete started node");
@@ -121,7 +124,7 @@ fn test_bv_cmd_node_lifecycle() {
     cmd.args(&["node", "delete", vm_id])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Deleted node with ID"));
+        .stdout(predicate::str::contains("Deleted node"));
 }
 
 #[test]
