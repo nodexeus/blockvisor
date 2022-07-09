@@ -67,7 +67,7 @@ impl Nodes {
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
-        debug!("Container with id `{}` created", id);
+        debug!("Node with id `{}` created", id);
 
         fdo::Result::Ok(())
     }
@@ -75,7 +75,7 @@ impl Nodes {
     #[instrument(skip(self))]
     async fn delete(&mut self, id_or_name: &str) -> fdo::Result<()> {
         let node = self.delete_node(id_or_name).ok_or_else(|| {
-            let msg = format!("Container with id or name `{}` not found", id_or_name);
+            let msg = format!("Node with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         node.delete()
@@ -89,7 +89,7 @@ impl Nodes {
     #[instrument(skip(self))]
     async fn start(&mut self, id_or_name: &str) -> fdo::Result<()> {
         let node = self.get_node_mut(id_or_name).ok_or_else(|| {
-            let msg = format!("Container with id or name `{}` not found", id_or_name);
+            let msg = format!("Node with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
@@ -104,7 +104,7 @@ impl Nodes {
     #[instrument(skip(self))]
     async fn stop(&mut self, id_or_name: &str) -> fdo::Result<()> {
         let node = self.get_node_mut(id_or_name).ok_or_else(|| {
-            let msg = format!("Container with id or name `{}` not found", id_or_name);
+            let msg = format!("Node with id or name `{}` not found", id_or_name);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
