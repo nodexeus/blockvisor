@@ -1,10 +1,6 @@
 [workspace]
 
 members = [
-  "api",
   "blockvisord",
   "turnstile",
 ]
-
-[profile.dev.package.sqlx-macros]
-opt-level = 3
