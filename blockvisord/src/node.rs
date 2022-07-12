@@ -68,9 +68,9 @@ impl Node {
         unimplemented!()
     }
 
-    /// Kills the running node.
+    /// Stops the running node.
     #[instrument(skip(self))]
-    pub async fn kill(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {

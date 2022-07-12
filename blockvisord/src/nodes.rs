@@ -108,7 +108,7 @@ impl Nodes {
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
-        node.kill()
+        node.stop()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("stopped");
