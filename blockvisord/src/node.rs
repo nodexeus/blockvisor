@@ -26,7 +26,6 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 impl Node {
     /// Creates a new node with `id`.
-    /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
