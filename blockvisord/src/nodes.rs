@@ -3,10 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
 use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
@@ -46,7 +44,7 @@ pub struct Nodes {
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct CommonData {
-    machine_index: Arc<Mutex<u32>>,
+    machine_index: Arc<AtomicU32>,
 }
 
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
@@ -187,11 +185,11 @@ impl Nodes {
 
     /// Get the next machine index and increment it.
     pub fn next_network_interface(&self) -> NetworkInterface {
-        let mut machine_index = self.data.machine_index.lock().expect("lock poisoned");
+        let machine_index = self.data.machine_index.fetch_add(1, Ordering::SeqCst);
 
         let idx_bytes = machine_index.to_be_bytes();
         let iface = NetworkInterface {
-            name: format!("bv{}", *machine_index),
+            name: format!("bv{}", machine_index),
             // FIXME: Hardcoding address for now.
             ip: IpAddr::V4(Ipv4Addr::new(
                 idx_bytes[0] + 74,
@@ -200,7 +198,6 @@ impl Nodes {
                 idx_bytes[3] + 83,
             )),
         };
-        *machine_index += 1;
 
         iface
     }
@@ -241,7 +238,10 @@ mod tests {
         );
 
         // Let's take the machine_index beyond u8 boundry.
-        *nodes.data.machine_index.lock().expect("lock poisoned") = u8::MAX as u32 + 1;
+        nodes
+            .data
+            .machine_index
+            .store(u8::MAX as u32 + 1, super::Ordering::SeqCst);
         let iface = nodes.next_network_interface();
         assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
         assert_eq!(
