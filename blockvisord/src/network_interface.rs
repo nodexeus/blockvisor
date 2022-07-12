@@ -36,6 +36,11 @@ impl NetworkInterface {
 
         Ok(Self { name, ip })
     }
+
+    /// Delete the network interface.
+    pub async fn delete(self) -> Result<()> {
+        delete_interface(&self.name).await
+    }
 }
 
 async fn delete_interface(name: &str) -> Result<()> {
