@@ -51,7 +51,10 @@ pub struct CommonData {
 impl Nodes {
     #[instrument(skip(self))]
     async fn create(&mut self, id: Uuid, name: String, chain: String) -> fdo::Result<()> {
-        let network_interface = self.next_network_interface();
+        let network_interface = self
+            .next_network_interface()
+            .await
+            .map_err(|e| fdo::Error::Failed(e.to_string()))?;
         let node = NodeData {
             id,
             name: name.clone(),
@@ -184,22 +187,23 @@ impl Nodes {
     }
 
     /// Get the next machine index and increment it.
-    pub fn next_network_interface(&self) -> NetworkInterface {
+    pub async fn next_network_interface(&self) -> Result<NetworkInterface> {
         let machine_index = self.data.machine_index.fetch_add(1, Ordering::SeqCst);
 
         let idx_bytes = machine_index.to_be_bytes();
-        let iface = NetworkInterface {
-            name: format!("bv{}", machine_index),
+        let iface = NetworkInterface::create(
+            format!("bv{}", machine_index),
             // FIXME: Hardcoding address for now.
-            ip: IpAddr::V4(Ipv4Addr::new(
+            IpAddr::V4(Ipv4Addr::new(
                 idx_bytes[0] + 74,
                 idx_bytes[1] + 50,
                 idx_bytes[2] + 82,
                 idx_bytes[3] + 83,
             )),
-        };
+        )
+        .await?;
 
-        iface
+        Ok(iface)
     }
 
     fn get_node_mut(&mut self, id_or_name: &str) -> Option<&mut Node> {
@@ -220,17 +224,17 @@ impl Nodes {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn network_interface_gen() {
+    #[tokio::test]
+    async fn network_interface_gen() {
         let nodes = super::Nodes::default();
-        let iface = nodes.next_network_interface();
+        let iface = nodes.next_network_interface().await.unwrap();
         assert_eq!(iface.name, "bv0");
         assert_eq!(
             iface.ip,
             super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 83))
         );
 
-        let iface = nodes.next_network_interface();
+        let iface = nodes.next_network_interface().await.unwrap();
         assert_eq!(iface.name, "bv1");
         assert_eq!(
             iface.ip,
@@ -242,7 +246,7 @@ mod tests {
             .data
             .machine_index
             .store(u8::MAX as u32 + 1, super::Ordering::SeqCst);
-        let iface = nodes.next_network_interface();
+        let iface = nodes.next_network_interface().await.unwrap();
         assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
         assert_eq!(
             iface.ip,
