@@ -2,7 +2,7 @@ import autoPreprocess from 'svelte-preprocess';
 import path from 'path';
 import fs from 'fs';
 import svg from '@poppanator/sveltekit-svg';
-import auto from '@sveltejs/adapter-auto';
+import adapter from '@sveltejs/adapter-static';
 
 const mediaQueries = fs
   .readFileSync('./src/styles/_internal.media.pcss')
@@ -21,7 +21,7 @@ const config = {
   ],
 
   kit: {
-    adapter: auto(),
+    adapter: adapter(),
 
     // hydrate the <div id="svelte"> element in src/app.html
     vite: {

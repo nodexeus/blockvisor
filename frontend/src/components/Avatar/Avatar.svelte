@@ -59,7 +59,7 @@
 
     & :global(.avatar__image) {
       object-fit: cover;
-      object-postion: center;
+      object-position: center;
       position: relative;
       z-index: var(--level-1);
       height: auto;
