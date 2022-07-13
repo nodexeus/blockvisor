@@ -21,6 +21,9 @@ trait Manager {
     /// [📖](https://www.freedesktop.org/software/systemd/man/systemd.directives.html#StopUnit()) Call interface method `StopUnit`.
     fn stop_unit(&self, name: &str, mode: UnitStopMode) -> Result<OwnedObjectPath>;
 
+    /// [📖](https://www.freedesktop.org/software/systemd/man/systemd.directives.html#RestartUnit()) Call interface method `RestartUnit`.
+    fn restart_unit(&self, name: &str, mode: UnitRestartMode) -> Result<OwnedObjectPath>;
+
     /// [📖](https://www.freedesktop.org/software/systemd/man/systemd.directives.html#EnableUnitFiles()) Call interface method `EnableUnitFiles`.
     fn enable_unit_files(
         &self,
@@ -90,5 +93,26 @@ pub enum UnitStopMode {
     /// Will stop a unit but ignore all its dependencies (not recommended).
     IgnoreDependencies,
     /// Will stop a unit but only ignore the requirement dependencies (not recommended).
+    IgnoreRequirements,
+}
+
+/// Mode to use when restarting a unit.
+///
+/// Same as [`UnitStartMode`].
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "kebab-case")]
+#[zvariant(signature = "s")]
+pub enum UnitRestartMode {
+    /// Will restart the unit and its dependencies, possibly replacing already queued jobs that
+    /// conflict with this.
+    Replace,
+    /// Will restart the unit and its dependencies, but will fail if this would change an already
+    /// queued job.
+    Fail,
+    /// Will restart the unit in question and terminate all units that aren't dependencies of it.
+    Isolate,
+    /// Will restart a unit but ignore all its dependencies (not recommended).
+    IgnoreDependencies,
+    /// Will restart a unit but only ignore the requirement dependencies (not recommended).
     IgnoreRequirements,
 }
