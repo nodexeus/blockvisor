@@ -1,1 +1,0 @@
-<div>Notifications</div>
