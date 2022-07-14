@@ -202,6 +202,7 @@ impl Nodes {
             )),
         )
         .await?;
+        self.save().await?;
 
         Ok(iface)
     }
