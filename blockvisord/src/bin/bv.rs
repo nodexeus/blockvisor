@@ -134,7 +134,6 @@ async fn process_host_command(command: &HostCommand) -> Result<()> {
             let info = get_host_info();
             println!("{:?}", info);
         }
-        HostCommand::Network { command: _ } => todo!(),
     }
 
     Ok(())
