@@ -227,6 +227,13 @@ impl Nodes {
 mod tests {
     #[tokio::test]
     async fn network_interface_gen() {
+        // Make sure the interface doesn't exist already.
+        let _ = crate::network_interface::NetworkInterface {
+            name: "bv0".to_string(),
+            ip: super::Ipv4Addr::LOCALHOST.into(),
+        }
+        .delete()
+        .await;
         let nodes = super::Nodes::default();
         let iface = nodes.next_network_interface().await.unwrap();
         assert_eq!(iface.name, "bv0");
@@ -235,6 +242,12 @@ mod tests {
             super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 83))
         );
 
+        let _ = crate::network_interface::NetworkInterface {
+            name: "bv1".to_string(),
+            ip: super::Ipv4Addr::LOCALHOST.into(),
+        }
+        .delete()
+        .await;
         let iface = nodes.next_network_interface().await.unwrap();
         assert_eq!(iface.name, "bv1");
         assert_eq!(
@@ -247,8 +260,15 @@ mod tests {
             .data
             .machine_index
             .store(u8::MAX as u32 + 1, super::Ordering::SeqCst);
+        let iface_name = format!("bv{}", u8::MAX as u32 + 1);
+        let _ = crate::network_interface::NetworkInterface {
+            name: iface_name.clone(),
+            ip: super::Ipv4Addr::LOCALHOST.into(),
+        }
+        .delete()
+        .await;
         let iface = nodes.next_network_interface().await.unwrap();
-        assert_eq!(iface.name, format!("bv{}", u8::MAX as u32 + 1));
+        assert_eq!(iface.name, iface_name);
         assert_eq!(
             iface.ip,
             super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 83, 83))
