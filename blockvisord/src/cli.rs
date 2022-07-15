@@ -146,54 +146,6 @@ pub enum HostCommand {
     /// Collect host system information
     #[clap(alias = "i")]
     Info,
-
-    /// Manage host network configuration
-    #[clap(alias = "n")]
-    Network {
-        #[clap(subcommand)]
-        command: HostNetworkCommand,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum HostNetworkCommand {
-    #[clap(alias = "i")]
-    Info,
-
-    #[clap(alias = "b")]
-    Bridge {
-        #[clap(subcommand)]
-        command: HostNetworkBridgeCommand,
-    },
-
-    Ip {
-        #[clap(subcommand)]
-        command: HostNetworkIpCommand,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum HostNetworkBridgeCommand {
-    #[clap(alias = "ls")]
-    List,
-
-    #[clap(alias = "c")]
-    Create { name: String },
-
-    #[clap(alias = "d")]
-    Delete { name: String },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum HostNetworkIpCommand {
-    #[clap(alias = "ls")]
-    List,
-
-    #[clap(alias = "a")]
-    Add { net: String },
-
-    #[clap(alias = "d")]
-    Delete { net: String },
 }
 
 #[derive(Debug, Subcommand)]
