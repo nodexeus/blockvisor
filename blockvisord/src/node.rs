@@ -26,7 +26,6 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 
 impl Node {
     /// Creates a new node with `id`.
-    /// TODO: machine_index is a hack. Remove after demo.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
@@ -68,9 +67,9 @@ impl Node {
         unimplemented!()
     }
 
-    /// Kills the running node.
+    /// Stops the running node.
     #[instrument(skip(self))]
-    pub async fn kill(&mut self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {

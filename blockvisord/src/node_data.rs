@@ -71,7 +71,9 @@ impl NodeData {
         info!("Deleting node config: {}", path.display());
         fs::remove_file(&*path)
             .await
-            .with_context(|| format!("Failed to delete node file `{}`", path.display()))
+            .with_context(|| format!("Failed to delete node file `{}`", path.display()))?;
+
+        self.network_interface.delete().await
     }
 
     fn file_path(&self) -> PathBuf {
