@@ -33,7 +33,7 @@ jobs:
           override: true
       - name: Build
         run: >
-          cargo build -p blockvisord
+          cargo build 
       - name: Reinstall
         run: >
           make reinstall
@@ -42,7 +42,7 @@ jobs:
           docker compose up -d
       - name: Test
         run: >
-          cargo test -p blockvisord
+          cargo test 
       - name: Shutdown test env
         if: always()
         run: >
@@ -62,9 +62,9 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: -p blockvisord -- --check
+          args:  -- --check
       - name: Catch common mistakes
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -p blockvisord -- -D warnings
+          args:  -- -D warnings
