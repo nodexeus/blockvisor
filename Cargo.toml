@@ -41,7 +41,7 @@ tracing-subscriber = {version = "0.3.11", features = ["env-filter", "fmt", "std"
 uuid = {version = "1.0.0", features = ["serde", "v4"]}
 zbus = {version = "2.3.0", features = ["tokio", "uuid"], default-features = false}
 
-firec = {git = "https://github.com/blockjoy/firec.git", rev = "2c7670aa"}
+firec = {git = "https://github.com/blockjoy/firec.git", rev = "6e2504be"}
 
 [build-dependencies]
 tonic-build = {version = "0.7", features = ["prost"]}
