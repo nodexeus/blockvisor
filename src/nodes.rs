@@ -156,7 +156,7 @@ impl Nodes {
                 // Skip the common data file.
                 continue;
             }
-            match NodeData::load(&*path).and_then(Node::connect).await {
+            match NodeData::load(&path).and_then(Node::connect).await {
                 Ok(node) => {
                     this.node_ids.insert(node.data.name.clone(), *node.id());
                     this.nodes.insert(node.data.id, node);
