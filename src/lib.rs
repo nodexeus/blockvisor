@@ -2,6 +2,7 @@ pub mod cli;
 pub mod client;
 pub mod config;
 pub mod dbus;
+pub mod grpc;
 pub mod hosts;
 pub mod logging;
 pub mod network_interface;

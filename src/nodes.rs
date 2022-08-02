@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
+use tokio::sync::broadcast::{self, Sender};
 use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
 use zbus::{dbus_interface, fdo};
 
 use crate::{
+    grpc::pb,
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeState},
@@ -34,11 +36,24 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
+    pub tx: Sender<pb::InfoUpdate>,
+}
+
+impl Default for Nodes {
+    fn default() -> Self {
+        let (tx, _rx) = broadcast::channel(128);
+        Self {
+            nodes: Default::default(),
+            node_ids: Default::default(),
+            data: Default::default(),
+            tx,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -163,9 +178,8 @@ impl Nodes {
             REGISTRY_CONFIG_DIR.display()
         );
         let mut this = Nodes {
-            nodes: HashMap::new(),
-            node_ids: HashMap::new(),
             data: nodes_data,
+            ..Default::default()
         };
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {

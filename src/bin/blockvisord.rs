@@ -18,6 +18,14 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await?;
     let nodes = Nodes::load().await?;
+
+    let mut updates_rx = nodes.tx.subscribe();
+    tokio::spawn(async move {
+        while let Ok(update) = updates_rx.recv().await {
+            info!("receiving node updates: {:?}", update);
+        }
+    });
+
     let _conn = ConnectionBuilder::system()?
         .name(NodeProxy::DESTINATION)?
         .serve_at(NodeProxy::PATH, nodes)?
