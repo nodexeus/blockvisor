@@ -125,6 +125,15 @@ impl Nodes {
     }
 
     // TODO: Rest of the NodeCommand variants.
+
+    async fn node_id_for_name(&self, name: &str) -> fdo::Result<Uuid> {
+        let uuid = self.node_ids.get(name).cloned().ok_or_else(|| {
+            let msg = format!("Node with name `{}` not found", name);
+            fdo::Error::FileNotFound(msg)
+        })?;
+
+        fdo::Result::Ok(uuid)
+    }
 }
 
 impl Nodes {

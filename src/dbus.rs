@@ -14,6 +14,6 @@ trait Node {
     async fn start(&self, id_or_name: &str) -> Result<()>;
     async fn stop(&self, id_or_name: &str) -> Result<()>;
     async fn list(&self) -> Result<Vec<NodeData>>;
-
     // TODO: Rest of the NodeCommand variants.
+    async fn node_id_for_name(&self, name: &str) -> Result<Uuid>;
 }
