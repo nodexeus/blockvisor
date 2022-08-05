@@ -182,21 +182,21 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 chain, id, name
             );
         }
-        NodeCommand::Start { id: id_or_name } => {
+        NodeCommand::Start { id_or_name } => {
             node_proxy.start(id_or_name).await?;
             println!("Started node `{}`", id_or_name);
         }
-        NodeCommand::Stop { id: id_or_name } => {
+        NodeCommand::Stop { id_or_name } => {
             node_proxy.stop(id_or_name).await?;
             println!("Stopped node `{}`", id_or_name);
         }
-        NodeCommand::Delete { id: id_or_name } => {
+        NodeCommand::Delete { id_or_name } => {
             node_proxy.delete(id_or_name).await?;
             println!("Deleted node `{}`", id_or_name);
         }
-        NodeCommand::Restart { id: _ } => todo!(),
-        NodeCommand::Console { id: _ } => todo!(),
-        NodeCommand::Logs { id: _ } => todo!(),
+        NodeCommand::Restart { id_or_name: _ } => todo!(),
+        NodeCommand::Console { id_or_name: _ } => todo!(),
+        NodeCommand::Logs { id_or_name: _ } => todo!(),
     }
     Ok(())
 }

@@ -104,40 +104,40 @@ pub enum NodeCommand {
     /// Start node
     Start {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 
     /// Stop node
     Stop {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 
     /// Restart node
     Restart {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 
     /// Delete node and clean up resources
     #[clap(alias = "d")]
     Delete {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 
     /// Attach to node console
     #[clap(alias = "c")]
     Console {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 
     /// Display node logs
     #[clap(alias = "l")]
     Logs {
         /// Node id or name
-        id: String,
+        id_or_name: String,
     },
 }
 
