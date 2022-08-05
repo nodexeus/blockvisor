@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
                 for node in nodes {
                     let id = node.id;
                     println!("Deleting node with ID `{}`", &id);
-                    node_proxy.delete(&id.to_string()).await?;
+                    node_proxy.delete(&id).await?;
                 }
 
                 let config = Config::load().await?;
@@ -182,23 +182,35 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 chain, id, name
             );
         }
-        NodeCommand::Start { id: id_or_name } => {
-            node_proxy.start(id_or_name).await?;
+        NodeCommand::Start { id_or_name } => {
+            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
+            node_proxy.start(&id).await?;
             println!("Started node `{}`", id_or_name);
         }
-        NodeCommand::Stop { id: id_or_name } => {
-            node_proxy.stop(id_or_name).await?;
+        NodeCommand::Stop { id_or_name } => {
+            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
+            node_proxy.stop(&id).await?;
             println!("Stopped node `{}`", id_or_name);
         }
-        NodeCommand::Delete { id: id_or_name } => {
-            node_proxy.delete(id_or_name).await?;
+        NodeCommand::Delete { id_or_name } => {
+            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
+            node_proxy.delete(&id).await?;
             println!("Deleted node `{}`", id_or_name);
         }
-        NodeCommand::Restart { id: _ } => todo!(),
-        NodeCommand::Console { id: _ } => todo!(),
-        NodeCommand::Logs { id: _ } => todo!(),
+        NodeCommand::Restart { id_or_name: _ } => todo!(),
+        NodeCommand::Console { id_or_name: _ } => todo!(),
+        NodeCommand::Logs { id_or_name: _ } => todo!(),
     }
     Ok(())
+}
+
+async fn resolve_id_or_name(node_proxy: &NodeProxy<'_>, id_or_name: &str) -> Result<Uuid> {
+    let uuid = match Uuid::parse_str(id_or_name) {
+        Ok(v) => v,
+        Err(_) => node_proxy.node_id_for_name(id_or_name).await?,
+    };
+
+    Ok(uuid)
 }
 
 #[cfg(test)]
