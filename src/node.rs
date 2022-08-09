@@ -4,7 +4,7 @@ use firec::Machine;
 use std::path::Path;
 use std::time::Duration;
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
-use tokio::time::sleep;
+use tokio::{fs, time::sleep};
 use tracing::{instrument, trace};
 use uuid::Uuid;
 
@@ -25,6 +25,7 @@ const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
+const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 
 impl Node {
     /// Creates a new node with `id`.
@@ -32,6 +33,9 @@ impl Node {
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
+        let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
+        let babel_socket_link = workspace_dir.join("vsock.socket_42");
+        fs::hard_link(BABEL_VSOCK_PATH, babel_socket_link).await?;
         data.save().await?;
 
         Ok(Self { data, machine })
