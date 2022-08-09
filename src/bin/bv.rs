@@ -98,11 +98,18 @@ async fn main() -> Result<()> {
                 bail!("Host is not registered, please run `init` first");
             }
 
-            // Enable the service to start on host bootup and start it.
+            // Enable the blockvisor service and babel socket to start on host bootup and start it.
             println!("Enabling blockvisor service to start on host boot.");
             systemd_manager_proxy
-                .enable_unit_files(&["blockvisor.service"], false, false)
+                .enable_unit_files(&["blockvisor.service", "babel-bus.socket"], false, false)
                 .await?;
+
+            println!("Starting babel socket unit");
+            systemd_manager_proxy
+                .start_unit("babel-bus.socket", UnitStartMode::Fail)
+                .await?;
+            println!("babel socket setup");
+
             println!("Starting blockvisor service");
             systemd_manager_proxy
                 .start_unit("blockvisor.service", UnitStartMode::Fail)
@@ -116,6 +123,12 @@ async fn main() -> Result<()> {
                 .stop_unit("blockvisor.service", UnitStopMode::Fail)
                 .await?;
             println!("blockvisor service stopped successfully");
+
+            println!("Shutting down babel socket unit");
+            systemd_manager_proxy
+                .stop_unit("babel-bus.socket", UnitStopMode::Fail)
+                .await?;
+            println!("babel socket terminated");
         }
         Command::Status(_) => {
             todo!()
