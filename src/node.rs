@@ -17,9 +17,9 @@ pub struct Node {
 }
 
 // FIXME: Hardcoding everything for now.
-const KERNEL_PATH: &str = "/var/demo/debian-vmlinux";
-const ROOT_FS: &str = "/var/demo/debian.ext4";
-const CHROOT_PATH: &str = "/var/demo/helium";
+const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
+const ROOT_FS: &str = "/var/lib/blockvisor/debian.ext4";
+const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
