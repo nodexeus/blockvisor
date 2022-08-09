@@ -23,6 +23,8 @@ const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
+const VSOCK_PATH: &str = "/vsock.socket";
+const VSOCK_GUEST_CID: u32 = 3;
 
 impl Node {
     /// Creates a new node with `id`.
@@ -127,6 +129,7 @@ impl Node {
             // Rest of the configuration.
             .socket_path(Path::new(FC_SOCKET_PATH))
             .kernel_args(kernel_args)
+            .vsock_cfg(VSOCK_GUEST_CID, Path::new(VSOCK_PATH))
             .build();
 
         Ok(config)
