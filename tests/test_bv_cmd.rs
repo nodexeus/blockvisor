@@ -147,6 +147,7 @@ fn test_bv_cmd_init_unknown_otp() {
 }
 
 #[tokio::test]
+#[ignore] // FIXME: wait for updated stakejoy api image
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_init_localhost() {

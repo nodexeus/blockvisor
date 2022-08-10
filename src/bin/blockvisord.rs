@@ -7,7 +7,7 @@ use blockvisord::{
     nodes::Nodes,
 };
 use tokio::time::{sleep, Duration};
-use tracing::info;
+use tracing::{error, info};
 use zbus::{ConnectionBuilder, ProxyDefault};
 
 #[allow(unreachable_code)]
@@ -25,7 +25,9 @@ async fn main() -> Result<()> {
         .await?;
 
     loop {
-        process_pending_commands(&config).await?;
+        if let Err(e) = process_pending_commands(&config).await {
+            error!("Error processing pending commands: {:?}", e);
+        }
 
         sleep(Duration::from_secs(5)).await;
     }
