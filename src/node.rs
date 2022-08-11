@@ -8,7 +8,7 @@ use tokio::{fs, time::sleep};
 use tracing::{instrument, trace};
 use uuid::Uuid;
 
-use crate::node_data::{NodeData, NodeState};
+use crate::node_data::{NodeData, NodeStatus};
 
 #[derive(Debug)]
 pub struct Node {
@@ -64,12 +64,12 @@ impl Node {
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await?;
-        self.data.state = NodeState::Running;
+        self.data.status = NodeStatus::Running;
         self.data.save().await
     }
 
-    /// Returns the state of the node.
-    pub async fn state(&self) -> Result<NodeState> {
+    /// Returns the status of the node.
+    pub async fn status(&self) -> Result<NodeStatus> {
         unimplemented!()
     }
 
@@ -90,7 +90,7 @@ impl Node {
                 }
             }
         }
-        self.data.state = NodeState::Stopped;
+        self.data.status = NodeStatus::Stopped;
         self.data.save().await?;
 
         Ok(())

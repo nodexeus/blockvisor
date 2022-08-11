@@ -16,19 +16,19 @@ use zbus::zvariant::Type;
 use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
-pub enum NodeState {
+pub enum NodeStatus {
     Running,
     Stopped,
 }
 
-fn style_node_state(cell: CellStruct, value: &NodeState) -> CellStruct {
+fn style_node_status(cell: CellStruct, value: &NodeStatus) -> CellStruct {
     match value {
-        NodeState::Running => cell.foreground_color(Some(Green)),
-        NodeState::Stopped => cell.foreground_color(Some(Red)),
+        NodeStatus::Running => cell.foreground_color(Some(Green)),
+        NodeStatus::Stopped => cell.foreground_color(Some(Red)),
     }
 }
 
-impl fmt::Display for NodeState {
+impl fmt::Display for NodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -42,8 +42,8 @@ pub struct NodeData {
     pub name: String,
     #[table(title = "Chain", color = "Blue")]
     pub chain: String,
-    #[table(title = "State", customize_fn = "style_node_state")]
-    pub state: NodeState,
+    #[table(title = "State", customize_fn = "style_node_status")]
+    pub status: NodeStatus,
     #[table(title = "IP Address", color = "Yellow")]
     pub network_interface: NetworkInterface,
 }

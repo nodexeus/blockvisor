@@ -16,7 +16,7 @@ use crate::{
     grpc::pb,
     network_interface::NetworkInterface,
     node::Node,
-    node_data::{NodeData, NodeState},
+    node_data::{NodeData, NodeStatus},
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
@@ -76,7 +76,7 @@ impl Nodes {
             id,
             name: name.clone(),
             chain,
-            state: NodeState::Stopped,
+            status: NodeStatus::Stopped,
             network_interface,
         };
 

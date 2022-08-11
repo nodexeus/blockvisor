@@ -5,7 +5,7 @@ use blockvisord::{
     config::Config,
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
-    node_data::NodeState,
+    node_data::NodeStatus,
     nodes::Nodes,
     pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
@@ -177,7 +177,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.state == NodeState::Running)
+                        && (*all || c.status == NodeStatus::Running)
                 })
                 .peekable();
             if nodes.peek().is_some() {
