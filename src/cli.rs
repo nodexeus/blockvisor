@@ -139,6 +139,12 @@ pub enum NodeCommand {
         /// Node id or name
         id_or_name: String,
     },
+
+    /// Get node status
+    Status {
+        /// Node id or name
+        id_or_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

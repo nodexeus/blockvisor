@@ -70,7 +70,7 @@ impl Node {
 
     /// Returns the status of the node.
     pub async fn status(&self) -> Result<NodeStatus> {
-        unimplemented!()
+        Ok(self.data.status)
     }
 
     /// Stops the running node.

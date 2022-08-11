@@ -173,6 +173,18 @@ impl Nodes {
         self.nodes.values().map(|n| n.data.clone()).collect()
     }
 
+    #[instrument(skip(self))]
+    async fn status(&self, id: Uuid) -> fdo::Result<NodeStatus> {
+        let node = self.nodes.get(&id).ok_or_else(|| {
+            let msg = format!("Node with id `{}` not found", &id);
+            fdo::Error::FileNotFound(msg)
+        })?;
+
+        node.status()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))
+    }
+
     // TODO: Rest of the NodeCommand variants.
 
     async fn node_id_for_name(&self, name: &str) -> fdo::Result<Uuid> {

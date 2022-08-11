@@ -213,6 +213,11 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Restart { id_or_name: _ } => todo!(),
         NodeCommand::Console { id_or_name: _ } => todo!(),
         NodeCommand::Logs { id_or_name: _ } => todo!(),
+        NodeCommand::Status { id_or_name } => {
+            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
+            let status = node_proxy.status(&id).await?;
+            println!("{}", status);
+        }
     }
     Ok(())
 }
