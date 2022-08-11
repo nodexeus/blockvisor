@@ -46,7 +46,7 @@ pub struct Nodes {
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct CommonData {
+struct CommonData {
     machine_index: Arc<AtomicU32>,
 }
 
