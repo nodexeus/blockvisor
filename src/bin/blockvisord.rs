@@ -3,12 +3,20 @@ use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
     dbus::NodeProxy,
+    grpc::{self, pb::node_command::Command},
     logging::setup_logging,
     nodes::Nodes,
 };
-use tokio::time::{sleep, Duration};
+use std::str::FromStr;
+use tokio::{
+    sync::broadcast::Receiver,
+    time::{sleep, Duration},
+};
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+use tonic::transport::Endpoint;
 use tracing::{error, info};
-use zbus::{ConnectionBuilder, ProxyDefault};
+use uuid::Uuid;
+use zbus::{Connection, ConnectionBuilder, ProxyDefault};
 
 #[allow(unreachable_code)]
 #[tokio::main]
@@ -18,13 +26,7 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await?;
     let nodes = Nodes::load().await?;
-
-    let mut updates_rx = nodes.tx.subscribe();
-    tokio::spawn(async move {
-        while let Ok(update) = updates_rx.recv().await {
-            info!("receiving node updates: {:?}", update);
-        }
-    });
+    let updates_tx = nodes.tx.clone();
 
     let _conn = ConnectionBuilder::system()?
         .name(NodeProxy::DESTINATION)?
@@ -33,17 +35,78 @@ async fn main() -> Result<()> {
         .await?;
 
     loop {
-        if let Err(e) = process_pending_commands(&config).await {
+        let updates_rx = updates_tx.subscribe();
+        if let Err(e) = connect_to_api_server(&config, updates_rx).await {
             error!("Error processing pending commands: {:?}", e);
+            sleep(Duration::from_secs(5)).await;
         }
-
-        sleep(Duration::from_secs(5)).await;
     }
 
     info!("Stopping...");
     Ok(())
 }
 
+async fn connect_to_api_server(config: &Config, rx: Receiver<grpc::pb::InfoUpdate>) -> Result<()> {
+    let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
+    info!("Connecting to gRPC channel...");
+    let channel = Endpoint::connect(&endpoint).await?;
+    let token = grpc::AuthToken(config.token.to_owned());
+    info!("Creating gRPC client...");
+    let mut client = grpc::Client::with_auth(channel, token);
+    process_commands_stream(&mut client, rx).await?;
+
+    Ok(())
+}
+
+async fn process_commands_stream(
+    client: &mut grpc::Client,
+    rx: Receiver<grpc::pb::InfoUpdate>,
+) -> Result<()> {
+    info!("Processing pending commands");
+    let updates_stream = BroadcastStream::new(rx).filter_map(|item| item.ok());
+
+    let response = client.commands(updates_stream).await?;
+    let mut commands_stream = response.into_inner();
+
+    let conn = Connection::system().await?;
+    let node_proxy = NodeProxy::new(&conn).await?;
+
+    info!("Getting pending commands from stream...");
+    while let Some(received) = commands_stream.next().await {
+        info!("received: {received:?}");
+        let received = received?;
+        match received.r#type {
+            Some(grpc::pb::command::Type::Node(node)) => {
+                let node_id = node.id.unwrap().value;
+                let node_id = Uuid::from_str(&node_id)?;
+                match node.command {
+                    Some(cmd) => match cmd {
+                        Command::Create(args) => {
+                            node_proxy
+                                .create(&node_id, &args.name, &args.image.unwrap().url)
+                                .await?;
+                        }
+                        Command::Delete(_) => unimplemented!(),
+                        Command::Start(_) => unimplemented!(),
+                        Command::Stop(_) => unimplemented!(),
+                        Command::Restart(_) => unimplemented!(),
+                        Command::Upgrade(_) => unimplemented!(),
+                        Command::Update(_) => unimplemented!(),
+                        Command::InfoGet(_) => unimplemented!(),
+                        Command::Generic(_) => unimplemented!(),
+                    },
+                    None => unimplemented!(),
+                };
+            }
+            Some(grpc::pb::command::Type::Host(_host)) => unimplemented!(),
+            None => unimplemented!(),
+        };
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
 async fn process_pending_commands(config: &Config) -> Result<()> {
     let timeout = Duration::from_secs(10);
     let client = APIClient::new(&config.blockjoy_api_url, timeout)?;

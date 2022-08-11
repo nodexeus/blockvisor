@@ -400,6 +400,7 @@ dependencies = [
  "serial_test",
  "sysinfo",
  "tokio",
+ "tokio-stream",
  "toml",
  "tonic",
  "tonic-build",
@@ -2574,6 +2575,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
