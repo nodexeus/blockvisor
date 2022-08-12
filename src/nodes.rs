@@ -220,53 +220,44 @@ impl Nodes {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[tokio::test]
     async fn network_interface_gen() {
-        // Make sure the interface doesn't exist already.
-        let _ = crate::network_interface::NetworkInterface {
-            name: "bv0".to_string(),
-            ip: super::Ipv4Addr::LOCALHOST.into(),
-        }
-        .delete()
-        .await;
-        let nodes = super::Nodes::default();
-        let iface = nodes.next_network_interface().await.unwrap();
-        assert_eq!(iface.name, "bv0");
-        assert_eq!(
-            iface.ip,
-            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 83))
-        );
-
-        let _ = crate::network_interface::NetworkInterface {
-            name: "bv1".to_string(),
-            ip: super::Ipv4Addr::LOCALHOST.into(),
-        }
-        .delete()
-        .await;
-        let iface = nodes.next_network_interface().await.unwrap();
-        assert_eq!(iface.name, "bv1");
-        assert_eq!(
-            iface.ip,
-            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 82, 84))
-        );
-
+        let nodes = Nodes::default();
+        clean_test_iface(&nodes, "bv0", &IpAddr::V4(Ipv4Addr::new(74, 50, 82, 83))).await;
+        clean_test_iface(&nodes, "bv1", &IpAddr::V4(Ipv4Addr::new(74, 50, 82, 84))).await;
         // Let's take the machine_index beyond u8 boundry.
         nodes
             .data
             .machine_index
-            .store(u8::MAX as u32 + 1, super::Ordering::SeqCst);
+            .store(u8::MAX as u32 + 1, Ordering::SeqCst);
         let iface_name = format!("bv{}", u8::MAX as u32 + 1);
+        clean_test_iface(
+            &nodes,
+            &iface_name,
+            &IpAddr::V4(Ipv4Addr::new(74, 50, 83, 83)),
+        )
+        .await;
+    }
+
+    async fn clean_test_iface(nodes: &Nodes, name: &str, ip: &IpAddr) {
+        // Make sure the interface doesn't exist already.
         let _ = crate::network_interface::NetworkInterface {
-            name: iface_name.clone(),
-            ip: super::Ipv4Addr::LOCALHOST.into(),
+            name: name.to_owned(),
+            ip: ip.to_owned(),
         }
         .delete()
         .await;
+
         let iface = nodes.next_network_interface().await.unwrap();
-        assert_eq!(iface.name, iface_name);
-        assert_eq!(
-            iface.ip,
-            super::IpAddr::V4(super::Ipv4Addr::new(74, 50, 83, 83))
-        );
+        let next_name = iface.name.clone();
+        let next_ip = iface.ip.clone();
+
+        // Clean up
+        let _ = iface.delete().await;
+
+        assert_eq!(&next_name, name);
+        assert_eq!(&next_ip, ip);
     }
 }
