@@ -23,6 +23,7 @@ anyhow = "1.0.56"
 chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive"]}
 cli-table = "0.4"
+futures-util = "0.3"
 home = "0.5.3"
 lazy_static = "1.4.0"
 local-ip-address = "0.4.4"

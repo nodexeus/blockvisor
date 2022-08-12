@@ -386,6 +386,7 @@ dependencies = [
  "clap",
  "cli-table",
  "firec",
+ "futures-util",
  "home",
  "httpmock",
  "lazy_static",
