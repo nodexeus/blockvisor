@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
 use zbus::{dbus_interface, fdo};
@@ -75,6 +75,10 @@ impl Nodes {
             return Err(fdo::Error::FileExists(msg));
         }
 
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let network_interface = self
             .next_network_interface()
             .await
@@ -93,6 +97,10 @@ impl Nodes {
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
@@ -218,6 +226,25 @@ impl Nodes {
 
     pub fn exists() -> bool {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
+    }
+
+    pub fn send_node_status(
+        &self,
+        id: &Uuid,
+        status: pb::node_info::ContainerStatus,
+    ) -> Result<()> {
+        let node_id = Some(pb::Uuid {
+            value: id.to_string(),
+        });
+        self.tx.send(pb::InfoUpdate {
+            info: Some(pb::info_update::Info::Node(pb::NodeInfo {
+                id: node_id,
+                container_status: Some(status.into()),
+                ..Default::default()
+            })),
+        })?;
+
+        Ok(())
     }
 
     /// Get the next machine index and increment it.
