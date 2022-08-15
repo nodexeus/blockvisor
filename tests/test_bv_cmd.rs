@@ -77,7 +77,9 @@ fn test_bv_cmd_node_lifecycle() {
     let cmd = cmd.args(&["node", "create", &chain_id]);
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
-    println!("create output: {stdout}");
+    let stderr = str::from_utf8(&output.stderr).unwrap();
+    println!("create stdout: {stdout}");
+    println!("create stderr: {stderr}");
     let vm_id = stdout
         .trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "))
         .split('`')
