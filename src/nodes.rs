@@ -50,6 +50,16 @@ pub struct CommonData {
 impl Nodes {
     #[instrument(skip(self))]
     async fn create(&mut self, id: Uuid, name: String, chain: String) -> fdo::Result<()> {
+        if self.nodes.contains_key(&id) {
+            let msg = format!("Node with id `{}` exists", &id);
+            return Err(fdo::Error::FileExists(msg));
+        }
+
+        if self.node_ids.contains_key(&name) {
+            let msg = format!("Node with name `{}` exists", &name);
+            return Err(fdo::Error::FileExists(msg));
+        }
+
         let network_interface = self
             .next_network_interface()
             .await
