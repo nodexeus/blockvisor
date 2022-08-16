@@ -102,40 +102,66 @@ impl Nodes {
         })?;
         self.node_ids.remove(&node.data.name);
 
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         node.delete()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("deleted");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
     async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| {
             let msg = format!("Node with id `{}` not found", &id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
+
         node.start()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("started");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
     async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| {
             let msg = format!("Node with id `{}` not found", &id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
+
         node.stop()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("stopped");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }

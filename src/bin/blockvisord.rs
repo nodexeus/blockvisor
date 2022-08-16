@@ -93,10 +93,19 @@ async fn process_commands_stream(
                                 .create(&node_id, &args.name, &args.image.unwrap().url)
                                 .await?;
                         }
-                        Command::Delete(_) => unimplemented!(),
-                        Command::Start(_) => unimplemented!(),
-                        Command::Stop(_) => unimplemented!(),
-                        Command::Restart(_) => unimplemented!(),
+                        Command::Delete(_) => {
+                            node_proxy.delete(&node_id).await?;
+                        }
+                        Command::Start(_) => {
+                            node_proxy.start(&node_id).await?;
+                        }
+                        Command::Stop(_) => {
+                            node_proxy.stop(&node_id).await?;
+                        }
+                        Command::Restart(_) => {
+                            node_proxy.stop(&node_id).await?;
+                            node_proxy.start(&node_id).await?;
+                        }
                         Command::Upgrade(_) => unimplemented!(),
                         Command::Update(_) => unimplemented!(),
                         Command::InfoGet(_) => unimplemented!(),

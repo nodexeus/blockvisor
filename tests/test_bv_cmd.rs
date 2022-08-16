@@ -305,25 +305,57 @@ async fn test_bv_cmd_grpc_commands() {
     use stub_server::StubServer;
     use uuid::Uuid;
 
+    let node_name = "beautiful-node-name".to_string();
     let node_id = Uuid::new_v4().to_string();
-    let commands = vec![pb::Command {
-        r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-            id: Some(pb::Uuid {
-                value: node_id.clone(),
-            }),
-            meta: None,
-            command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                name: "beautiful-node-name".to_string(),
-                image: Some(pb::ContainerImage {
-                    url: "helium/node/latest".to_string(),
-                }),
-                blockchain: "helium".to_string(),
-                r#type: pb::NodeType::Node.into(),
-            })),
-        })),
-    }];
+    let id = pb::Uuid {
+        value: node_id.clone(),
+    };
 
-    let (updates_tx, updates_rx) = mpsc::channel(10);
+    println!("delete existing node, if any");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "delete", &node_name]).assert();
+    sleep(Duration::from_secs(1)).await;
+
+    println!("preparing server");
+    let commands = vec![
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: None,
+                command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                    name: node_name,
+                    image: Some(pb::ContainerImage {
+                        url: "helium/node/latest".to_string(),
+                    }),
+                    blockchain: "helium".to_string(),
+                    r#type: pb::NodeType::Node.into(),
+                })),
+            })),
+        },
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: None,
+                command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
+            })),
+        },
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: None,
+                command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
+            })),
+        },
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: None,
+                command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
+            })),
+        },
+    ];
+
+    let (updates_tx, updates_rx) = mpsc::channel(128);
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel(1);
 
     let server = StubServer {
@@ -334,6 +366,7 @@ async fn test_bv_cmd_grpc_commands() {
 
     let server_future = async {
         Server::builder()
+            .max_concurrent_streams(1)
             .add_service(pb::command_flow_server::CommandFlowServer::new(server))
             .serve_with_shutdown(
                 "0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap(),
@@ -346,7 +379,7 @@ async fn test_bv_cmd_grpc_commands() {
     println!("run server");
     tokio::select! {
         _ = server_future => {},
-        _ = sleep(Duration::from_secs(5)) => {},
+        _ = sleep(Duration::from_secs(60)) => {},
     };
 
     println!("list created node");
@@ -356,6 +389,7 @@ async fn test_bv_cmd_grpc_commands() {
         .assert()
         .success()
         .stdout(predicate::str::contains(&node_id));
+    sleep(Duration::from_secs(1)).await;
 
     println!("delete created node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -363,6 +397,7 @@ async fn test_bv_cmd_grpc_commands() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Deleted node"));
+    sleep(Duration::from_secs(1)).await;
 
     println!("check received updates");
     let updates: Vec<_> = ReceiverStream::new(updates_rx)
@@ -372,15 +407,28 @@ async fn test_bv_cmd_grpc_commands() {
         .await;
 
     println!("got updates: {updates:?}");
-    assert_eq!(
-        updates.get(0).unwrap().as_ref().unwrap(),
-        &default_node_update_with_status(&node_id, pb::node_info::ContainerStatus::Creating)
-    );
-    assert_eq!(
-        updates.get(1).unwrap().as_ref().unwrap(),
-        &default_node_update_with_status(&node_id, pb::node_info::ContainerStatus::Stopped)
-    );
-    assert_eq!(updates.len(), 2);
+    let expected_statuses = vec![
+        pb::node_info::ContainerStatus::Creating,
+        pb::node_info::ContainerStatus::Stopped,
+        pb::node_info::ContainerStatus::Starting,
+        pb::node_info::ContainerStatus::Running,
+        pb::node_info::ContainerStatus::Stopping,
+        pb::node_info::ContainerStatus::Stopped,
+        pb::node_info::ContainerStatus::Stopping,
+        pb::node_info::ContainerStatus::Stopped,
+        pb::node_info::ContainerStatus::Starting,
+        pb::node_info::ContainerStatus::Running,
+        pb::node_info::ContainerStatus::Deleting,
+        pb::node_info::ContainerStatus::Deleted,
+    ];
+    for (id, status) in expected_statuses.into_iter().enumerate() {
+        assert_eq!(
+            updates.get(id).unwrap().as_ref().unwrap(),
+            &default_node_update_with_status(&node_id, status)
+        );
+    }
+
+    assert_eq!(updates.len(), 12);
 }
 
 #[cfg(target_os = "linux")]
