@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await?;
     let nodes = Nodes::load().await?;
-    let updates_tx = nodes.tx.clone();
+    let updates_tx = nodes.get_updates_sender().await?.clone();
 
     let _conn = ConnectionBuilder::system()?
         .name(NodeProxy::DESTINATION)?

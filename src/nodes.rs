@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
+use tokio::sync::OnceCell;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
@@ -36,24 +37,12 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
-    pub tx: Sender<pb::InfoUpdate>,
-}
-
-impl Default for Nodes {
-    fn default() -> Self {
-        let (tx, _rx) = broadcast::channel(128);
-        Self {
-            nodes: Default::default(),
-            node_ids: Default::default(),
-            data: Default::default(),
-            tx,
-        }
-    }
+    tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -233,10 +222,14 @@ impl Nodes {
         id: &Uuid,
         status: pb::node_info::ContainerStatus,
     ) -> Result<()> {
+        if !self.tx.initialized() {
+            bail!("Updates channel not initialized")
+        }
+
         let node_id = Some(pb::Uuid {
             value: id.to_string(),
         });
-        self.tx.send(pb::InfoUpdate {
+        self.tx.get().unwrap().send(pb::InfoUpdate {
             info: Some(pb::info_update::Info::Node(pb::NodeInfo {
                 id: node_id,
                 container_status: Some(status.into()),
@@ -266,6 +259,16 @@ impl Nodes {
         self.save().await?;
 
         Ok(iface)
+    }
+
+    // Get or init updates sender
+    pub async fn get_updates_sender(&self) -> Result<&Sender<pb::InfoUpdate>> {
+        self.tx
+            .get_or_try_init(|| async {
+                let (tx, _rx) = broadcast::channel(128);
+                Ok(tx)
+            })
+            .await
     }
 }
 
