@@ -15,7 +15,9 @@ use zbus::zvariant::Type;
 
 use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 
-#[derive(Deserialize, Serialize, PartialEq, Eq, Clone, Copy, Debug, Type)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Type,
+)]
 pub enum NodeStatus {
     Running,
     Stopped,
