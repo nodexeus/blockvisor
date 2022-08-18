@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use tokio::sync::OnceCell;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
-use zbus::{dbus_interface, fdo};
+use zbus::{dbus_interface, fdo, Connection, ConnectionBuilder};
 
 use crate::{
     grpc::pb,
@@ -20,6 +20,7 @@ use crate::{
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
+const BABEL_BUS_ADDRESS: &str = "unix:path=/var/lib/blockvisor/vsock.socket_42";
 
 lazy_static::lazy_static! {
     pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
@@ -41,6 +42,7 @@ pub enum ServiceStatus {
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
+    babel_conn: OnceCell<Connection>,
     data: CommonData,
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
@@ -80,7 +82,11 @@ impl Nodes {
             network_interface,
         };
 
-        let node = Node::create(node)
+        let babel_conn = self
+            .babel_conn()
+            .await
+            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        let node = Node::create(node, babel_conn)
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         self.nodes.insert(id, node);
@@ -206,7 +212,6 @@ impl Nodes {
         );
         let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE).await?;
         let nodes_data = toml::from_str(&config)?;
-
         // Now the individual node data files.
         info!(
             "Reading nodes config dir: {}",
@@ -225,7 +230,13 @@ impl Nodes {
                 // Skip the common data file.
                 continue;
             }
-            match NodeData::load(&path).and_then(Node::connect).await {
+            match NodeData::load(&path)
+                .and_then(|data| async {
+                    let babel_conn = this.babel_conn().await?;
+                    Node::connect(data, babel_conn).await
+                })
+                .await
+            {
                 Ok(node) => {
                     this.node_ids.insert(node.data.name.clone(), *node.id());
                     this.nodes.insert(node.data.id, node);
@@ -307,6 +318,15 @@ impl Nodes {
                 Ok(tx)
             })
             .await
+    }
+
+    async fn babel_conn(&self) -> Result<&Connection> {
+        self.babel_conn
+            .get_or_try_init(|| async {
+                ConnectionBuilder::address(BABEL_BUS_ADDRESS)?.build().await
+            })
+            .await
+            .context("Failed to connect to babel bus")
     }
 }
 
