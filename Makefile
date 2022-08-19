@@ -9,6 +9,7 @@ install:
 	install -m u=rw,g=r,o=r data/babel-bus.conf /etc/
 	install -m u=rw,g=r,o=r data/babel-bus.service /etc/systemd/system/
 	install -m u=rw,g=r,o=r data/babel-bus.socket /etc/systemd/system/
+	systemctl daemon-reload
 
 reinstall:
 	bv stop || true
