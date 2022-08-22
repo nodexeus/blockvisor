@@ -13,7 +13,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
-use tonic::transport::Endpoint;
+use tonic::transport::{Channel, Endpoint};
 use tracing::{error, info};
 use uuid::Uuid;
 use zbus::{Connection, ConnectionBuilder, ProxyDefault};
@@ -34,28 +34,35 @@ async fn main() -> Result<()> {
         .build()
         .await?;
 
+    let token = grpc::AuthToken(config.token.to_owned());
+    let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
+    let channel = wait_for_channel(&endpoint).await;
+
+    info!("Creating gRPC client...");
+    let mut client = grpc::Client::with_auth(channel, token);
+
     loop {
         let updates_rx = updates_tx.subscribe();
-        if let Err(e) = connect_to_api_server(&config, updates_rx).await {
+        if let Err(e) = process_commands_stream(&mut client, updates_rx).await {
             error!("Error processing pending commands: {:?}", e);
-            sleep(Duration::from_secs(5)).await;
         }
+        sleep(Duration::from_secs(5)).await;
     }
 
     info!("Stopping...");
     Ok(())
 }
 
-async fn connect_to_api_server(config: &Config, rx: Receiver<grpc::pb::InfoUpdate>) -> Result<()> {
-    let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
-    info!("Connecting to gRPC channel...");
-    let channel = Endpoint::connect(&endpoint).await?;
-    let token = grpc::AuthToken(config.token.to_owned());
-    info!("Creating gRPC client...");
-    let mut client = grpc::Client::with_auth(channel, token);
-    process_commands_stream(&mut client, rx).await?;
-
-    Ok(())
+async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
+    loop {
+        match Endpoint::connect(endpoint).await {
+            Ok(channel) => return channel,
+            Err(e) => {
+                error!("Error connecting to endpoint: {:?}", e);
+                sleep(Duration::from_secs(5)).await;
+            }
+        }
+    }
 }
 
 async fn process_commands_stream(
