@@ -1,16 +1,19 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
-use tracing::{debug, info, instrument, warn};
+use tokio::sync::broadcast::{self, Sender};
+use tokio::sync::OnceCell;
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 use zbus::export::futures_util::TryFutureExt;
 use zbus::{dbus_interface, fdo};
 
 use crate::{
+    grpc::pb,
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeState},
@@ -39,6 +42,7 @@ pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
+    tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -60,6 +64,10 @@ impl Nodes {
             return Err(fdo::Error::FileExists(msg));
         }
 
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let network_interface = self
             .next_network_interface()
             .await
@@ -79,6 +87,10 @@ impl Nodes {
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
 
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         fdo::Result::Ok(())
     }
 
@@ -90,40 +102,66 @@ impl Nodes {
         })?;
         self.node_ids.remove(&node.data.name);
 
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         node.delete()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("deleted");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
     async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| {
             let msg = format!("Node with id `{}` not found", &id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
+
         node.start()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("started");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
 
     #[instrument(skip(self))]
     async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
+            error!("Cannot send node status: {error:?}");
+        };
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| {
             let msg = format!("Node with id `{}` not found", &id);
             fdo::Error::FileNotFound(msg)
         })?;
         debug!("found node");
+
         node.stop()
             .await
             .map_err(|e| fdo::Error::IOError(e.to_string()))?;
         debug!("stopped");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
 
         fdo::Result::Ok(())
     }
@@ -163,9 +201,8 @@ impl Nodes {
             REGISTRY_CONFIG_DIR.display()
         );
         let mut this = Nodes {
-            nodes: HashMap::new(),
-            node_ids: HashMap::new(),
             data: nodes_data,
+            ..Default::default()
         };
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {
@@ -206,6 +243,29 @@ impl Nodes {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
+    pub fn send_node_status(
+        &self,
+        id: &Uuid,
+        status: pb::node_info::ContainerStatus,
+    ) -> Result<()> {
+        if !self.tx.initialized() {
+            bail!("Updates channel not initialized")
+        }
+
+        let node_id = Some(pb::Uuid {
+            value: id.to_string(),
+        });
+        self.tx.get().unwrap().send(pb::InfoUpdate {
+            info: Some(pb::info_update::Info::Node(pb::NodeInfo {
+                id: node_id,
+                container_status: Some(status.into()),
+                ..Default::default()
+            })),
+        })?;
+
+        Ok(())
+    }
+
     /// Get the next machine index and increment it.
     pub async fn next_network_interface(&self) -> Result<NetworkInterface> {
         let machine_index = self.data.machine_index.fetch_add(1, Ordering::SeqCst);
@@ -225,6 +285,16 @@ impl Nodes {
         self.save().await?;
 
         Ok(iface)
+    }
+
+    // Get or init updates sender
+    pub async fn get_updates_sender(&self) -> Result<&Sender<pb::InfoUpdate>> {
+        self.tx
+            .get_or_try_init(|| async {
+                let (tx, _rx) = broadcast::channel(128);
+                Ok(tx)
+            })
+            .await
     }
 }
 

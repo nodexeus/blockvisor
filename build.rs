@@ -1,6 +1,6 @@
 fn main() {
     tonic_build::configure()
-        .build_server(false)
+        .build_server(true)
         .build_client(true)
         .compile(
             &[
@@ -9,7 +9,6 @@ fn main() {
                 "proto/blockjoy/api/v1/host_service.proto",
                 "proto/blockjoy/api/v1/host.proto",
                 "proto/blockjoy/api/v1/messages.proto",
-                "proto/blockjoy/api/v1/node_types.proto",
                 "proto/blockjoy/api/v1/node.proto",
             ],
             &["proto/blockjoy/api/v1"],
