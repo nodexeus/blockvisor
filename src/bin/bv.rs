@@ -5,7 +5,7 @@ use blockvisord::{
     config::Config,
     dbus::NodeProxy,
     hosts::{get_host_info, get_ip_address},
-    node_data::NodeState,
+    node_data::NodeStatus,
     nodes::Nodes,
     pretty_table::PrettyTable,
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
@@ -98,11 +98,18 @@ async fn main() -> Result<()> {
                 bail!("Host is not registered, please run `init` first");
             }
 
-            // Enable the service to start on host bootup and start it.
+            // Enable the blockvisor service and babel socket to start on host bootup and start it.
             println!("Enabling blockvisor service to start on host boot.");
             systemd_manager_proxy
-                .enable_unit_files(&["blockvisor.service"], false, false)
+                .enable_unit_files(&["blockvisor.service", "babel-bus.socket"], false, false)
                 .await?;
+
+            println!("Starting babel socket unit");
+            systemd_manager_proxy
+                .start_unit("babel-bus.socket", UnitStartMode::Fail)
+                .await?;
+            println!("babel socket setup");
+
             println!("Starting blockvisor service");
             systemd_manager_proxy
                 .start_unit("blockvisor.service", UnitStartMode::Fail)
@@ -116,6 +123,12 @@ async fn main() -> Result<()> {
                 .stop_unit("blockvisor.service", UnitStopMode::Fail)
                 .await?;
             println!("blockvisor service stopped successfully");
+
+            println!("Shutting down babel socket unit");
+            systemd_manager_proxy
+                .stop_unit("babel-bus.socket", UnitStopMode::Fail)
+                .await?;
+            println!("babel socket terminated");
         }
         Command::Status(_) => {
             todo!()
@@ -164,7 +177,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.state == NodeState::Running)
+                        && (*all || c.status == NodeStatus::Running)
                 })
                 .peekable();
             if nodes.peek().is_some() {
@@ -200,6 +213,11 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Restart { id_or_name: _ } => todo!(),
         NodeCommand::Console { id_or_name: _ } => todo!(),
         NodeCommand::Logs { id_or_name: _ } => todo!(),
+        NodeCommand::Status { id_or_name } => {
+            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
+            let status = node_proxy.status(&id).await?;
+            println!("{}", status);
+        }
     }
     Ok(())
 }

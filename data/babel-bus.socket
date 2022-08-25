@@ -1,0 +1,9 @@
+[Unit]
+Description=Babel's private D-Bus Bus Socket
+# Do not stop on shutdown
+DefaultDependencies=no
+Wants=sysinit.target
+After=sysinit.target
+
+[Socket]
+ListenStream=/var/lib/blockvisor/vsock.socket_42

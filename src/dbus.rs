@@ -1,7 +1,7 @@
 use uuid::Uuid;
 use zbus::{dbus_proxy, Result};
 
-use crate::node_data::NodeData;
+use crate::node_data::{NodeData, NodeStatus};
 
 #[dbus_proxy(
     interface = "com.BlockJoy.blockvisor.Node",
@@ -14,6 +14,7 @@ trait Node {
     async fn start(&self, id: &Uuid) -> Result<()>;
     async fn stop(&self, id: &Uuid) -> Result<()>;
     async fn list(&self) -> Result<Vec<NodeData>>;
+    async fn status(&self, id: &Uuid) -> Result<NodeStatus>;
     // TODO: Rest of the NodeCommand variants.
     async fn node_id_for_name(&self, name: &str) -> Result<Uuid>;
 }
