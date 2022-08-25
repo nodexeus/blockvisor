@@ -121,19 +121,21 @@ impl Node {
                             // Look for the first name-lost event.
                             ready(unique_name.is_none())
                         });
+                let mut shutdown_success = true;
                 if let Err(err) = self.machine.shutdown().await {
-                    trace!("Shutdown error: {err}");
-                } else if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
-                    warn!("Babel shutdown timeout: {e}");
-                } else {
-                    self.data.status = NodeStatus::Stopped;
-                    self.data.save().await?;
+                    trace!("Graceful shutdown failed: {err}");
 
-                    return Ok(());
+                    // FIXME: Perhaps we should be just bailing out on this one?
+                    if let Err(err) = self.machine.force_shutdown().await {
+                        trace!("Forced shutdown failed: {err}");
+                        shutdown_success = false;
+                    }
                 }
 
-                if let Err(err) = self.machine.force_shutdown().await {
-                    trace!("Forced shutdown error: {err}");
+                if shutdown_success {
+                    if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
+                        warn!("Babel shutdown timeout: {e}");
+                    }
                 }
             }
         }
