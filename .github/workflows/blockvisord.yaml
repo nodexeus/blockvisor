@@ -37,7 +37,7 @@ jobs:
           override: true
       - name: Build
         run: >
-          cargo build 
+          cargo build
       - name: Reinstall
         run: >
           make reinstall
@@ -47,7 +47,7 @@ jobs:
       #    docker compose up -d
       - name: Test
         run: >
-          cargo test 
+          cargo test
       #- name: Shutdown test env
       #  if: always()
       #  run: >
