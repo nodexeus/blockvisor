@@ -144,6 +144,7 @@ fn test_bv_cmd_node_lifecycle() {
 }
 
 #[test]
+#[ignore] // FIXME: switch from rest API client to gRPC one
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_init_unknown_otp() {
