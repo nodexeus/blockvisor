@@ -17,10 +17,11 @@ use tokio::time::Duration;
 use uuid::Uuid;
 use zbus::Connection;
 
+const API_TIMEOUT: Duration = Duration::from_secs(10);
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = App::parse();
-    let timeout = Duration::from_secs(10);
 
     let conn = Connection::system().await?;
     let systemd_manager_proxy = ManagerProxy::new(&conn).await?;
@@ -47,7 +48,7 @@ async fn main() -> Result<()> {
             };
             println!("{:?}", create);
 
-            let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
+            let client = APIClient::new(&cmd_args.blockjoy_api_url, API_TIMEOUT)?;
             let host = client.register_host(&cmd_args.otp, &create).await?;
 
             Config {
@@ -86,7 +87,7 @@ async fn main() -> Result<()> {
                 let config = Config::load().await?;
                 let url = config.blockjoy_api_url;
                 let host_id = config.id;
-                let client = APIClient::new(&url, timeout)?;
+                let client = APIClient::new(&url, API_TIMEOUT)?;
                 println!("Deleting host `{host_id}` from API `{url}`");
                 client.delete_host(&config.token, &host_id).await?;
 
