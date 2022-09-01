@@ -65,54 +65,6 @@ impl APIClient {
 
         Ok(())
     }
-
-    pub async fn get_pending_commands(&self, token: &str, host_id: &str) -> Result<Vec<Command>> {
-        let url = format!(
-            "{}/hosts/{}/commands/pending",
-            self.base_url.as_str().trim_end_matches('/'),
-            host_id
-        );
-
-        let text = self
-            .inner
-            .get(url)
-            .header("Content-Type", "application/json")
-            .bearer_auth(token)
-            .send()
-            .await?
-            .text()
-            .await?;
-        let commands: Vec<Command> = serde_json::from_str(&text)?;
-
-        Ok(commands)
-    }
-
-    pub async fn update_command_status(
-        &self,
-        token: &str,
-        command_id: &str,
-        update: &CommandStatusUpdate,
-    ) -> Result<Command> {
-        let url = format!(
-            "{}/commands/{}/response",
-            self.base_url.as_str().trim_end_matches('/'),
-            command_id
-        );
-
-        let text = self
-            .inner
-            .put(url)
-            .header("Content-Type", "application/json")
-            .bearer_auth(token)
-            .json(update)
-            .send()
-            .await?
-            .text()
-            .await?;
-        let command: Command = serde_json::from_str(&text)?;
-
-        Ok(command)
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -146,28 +98,4 @@ pub struct HostCreateResponse {
     pub val_ip_addrs: Option<String>,
     pub token: String,
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Command {
-    pub id: String,
-    pub host_id: String,
-    pub cmd: String,
-    pub sub_cmd: Option<String>,
-    pub response: Option<String>,
-    pub exit_status: Option<i32>,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct CommandCreateRequest {
-    pub cmd: String,
-    pub sub_cmd: Option<String>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct CommandStatusUpdate {
-    pub response: String,
-    pub exit_status: i32,
 }
