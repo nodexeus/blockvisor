@@ -44,9 +44,6 @@ fn test_bv_cmd_start_no_init() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_restart() {
-    // FIXME: investigate why test is not stable without sleeps
-    use std::{thread::sleep, time::Duration};
-
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("stop")
         .assert()
@@ -54,7 +51,6 @@ fn test_bv_cmd_restart() {
         .stdout(predicate::str::contains(
             "blockvisor service stopped successfully",
         ));
-    sleep(Duration::from_secs(1));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
@@ -63,7 +59,12 @@ fn test_bv_cmd_restart() {
         .stdout(predicate::str::contains(
             "blockvisor service started successfully",
         ));
-    sleep(Duration::from_secs(1));
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("start")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Service already running"));
 }
 
 #[test]
@@ -71,21 +72,9 @@ fn test_bv_cmd_restart() {
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     use std::str;
-    // FIXME: investigate why test is not stable without sleeps
-    use std::{thread::sleep, time::Duration};
     use uuid::Uuid;
 
     let chain_id = Uuid::new_v4().to_string();
-
-    println!("start service");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("start")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "blockvisor service started successfully",
-        ));
-    sleep(Duration::from_secs(1));
 
     println!("create a node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -101,7 +90,6 @@ fn test_bv_cmd_node_lifecycle() {
         .nth(1)
         .unwrap();
     println!("create vm_id: {vm_id}");
-    sleep(Duration::from_secs(1));
 
     println!("stop stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -109,7 +97,6 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node"));
-    sleep(Duration::from_secs(1));
 
     println!("start stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -117,7 +104,6 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Started node"));
-    sleep(Duration::from_secs(1));
 
     println!("stop started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -125,7 +111,6 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Stopped node"));
-    sleep(Duration::from_secs(1));
 
     println!("restart stopped node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -133,7 +118,6 @@ fn test_bv_cmd_node_lifecycle() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Started node"));
-    sleep(Duration::from_secs(1));
 
     println!("delete started node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -315,7 +299,6 @@ async fn test_bv_cmd_grpc_commands() {
     println!("delete existing node, if any");
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["node", "delete", &node_name]).assert();
-    sleep(Duration::from_secs(1)).await;
 
     println!("preparing server");
     let commands = vec![
@@ -390,7 +373,6 @@ async fn test_bv_cmd_grpc_commands() {
         .assert()
         .success()
         .stdout(predicate::str::contains(&node_id));
-    sleep(Duration::from_secs(1)).await;
 
     println!("delete created node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -398,7 +380,6 @@ async fn test_bv_cmd_grpc_commands() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Deleted node"));
-    sleep(Duration::from_secs(1)).await;
 
     println!("check received updates");
     let updates: Vec<_> = ReceiverStream::new(updates_rx)

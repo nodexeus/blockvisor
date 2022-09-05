@@ -13,14 +13,17 @@ use blockvisord::{
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
-use tokio::time::Duration;
+use std::future::ready;
+use tokio::time::{timeout, Duration};
 use uuid::Uuid;
-use zbus::Connection;
+use zbus::{export::futures_util::StreamExt, fdo, names::BusName, Connection, ProxyDefault};
+
+const API_TIMEOUT: Duration = Duration::from_secs(10);
+const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = App::parse();
-    let timeout = Duration::from_secs(10);
 
     let conn = Connection::system().await?;
     let systemd_manager_proxy = ManagerProxy::new(&conn).await?;
@@ -47,7 +50,7 @@ async fn main() -> Result<()> {
             };
             println!("{:?}", create);
 
-            let client = APIClient::new(&cmd_args.blockjoy_api_url, timeout)?;
+            let client = APIClient::new(&cmd_args.blockjoy_api_url, API_TIMEOUT)?;
             let host = client.register_host(&cmd_args.otp, &create).await?;
 
             Config {
@@ -86,7 +89,7 @@ async fn main() -> Result<()> {
                 let config = Config::load().await?;
                 let url = config.blockjoy_api_url;
                 let host_id = config.id;
-                let client = APIClient::new(&url, timeout)?;
+                let client = APIClient::new(&url, API_TIMEOUT)?;
                 println!("Deleting host `{host_id}` from API `{url}`");
                 client.delete_host(&config.token, &host_id).await?;
 
@@ -97,6 +100,23 @@ async fn main() -> Result<()> {
             if !Config::exists() {
                 bail!("Host is not registered, please run `init` first");
             }
+
+            let dbus_proxy = fdo::DBusProxy::new(&conn).await.unwrap();
+            if dbus_proxy
+                .name_has_owner(BusName::from_static_str(NodeProxy::DESTINATION)?)
+                .await?
+            {
+                println!("Service already running");
+                return Ok(());
+            }
+
+            let mut stream = dbus_proxy
+                .receive_name_owner_changed()
+                .await?
+                .filter(|signal| {
+                    let args = signal.args().unwrap();
+                    ready(args.name() == NodeProxy::DESTINATION)
+                });
 
             // Enable the blockvisor service and babel socket to start on host bootup and start it.
             println!("Enabling blockvisor service to start on host boot.");
@@ -114,6 +134,8 @@ async fn main() -> Result<()> {
             systemd_manager_proxy
                 .start_unit("blockvisor.service", UnitStartMode::Fail)
                 .await?;
+
+            timeout(BLOCKVISOR_START_TIMEOUT, stream.next()).await?;
 
             println!("blockvisor service started successfully");
         }
