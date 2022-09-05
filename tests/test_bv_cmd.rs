@@ -295,19 +295,26 @@ async fn test_bv_cmd_grpc_commands() {
     let id = pb::Uuid {
         value: node_id.clone(),
     };
-
+    let command_id = Uuid::new_v4().to_string();
+    let meta = pb::CommandMeta {
+        api_command_id: Some(pb::Uuid {
+            value: command_id.clone(),
+        }),
+        created_at: None,
+    };
     println!("delete existing node, if any");
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["node", "delete", &node_name]).assert();
 
     println!("preparing server");
     let commands = vec![
+        // create
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
                 id: Some(id.clone()),
-                meta: None,
+                meta: Some(meta.clone()),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: node_name,
+                    name: node_name.clone(),
                     image: Some(pb::ContainerImage {
                         url: "helium/node/latest".to_string(),
                     }),
@@ -316,24 +323,83 @@ async fn test_bv_cmd_grpc_commands() {
                 })),
             })),
         },
+        // create with same node id
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
                 id: Some(id.clone()),
-                meta: None,
-                command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                    name: "some-new-name".to_string(),
+                    image: Some(pb::ContainerImage {
+                        url: "helium/node/latest".to_string(),
+                    }),
+                    blockchain: "helium".to_string(),
+                    r#type: pb::NodeType::Node.into(),
+                })),
             })),
         },
+        //  create with same node name
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(pb::Uuid {
+                    value: Uuid::new_v4().to_string(),
+                }),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                    name: node_name.clone(),
+                    image: Some(pb::ContainerImage {
+                        url: "helium/node/latest".to_string(),
+                    }),
+                    blockchain: "helium".to_string(),
+                    r#type: pb::NodeType::Node.into(),
+                })),
+            })),
+        },
+        // stop stopped
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
                 id: Some(id.clone()),
-                meta: None,
+                meta: Some(meta.clone()),
                 command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
             })),
         },
+        // start
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
                 id: Some(id.clone()),
-                meta: None,
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
+            })),
+        },
+        // start running
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
+            })),
+        },
+        // stop
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
+            })),
+        },
+        // restart stopped
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
+            })),
+        },
+        // restart running
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: Some(meta.clone()),
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
@@ -387,37 +453,58 @@ async fn test_bv_cmd_grpc_commands() {
         .take_while(Result::is_ok)
         .collect()
         .await;
+    let updates_count = updates.len();
 
     println!("got updates: {updates:?}");
-    let expected_statuses = vec![
-        pb::node_info::ContainerStatus::Creating,
-        pb::node_info::ContainerStatus::Stopped,
-        pb::node_info::ContainerStatus::Starting,
-        pb::node_info::ContainerStatus::Running,
-        pb::node_info::ContainerStatus::Stopping,
-        pb::node_info::ContainerStatus::Stopped,
-        pb::node_info::ContainerStatus::Stopping,
-        pb::node_info::ContainerStatus::Stopped,
-        pb::node_info::ContainerStatus::Starting,
-        pb::node_info::ContainerStatus::Running,
-        pb::node_info::ContainerStatus::Deleting,
-        pb::node_info::ContainerStatus::Deleted,
+    let expected_updates = vec![
+        node_update(&node_id, pb::node_info::ContainerStatus::Creating),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        success_command_update(&command_id),
+        error_command_update(
+            &command_id,
+            format!("org.freedesktop.DBus.Error.FileExists: Node with id `{node_id}` exists"),
+        ),
+        error_command_update(
+            &command_id,
+            format!("org.freedesktop.DBus.Error.FileExists: Node with name `{node_name}` exists"),
+        ),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
+        node_update(&node_id, pb::node_info::ContainerStatus::Running),
+        success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
+        error_command_update(
+            &command_id,
+            "org.freedesktop.DBus.Error.IOError: Firecracker API call failed with status=400 Bad Request, body=Some(\"{\\\"fault_message\\\":\\\"The requested operation is not supported after starting the microVM.\\\"}\")".to_string(),
+        ),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
+        node_update(&node_id, pb::node_info::ContainerStatus::Running),
+        success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
+        node_update(&node_id, pb::node_info::ContainerStatus::Running),
+        success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Deleting),
+        node_update(&node_id, pb::node_info::ContainerStatus::Deleted),
     ];
-    for (id, status) in expected_statuses.into_iter().enumerate() {
-        assert_eq!(
-            updates.get(id).unwrap().as_ref().unwrap(),
-            &default_node_update_with_status(&node_id, status)
-        );
+
+    for (actual, expected) in updates.into_iter().zip(expected_updates) {
+        assert_eq!(actual.unwrap(), expected);
     }
 
-    assert_eq!(updates.len(), 12);
+    assert_eq!(updates_count, 28);
 }
 
 #[cfg(target_os = "linux")]
-fn default_node_update_with_status(
-    node_id: &str,
-    status: pb::node_info::ContainerStatus,
-) -> pb::InfoUpdate {
+fn node_update(node_id: &str, status: pb::node_info::ContainerStatus) -> pb::InfoUpdate {
     pb::InfoUpdate {
         info: Some(pb::info_update::Info::Node(pb::NodeInfo {
             id: Some(pb::Uuid {
@@ -425,6 +512,32 @@ fn default_node_update_with_status(
             }),
             container_status: Some(status.into()),
             ..Default::default()
+        })),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn error_command_update(command_id: &str, message: String) -> pb::InfoUpdate {
+    pb::InfoUpdate {
+        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
+            id: Some(pb::Uuid {
+                value: command_id.to_owned(),
+            }),
+            response: Some(message),
+            exit_code: Some(1),
+        })),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn success_command_update(command_id: &str) -> pb::InfoUpdate {
+    pb::InfoUpdate {
+        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
+            id: Some(pb::Uuid {
+                value: command_id.to_owned(),
+            }),
+            response: None,
+            exit_code: Some(0),
         })),
     }
 }
