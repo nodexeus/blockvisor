@@ -13,6 +13,62 @@ pub struct StubServer {
     pub shutdown_tx: mpsc::Sender<()>,
 }
 
+pub struct StubHostsServer {}
+
+#[tonic::async_trait]
+impl pb::hosts_server::Hosts for StubHostsServer {
+    async fn provision(
+        &self,
+        request: Request<pb::ProvisionHostRequest>,
+    ) -> Result<Response<pb::ProvisionHostResponse>, Status> {
+        let host = request.into_inner();
+        if host.otp != "UNKNOWN" {
+            let host_id = pb::Uuid {
+                value: "497d13b1-ddbe-4ee7-bfc7-752c7b710afe".into(),
+            };
+
+            let reply = pb::ProvisionHostResponse {
+                host_id: Some(host_id),
+                token: "awesome-token".to_owned(),
+                messages: vec![],
+                origin_request_id: host.request_id,
+            };
+
+            Ok(Response::new(reply))
+        } else {
+            Err(Status::permission_denied("Invalid token"))
+        }
+    }
+
+    async fn delete(
+        &self,
+        request: Request<pb::DeleteHostRequest>,
+    ) -> Result<Response<pb::DeleteHostResponse>, Status> {
+        let host = request.into_inner();
+
+        let reply = pb::DeleteHostResponse {
+            messages: vec![],
+            origin_request_id: host.request_id,
+        };
+
+        Ok(Response::new(reply))
+    }
+
+    async fn info_update(
+        &self,
+        request: Request<pb::HostInfoUpdateRequest>,
+    ) -> Result<Response<pb::HostInfoUpdateResponse>, Status> {
+        let host = request.into_inner();
+
+        let reply = pb::HostInfoUpdateResponse {
+            messages: vec![],
+            origin_request_id: host.request_id,
+        };
+
+        Ok(Response::new(reply))
+    }
+}
+
 #[tonic::async_trait]
 impl pb::command_flow_server::CommandFlow for StubServer {
     type CommandsStream = ResponseStream;
