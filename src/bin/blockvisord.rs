@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use blockvisord::{
     client::{APIClient, CommandStatusUpdate},
     config::Config,
@@ -93,18 +93,22 @@ async fn process_commands_stream(
                 match process_node_command(&node_proxy, node_command).await {
                     Err(error) => {
                         error!("Error processing command: {error}");
-                        create_info_update(command_id, STATUS_ERROR, Some(error.to_string()))
+                        create_info_update(Some(command_id), STATUS_ERROR, Some(error.to_string()))
                     }
-                    Ok(()) => create_info_update(command_id, STATUS_OK, None),
+                    Ok(()) => create_info_update(Some(command_id), STATUS_OK, None),
                 }
             }
             Some(grpc::pb::command::Type::Host(host_command)) => {
                 let msg = "Command type `Host` not supported".to_string();
                 error!("Error processing command: {msg}");
                 let command_id = host_command.meta.clone().unwrap().api_command_id.unwrap();
-                create_info_update(command_id, STATUS_ERROR, Some(msg))
+                create_info_update(Some(command_id), STATUS_ERROR, Some(msg))
             }
-            None => unreachable!(),
+            None => {
+                let msg = "Command type is `None`".to_string();
+                error!("Error processing command: {msg}");
+                create_info_update(None, STATUS_ERROR, Some(msg))
+            }
         };
 
         updates_tx.send(update)?;
@@ -114,14 +118,14 @@ async fn process_commands_stream(
 }
 
 fn create_info_update(
-    command_id: grpc::pb::Uuid,
+    command_id: Option<grpc::pb::Uuid>,
     code: i32,
     msg: Option<String>,
 ) -> grpc::pb::InfoUpdate {
     grpc::pb::InfoUpdate {
         info: Some(grpc::pb::info_update::Info::Command(
             grpc::pb::CommandInfo {
-                id: Some(command_id),
+                id: command_id,
                 response: msg,
                 exit_code: Some(code),
             },
@@ -160,7 +164,7 @@ async fn process_node_command(
             Command::InfoGet(_) => unimplemented!(),
             Command::Generic(_) => unimplemented!(),
         },
-        None => unreachable!(),
+        None => bail!("Node command is `None`"),
     };
 
     Ok(())
