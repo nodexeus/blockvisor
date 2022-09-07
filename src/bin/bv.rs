@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
-    client::{APIClient, HostCreateRequest},
     config::Config,
     dbus::NodeProxy,
+    grpc::pb,
     hosts::{get_host_info, get_ip_address},
     node_data::NodeStatus,
     nodes::Nodes,
@@ -18,7 +18,6 @@ use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 use zbus::{export::futures_util::StreamExt, fdo, names::BusName, Connection, ProxyDefault};
 
-const API_TIMEOUT: Duration = Duration::from_secs(10);
 const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[tokio::main]
@@ -33,28 +32,39 @@ async fn main() -> Result<()> {
             println!("Configuring blockvisor");
 
             let ip = get_ip_address(&cmd_args.ifa);
-            let info = get_host_info();
+            let host_info = get_host_info();
 
-            let create = HostCreateRequest {
-                org_id: None,
-                name: info.name.unwrap(),
+            let info = pb::HostInfo {
+                id: None,
+                name: host_info.name,
                 version: Some(env!("CARGO_PKG_VERSION").to_string()),
                 location: None,
-                cpu_count: info.cpu_count,
-                mem_size: info.mem_size,
-                disk_size: info.disk_size,
-                os: info.os,
-                os_version: info.os_version,
-                ip_addr: ip,
-                val_ip_addrs: None,
+                cpu_count: host_info.cpu_count,
+                mem_size: host_info.mem_size,
+                disk_size: host_info.disk_size,
+                os: host_info.os,
+                os_version: host_info.os_version,
+                ip: Some(ip),
+            };
+            let create = pb::ProvisionHostRequest {
+                request_id: Some(pb::Uuid {
+                    value: Uuid::new_v4().to_string(),
+                }),
+                otp: cmd_args.otp,
+                org_id: None,
+                info: Some(info),
+                validator_ips: vec![],
+                status: pb::ConnectionStatus::Online.into(),
             };
             println!("{:?}", create);
 
-            let client = APIClient::new(&cmd_args.blockjoy_api_url, API_TIMEOUT)?;
-            let host = client.register_host(&cmd_args.otp, &create).await?;
+            let mut client =
+                pb::hosts_client::HostsClient::connect(cmd_args.blockjoy_api_url.clone()).await?;
+
+            let host = client.provision(create).await?.into_inner();
 
             Config {
-                id: host.id.to_string(),
+                id: host.host_id.unwrap().value.to_string(),
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
             }
@@ -89,9 +99,18 @@ async fn main() -> Result<()> {
                 let config = Config::load().await?;
                 let url = config.blockjoy_api_url;
                 let host_id = config.id;
-                let client = APIClient::new(&url, API_TIMEOUT)?;
+
+                let delete = pb::DeleteHostRequest {
+                    request_id: Some(pb::Uuid {
+                        value: Uuid::new_v4().to_string(),
+                    }),
+                    host_id: Some(pb::Uuid {
+                        value: host_id.clone(),
+                    }),
+                };
+                let mut client = pb::hosts_client::HostsClient::connect(url.clone()).await?;
                 println!("Deleting host `{host_id}` from API `{url}`");
-                client.delete_host(&config.token, &host_id).await?;
+                client.delete(delete).await?;
 
                 Config::remove().await?;
             }

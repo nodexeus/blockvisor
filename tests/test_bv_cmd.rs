@@ -541,3 +541,53 @@ fn success_command_update(command_id: &str) -> pb::InfoUpdate {
         })),
     }
 }
+
+#[tokio::test]
+#[serial]
+#[cfg(target_os = "linux")]
+async fn test_bv_cmd_grpc_stub_init_reset() {
+    use stub_server::StubHostsServer;
+
+    let server = StubHostsServer {};
+
+    let server_future = async {
+        Server::builder()
+            .max_concurrent_streams(1)
+            .add_service(pb::hosts_server::HostsServer::new(server))
+            .serve("0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap())
+            .await
+            .unwrap()
+    };
+
+    tokio::spawn(server_future);
+    sleep(Duration::from_secs(5)).await;
+
+    let res = tokio::task::spawn_blocking(move || {
+        let tmp_dir = TempDir::new().unwrap();
+        let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
+        let url = "http://localhost:8080";
+        let otp = "AWESOME";
+
+        println!("bv init");
+        Command::cargo_bin("bv")
+            .unwrap()
+            .args(&["init", otp])
+            .args(&["--ifa", ifa])
+            .args(&["--url", url])
+            .env("HOME", tmp_dir.as_os_str())
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Configuring blockvisor"));
+
+        println!("bv reset");
+        Command::cargo_bin("bv")
+            .unwrap()
+            .args(&["reset", "--yes"])
+            .env("HOME", tmp_dir.as_os_str())
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Deleting host"));
+    })
+    .await
+    .unwrap();
+}
