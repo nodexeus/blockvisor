@@ -128,15 +128,14 @@ fn test_bv_cmd_node_lifecycle() {
 }
 
 #[test]
-#[ignore] // FIXME: switch from rest API client to gRPC one
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_init_unknown_otp() {
     let tmp_dir = TempDir::new().unwrap();
 
-    let otp = "UNKNOWN";
+    let otp = "NOT_FOUND";
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
-    let url = "https://api.blockvisor.dev";
+    let url = "http://localhost:8080";
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["init", otp])
