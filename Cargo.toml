@@ -51,6 +51,5 @@ tonic-build = {version = "0.7", features = ["prost"]}
 [dev-dependencies]
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
-httpmock = "0.6"
 predicates = "2.1.1"
 serial_test = "0.7.0"
