@@ -419,7 +419,7 @@ async fn test_bv_cmd_grpc_commands() {
             .max_concurrent_streams(1)
             .add_service(pb::command_flow_server::CommandFlowServer::new(server))
             .serve_with_shutdown(
-                "0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap(),
+                "0.0.0.0:8081".to_socket_addrs().unwrap().next().unwrap(),
                 shutdown_rx.recv().map(drop),
             )
             .await
@@ -554,7 +554,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(pb::hosts_server::HostsServer::new(server))
-            .serve("0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap())
+            .serve("0.0.0.0:8082".to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap()
     };
@@ -565,7 +565,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
     let res = tokio::task::spawn_blocking(move || {
         let tmp_dir = TempDir::new().unwrap();
         let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
-        let url = "http://localhost:8080";
+        let url = "http://localhost:8082";
         let otp = "AWESOME";
 
         println!("bv init");
