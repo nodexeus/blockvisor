@@ -179,6 +179,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "assert_fs",
+ "base64",
  "chrono",
  "clap",
  "cli-table",
