@@ -11,18 +11,23 @@ services:
       POSTGRES_DB: blockvisor_db
 
   api:
-    image: 'registry.digitalocean.com/stakejoy/stakejoy-api:latest'
+    image: 'registry.digitalocean.com/stakejoy/blockvisor-api:latest'
     ports:
       - 8080:8080
     environment:
       DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
-      JWT_SECRET: 123456
-      API_SERVICE_SECRET: abc123
+      CASBIN_MODEL: /etc/api/conf/model.conf
+      CASBIN_POLICIES: /etc/api/conf/policies.csv
+      BIDI_BUFFER_SIZE: 128
+      INTERNAL_BUFFER_SIZE: 128
+      TOKEN_EXPIRATION_DAYS_USER: 1
+      TOKEN_EXPIRATION_DAYS_HOST: 365
+      JWT_SECRET: 1245456
     depends_on:
       - database
 
   migrations:
-    image: 'registry.digitalocean.com/stakejoy/stakejoy-api-migrations:latest'
+    image: 'registry.digitalocean.com/stakejoy/blockvisor-api-migrations:latest'
     environment:
       DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
     depends_on:

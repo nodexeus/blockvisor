@@ -4,14 +4,22 @@ fn main() {
         .build_client(true)
         .compile(
             &[
-                "proto/blockjoy/api/v1/command_flow.proto",
-                "proto/blockjoy/api/v1/command.proto",
-                "proto/blockjoy/api/v1/host_service.proto",
-                "proto/blockjoy/api/v1/host.proto",
-                "proto/blockjoy/api/v1/messages.proto",
-                "proto/blockjoy/api/v1/node.proto",
+                // Backend API
+                "command_flow.proto",
+                "host_service.proto",
+                // UI API (used in the tests)
+                "authentication_service.proto",
+                "billing_service.proto",
+                "command_service.proto",
+                "dashboard_service.proto",
+                "host_provision_service.proto",
+                "fe_host_service.proto",
+                "node_service.proto",
+                "organization_service.proto",
+                "update_service.proto",
+                "user_service.proto",
             ],
-            &["proto/blockjoy/api/v1"],
+            &["proto/blockjoy/api/v1", "proto/blockjoy/api/ui_v1"],
         )
         .unwrap();
 }

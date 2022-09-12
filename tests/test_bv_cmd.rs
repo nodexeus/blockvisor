@@ -9,8 +9,6 @@ use futures_util::FutureExt;
 #[cfg(target_os = "linux")]
 use predicates::prelude::*;
 #[cfg(target_os = "linux")]
-use serde_json::{json, Value};
-#[cfg(target_os = "linux")]
 use serial_test::serial;
 #[cfg(target_os = "linux")]
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -128,15 +126,14 @@ fn test_bv_cmd_node_lifecycle() {
 }
 
 #[test]
-#[ignore] // FIXME: switch from rest API client to gRPC one
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_init_unknown_otp() {
     let tmp_dir = TempDir::new().unwrap();
 
-    let otp = "UNKNOWN";
+    let otp = "NOT_FOUND";
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
-    let url = "https://api.blockvisor.dev";
+    let url = "http://localhost:8080";
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["init", otp])
@@ -149,125 +146,164 @@ fn test_bv_cmd_init_unknown_otp() {
 }
 
 #[tokio::test]
-#[ignore] // FIXME: wait for updated stakejoy api image
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_init_localhost() {
-    let timeout = Duration::from_secs(2);
-    let client = reqwest::Client::builder().timeout(timeout).build().unwrap();
+    pub mod ui_pb {
+        // https://github.com/tokio-rs/prost/issues/661
+        #![allow(clippy::derive_partial_eq_without_eq)]
+        tonic::include_proto!("blockjoy.api.ui_v1");
+    }
+    use base64;
+    use tonic::Request;
+    use uuid::Uuid;
 
-    println!("create user");
-    let create_user = json!({
-        "email": "user1@example.com",
-        "password": "user1pass",
-        "password_confirm": "user1pass",
-    });
-    client
-        .post("http://localhost:8080/users")
-        .header("Content-Type", "application/json")
-        .json(&create_user)
-        .send()
-        .await
-        .unwrap()
-        .text()
+    let request_id = Uuid::new_v4().to_string();
+    let request_id = ui_pb::Uuid {
+        value: request_id.clone(),
+    };
+
+    let url = "http://localhost:8080";
+    let email = "user1@example.com";
+    let password = "user1pass";
+
+    let mut client = ui_pb::user_service_client::UserServiceClient::connect(url)
         .await
         .unwrap();
 
+    println!("create user");
+    let create_user = ui_pb::CreateUserRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: None,
+            fields: vec![],
+            limit: None,
+        }),
+        user: Some(ui_pb::User {
+            id: None,
+            email: Some(email.to_string()),
+            first_name: None,
+            last_name: None,
+            created_at: None,
+            updated_at: None,
+        }),
+        password: password.to_string(),
+        password_confirmation: password.to_string(),
+    };
+    let user: ui_pb::CreateUserResponse = client.create(create_user).await.unwrap().into_inner();
+    println!("user created: {user:?}");
+    assert_eq!(
+        user.meta
+            .as_ref()
+            .unwrap()
+            .origin_request_id
+            .as_ref()
+            .unwrap(),
+        &request_id
+    );
+
+    let user_id = user
+        .meta
+        .unwrap()
+        .messages
+        .first()
+        .expect("user_id in messages")
+        .clone();
+
     println!("make admin");
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
-    let db_query = r#"update users set role='admin' where email='user1@example.com'"#;
+    let db_query = format!(
+        r#"update tokens set role='admin'::enum_token_role where user_id='{user_id}'::uuid"#
+    );
 
     Command::new("docker")
         .args(&[
-            "compose", "run", "-it", "database", "psql", db_url, "-c", db_query,
+            "compose", "run", "-it", "database", "psql", db_url, "-c", &db_query,
         ])
         .assert()
         .success()
         .stdout(predicate::str::contains("UPDATE 1"));
 
     println!("login user");
-    let login_user = json!({
-        "email": "user1@example.com",
-        "password": "user1pass",
-    });
-    let text = client
-        .post("http://localhost:8080/login")
-        .header("Content-Type", "application/json")
-        .json(&login_user)
-        .send()
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
-    let login: Value = serde_json::from_str(&text).unwrap();
-    assert_eq!(login.get("role").unwrap(), "admin");
+    let mut client =
+        ui_pb::authentication_service_client::AuthenticationServiceClient::connect(url)
+            .await
+            .unwrap();
+    let login_user = ui_pb::LoginUserRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: None,
+            fields: vec![],
+            limit: None,
+        }),
+        email: email.to_string(),
+        password: password.to_string(),
+    };
+    let login: ui_pb::LoginUserResponse = client.login(login_user).await.unwrap().into_inner();
+    println!("user login: {login:?}");
+    let token = login.token.unwrap();
 
     println!("get user organization id");
-    let user_id = login.get("id").unwrap().as_str().unwrap();
-    let token = login.get("token").unwrap().as_str().unwrap();
+    let mut client = ui_pb::organization_service_client::OrganizationServiceClient::connect(url)
+        .await
+        .unwrap();
 
-    let text = client
-        .get(format!("http://localhost:8080/users/{}/orgs", user_id))
-        .header("Content-Type", "application/json")
-        .bearer_auth(token)
-        .send()
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
-    let orgs: Value = serde_json::from_str(&text).unwrap();
-    let org = orgs
-        .as_array()
-        .unwrap()
-        .first()
-        .unwrap()
-        .as_object()
-        .unwrap();
-    let org_id = org.get("id").unwrap().as_str().unwrap();
+    let org_get = ui_pb::GetOrganizationsRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: Some(token.clone()),
+            fields: vec![],
+            limit: None,
+        }),
+    };
+    let mut request = Request::new(org_get);
+    request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", base64::encode(token.value.clone()))
+            .parse()
+            .unwrap(),
+    );
 
-    println!("get blockchain id");
-    let text = client
-        .get("http://localhost:8080/blockchains")
-        .header("Content-Type", "application/json")
-        .bearer_auth(token)
-        .send()
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
-    let blockchains: Value = serde_json::from_str(&text).unwrap();
-    let blockchain = blockchains
-        .as_array()
-        .unwrap()
-        .first()
-        .unwrap()
-        .as_object()
-        .unwrap();
-    let blockchain_id = blockchain.get("id").unwrap().as_str().unwrap();
+    let orgs: ui_pb::GetOrganizationsResponse = client.get(request).await.unwrap().into_inner();
+    println!("user org: {orgs:?}");
+    let org_id = orgs.organizations.first().unwrap().id.as_ref().unwrap();
 
     println!("create host provision");
-    let host_provision = json!({
-        "org_id": org_id,
-        "nodes": [
-            {"blockchain_id": blockchain_id, "node_type": "validator"}
-        ],
-    });
-    let text = client
-        .post("http://localhost:8080/host_provisions")
-        .header("Content-Type", "application/json")
-        .bearer_auth(token)
-        .json(&host_provision)
-        .send()
-        .await
-        .unwrap()
-        .text()
+    let mut client = ui_pb::host_provision_service_client::HostProvisionServiceClient::connect(url)
         .await
         .unwrap();
-    let provision: Value = serde_json::from_str(&text).unwrap();
-    let otp = provision.get("id").unwrap().as_str().unwrap();
+
+    let provision_create = ui_pb::CreateHostProvisionRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: Some(token.clone()),
+            fields: vec![],
+            limit: None,
+        }),
+        host_provision: Some(ui_pb::HostProvision {
+            id: None,
+            org_id: Some(org_id.clone()),
+            host_id: None,
+            created_at: None,
+            claimed_at: None,
+            install_cmd: Some("install cmd".to_string()),
+        }),
+    };
+    let mut request = Request::new(provision_create);
+    request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", base64::encode(token.value.clone()))
+            .parse()
+            .unwrap(),
+    );
+
+    let provision: ui_pb::CreateHostProvisionResponse =
+        client.create(request).await.unwrap().into_inner();
+
+    println!("host provision: {provision:?}");
+    let otp = provision.meta.unwrap().messages.first().unwrap().clone();
+
+    let tmp_dir = TempDir::new().unwrap();
 
     println!("bv init");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
@@ -275,9 +311,10 @@ async fn test_bv_cmd_init_localhost() {
 
     Command::cargo_bin("bv")
         .unwrap()
-        .args(&["init", otp])
+        .args(&["init", &otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
+        .env("HOME", tmp_dir.as_os_str())
         .assert()
         .success()
         .stdout(predicate::str::contains("Configuring blockvisor"));
@@ -419,7 +456,7 @@ async fn test_bv_cmd_grpc_commands() {
             .max_concurrent_streams(1)
             .add_service(pb::command_flow_server::CommandFlowServer::new(server))
             .serve_with_shutdown(
-                "0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap(),
+                "0.0.0.0:8081".to_socket_addrs().unwrap().next().unwrap(),
                 shutdown_rx.recv().map(drop),
             )
             .await
@@ -554,7 +591,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(pb::hosts_server::HostsServer::new(server))
-            .serve("0.0.0.0:8080".to_socket_addrs().unwrap().next().unwrap())
+            .serve("0.0.0.0:8082".to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap()
     };
@@ -562,10 +599,10 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
     tokio::spawn(server_future);
     sleep(Duration::from_secs(5)).await;
 
-    let res = tokio::task::spawn_blocking(move || {
+    let _ = tokio::task::spawn_blocking(move || {
         let tmp_dir = TempDir::new().unwrap();
         let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
-        let url = "http://localhost:8080";
+        let url = "http://localhost:8082";
         let otp = "AWESOME";
 
         println!("bv init");
