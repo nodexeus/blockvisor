@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package blockjoy.blockvisor.v1;
+
+import "blockvisor.proto";
+
+service Blockvisor {
+    rpc CreateNode(CreateNodeRequest) returns (CreateNodeResponse) {}
+    rpc DeleteNode(DeleteNodeRequest) returns (DeleteNodeResponse) {}
+    rpc StartNode(StartNodeRequest) returns (StartNodeResponse) {}
+    rpc StopNode(StopNodeRequest) returns (StopNodeResponse) {}
+    rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
+    rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse) {}
+    rpc GetNodeIdForName(GetNodeIdForNameRequest) returns (GetNodeIdForNameResponse) {}
+}
