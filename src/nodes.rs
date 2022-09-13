@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -50,6 +50,139 @@ pub struct Nodes {
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 struct CommonData {
     machine_index: Arc<AtomicU32>,
+}
+
+impl Nodes {
+    #[instrument(skip(self))]
+    pub async fn create2(&mut self, id: Uuid, name: String, chain: String) -> Result<()> {
+        if self.nodes.contains_key(&id) {
+            bail!(format!("Node with id `{}` exists", &id));
+        }
+
+        if self.node_ids.contains_key(&name) {
+            bail!(format!("Node with name `{}` exists", &name));
+        }
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        let network_interface = self.next_network_interface().await?;
+        let node = NodeData {
+            id,
+            name: name.clone(),
+            chain,
+            status: NodeStatus::Stopped,
+            network_interface,
+        };
+
+        let babel_conn = self.babel_conn().await?;
+        let node = Node::create(node, babel_conn).await?;
+        self.nodes.insert(id, node);
+        self.node_ids.insert(name, id);
+        debug!("Node with id `{}` created", id);
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub async fn delete2(&mut self, id: Uuid) -> Result<()> {
+        let node = self
+            .nodes
+            .remove(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        self.node_ids.remove(&node.data.name);
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        node.delete().await?;
+        debug!("deleted");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub async fn start2(&mut self, id: Uuid) -> Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        debug!("found node");
+
+        node.start().await?;
+        debug!("started");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub async fn stop2(&mut self, id: Uuid) -> Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        debug!("found node");
+
+        node.stop().await?;
+        debug!("stopped");
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    pub async fn list2(&self) -> Vec<NodeData> {
+        debug!("listing {} nodes", self.nodes.len());
+
+        self.nodes.values().map(|n| n.data.clone()).collect()
+    }
+
+    #[instrument(skip(self))]
+    pub async fn status2(&self, id: Uuid) -> Result<NodeStatus> {
+        let node = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+
+        Ok(node.status().await?)
+    }
+
+    // TODO: Rest of the NodeCommand variants.
+
+    pub async fn node_id_for_name2(&self, name: &str) -> Result<Uuid> {
+        let uuid = self
+            .node_ids
+            .get(name)
+            .cloned()
+            .ok_or_else(|| anyhow!("Node with name `{}` not found", name))?;
+
+        Ok(uuid)
+    }
 }
 
 #[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
