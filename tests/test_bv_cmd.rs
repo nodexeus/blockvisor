@@ -499,11 +499,11 @@ async fn test_bv_cmd_grpc_commands() {
         success_command_update(&command_id),
         error_command_update(
             &command_id,
-            format!("org.freedesktop.DBus.Error.FileExists: Node with id `{node_id}` exists"),
+            format!("Node with id `{node_id}` exists"),
         ),
         error_command_update(
             &command_id,
-            format!("org.freedesktop.DBus.Error.FileExists: Node with name `{node_name}` exists"),
+            format!("Node with name `{node_name}` exists"),
         ),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
@@ -514,7 +514,7 @@ async fn test_bv_cmd_grpc_commands() {
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         error_command_update(
             &command_id,
-            "org.freedesktop.DBus.Error.IOError: Firecracker API call failed with status=400 Bad Request, body=Some(\"{\\\"fault_message\\\":\\\"The requested operation is not supported after starting the microVM.\\\"}\")".to_string(),
+            "Firecracker API call failed with status=400 Bad Request, body=Some(\"{\\\"fault_message\\\":\\\"The requested operation is not supported after starting the microVM.\\\"}\")".to_string(),
         ),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),

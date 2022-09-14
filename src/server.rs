@@ -5,31 +5,47 @@ pub mod bv_pb {
 }
 
 use crate::{node_data::NodeStatus, nodes::Nodes};
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
+
+pub const BLOCKVISOR_SERVICE_PORT: usize = 9001;
+pub const BLOCKVISOR_SERVICE_URL: &str = "http://localhost:9001";
+
 pub struct BlockvisorServer {
     pub nodes: Arc<Mutex<Nodes>>,
 }
 
 #[tonic::async_trait]
 impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
+    async fn health(
+        &self,
+        _request: Request<bv_pb::HealthRequest>,
+    ) -> Result<Response<bv_pb::HealthResponse>, Status> {
+        let reply = bv_pb::HealthResponse {
+            status: bv_pb::ServiceStatus::Ok.into(),
+        };
+        Ok(Response::new(reply))
+    }
+
     async fn create_node(
         &self,
         request: Request<bv_pb::CreateNodeRequest>,
     ) -> Result<Response<bv_pb::CreateNodeResponse>, Status> {
         let request = request.into_inner();
-        let id = Uuid::parse_str(&request.id.unwrap().value).unwrap();
+        let id =
+            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
         let name = request.name;
         let chain = request.chain;
 
         self.nodes
             .lock()
             .await
-            .create2(id, name, chain)
+            .create(id, name, chain)
             .await
-            .unwrap();
+            .map_err(|e| Status::unknown(e.to_string()))?;
 
         let reply = bv_pb::CreateNodeResponse {};
 
@@ -41,9 +57,15 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::DeleteNodeRequest>,
     ) -> Result<Response<bv_pb::DeleteNodeResponse>, Status> {
         let request = request.into_inner();
-        let id = Uuid::parse_str(&request.id.unwrap().value).unwrap();
+        let id =
+            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
 
-        self.nodes.lock().await.delete2(id).await.unwrap();
+        self.nodes
+            .lock()
+            .await
+            .delete(id)
+            .await
+            .map_err(|e| Status::unknown(e.to_string()))?;
 
         let reply = bv_pb::DeleteNodeResponse {};
 
@@ -55,9 +77,15 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::StartNodeRequest>,
     ) -> Result<Response<bv_pb::StartNodeResponse>, Status> {
         let request = request.into_inner();
-        let id = Uuid::parse_str(&request.id.unwrap().value).unwrap();
+        let id =
+            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
 
-        self.nodes.lock().await.start2(id).await.unwrap();
+        self.nodes
+            .lock()
+            .await
+            .start(id)
+            .await
+            .map_err(|e| Status::unknown(e.to_string()))?;
 
         let reply = bv_pb::StartNodeResponse {};
 
@@ -69,9 +97,15 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::StopNodeRequest>,
     ) -> Result<Response<bv_pb::StopNodeResponse>, Status> {
         let request = request.into_inner();
-        let id = Uuid::parse_str(&request.id.unwrap().value).unwrap();
+        let id =
+            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
 
-        self.nodes.lock().await.stop2(id).await.unwrap();
+        self.nodes
+            .lock()
+            .await
+            .stop(id)
+            .await
+            .map_err(|e| Status::unknown(e.to_string()))?;
 
         let reply = bv_pb::StopNodeResponse {};
 
@@ -82,7 +116,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::GetNodesRequest>,
     ) -> Result<Response<bv_pb::GetNodesResponse>, Status> {
-        let list = self.nodes.lock().await.list2().await;
+        let list = self.nodes.lock().await.list().await;
         let mut nodes = vec![];
         for node in list {
             let status = match node.status {
@@ -90,9 +124,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
                 NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
             };
             let n = bv_pb::Node {
-                id: Some(bv_pb::Uuid {
-                    value: node.id.to_string(),
-                }),
+                id: node.id.to_string(),
                 name: node.name,
                 chain: node.chain,
                 status: status.into(),
@@ -111,9 +143,17 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::GetNodeStatusRequest>,
     ) -> Result<Response<bv_pb::GetNodeStatusResponse>, Status> {
         let request = request.into_inner();
-        let id = Uuid::parse_str(&request.id.unwrap().value).unwrap();
+        let id =
+            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
 
-        let status = match self.nodes.lock().await.status2(id).await.unwrap() {
+        let status = self
+            .nodes
+            .lock()
+            .await
+            .status(id)
+            .await
+            .map_err(|e| Status::unknown(e.to_string()))?;
+        let status = match status {
             NodeStatus::Running => bv_pb::NodeStatus::Running,
             NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
         };
@@ -136,16 +176,18 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .nodes
             .lock()
             .await
-            .node_id_for_name2(&name)
+            .node_id_for_name(&name)
             .await
-            .unwrap();
+            .map_err(|e| Status::unknown(e.to_string()))?;
 
-        let reply = bv_pb::GetNodeIdForNameResponse {
-            id: Some(bv_pb::Uuid {
-                value: id.to_string(),
-            }),
-        };
+        let reply = bv_pb::GetNodeIdForNameResponse { id: id.to_string() };
 
         Ok(Response::new(reply))
+    }
+}
+
+impl fmt::Display for bv_pb::NodeStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
