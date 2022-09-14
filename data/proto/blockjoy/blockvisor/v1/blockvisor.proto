@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package blockjoy.blockvisor.v1;
 
-message Uuid {
-    string value = 1;
-}
-
 enum NodeStatus {
     UndefinedNodeStatus = 0;
     Running = 1;
@@ -13,15 +9,26 @@ enum NodeStatus {
 }
 
 message Node {
-    Uuid id = 1;
+    string id = 1;
     string name = 2;
     string chain = 3;
     NodeStatus status = 4;
     string ip = 5;
 }
 
+enum ServiceStatus {
+    UndefinedServiceStatus = 0;
+    Ok = 1;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+    ServiceStatus status = 1;
+}
+
 message CreateNodeRequest {
-    Uuid id = 1;
+    string id = 1;
     string name = 2;
     string chain = 3;
 }
@@ -29,19 +36,19 @@ message CreateNodeRequest {
 message CreateNodeResponse {}
 
 message DeleteNodeRequest {
-    Uuid id = 1;
+    string id = 1;
 }
 
 message DeleteNodeResponse {}
 
 message StartNodeRequest {
-    Uuid id = 1;
+    string id = 1;
 }
 
 message StartNodeResponse {}
 
 message StopNodeRequest {
-    Uuid id = 1;
+    string id = 1;
 }
 
 message StopNodeResponse {}
@@ -53,7 +60,7 @@ message GetNodesResponse {
 }
 
 message GetNodeStatusRequest {
-    Uuid id = 1;   
+    string id = 1;   
 }
 
 message GetNodeStatusResponse {
@@ -65,5 +72,5 @@ message GetNodeIdForNameRequest {
 }
 
 message GetNodeIdForNameResponse {
-    Uuid id = 1;
+    string id = 1;
 }
