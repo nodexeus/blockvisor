@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
+use futures_util::StreamExt;
 use std::{future::ready, path::Path, time::Duration};
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::{
@@ -9,7 +10,7 @@ use tokio::{
 };
 use tracing::{instrument, log::warn, trace};
 use uuid::Uuid;
-use zbus::{export::futures_util::StreamExt, Connection, Proxy};
+use zbus::{Connection, Proxy};
 
 use crate::node_data::{NodeData, NodeStatus};
 

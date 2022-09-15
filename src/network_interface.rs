@@ -1,14 +1,13 @@
 use crate::utils::run_cmd;
 use anyhow::Result;
+use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::net::IpAddr;
-use zbus::export::futures_util::TryFutureExt;
-use zbus::zvariant::Type;
 
 const BRIDGE_IFACE: &str = "bvbr0";
 
-#[derive(Deserialize, Serialize, Debug, Clone, Type)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NetworkInterface {
     pub name: String,
     pub ip: IpAddr,

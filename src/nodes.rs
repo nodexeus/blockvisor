@@ -1,4 +1,5 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
@@ -9,8 +10,7 @@ use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-use zbus::export::futures_util::TryFutureExt;
-use zbus::{dbus_interface, fdo, Connection, ConnectionBuilder};
+use zbus::{Connection, ConnectionBuilder};
 
 use crate::{
     grpc::pb,
@@ -52,28 +52,22 @@ struct CommonData {
     machine_index: Arc<AtomicU32>,
 }
 
-#[dbus_interface(interface = "com.BlockJoy.blockvisor.Node")]
 impl Nodes {
     #[instrument(skip(self))]
-    async fn create(&mut self, id: Uuid, name: String, chain: String) -> fdo::Result<()> {
+    pub async fn create(&mut self, id: Uuid, name: String, chain: String) -> Result<()> {
         if self.nodes.contains_key(&id) {
-            let msg = format!("Node with id `{}` exists", &id);
-            return Err(fdo::Error::FileExists(msg));
+            bail!(format!("Node with id `{}` exists", &id));
         }
 
         if self.node_ids.contains_key(&name) {
-            let msg = format!("Node with name `{}` exists", &name);
-            return Err(fdo::Error::FileExists(msg));
+            bail!(format!("Node with name `{}` exists", &name));
         }
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
             error!("Cannot send node status: {error:?}");
         };
 
-        let network_interface = self
-            .next_network_interface()
-            .await
-            .map_err(|e| fdo::Error::Failed(e.to_string()))?;
+        let network_interface = self.next_network_interface().await?;
         let node = NodeData {
             id,
             name: name.clone(),
@@ -82,13 +76,8 @@ impl Nodes {
             network_interface,
         };
 
-        let babel_conn = self
-            .babel_conn()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
-        let node = Node::create(node, babel_conn)
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        let babel_conn = self.babel_conn().await?;
+        let node = Node::create(node, babel_conn).await?;
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
@@ -97,109 +86,102 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        fdo::Result::Ok(())
+        Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn delete(&mut self, id: Uuid) -> fdo::Result<()> {
-        let node = self.nodes.remove(&id).ok_or_else(|| {
-            let msg = format!("Node with id `{}` not found", &id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+    pub async fn delete(&mut self, id: Uuid) -> Result<()> {
+        let node = self
+            .nodes
+            .remove(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
         self.node_ids.remove(&node.data.name);
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
             error!("Cannot send node status: {error:?}");
         };
 
-        node.delete()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.delete().await?;
         debug!("deleted");
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
             error!("Cannot send node status: {error:?}");
         };
 
-        fdo::Result::Ok(())
+        Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn start(&mut self, id: Uuid) -> fdo::Result<()> {
+    pub async fn start(&mut self, id: Uuid) -> Result<()> {
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
             error!("Cannot send node status: {error:?}");
         };
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Node with id `{}` not found", &id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
         debug!("found node");
 
-        node.start()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.start().await?;
         debug!("started");
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
             error!("Cannot send node status: {error:?}");
         };
 
-        fdo::Result::Ok(())
+        Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn stop(&mut self, id: Uuid) -> fdo::Result<()> {
+    pub async fn stop(&mut self, id: Uuid) -> Result<()> {
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
             error!("Cannot send node status: {error:?}");
         };
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| {
-            let msg = format!("Node with id `{}` not found", &id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
         debug!("found node");
 
-        node.stop()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))?;
+        node.stop().await?;
         debug!("stopped");
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
             error!("Cannot send node status: {error:?}");
         };
 
-        fdo::Result::Ok(())
+        Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn list(&self) -> Vec<NodeData> {
+    pub async fn list(&self) -> Vec<NodeData> {
         debug!("listing {} nodes", self.nodes.len());
 
         self.nodes.values().map(|n| n.data.clone()).collect()
     }
 
     #[instrument(skip(self))]
-    async fn status(&self, id: Uuid) -> fdo::Result<NodeStatus> {
-        let node = self.nodes.get(&id).ok_or_else(|| {
-            let msg = format!("Node with id `{}` not found", &id);
-            fdo::Error::FileNotFound(msg)
-        })?;
+    pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
+        let node = self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
 
-        node.status()
-            .await
-            .map_err(|e| fdo::Error::IOError(e.to_string()))
+        node.status().await
     }
 
     // TODO: Rest of the NodeCommand variants.
 
-    async fn node_id_for_name(&self, name: &str) -> fdo::Result<Uuid> {
-        let uuid = self.node_ids.get(name).cloned().ok_or_else(|| {
-            let msg = format!("Node with name `{}` not found", name);
-            fdo::Error::FileNotFound(msg)
-        })?;
+    pub async fn node_id_for_name(&self, name: &str) -> Result<Uuid> {
+        let uuid = self
+            .node_ids
+            .get(name)
+            .cloned()
+            .ok_or_else(|| anyhow!("Node with name `{}` not found", name))?;
 
-        fdo::Result::Ok(uuid)
+        Ok(uuid)
     }
 }
 

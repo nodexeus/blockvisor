@@ -18,8 +18,14 @@ fn main() {
                 "organization_service.proto",
                 "update_service.proto",
                 "user_service.proto",
+                // Internal API
+                "blockvisor_service.proto",
             ],
-            &["proto/blockjoy/api/v1", "proto/blockjoy/api/ui_v1"],
+            &[
+                "proto/blockjoy/api/v1",
+                "proto/blockjoy/api/ui_v1",
+                "data/proto/blockjoy/blockvisor/v1",
+            ],
         )
         .unwrap();
 }

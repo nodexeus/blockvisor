@@ -23,6 +23,9 @@ services:
       TOKEN_EXPIRATION_DAYS_USER: 1
       TOKEN_EXPIRATION_DAYS_HOST: 365
       JWT_SECRET: 1245456
+      REQUEST_CONCURRENCY_LIMIT: 32
+      PAGINATION_MAX_ITEMS: 10
+
     depends_on:
       - database
 

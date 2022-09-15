@@ -2,23 +2,23 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
-    dbus::NodeProxy,
     grpc::pb,
     hosts::{get_host_info, get_ip_address},
-    node_data::NodeStatus,
     nodes::Nodes,
-    pretty_table::PrettyTable,
+    pretty_table::{PrettyTable, PrettyTableRow},
+    server::{bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BLOCKVISOR_SERVICE_URL},
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
-use std::future::ready;
-use tokio::time::{timeout, Duration};
+use std::str::FromStr;
+use tokio::time::{sleep, Duration};
+use tonic::transport::{Channel, Endpoint};
 use uuid::Uuid;
-use zbus::{export::futures_util::StreamExt, fdo, names::BusName, Connection, ProxyDefault};
+use zbus::Connection;
 
-const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(30);
+const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -87,13 +87,20 @@ async fn main() -> Result<()> {
                 input.trim().to_lowercase() == "y"
             };
 
+            let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
+
             if confirm {
-                let node_proxy = NodeProxy::new(&conn).await?;
-                let nodes = node_proxy.list().await?;
+                let nodes = service_client
+                    .get_nodes(bv_pb::GetNodesRequest {})
+                    .await?
+                    .into_inner()
+                    .nodes;
                 for node in nodes {
                     let id = node.id;
                     println!("Deleting node with ID `{}`", &id);
-                    node_proxy.delete(&id).await?;
+                    service_client
+                        .delete_node(bv_pb::DeleteNodeRequest { id })
+                        .await?;
                 }
 
                 let config = Config::load().await?;
@@ -120,22 +127,13 @@ async fn main() -> Result<()> {
                 bail!("Host is not registered, please run `init` first");
             }
 
-            let dbus_proxy = fdo::DBusProxy::new(&conn).await.unwrap();
-            if dbus_proxy
-                .name_has_owner(BusName::from_static_str(NodeProxy::DESTINATION)?)
-                .await?
+            if Endpoint::connect(&Endpoint::from_str(BLOCKVISOR_SERVICE_URL)?)
+                .await
+                .is_ok()
             {
                 println!("Service already running");
                 return Ok(());
             }
-
-            let mut stream = dbus_proxy
-                .receive_name_owner_changed()
-                .await?
-                .filter(|signal| {
-                    let args = signal.args().unwrap();
-                    ready(args.name() == NodeProxy::DESTINATION)
-                });
 
             // Enable the blockvisor service and babel socket to start on host bootup and start it.
             println!("Enabling blockvisor service to start on host boot.");
@@ -154,7 +152,7 @@ async fn main() -> Result<()> {
                 .start_unit("blockvisor.service", UnitStartMode::Fail)
                 .await?;
 
-            timeout(BLOCKVISOR_START_TIMEOUT, stream.next()).await?;
+            sleep(BLOCKVISOR_START_TIMEOUT).await;
 
             println!("blockvisor service started successfully");
         }
@@ -205,12 +203,15 @@ async fn process_chain_command(command: &ChainCommand) -> Result<()> {
 }
 
 async fn process_node_command(command: &NodeCommand) -> Result<()> {
-    let conn = Connection::system().await?;
-    let node_proxy = NodeProxy::new(&conn).await?;
+    let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
 
     match command {
         NodeCommand::List { all, chain } => {
-            let nodes = node_proxy.list().await?;
+            let nodes = service_client
+                .get_nodes(bv_pb::GetNodesRequest {})
+                .await?
+                .into_inner()
+                .nodes;
             let mut nodes = nodes
                 .iter()
                 .filter(|c| {
@@ -218,11 +219,21 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.status == NodeStatus::Running)
+                        && (*all || c.status == bv_pb::NodeStatus::Running as i32)
                 })
                 .peekable();
             if nodes.peek().is_some() {
-                print_stdout(nodes.to_pretty_table())?;
+                let mut table = vec![];
+                for node in nodes.cloned() {
+                    table.push(PrettyTableRow {
+                        id: node.id,
+                        name: node.name,
+                        chain: node.chain,
+                        status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
+                        ip: node.ip,
+                    })
+                }
+                print_stdout(table.to_pretty_table())?;
             } else {
                 println!("No nodes found.");
             }
@@ -230,43 +241,71 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4();
             let name = Petnames::default().generate_one(3, "-");
-            node_proxy.create(&id, &name, chain).await?;
+            service_client
+                .create_node(bv_pb::CreateNodeRequest {
+                    id: id.to_string(),
+                    name: name.clone(),
+                    chain: chain.to_string(),
+                })
+                .await?;
             println!(
                 "Created new node for `{}` chain with ID `{}` and name `{}`",
-                chain, id, name
+                chain, &id, &name
             );
         }
         NodeCommand::Start { id_or_name } => {
-            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
-            node_proxy.start(&id).await?;
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            service_client
+                .start_node(bv_pb::StartNodeRequest { id: id.to_string() })
+                .await?;
             println!("Started node `{}`", id_or_name);
         }
         NodeCommand::Stop { id_or_name } => {
-            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
-            node_proxy.stop(&id).await?;
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            service_client
+                .stop_node(bv_pb::StopNodeRequest { id: id.to_string() })
+                .await?;
             println!("Stopped node `{}`", id_or_name);
         }
         NodeCommand::Delete { id_or_name } => {
-            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
-            node_proxy.delete(&id).await?;
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            service_client
+                .delete_node(bv_pb::DeleteNodeRequest { id: id.to_string() })
+                .await?;
             println!("Deleted node `{}`", id_or_name);
         }
         NodeCommand::Restart { id_or_name: _ } => todo!(),
         NodeCommand::Console { id_or_name: _ } => todo!(),
         NodeCommand::Logs { id_or_name: _ } => todo!(),
         NodeCommand::Status { id_or_name } => {
-            let id = resolve_id_or_name(&node_proxy, id_or_name).await?;
-            let status = node_proxy.status(&id).await?;
-            println!("{}", status);
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let status = service_client
+                .get_node_status(bv_pb::GetNodeStatusRequest { id: id.to_string() })
+                .await?
+                .into_inner()
+                .status;
+            println!("{}", bv_pb::NodeStatus::from_i32(status).unwrap());
         }
     }
     Ok(())
 }
 
-async fn resolve_id_or_name(node_proxy: &NodeProxy<'_>, id_or_name: &str) -> Result<Uuid> {
+async fn resolve_id_or_name(
+    service_client: &mut BlockvisorClient<Channel>,
+    id_or_name: &str,
+) -> Result<Uuid> {
     let uuid = match Uuid::parse_str(id_or_name) {
         Ok(v) => v,
-        Err(_) => node_proxy.node_id_for_name(id_or_name).await?,
+        Err(_) => {
+            let uuid = service_client
+                .get_node_id_for_name(bv_pb::GetNodeIdForNameRequest {
+                    name: id_or_name.to_string(),
+                })
+                .await?
+                .into_inner()
+                .id;
+            Uuid::parse_str(&uuid)?
+        }
     };
 
     Ok(uuid)

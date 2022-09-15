@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod config;
-pub mod dbus;
 pub mod grpc;
 pub mod hosts;
 pub mod logging;
@@ -9,5 +8,6 @@ pub mod node;
 pub mod node_data;
 pub mod nodes;
 pub mod pretty_table;
+pub mod server;
 pub mod systemd;
 pub mod utils;

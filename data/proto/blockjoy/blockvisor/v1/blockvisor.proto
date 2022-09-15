@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package blockjoy.blockvisor.v1;
+
+enum NodeStatus {
+    UndefinedNodeStatus = 0;
+    Running = 1;
+    Stopped = 2;
+}
+
+message Node {
+    string id = 1;
+    string name = 2;
+    string chain = 3;
+    NodeStatus status = 4;
+    string ip = 5;
+}
+
+enum ServiceStatus {
+    UndefinedServiceStatus = 0;
+    Ok = 1;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+    ServiceStatus status = 1;
+}
+
+message CreateNodeRequest {
+    string id = 1;
+    string name = 2;
+    string chain = 3;
+}
+
+message CreateNodeResponse {}
+
+message DeleteNodeRequest {
+    string id = 1;
+}
+
+message DeleteNodeResponse {}
+
+message StartNodeRequest {
+    string id = 1;
+}
+
+message StartNodeResponse {}
+
+message StopNodeRequest {
+    string id = 1;
+}
+
+message StopNodeResponse {}
+
+message GetNodesRequest {}
+
+message GetNodesResponse {
+    repeated Node nodes = 1;
+}
+
+message GetNodeStatusRequest {
+    string id = 1;   
+}
+
+message GetNodeStatusResponse {
+    NodeStatus status = 1;
+}
+
+message GetNodeIdForNameRequest {
+    string name = 1;   
+}
+
+message GetNodeIdForNameResponse {
+    string id = 1;
+}

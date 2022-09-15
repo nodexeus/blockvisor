@@ -1,33 +1,17 @@
 use anyhow::{Context, Result};
-use cli_table::{
-    format::Justify,
-    CellStruct,
-    Color::{Blue, Cyan, Green, Red, Yellow},
-    Style, Table,
-};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
-use zbus::zvariant::Type;
 
 use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 
-#[derive(
-    Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Type,
-)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub enum NodeStatus {
     Running,
     Stopped,
-}
-
-fn style_node_status(cell: CellStruct, value: &NodeStatus) -> CellStruct {
-    match value {
-        NodeStatus::Running => cell.foreground_color(Some(Green)),
-        NodeStatus::Stopped => cell.foreground_color(Some(Red)),
-    }
 }
 
 impl fmt::Display for NodeStatus {
@@ -36,17 +20,12 @@ impl fmt::Display for NodeStatus {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Type, Table)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NodeData {
-    #[table(title = "ID", justify = "Justify::Right")]
     pub id: Uuid,
-    #[table(title = "Name", color = "Cyan")]
     pub name: String,
-    #[table(title = "Chain", color = "Blue")]
     pub chain: String,
-    #[table(title = "State", customize_fn = "style_node_status")]
     pub status: NodeStatus,
-    #[table(title = "IP Address", color = "Yellow")]
     pub network_interface: NetworkInterface,
 }
 
