@@ -85,9 +85,9 @@ pub enum NodeCommand {
     /// Show nodes list
     #[clap(alias = "ls")]
     List {
-        /// Should we display all nodes including stopped
+        /// Display only running nodes
         #[clap(long, short)]
-        all: bool,
+        running: bool,
 
         /// Display nodes of particular chain
         #[clap(long, short)]

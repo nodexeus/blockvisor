@@ -471,7 +471,7 @@ async fn test_bv_cmd_grpc_commands() {
 
     println!("list created node");
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "list", "--all"])
+    cmd.args(&["node", "list"])
         .env("NO_COLOR", "1")
         .assert()
         .success()

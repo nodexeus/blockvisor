@@ -206,7 +206,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
     let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
 
     match command {
-        NodeCommand::List { all, chain } => {
+        NodeCommand::List { running, chain } => {
             let nodes = service_client
                 .get_nodes(bv_pb::GetNodesRequest {})
                 .await?
@@ -219,7 +219,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                         .as_ref()
                         .map(|chain| c.chain.contains(chain))
                         .unwrap_or(true)
-                        && (*all || c.status == bv_pb::NodeStatus::Running as i32)
+                        && (!running || (c.status == bv_pb::NodeStatus::Running as i32))
                 })
                 .peekable();
             if nodes.peek().is_some() {
