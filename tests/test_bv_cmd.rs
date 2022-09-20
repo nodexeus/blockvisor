@@ -177,13 +177,13 @@ async fn test_bv_cmd_init_localhost() {
             id: Some(request_id.clone()),
             token: None,
             fields: vec![],
-            limit: None,
+            pagination: None,
         }),
         user: Some(ui_pb::User {
             id: None,
             email: Some(email.to_string()),
-            first_name: None,
-            last_name: None,
+            first_name: Some("first".to_string()),
+            last_name: Some("last".to_string()),
             created_at: None,
             updated_at: None,
         }),
@@ -234,7 +234,7 @@ async fn test_bv_cmd_init_localhost() {
             id: Some(request_id.clone()),
             token: None,
             fields: vec![],
-            limit: None,
+            pagination: None,
         }),
         email: email.to_string(),
         password: password.to_string(),
@@ -253,7 +253,7 @@ async fn test_bv_cmd_init_localhost() {
             id: Some(request_id.clone()),
             token: Some(token.clone()),
             fields: vec![],
-            limit: None,
+            pagination: None,
         }),
     };
     let mut request = Request::new(org_get);
@@ -278,7 +278,7 @@ async fn test_bv_cmd_init_localhost() {
             id: Some(request_id.clone()),
             token: Some(token.clone()),
             fields: vec![],
-            limit: None,
+            pagination: None,
         }),
         host_provision: Some(ui_pb::HostProvision {
             id: None,
