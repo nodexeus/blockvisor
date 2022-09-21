@@ -20,6 +20,7 @@ path = "src/bin/blockvisord.rs"
 
 [dependencies]
 anyhow = "1.0.56"
+base64 = "0.13.0"
 chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive"]}
 cli-table = "0.4"
@@ -51,6 +52,5 @@ tonic-build = {version = "0.7", features = ["prost"]}
 [dev-dependencies]
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
-base64 = "0.13.0"
 predicates = "2.1.1"
 serial_test = "0.7.0"

@@ -16,9 +16,10 @@ pub type Client = CommandFlowClient<InterceptedService<tonic::transport::Channel
 impl Interceptor for AuthToken {
     fn call(&mut self, request: Request<()>) -> Result<Request<()>, Status> {
         let mut request = request;
+        let val = format!("Bearer {}", base64::encode(self.0.clone()));
         request
             .metadata_mut()
-            .insert("authorization", self.0.parse().unwrap());
+            .insert("authorization", val.parse().unwrap());
         Ok(request)
     }
 }
