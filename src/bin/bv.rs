@@ -18,7 +18,9 @@ use tonic::transport::{Channel, Endpoint};
 use uuid::Uuid;
 use zbus::Connection;
 
+// TODO: use proper wait mechanism
 const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(5);
+const BLOCKVISOR_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -157,17 +159,20 @@ async fn main() -> Result<()> {
             println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            println!("Stopping blockvisor service");
-            systemd_manager_proxy
-                .stop_unit("blockvisor.service", UnitStopMode::Fail)
-                .await?;
-            println!("blockvisor service stopped successfully");
-
             println!("Shutting down babel socket unit");
             systemd_manager_proxy
                 .stop_unit("babel-bus.socket", UnitStopMode::Fail)
                 .await?;
             println!("babel socket terminated");
+
+            println!("Stopping blockvisor service");
+            systemd_manager_proxy
+                .stop_unit("blockvisor.service", UnitStopMode::Fail)
+                .await?;
+
+            sleep(BLOCKVISOR_STOP_TIMEOUT).await;
+
+            println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
             todo!()
