@@ -25,6 +25,7 @@ services:
       JWT_SECRET: 1245456
       REQUEST_CONCURRENCY_LIMIT: 32
       PAGINATION_MAX_ITEMS: 10
+      RUST_LOG: debug
 
     depends_on:
       - database
