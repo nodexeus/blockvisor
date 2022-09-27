@@ -6,7 +6,7 @@ After=syslog.target network.target network-online.target
 
 [Service]
 # Debug logging for now
-Environment="RUST_LOG=debug"
+Environment="RUST_LOG=debug,firec=trace"
 # TODO: We need to run things as a special system user.
 # User=blockvisor
 ExecStart=/usr/bin/blockvisord

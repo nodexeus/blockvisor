@@ -51,12 +51,24 @@ fn test_bv_cmd_restart() {
         ));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Service stopped"));
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
         .assert()
         .success()
         .stdout(predicate::str::contains(
             "blockvisor service started successfully",
         ));
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Service running"));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
@@ -324,6 +336,7 @@ async fn test_bv_cmd_init_localhost() {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_grpc_commands() {
+    use serde_json::json;
     use stub_server::StubServer;
     use uuid::Uuid;
 
@@ -356,7 +369,7 @@ async fn test_bv_cmd_grpc_commands() {
                         url: "helium/node/latest".to_string(),
                     }),
                     blockchain: "helium".to_string(),
-                    r#type: pb::NodeType::Node.into(),
+                    r#type: json!({"id": 3, "properties": []}).to_string(),
                 })),
             })),
         },
@@ -371,7 +384,7 @@ async fn test_bv_cmd_grpc_commands() {
                         url: "helium/node/latest".to_string(),
                     }),
                     blockchain: "helium".to_string(),
-                    r#type: pb::NodeType::Node.into(),
+                    r#type: json!({"id": 3, "properties": []}).to_string(),
                 })),
             })),
         },
@@ -388,7 +401,7 @@ async fn test_bv_cmd_grpc_commands() {
                         url: "helium/node/latest".to_string(),
                     }),
                     blockchain: "helium".to_string(),
-                    r#type: pb::NodeType::Node.into(),
+                    r#type: json!({"id": 3, "properties": []}).to_string(),
                 })),
             })),
         },

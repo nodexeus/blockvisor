@@ -5,17 +5,29 @@ pub mod bv_pb {
 }
 
 use crate::{node_data::NodeStatus, nodes::Nodes};
-use std::fmt;
 use std::sync::Arc;
+use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
-use tonic::{Request, Response, Status};
+use tonic::{transport::Endpoint, Request, Response, Status};
 use uuid::Uuid;
 
 pub const BLOCKVISOR_SERVICE_PORT: usize = 9001;
 pub const BLOCKVISOR_SERVICE_URL: &str = "http://localhost:9001";
 
+lazy_static::lazy_static! {
+    pub static ref BLOCKVISOR_SERVICE_ENDPOINT: Endpoint = Endpoint::from_str(BLOCKVISOR_SERVICE_URL).expect("valid url");
+}
+
 pub struct BlockvisorServer {
     pub nodes: Arc<Mutex<Nodes>>,
+}
+
+impl BlockvisorServer {
+    pub async fn is_running() -> bool {
+        Endpoint::connect(&BLOCKVISOR_SERVICE_ENDPOINT)
+            .await
+            .is_ok()
+    }
 }
 
 #[tonic::async_trait]

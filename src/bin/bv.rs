@@ -6,19 +6,22 @@ use blockvisord::{
     hosts::{get_host_info, get_ip_address},
     nodes::Nodes,
     pretty_table::{PrettyTable, PrettyTableRow},
-    server::{bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BLOCKVISOR_SERVICE_URL},
+    server::{
+        bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BlockvisorServer, BLOCKVISOR_SERVICE_URL,
+    },
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
-use std::str::FromStr;
 use tokio::time::{sleep, Duration};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use uuid::Uuid;
 use zbus::Connection;
 
+// TODO: use proper wait mechanism
 const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(5);
+const BLOCKVISOR_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -127,10 +130,7 @@ async fn main() -> Result<()> {
                 bail!("Host is not registered, please run `init` first");
             }
 
-            if Endpoint::connect(&Endpoint::from_str(BLOCKVISOR_SERVICE_URL)?)
-                .await
-                .is_ok()
-            {
+            if BlockvisorServer::is_running().await {
                 println!("Service already running");
                 return Ok(());
             }
@@ -157,20 +157,27 @@ async fn main() -> Result<()> {
             println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            println!("Stopping blockvisor service");
-            systemd_manager_proxy
-                .stop_unit("blockvisor.service", UnitStopMode::Fail)
-                .await?;
-            println!("blockvisor service stopped successfully");
-
             println!("Shutting down babel socket unit");
             systemd_manager_proxy
                 .stop_unit("babel-bus.socket", UnitStopMode::Fail)
                 .await?;
             println!("babel socket terminated");
+
+            println!("Stopping blockvisor service");
+            systemd_manager_proxy
+                .stop_unit("blockvisor.service", UnitStopMode::Fail)
+                .await?;
+
+            sleep(BLOCKVISOR_STOP_TIMEOUT).await;
+
+            println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
-            todo!()
+            if BlockvisorServer::is_running().await {
+                println!("Service running");
+            } else {
+                println!("Service stopped");
+            }
         }
         Command::Host { command } => process_host_command(&command).await?,
         Command::Chain { command } => process_chain_command(&command).await?,
