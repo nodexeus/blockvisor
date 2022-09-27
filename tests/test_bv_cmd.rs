@@ -24,6 +24,16 @@ use tonic::transport::Server;
 #[cfg(target_os = "linux")]
 mod stub_server;
 
+#[cfg(target_os = "linux")]
+fn bv_run(commands: &[&str], stdout_pattern: &str) {
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(commands)
+        .env("NO_COLOR", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(stdout_pattern));
+}
+
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
@@ -42,39 +52,11 @@ fn test_bv_cmd_start_no_init() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_restart() {
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("stop")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "blockvisor service stopped successfully",
-        ));
-
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("status")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Service stopped"));
-
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("start")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "blockvisor service started successfully",
-        ));
-
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("status")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Service running"));
-
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.arg("start")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Service already running"));
+    bv_run(&["stop"], "blockvisor service stopped successfully");
+    bv_run(&["status"], "Service stopped");
+    bv_run(&["start"], "blockvisor service started successfully");
+    bv_run(&["status"], "Service running");
+    bv_run(&["start"], "Service already running");
 }
 
 #[test]
@@ -102,39 +84,19 @@ fn test_bv_cmd_node_lifecycle() {
     println!("create vm_id: {vm_id}");
 
     println!("stop stopped node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "stop", vm_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Stopped node"));
+    bv_run(&["node", "stop", vm_id], "Stopped node");
 
     println!("start stopped node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "start", vm_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Started node"));
+    bv_run(&["node", "start", vm_id], "Started node");
 
     println!("stop started node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "stop", vm_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Stopped node"));
+    bv_run(&["node", "stop", vm_id], "Stopped node");
 
     println!("restart stopped node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "start", vm_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Started node"));
+    bv_run(&["node", "start", vm_id], "Started node");
 
     println!("delete started node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "delete", vm_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Deleted node"));
+    bv_run(&["node", "delete", vm_id], "Deleted node");
 }
 
 #[test]
@@ -483,19 +445,10 @@ async fn test_bv_cmd_grpc_commands() {
     };
 
     println!("list created node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "list"])
-        .env("NO_COLOR", "1")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(&node_id));
+    bv_run(&["node", "list"], &node_id);
 
     println!("delete created node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "delete", &node_id])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Deleted node"));
+    bv_run(&["node", "delete", &node_id], &node_id);
 
     println!("check received updates");
     let updates: Vec<_> = ReceiverStream::new(updates_rx)
