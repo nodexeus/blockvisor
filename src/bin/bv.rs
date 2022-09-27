@@ -6,15 +6,16 @@ use blockvisord::{
     hosts::{get_host_info, get_ip_address},
     nodes::Nodes,
     pretty_table::{PrettyTable, PrettyTableRow},
-    server::{bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BLOCKVISOR_SERVICE_URL},
+    server::{
+        bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BlockvisorServer, BLOCKVISOR_SERVICE_URL,
+    },
     systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
 };
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
-use std::str::FromStr;
 use tokio::time::{sleep, Duration};
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use uuid::Uuid;
 use zbus::Connection;
 
@@ -129,10 +130,7 @@ async fn main() -> Result<()> {
                 bail!("Host is not registered, please run `init` first");
             }
 
-            if Endpoint::connect(&Endpoint::from_str(BLOCKVISOR_SERVICE_URL)?)
-                .await
-                .is_ok()
-            {
+            if BlockvisorServer::is_running().await {
                 println!("Service already running");
                 return Ok(());
             }
@@ -175,7 +173,11 @@ async fn main() -> Result<()> {
             println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
-            todo!()
+            if BlockvisorServer::is_running().await {
+                println!("Service running");
+            } else {
+                println!("Service stopped");
+            }
         }
         Command::Host { command } => process_host_command(&command).await?,
         Command::Chain { command } => process_chain_command(&command).await?,

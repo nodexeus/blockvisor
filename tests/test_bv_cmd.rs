@@ -51,12 +51,24 @@ fn test_bv_cmd_restart() {
         ));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Service stopped"));
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
         .assert()
         .success()
         .stdout(predicate::str::contains(
             "blockvisor service started successfully",
         ));
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Service running"));
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
