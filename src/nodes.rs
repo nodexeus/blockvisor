@@ -72,7 +72,6 @@ impl Nodes {
             id,
             name: name.clone(),
             chain,
-            status: NodeStatus::Stopped,
             network_interface,
         };
 

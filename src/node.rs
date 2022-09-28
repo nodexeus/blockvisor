@@ -1,9 +1,8 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use futures_util::StreamExt;
 use std::{future::ready, path::Path, time::Duration};
-use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::{
     fs,
     time::{sleep, timeout},
@@ -12,7 +11,10 @@ use tracing::{instrument, log::warn, trace};
 use uuid::Uuid;
 use zbus::{Connection, Proxy};
 
-use crate::node_data::{NodeData, NodeStatus};
+use crate::{
+    node_data::{NodeData, NodeStatus},
+    utils::get_process_pid,
+};
 
 #[derive(Debug)]
 pub struct Node {
@@ -22,11 +24,11 @@ pub struct Node {
 }
 
 // FIXME: Hardcoding everything for now.
+pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
 const ROOT_FS: &str = "/var/lib/blockvisor/debian.ext4";
 const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
-const FC_BIN_NAME: &str = "firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
@@ -97,13 +99,12 @@ impl Node {
             });
         self.machine.start().await?;
         timeout(BABEL_START_TIMEOUT, stream.next()).await?;
-        self.data.status = NodeStatus::Running;
         self.data.save().await
     }
 
     /// Returns the status of the node.
     pub async fn status(&self) -> Result<NodeStatus> {
-        Ok(self.data.status)
+        Ok(self.data.status())
     }
 
     /// Stops the running node.
@@ -143,7 +144,6 @@ impl Node {
                 }
             }
         }
-        self.data.status = NodeStatus::Stopped;
         self.data.save().await?;
 
         // FIXME: for some reason firecracker socket is not created by
@@ -194,23 +194,6 @@ impl Node {
             .build();
 
         Ok(config)
-    }
-}
-
-/// Get the pid of the running VM process knowing its process name and part of command line.
-fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
-    let mut sys = System::new();
-    // TODO: would be great to save the System and not do a full refresh each time
-    sys.refresh_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::everything()));
-    let processes: Vec<_> = sys
-        .processes_by_name(process_name)
-        .filter(|&process| process.cmd().contains(&cmd.to_string()))
-        .collect();
-
-    match processes.len() {
-        0 => bail!("No {process_name} processes running for id: {cmd}"),
-        1 => processes[0].pid().as_u32().try_into().map_err(Into::into),
-        _ => bail!("More then 1 {process_name} process running for id: {cmd}"),
     }
 }
 

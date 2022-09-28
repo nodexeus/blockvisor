@@ -131,7 +131,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let list = self.nodes.lock().await.list().await;
         let mut nodes = vec![];
         for node in list {
-            let status = match node.status {
+            let status = match node.status() {
                 NodeStatus::Running => bv_pb::NodeStatus::Running,
                 NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
             };
