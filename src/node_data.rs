@@ -6,6 +6,8 @@ use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
 
+use crate::node::FC_BIN_NAME;
+use crate::utils::get_process_pid;
 use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
@@ -25,7 +27,6 @@ pub struct NodeData {
     pub id: Uuid,
     pub name: String,
     pub chain: String,
-    pub status: NodeStatus,
     pub network_interface: NetworkInterface,
 }
 
@@ -60,5 +61,13 @@ impl NodeData {
     fn file_path(&self) -> PathBuf {
         let filename = format!("{}.toml", self.id);
         REGISTRY_CONFIG_DIR.join(filename)
+    }
+
+    pub fn status(&self) -> NodeStatus {
+        let cmd = self.id.to_string();
+        match get_process_pid(FC_BIN_NAME, &cmd) {
+            Ok(_) => NodeStatus::Running,
+            Err(_) => NodeStatus::Stopped,
+        }
     }
 }
