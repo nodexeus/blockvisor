@@ -136,9 +136,18 @@ async fn main() -> Result<()> {
             }
 
             // Enable the blockvisor service and babel socket to start on host bootup and start it.
-            println!("Enabling blockvisor service to start on host boot.");
+            println!("Enabling blockvisor services to start on host boot.");
             systemd_manager_proxy
-                .enable_unit_files(&["blockvisor.service", "babel-bus.socket"], false, false)
+                .enable_unit_files(
+                    &["tmux.service", "blockvisor.service", "babel-bus.socket"],
+                    false,
+                    false,
+                )
+                .await?;
+
+            println!("Starting tmux server");
+            systemd_manager_proxy
+                .start_unit("tmux.service", UnitStartMode::Fail)
                 .await?;
 
             println!("Starting babel socket unit");
