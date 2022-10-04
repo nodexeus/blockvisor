@@ -95,6 +95,9 @@ fn test_bv_cmd_node_lifecycle() {
     println!("restart stopped node");
     bv_run(&["node", "start", vm_id], "Started node");
 
+    println!("list running node before service restart");
+    bv_run(&["node", "status", vm_id], "Running");
+
     println!("stop service");
     bv_run(&["stop"], "blockvisor service stopped successfully");
 
@@ -102,12 +105,7 @@ fn test_bv_cmd_node_lifecycle() {
     bv_run(&["start"], "blockvisor service started successfully");
 
     println!("list running node after service restart");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["node", "list"])
-        .env("NO_COLOR", "1")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(vm_id).and(predicate::str::contains("Running")));
+    bv_run(&["node", "status", vm_id], "Running");
 
     println!("delete started node");
     bv_run(&["node", "delete", vm_id], "Deleted node");
