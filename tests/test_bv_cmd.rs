@@ -3,6 +3,8 @@ use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
+use base64;
+#[cfg(target_os = "linux")]
 use blockvisord::grpc::{self, pb};
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
@@ -19,7 +21,17 @@ use tokio::time::{sleep, Duration};
 #[cfg(target_os = "linux")]
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 #[cfg(target_os = "linux")]
-use tonic::transport::{Endpoint, Server};
+use tonic::{
+    transport::{Endpoint, Server},
+    Request,
+};
+
+#[cfg(target_os = "linux")]
+pub mod ui_pb {
+    // https://github.com/tokio-rs/prost/issues/661
+    #![allow(clippy::derive_partial_eq_without_eq)]
+    tonic::include_proto!("blockjoy.api.ui_v1");
+}
 
 #[cfg(target_os = "linux")]
 mod stub_server;
@@ -135,13 +147,9 @@ fn test_bv_cmd_init_unknown_otp() {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_init_localhost() {
-    pub mod ui_pb {
-        // https://github.com/tokio-rs/prost/issues/661
-        #![allow(clippy::derive_partial_eq_without_eq)]
-        tonic::include_proto!("blockjoy.api.ui_v1");
-    }
-    use base64;
-    use tonic::Request;
+    use blockvisord::config::Config;
+    use prost_types::Any;
+    use serde_json::json;
     use uuid::Uuid;
 
     let request_id = Uuid::new_v4().to_string();
@@ -152,6 +160,7 @@ async fn test_bv_cmd_init_localhost() {
     let url = "http://localhost:8080";
     let email = "user1@example.com";
     let password = "user1pass";
+    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
 
     let mut client = ui_pb::user_service_client::UserServiceClient::connect(url)
         .await
@@ -187,17 +196,9 @@ async fn test_bv_cmd_init_localhost() {
             .unwrap(),
         &request_id
     );
-
-    let user_id = user
-        .meta
-        .unwrap()
-        .messages
-        .first()
-        .expect("user_id in messages")
-        .clone();
+    let user_id = get_first_message(user.meta);
 
     println!("make admin");
-    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
     let db_query = format!(
         r#"update tokens set role='admin'::enum_token_role where user_id='{user_id}'::uuid"#
     );
@@ -242,15 +243,11 @@ async fn test_bv_cmd_init_localhost() {
             pagination: None,
         }),
     };
-    let mut request = Request::new(org_get);
-    request.metadata_mut().insert(
-        "authorization",
-        format!("Bearer {}", base64::encode(token.value.clone()))
-            .parse()
-            .unwrap(),
-    );
-
-    let orgs: ui_pb::GetOrganizationsResponse = client.get(request).await.unwrap().into_inner();
+    let orgs: ui_pb::GetOrganizationsResponse = client
+        .get(with_auth(org_get, &token.value))
+        .await
+        .unwrap()
+        .into_inner();
     println!("user org: {orgs:?}");
     let org_id = orgs.organizations.first().unwrap().id.as_ref().unwrap();
 
@@ -275,21 +272,13 @@ async fn test_bv_cmd_init_localhost() {
             install_cmd: Some("install cmd".to_string()),
         }),
     };
-    let mut request = Request::new(provision_create);
-    request.metadata_mut().insert(
-        "authorization",
-        format!("Bearer {}", base64::encode(token.value.clone()))
-            .parse()
-            .unwrap(),
-    );
-
-    let provision: ui_pb::CreateHostProvisionResponse =
-        client.create(request).await.unwrap().into_inner();
-
+    let provision: ui_pb::CreateHostProvisionResponse = client
+        .create(with_auth(provision_create, &token.value))
+        .await
+        .unwrap()
+        .into_inner();
     println!("host provision: {provision:?}");
-    let otp = provision.meta.unwrap().messages.first().unwrap().clone();
-
-    let tmp_dir = TempDir::new().unwrap();
+    let otp = get_first_message(provision.meta);
 
     println!("bv init");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
@@ -300,10 +289,139 @@ async fn test_bv_cmd_init_localhost() {
         .args(&["init", &otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
-        .env("HOME", tmp_dir.as_os_str())
         .assert()
         .success()
         .stdout(predicate::str::contains("Configuring blockvisor"));
+
+    println!("read host id");
+    let config_path = "/root/.config/blockvisor.toml";
+    let config = std::fs::read_to_string(config_path).unwrap();
+    let config: Config = toml::from_str(&config).unwrap();
+    let host_id = config.id;
+    println!("got host id: {host_id}");
+
+    println!("restart blockvisor");
+    bv_run(&["stop"], "blockvisor service stopped successfully");
+    bv_run(&["start"], "blockvisor service started successfully");
+
+    println!("get blockchain id");
+    let mut client = ui_pb::blockchain_service_client::BlockchainServiceClient::connect(url)
+        .await
+        .unwrap();
+
+    let list_blockchains = ui_pb::ListBlockchainsRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: Some(token.clone()),
+            fields: vec![],
+            pagination: None,
+        }),
+    };
+    let list: ui_pb::ListBlockchainsResponse = client
+        .list(with_auth(list_blockchains, &token.value))
+        .await
+        .unwrap()
+        .into_inner();
+    let blockchain_id = &list.blockchains.first().unwrap().id.as_ref().unwrap().value;
+    println!("got blockchain_id: {blockchain_id}");
+
+    let mut client = ui_pb::node_service_client::NodeServiceClient::connect(url)
+        .await
+        .unwrap();
+
+    let node_create = ui_pb::CreateNodeRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: Some(token.clone()),
+            fields: vec![],
+            pagination: None,
+        }),
+        node: Some(ui_pb::Node {
+            id: None,
+            org_id: Some(org_id.clone()),
+            host_id: Some(ui_pb::Uuid {
+                value: host_id.to_string(),
+            }),
+            blockchain_id: Some(ui_pb::Uuid {
+                value: blockchain_id.to_string(),
+            }),
+            name: None,
+            groups: vec![],
+            version: None,
+            ip: None,
+            r#type: Some(json!({"id": 3, "properties": []}).to_string()),
+            address: None,
+            wallet_address: None,
+            block_height: None,
+            node_data: None,
+            created_at: None,
+            updated_at: None,
+            status: Some(ui_pb::node::NodeStatus::Relaying.into()),
+        }),
+    };
+    let node: ui_pb::CreateNodeResponse = client
+        .create(with_auth(node_create, &token.value))
+        .await
+        .unwrap()
+        .into_inner();
+    println!("created node: {node:?}");
+    let node_id = get_first_message(node.meta);
+
+    sleep(Duration::from_secs(30)).await;
+
+    println!("list created node");
+    bv_run(&["node", "status", &node_id], "Stopped");
+
+    let mut client = ui_pb::command_service_client::CommandServiceClient::connect(url)
+        .await
+        .unwrap();
+
+    let node_start = ui_pb::CommandRequest {
+        meta: Some(ui_pb::RequestMeta {
+            id: Some(request_id.clone()),
+            token: Some(token.clone()),
+            fields: vec![],
+            pagination: None,
+        }),
+        id: Some(ui_pb::Uuid {
+            value: host_id.to_string(),
+        }),
+        params: vec![ui_pb::Parameter {
+            name: "resource_id".to_string(),
+            value: Some(Any {
+                type_url: "string".to_string(),
+                value: Uuid::parse_str(&node_id).unwrap().into_bytes().to_vec(),
+            }),
+        }],
+    };
+    let command: ui_pb::CommandResponse = client
+        .start_node(with_auth(node_start, &token.value))
+        .await
+        .unwrap()
+        .into_inner();
+    println!("executed start node command: {command:?}");
+
+    sleep(Duration::from_secs(30)).await;
+
+    println!("get node status");
+    bv_run(&["node", "status", &node_id], "Running");
+}
+
+#[cfg(target_os = "linux")]
+fn get_first_message(meta: Option<ui_pb::ResponseMeta>) -> String {
+    meta.unwrap().messages.first().unwrap().clone()
+}
+
+#[cfg(target_os = "linux")]
+fn with_auth<T>(inner: T, token: &str) -> Request<T> {
+    let mut request = Request::new(inner);
+    request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", base64::encode(token.to_string()))
+            .parse()
+            .unwrap(),
+    );
+    request
 }
 
 #[tokio::test]
