@@ -3,7 +3,7 @@ use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
-use blockvisord::grpc::pb;
+use blockvisord::grpc::{self, pb};
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
 #[cfg(target_os = "linux")]
@@ -19,7 +19,7 @@ use tokio::time::{sleep, Duration};
 #[cfg(target_os = "linux")]
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 #[cfg(target_os = "linux")]
-use tonic::transport::Server;
+use tonic::transport::{Endpoint, Server};
 
 #[cfg(target_os = "linux")]
 mod stub_server;
@@ -310,7 +310,10 @@ async fn test_bv_cmd_init_localhost() {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_grpc_commands() {
+    use blockvisord::grpc::process_commands_stream;
+    use blockvisord::nodes::Nodes;
     use serde_json::json;
+    use std::str::FromStr;
     use stub_server::StubServer;
     use uuid::Uuid;
 
@@ -326,6 +329,7 @@ async fn test_bv_cmd_grpc_commands() {
         }),
         created_at: None,
     };
+
     println!("delete existing node, if any");
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["node", "delete", &node_name]).assert();
@@ -427,6 +431,14 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
+        // delete
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: Some(id.clone()),
+                meta: Some(meta.clone()),
+                command: Some(pb::node_command::Command::Delete(pb::NodeDelete {})),
+            })),
+        },
     ];
 
     let (updates_tx, updates_rx) = mpsc::channel(128);
@@ -450,17 +462,27 @@ async fn test_bv_cmd_grpc_commands() {
             .unwrap()
     };
 
+    let nodes = Nodes::load().await.unwrap();
+    let updates_tx = nodes.get_updates_sender().await.unwrap().clone();
+    let nodes = Arc::new(Mutex::new(nodes));
+
+    let token = grpc::AuthToken("any token".to_string());
+    let endpoint = Endpoint::from_str("http://localhost:8081").unwrap();
+    let client_future = async {
+        sleep(Duration::from_secs(5)).await;
+        let channel = Endpoint::connect(&endpoint).await.unwrap();
+        let mut client = grpc::Client::with_auth(channel, token);
+        process_commands_stream(&mut client, nodes.clone(), updates_tx.clone())
+            .await
+            .unwrap();
+    };
+
     println!("run server");
     tokio::select! {
         _ = server_future => {},
-        _ = sleep(Duration::from_secs(60)) => {},
+        _ = client_future => {},
+        _ = sleep(Duration::from_secs(120)) => {},
     };
-
-    println!("list created node");
-    bv_run(&["node", "list"], &node_id);
-
-    println!("delete created node");
-    bv_run(&["node", "delete", &node_id], &node_id);
 
     println!("check received updates");
     let updates: Vec<_> = ReceiverStream::new(updates_rx)
@@ -509,13 +531,14 @@ async fn test_bv_cmd_grpc_commands() {
         success_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleting),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleted),
+        success_command_update(&command_id),
     ];
 
     for (actual, expected) in updates.into_iter().zip(expected_updates) {
         assert_eq!(actual.unwrap(), expected);
     }
 
-    assert_eq!(updates_count, 28);
+    assert_eq!(updates_count, 29);
 }
 
 #[cfg(target_os = "linux")]
