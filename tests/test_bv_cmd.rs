@@ -702,6 +702,7 @@ fn success_command_update(command_id: &str) -> pb::InfoUpdate {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_grpc_stub_init_reset() {
+    use std::path::Path;
     use stub_server::StubHostsServer;
 
     let server = StubHostsServer {};
@@ -723,6 +724,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
         let url = "http://localhost:8082";
         let otp = "AWESOME";
+        let config_path = format!("{}/.config/blockvisor.toml", tmp_dir.to_string_lossy());
 
         println!("bv init");
         Command::cargo_bin("bv")
@@ -735,6 +737,8 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .success()
             .stdout(predicate::str::contains("Configuring blockvisor"));
 
+        assert_eq!(Path::new(&config_path).exists(), true);
+
         println!("bv reset");
         Command::cargo_bin("bv")
             .unwrap()
@@ -743,6 +747,8 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .assert()
             .success()
             .stdout(predicate::str::contains("Deleting host"));
+
+        assert_eq!(Path::new(&config_path).exists(), false);
     })
     .await
     .unwrap();
