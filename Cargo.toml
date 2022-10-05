@@ -31,7 +31,6 @@ local-ip-address = "0.4.4"
 petname = {version = "1.1.2", features = ["default_dictionary", "std_rng"], default-features = false}
 prost = "0.10"
 prost-types = "0.10"
-reqwest = {version = "0.11.10", features = ["json"]}
 serde = {version = "1.0.136", features = ["rc"]}
 serde_json = "1.0.79"
 sysinfo = "0.23.12"

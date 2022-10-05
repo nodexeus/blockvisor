@@ -11,8 +11,9 @@ install:
 	install -m u=rw,g=r,o=r data/babel-bus.service /etc/systemd/system/
 	install -m u=rw,g=r,o=r data/babel-bus.socket /etc/systemd/system/
 	systemctl daemon-reload
+	systemctl enable blockvisor.service
 
 reinstall:
-	bv stop || true
+	systemctl stop blockvisor.service
 	make install
-	bv start
+	systemctl start blockvisor.service
