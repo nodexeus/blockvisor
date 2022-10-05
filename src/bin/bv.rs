@@ -9,7 +9,7 @@ use blockvisord::{
     server::{
         bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BlockvisorServer, BLOCKVISOR_SERVICE_URL,
     },
-    systemd::{ManagerProxy, UnitStartMode, UnitStopMode},
+    utils::run_cmd,
 };
 use clap::Parser;
 use cli_table::print_stdout;
@@ -17,7 +17,6 @@ use petname::Petnames;
 use tokio::time::{sleep, Duration};
 use tonic::transport::Channel;
 use uuid::Uuid;
-use zbus::Connection;
 
 // TODO: use proper wait mechanism
 const BLOCKVISOR_START_TIMEOUT: Duration = Duration::from_secs(5);
@@ -26,9 +25,6 @@ const BLOCKVISOR_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = App::parse();
-
-    let conn = Connection::system().await?;
-    let systemd_manager_proxy = ManagerProxy::new(&conn).await?;
 
     match args.command {
         Command::Init(cmd_args) => {
@@ -135,53 +131,20 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
 
-            // Enable the blockvisor service and babel socket to start on host bootup and start it.
-            println!("Enabling blockvisor services to start on host boot.");
-            systemd_manager_proxy
-                .enable_unit_files(
-                    &["tmux.service", "blockvisor.service", "babel-bus.socket"],
-                    false,
-                    false,
-                )
-                .await?;
-
-            println!("Starting tmux server");
-            systemd_manager_proxy
-                .start_unit("tmux.service", UnitStartMode::Fail)
-                .await?;
-
-            println!("Starting babel socket unit");
-            systemd_manager_proxy
-                .start_unit("babel-bus.socket", UnitStartMode::Fail)
-                .await?;
-            println!("babel socket setup");
-
-            println!("Starting blockvisor service");
-            systemd_manager_proxy
-                .start_unit("blockvisor.service", UnitStartMode::Fail)
-                .await?;
-
+            run_cmd("systemctl", &["start", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_START_TIMEOUT).await;
-
             println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            println!("Shutting down babel socket unit");
-            systemd_manager_proxy
-                .stop_unit("babel-bus.socket", UnitStopMode::Fail)
-                .await?;
-            println!("babel socket terminated");
-
-            println!("Stopping blockvisor service");
-            systemd_manager_proxy
-                .stop_unit("blockvisor.service", UnitStopMode::Fail)
-                .await?;
-
+            run_cmd("systemctl", &["stop", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_STOP_TIMEOUT).await;
-
             println!("blockvisor service stopped successfully");
         }
         Command::Status(_) => {
+            if !Config::exists() {
+                bail!("Host is not registered, please run `init` first");
+            }
+
             if BlockvisorServer::is_running().await {
                 println!("Service running");
             } else {

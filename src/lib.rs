@@ -9,5 +9,4 @@ pub mod node_data;
 pub mod nodes;
 pub mod pretty_table;
 pub mod server;
-pub mod systemd;
 pub mod utils;
