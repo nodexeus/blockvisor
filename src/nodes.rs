@@ -256,9 +256,7 @@ impl Nodes {
             bail!("Updates channel not initialized")
         }
 
-        let node_id = Some(pb::Uuid {
-            value: id.to_string(),
-        });
+        let node_id = id.to_string();
         self.tx.get().unwrap().send(pb::InfoUpdate {
             info: Some(pb::info_update::Info::Node(pb::NodeInfo {
                 id: node_id,

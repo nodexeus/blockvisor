@@ -148,14 +148,10 @@ fn test_bv_cmd_init_unknown_otp() {
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_init_localhost() {
     use blockvisord::config::Config;
-    use prost_types::Any;
     use serde_json::json;
     use uuid::Uuid;
 
     let request_id = Uuid::new_v4().to_string();
-    let request_id = ui_pb::Uuid {
-        value: request_id.clone(),
-    };
 
     let url = "http://localhost:8080";
     let email = "user1@example.com";
@@ -187,15 +183,7 @@ async fn test_bv_cmd_init_localhost() {
     };
     let user: ui_pb::CreateUserResponse = client.create(create_user).await.unwrap().into_inner();
     println!("user created: {user:?}");
-    assert_eq!(
-        user.meta
-            .as_ref()
-            .unwrap()
-            .origin_request_id
-            .as_ref()
-            .unwrap(),
-        &request_id
-    );
+    assert_eq!(user.meta.as_ref().unwrap().origin_request_id, request_id);
     let user_id = get_first_message(user.meta);
 
     println!("make admin");
@@ -217,12 +205,7 @@ async fn test_bv_cmd_init_localhost() {
             .await
             .unwrap();
     let login_user = ui_pb::LoginUserRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: None,
-            fields: vec![],
-            pagination: None,
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
         email: email.to_string(),
         password: password.to_string(),
     };
@@ -236,12 +219,7 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap();
 
     let org_get = ui_pb::GetOrganizationsRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: Some(token.clone()),
-            fields: vec![],
-            pagination: None,
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
     };
     let orgs: ui_pb::GetOrganizationsResponse = client
         .get(with_auth(org_get, &token.value))
@@ -257,15 +235,10 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap();
 
     let provision_create = ui_pb::CreateHostProvisionRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: Some(token.clone()),
-            fields: vec![],
-            pagination: None,
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
         host_provision: Some(ui_pb::HostProvision {
             id: None,
-            org_id: Some(org_id.clone()),
+            org_id: org_id.clone(),
             host_id: None,
             created_at: None,
             claimed_at: None,
@@ -310,19 +283,14 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap();
 
     let list_blockchains = ui_pb::ListBlockchainsRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: Some(token.clone()),
-            fields: vec![],
-            pagination: None,
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
     };
     let list: ui_pb::ListBlockchainsResponse = client
         .list(with_auth(list_blockchains, &token.value))
         .await
         .unwrap()
         .into_inner();
-    let blockchain_id = &list.blockchains.first().unwrap().id.as_ref().unwrap().value;
+    let blockchain_id = list.blockchains.first().unwrap().id.as_ref().unwrap();
     println!("got blockchain_id: {blockchain_id}");
 
     let mut client = ui_pb::node_service_client::NodeServiceClient::connect(url)
@@ -330,21 +298,12 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap();
 
     let node_create = ui_pb::CreateNodeRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: Some(token.clone()),
-            fields: vec![],
-            pagination: None,
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
         node: Some(ui_pb::Node {
             id: None,
             org_id: Some(org_id.clone()),
-            host_id: Some(ui_pb::Uuid {
-                value: host_id.to_string(),
-            }),
-            blockchain_id: Some(ui_pb::Uuid {
-                value: blockchain_id.to_string(),
-            }),
+            host_id: Some(host_id.to_string()),
+            blockchain_id: Some(blockchain_id.to_string()),
             name: None,
             groups: vec![],
             version: None,
@@ -356,7 +315,9 @@ async fn test_bv_cmd_init_localhost() {
             node_data: None,
             created_at: None,
             updated_at: None,
-            status: Some(ui_pb::node::NodeStatus::Relaying.into()),
+            status: Some(ui_pb::node::NodeStatus::Provisioning.into()),
+            sync_status: None,
+            staking_status: None,
         }),
     };
     let node: ui_pb::CreateNodeResponse = client
@@ -377,21 +338,11 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap();
 
     let node_start = ui_pb::CommandRequest {
-        meta: Some(ui_pb::RequestMeta {
-            id: Some(request_id.clone()),
-            token: Some(token.clone()),
-            fields: vec![],
-            pagination: None,
-        }),
-        id: Some(ui_pb::Uuid {
-            value: host_id.to_string(),
-        }),
+        meta: Some(ui_pb::RequestMeta::default()),
+        id: host_id.to_string(),
         params: vec![ui_pb::Parameter {
             name: "resource_id".to_string(),
-            value: Some(Any {
-                type_url: "string".to_string(),
-                value: Uuid::parse_str(&node_id).unwrap().into_bytes().to_vec(),
-            }),
+            value: node_id.clone(),
         }],
     };
     let command: ui_pb::CommandResponse = client
@@ -437,16 +388,8 @@ async fn test_bv_cmd_grpc_commands() {
 
     let node_name = "beautiful-node-name".to_string();
     let node_id = Uuid::new_v4().to_string();
-    let id = pb::Uuid {
-        value: node_id.clone(),
-    };
+    let id = node_id.clone();
     let command_id = Uuid::new_v4().to_string();
-    let meta = pb::CommandMeta {
-        api_command_id: Some(pb::Uuid {
-            value: command_id.clone(),
-        }),
-        created_at: None,
-    };
 
     println!("delete existing node, if any");
     let mut cmd = Command::cargo_bin("bv").unwrap();
@@ -457,8 +400,9 @@ async fn test_bv_cmd_grpc_commands() {
         // create
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
@@ -472,8 +416,9 @@ async fn test_bv_cmd_grpc_commands() {
         // create with same node id
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: "some-new-name".to_string(),
                     image: Some(pb::ContainerImage {
@@ -487,10 +432,9 @@ async fn test_bv_cmd_grpc_commands() {
         //  create with same node name
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(pb::Uuid {
-                    value: Uuid::new_v4().to_string(),
-                }),
-                meta: Some(meta.clone()),
+                id: Uuid::new_v4().to_string(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
@@ -504,56 +448,63 @@ async fn test_bv_cmd_grpc_commands() {
         // stop stopped
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
             })),
         },
         // start
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
             })),
         },
         // start running
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
             })),
         },
         // stop
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
             })),
         },
         // restart stopped
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
         // restart running
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
         // delete
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Some(id.clone()),
-                meta: Some(meta.clone()),
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
                 command: Some(pb::node_command::Command::Delete(pb::NodeDelete {})),
             })),
         },
@@ -663,9 +614,7 @@ async fn test_bv_cmd_grpc_commands() {
 fn node_update(node_id: &str, status: pb::node_info::ContainerStatus) -> pb::InfoUpdate {
     pb::InfoUpdate {
         info: Some(pb::info_update::Info::Node(pb::NodeInfo {
-            id: Some(pb::Uuid {
-                value: node_id.to_string(),
-            }),
+            id: node_id.to_string(),
             container_status: Some(status.into()),
             ..Default::default()
         })),
@@ -676,9 +625,7 @@ fn node_update(node_id: &str, status: pb::node_info::ContainerStatus) -> pb::Inf
 fn error_command_update(command_id: &str, message: String) -> pb::InfoUpdate {
     pb::InfoUpdate {
         info: Some(pb::info_update::Info::Command(pb::CommandInfo {
-            id: Some(pb::Uuid {
-                value: command_id.to_owned(),
-            }),
+            id: command_id.to_string(),
             response: Some(message),
             exit_code: Some(1),
         })),
@@ -689,9 +636,7 @@ fn error_command_update(command_id: &str, message: String) -> pb::InfoUpdate {
 fn success_command_update(command_id: &str) -> pb::InfoUpdate {
     pb::InfoUpdate {
         info: Some(pb::info_update::Info::Command(pb::CommandInfo {
-            id: Some(pb::Uuid {
-                value: command_id.to_owned(),
-            }),
+            id: command_id.to_string(),
             response: None,
             exit_code: Some(0),
         })),

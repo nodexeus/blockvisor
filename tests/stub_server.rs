@@ -23,12 +23,10 @@ impl pb::hosts_server::Hosts for StubHostsServer {
     ) -> Result<Response<pb::ProvisionHostResponse>, Status> {
         let host = request.into_inner();
         if host.otp != "UNKNOWN" {
-            let host_id = pb::Uuid {
-                value: "497d13b1-ddbe-4ee7-bfc7-752c7b710afe".into(),
-            };
+            let host_id = "497d13b1-ddbe-4ee7-bfc7-752c7b710afe".to_string();
 
             let reply = pb::ProvisionHostResponse {
-                host_id: Some(host_id),
+                host_id,
                 token: "awesome-token".to_owned(),
                 messages: vec![],
                 origin_request_id: host.request_id,

@@ -46,13 +46,9 @@ async fn main() -> Result<()> {
                 ip: Some(ip),
             };
             let create = pb::ProvisionHostRequest {
-                request_id: Some(pb::Uuid {
-                    value: Uuid::new_v4().to_string(),
-                }),
+                request_id: Some(Uuid::new_v4().to_string()),
                 otp: cmd_args.otp,
-                org_id: None,
                 info: Some(info),
-                validator_ips: vec![],
                 status: pb::ConnectionStatus::Online.into(),
             };
             println!("{:?}", create);
@@ -63,7 +59,7 @@ async fn main() -> Result<()> {
             let host = client.provision(create).await?.into_inner();
 
             Config {
-                id: host.host_id.unwrap().value.to_string(),
+                id: host.host_id,
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
             }
@@ -107,12 +103,8 @@ async fn main() -> Result<()> {
                 let host_id = config.id;
 
                 let delete = pb::DeleteHostRequest {
-                    request_id: Some(pb::Uuid {
-                        value: Uuid::new_v4().to_string(),
-                    }),
-                    host_id: Some(pb::Uuid {
-                        value: host_id.clone(),
-                    }),
+                    request_id: Some(Uuid::new_v4().to_string()),
+                    host_id: host_id.clone(),
                 };
                 let mut client = pb::hosts_client::HostsClient::connect(url.clone()).await?;
                 println!("Deleting host `{host_id}` from API `{url}`");
