@@ -6,16 +6,20 @@ on:
       - "main"
       - "master"
     paths:
-      - "src/**.rs"
-      - "tests/**.rs"
+      - "bv/src/**.rs"
+      - "bv/tests/**.rs"
+      - "babel/src/**.rs"
+      - "babel/tests/**.rs"
       - ".github/workflows/**"
   pull_request:
     branches:
       - "main"
       - "master"
     paths:
-      - "src/**.rs"
-      - "tests/**.rs"
+      - "bv/src/**.rs"
+      - "bv/tests/**.rs"
+      - "babel/src/**.rs"
+      - "babel/tests/**.rs"
       - ".github/workflows/**"
 
 env:
@@ -37,7 +41,7 @@ jobs:
           override: true
       - name: Build
         run: >
-          cargo build
+          cargo build -p bv
       - name: Reinstall
         run: >
           make reinstall
@@ -46,7 +50,7 @@ jobs:
           docker compose up -d
       - name: Test
         run: >
-          cargo test
+          cargo test -p bv
       - name: Shutdown test env
         if: always()
         run: >
@@ -68,9 +72,9 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args:  -- --check
+          args: -p bv -- --check
       - name: Catch common mistakes
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args:  -- -D warnings
+          args: -p bv -- -D warnings
