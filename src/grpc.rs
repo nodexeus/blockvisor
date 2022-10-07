@@ -60,54 +60,55 @@ pub async fn process_commands_stream(
 
         let update = match received.r#type {
             Some(pb::command::Type::Node(node_command)) => {
-                let command_id = node_command.meta.clone().unwrap().api_command_id.unwrap();
+                let command_id = node_command.api_command_id.clone();
                 match process_node_command(nodes.clone(), node_command).await {
                     Err(error) => {
                         error!("Error processing command: {error}");
-                        create_info_update(Some(command_id), STATUS_ERROR, Some(error.to_string()))
+                        create_info_update(command_id, STATUS_ERROR, Some(error.to_string()))
                     }
-                    Ok(()) => create_info_update(Some(command_id), STATUS_OK, None),
+                    Ok(()) => create_info_update(command_id, STATUS_OK, None),
                 }
             }
             Some(pb::command::Type::Host(host_command)) => {
                 let msg = "Command type `Host` not supported".to_string();
                 error!("Error processing command: {msg}");
-                let command_id = host_command.meta.clone().unwrap().api_command_id.unwrap();
-                create_info_update(Some(command_id), STATUS_ERROR, Some(msg))
+                let command_id = host_command.api_command_id;
+                create_info_update(command_id, STATUS_ERROR, Some(msg))
             }
             None => {
                 let msg = "Command type is `None`".to_string();
                 error!("Error processing command: {msg}");
-                create_info_update(None, STATUS_ERROR, Some(msg))
+                None
             }
         };
 
-        updates_tx.send(update)?;
+        if let Some(update) = update {
+            updates_tx.send(update)?;
+        }
     }
 
     Ok(())
 }
 
 fn create_info_update(
-    command_id: Option<pb::Uuid>,
+    command_id: String,
     code: i32,
     msg: Option<String>,
-) -> pb::InfoUpdate {
-    pb::InfoUpdate {
+) -> Option<pb::InfoUpdate> {
+    Some(pb::InfoUpdate {
         info: Some(pb::info_update::Info::Command(pb::CommandInfo {
             id: command_id,
             response: msg,
             exit_code: Some(code),
         })),
-    }
+    })
 }
 
 async fn process_node_command(
     nodes: Arc<Mutex<Nodes>>,
     node_command: pb::NodeCommand,
 ) -> Result<()> {
-    let node_id = node_command.id.unwrap().value;
-    let node_id = Uuid::from_str(&node_id)?;
+    let node_id = Uuid::from_str(&node_command.id)?;
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {
