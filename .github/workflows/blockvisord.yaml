@@ -5,22 +5,10 @@ on:
     branches:
       - "main"
       - "master"
-    paths:
-      - "bv/src/**.rs"
-      - "bv/tests/**.rs"
-      - "babel/src/**.rs"
-      - "babel/tests/**.rs"
-      - ".github/workflows/**"
   pull_request:
     branches:
       - "main"
       - "master"
-    paths:
-      - "bv/src/**.rs"
-      - "bv/tests/**.rs"
-      - "babel/src/**.rs"
-      - "babel/tests/**.rs"
-      - ".github/workflows/**"
 
 env:
   RUST_LOG: trace
