@@ -4,7 +4,14 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: [master]
+    branches:
+      - "main"
+      - "master"
+    paths:
+      - "babel/src/**.rs"
+      - "babel/tests/**.rs"
+      - ".github/workflows/**"
+
 
 
 jobs:

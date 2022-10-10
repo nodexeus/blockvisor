@@ -8,8 +8,6 @@ on:
     paths:
       - "bv/src/**.rs"
       - "bv/tests/**.rs"
-      - "babel/src/**.rs"
-      - "babel/tests/**.rs"
       - ".github/workflows/**"
   pull_request:
     branches:
