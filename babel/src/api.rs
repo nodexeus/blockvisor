@@ -1,14 +1,12 @@
-use std::future::ready;
-
+use crate::config::{self, Method, MethodResponseFormat};
 use eyre::ContextCompat;
 use futures::TryStreamExt;
 use reqwest::Client;
 use serde_json::json;
+use std::future::ready;
 use tokio::fs;
 use tracing::trace;
 use zbus::{fdo, Address, ConnectionBuilder, MessageStream, MessageType, VsockAddress};
-
-use crate::config::{self, Method, MethodResponseFormat};
 
 const VSOCK_HOST_CID: u32 = 2;
 const VSOCK_PORT: u32 = 42;
