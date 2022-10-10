@@ -1,4 +1,4 @@
-name: Blockvisor
+name: Babel
 
 on:
   push:
@@ -10,46 +10,26 @@ on:
       - "main"
       - "master"
 
-env:
-  RUST_LOG: trace
-  RUST_BACKTRACE: full
-
 jobs:
   test:
     name: Tests
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
-      - name: Build
-        run: >
-          cargo build -p blockvisord
-      - name: Reinstall
-        run: >
-          make reinstall
-      - name: Start test env
-        run: >
-          docker compose up -d
       - name: Test
         run: >
-          cargo test -p blockvisord
-      - name: Shutdown test env
-        if: always()
-        run: >
-          docker compose down
+          cargo test -p babel
   lints:
     name: Lints
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -60,9 +40,9 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: -p blockvisord -- --check
+          args: -p babel -- --check
       - name: Catch common mistakes
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -p blockvisord -- -D warnings
+          args: -p babel --tests -- -D warnings
