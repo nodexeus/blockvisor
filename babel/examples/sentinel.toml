@@ -1,0 +1,41 @@
+urn  = "sentinel:validator"
+
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+babel_version = "0.0.1"
+node_version = "0.3.2"
+node_type = "validator"
+description = "sentiel blockchain validator"
+api_host = "http://localhost:26657/"
+
+[monitor]
+pid_file = "/var/run/sentinel.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "sync_info.latest_block_height"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "validator_info.pub_key.value" 
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "health"
+
+    [methods.response]
+    code = 200
+    field = "result"

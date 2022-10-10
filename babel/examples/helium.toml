@@ -1,0 +1,180 @@
+urn  = "helium:node"
+
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+babel_version = "0.0.1"
+node_version = "1.14.0"
+node_type = "validator"
+description = "helium blockchain validator"
+jrpc_host = "http://localhost:4467/"
+
+[monitor]
+pid_file = "/var/run/helium.pid" #this is likely not necessary
+
+# METHOD BLOCK-HEIGHT
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_height"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "epoch": 40440,
+#     "height": 1492344
+#   }
+# }
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "info_height"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.height"
+
+# METHOD: P2P Address
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"peer_addr"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "peer_addr": "/p2p/11jD9oGmS8bqnMM6tDsxMoq9aAUrNjfSqjBDMtKAjXCYyvgbpLU"
+#   }
+# }
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "peer_addr"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.keys.public_key"
+
+# METHOD name
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_name"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "name": "rare-jade-barbel"
+#   }
+# }
+[[methods]]
+name = "name"
+transport = "jrpc"
+method = "info_name"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+# METHOD: consensus status
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_in_consensus"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "in_consensus": false
+#   }
+# }
+[[methods]]
+name = "consensus"
+transport = "jrpc"
+method = "info_in_consensus"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+#METHOD: block age
+#DESC: The age of the last block received.
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_block_age"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "block_age": 41
+#   }
+# }
+[[methods]]
+name = "block_age"
+transport = "jrpc"
+method = "info_block_age"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+
+#METHOD: summary
+#DESC: The age of the last block received.
+# example:
+# curl -v -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_summary"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "block_age": 77,
+#     "epoch": 40441,
+#     "firmware_version": "cat: /etc/lsb_release: No such file or directory\n",
+#     "gateway_details": "undefined",
+#     "height": 1492366,
+#     "mac_addresses": [
+#       {
+#         "bge3": "1402EC400C07"
+#       },
+#       {
+#         "bge2": "1402EC400C06"
+#       },
+#       {
+#         "bge1": "1402EC400C05"
+#       },
+#       {
+#         "bge0": "1402EC400C04"
+#       },
+#       {
+#         "bxe1": "A0D3C1F6F924"
+#       },
+#       {
+#         "bxe0": "A0D3C1F6F920"
+#       }
+#     ],
+#     "name": "rare-jade-barbel",
+#     "peer_book_entry_count": 30829,
+#     "sync_height": 1492366,
+#     "uptime": 367135,
+#     "version": "1.14.0"
+#   }
+# }
+[[methods]]
+name = "info"
+transport = "jrpc"
+method = "info_summary"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result"
+

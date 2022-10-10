@@ -1,0 +1,41 @@
+urn  = "solana:validator"
+
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+babel_version = "0.0.1"
+node_version = "1.10.34"
+node_type = "validator"
+description = "solana blockchain validator"
+api_host = "http://localhost:8899/"
+
+[monitor]
+pid_file = "/var/run/solana.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "getBlockHeight"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "getClusterNodes"
+    
+    [methods.response]
+    code = 200
+    field = "pubkey"
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "getHealth"
+
+    [methods.response]
+    code = 200
+    field = "result"

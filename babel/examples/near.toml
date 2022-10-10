@@ -1,0 +1,41 @@
+urn  = "near:validator"
+
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+babel_version = "0.0.1"
+node_version = "1.28.0"
+node_type = "validator"
+description = "near blockchain validator"
+api_host = "http://localhost:3030" 
+
+[monitor]
+pid_file = "/var/run/near.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "sync_info.latest_block_height" 
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "query" 
+
+    [methods.response]
+    code = 200
+    field = "result.keys.public_key"
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "sync_info.syncing"
