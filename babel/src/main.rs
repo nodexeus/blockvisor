@@ -2,7 +2,7 @@ use std::path::Path;
 use tracing::debug;
 
 #[cfg(feature = "vsock")]
-mod api;
+mod vsock;
 
 mod config;
 
@@ -20,7 +20,7 @@ async fn main() -> eyre::Result<()> {
 
 #[cfg(feature = "vsock")]
 async fn serve(cfg: config::Babel) -> eyre::Result<()> {
-    api::serve(cfg).await
+    vsock::serve(cfg).await
 }
 
 #[cfg(not(feature = "vsock"))]
