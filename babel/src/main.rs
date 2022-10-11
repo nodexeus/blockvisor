@@ -1,3 +1,4 @@
+use std::path::Path;
 use tracing::debug;
 
 #[cfg(feature = "vsock")]
@@ -11,7 +12,7 @@ async fn main() -> eyre::Result<()> {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let cfg = config::load("/etc/babel.conf").await?;
+    let cfg = config::load(Path::new("/etc/babel.conf")).await?;
     debug!("Loaded babel configuration: {:?}", cfg);
 
     serve(cfg).await
