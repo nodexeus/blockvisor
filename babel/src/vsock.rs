@@ -1,9 +1,12 @@
-use crate::config::{self, Method, MethodResponseFormat};
+use crate::{
+    client::Client,
+    config::{self, Method, MethodResponseFormat},
+    error,
+};
 use eyre::ContextCompat;
 use futures::TryStreamExt;
-use reqwest::Client;
 use serde_json::json;
-use std::future::ready;
+use std::{future::ready, time::Duration};
 use tokio::fs;
 use tracing::trace;
 use zbus::{fdo, Address, ConnectionBuilder, MessageStream, MessageType, VsockAddress};
@@ -27,7 +30,7 @@ pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
         .await?;
     trace!("D-bus connection created: {:?}", conn);
 
-    let client = Client::new();
+    let client = Client::new(cfg, Duration::from_secs(10))?;
 
     let mut stream = MessageStream::from(&conn).try_filter(|msg| {
         trace!("got message: {:?}", msg);
@@ -44,7 +47,22 @@ pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
         // SAFETY: The filter we setup above already ensures header and member are set.
         let header = msg.header().unwrap();
         let method_name = msg.member().unwrap();
-        if let Err(e) = match handle_method_call(method_name.as_str(), &client, &cfg).await {
+
+        if let Err(e) = match client
+            .handle_method_call(method_name.as_str())
+            .await
+            .map_err(|e| match e {
+                error::Error::UnknownMethod { method } => {
+                    fdo::Error::UnknownMethod(format!("{method} not found"))
+                }
+                error::Error::NoHostSpecified { method } => fdo::Error::InvalidFileContent(
+                    format!("`{method}` specified in the config but no host specified"),
+                ),
+                error::Error::Command { args, output } => {
+                    fdo::Error::IOError(format!("failed to run command `{args}`: {output:?}"))
+                }
+                err => fdo::Error::IOError(err.to_string()),
+            }) {
             Ok(response) => conn.reply(&msg, &response).await,
             Err(e) => conn.reply_dbus_error(&header, e).await,
         } {
@@ -53,92 +71,4 @@ pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     }
 
     Ok(())
-}
-
-async fn handle_method_call(
-    method_name: &str,
-    client: &Client,
-    cfg: &config::Babel,
-) -> fdo::Result<String> {
-    let method = match cfg.methods.get(method_name) {
-        Some(method) => method,
-        None => {
-            return Err(fdo::Error::UnknownMethod(format!(
-                "{} not found",
-                method_name
-            )))
-        }
-    };
-
-    match method {
-        Method::Jrpc {
-            name: _,
-            method: jrpc_method,
-            response: _,
-        } => {
-            let url = cfg.config.api_host.clone().ok_or_else(|| {
-                fdo::Error::InvalidFileContent(format!("`{jrpc_method}` specified as a JSON-RPC method in the config but no host specified"))
-            })?;
-            client
-                .post(&url)
-                .json(&json!({ "jsonrpc": "2.0", "id": "id", "method": jrpc_method }))
-                .send()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))?
-                .json()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))
-        }
-        Method::Rest {
-            name: _,
-            method: rest_method,
-            response,
-        } => {
-            let url = cfg.config.api_host.as_ref().map(|host| {
-                format!("{}/{}", host.trim_end_matches('/'), rest_method.trim_start_matches('/'))
-            }).ok_or_else(|| {
-                fdo::Error::InvalidFileContent(format!(
-                    "`{rest_method}` specified as a REST method in the config but no host specified",
-                ))
-            })?;
-            let res = client
-                .post(&url)
-                .send()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))?;
-
-            match response.format {
-                MethodResponseFormat::Json => res.json().await,
-                MethodResponseFormat::Raw => res.text().await,
-            }
-            .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))
-        }
-        Method::Sh {
-            name: _,
-            body: command,
-            response,
-        } => {
-            let args = command.split_whitespace();
-            let output = tokio::process::Command::new("sh")
-                .args(args)
-                .output()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to run {command}: {e}")))?;
-
-            if !output.status.success() {
-                return Err(fdo::Error::IOError(format!(
-                    "failed to run {command}: {}",
-                    output.status,
-                )));
-            }
-
-            match response.format {
-                MethodResponseFormat::Json => serde_json::from_slice(&output.stdout),
-                MethodResponseFormat::Raw => {
-                    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                }
-            }
-            .map_err(|e| fdo::Error::IOError(format!("failed to run {command}: {e}")))
-        }
-    }
 }

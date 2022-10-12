@@ -1,10 +1,13 @@
 use std::path::Path;
 use tracing::debug;
 
+// TODO: What are we going to use as backup when vsock is disabled?
 #[cfg(feature = "vsock")]
 mod vsock;
 
+mod client;
 mod config;
+mod error;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
