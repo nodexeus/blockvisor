@@ -148,7 +148,7 @@ impl Node {
 
         // FIXME: for some reason firecracker socket is not created by
         // consequent start command if we do not wait a bit here
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(5)).await;
 
         Ok(())
     }

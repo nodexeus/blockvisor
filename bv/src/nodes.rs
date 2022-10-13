@@ -70,13 +70,15 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        let network_interface = self.next_network_interface().await?;
+        self.data.machine_index.fetch_add(1, Ordering::SeqCst);
+        let network_interface = self.create_network_interface().await?;
         let node = NodeData {
             id,
             name: name.clone(),
             chain,
             network_interface,
         };
+        self.save().await?;
 
         let babel_conn = self.babel_conn().await?;
         let node = Node::create(node, babel_conn).await?;
@@ -278,10 +280,9 @@ impl Nodes {
         Ok(())
     }
 
-    /// Get the next machine index and increment it.
-    pub async fn next_network_interface(&self) -> Result<NetworkInterface> {
-        let machine_index = self.data.machine_index.fetch_add(1, Ordering::SeqCst);
-
+    /// Create and return the next network interface using machine index
+    pub async fn create_network_interface(&self) -> Result<NetworkInterface> {
+        let machine_index = self.data.machine_index.load(Ordering::SeqCst);
         let idx_bytes = machine_index.to_be_bytes();
         let octets = match self.data.ip_range_from {
             IpAddr::V4(v4) => v4.octets(),
@@ -297,7 +298,6 @@ impl Nodes {
         let iface =
             NetworkInterface::create(format!("bv{}", machine_index), ip, self.data.ip_gateway)
                 .await?;
-        self.save().await?;
 
         Ok(iface)
     }
@@ -330,7 +330,7 @@ mod tests {
     async fn network_interface_gen() {
         let gw = IpAddr::V4(Ipv4Addr::new(216, 18, 214, 193));
         let nodes_data = CommonData {
-            machine_index: Arc::new(AtomicU32::new(1)),
+            machine_index: Arc::new(AtomicU32::new(0)),
             ip_range_from: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 195)),
             ip_range_to: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 206)),
             ip_gateway: gw.clone(),
@@ -354,7 +354,7 @@ mod tests {
         nodes
             .data
             .machine_index
-            .store(u8::MAX as u32 + 1, Ordering::SeqCst);
+            .store(u8::MAX as u32, Ordering::SeqCst);
         let iface_name = format!("bv{}", u8::MAX as u32 + 1);
         clean_test_iface(
             &nodes,
@@ -375,7 +375,8 @@ mod tests {
         .delete()
         .await;
 
-        let iface = nodes.next_network_interface().await.unwrap();
+        nodes.data.machine_index.fetch_add(1, Ordering::SeqCst);
+        let iface = nodes.create_network_interface().await.unwrap();
         let next_name = iface.name.clone();
         let next_ip = iface.ip.clone();
 
