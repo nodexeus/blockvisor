@@ -1,10 +1,15 @@
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    sync::{atomic::AtomicU32, Arc},
+};
+
 use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
     grpc::pb,
     hosts::{get_host_info, get_ip_address},
-    nodes::Nodes,
+    nodes::{CommonData, Nodes},
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
         bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BlockvisorServer, BLOCKVISOR_SERVICE_URL,
@@ -67,7 +72,14 @@ async fn main() -> Result<()> {
             .await?;
 
             if !Nodes::exists() {
-                Nodes::default().save().await?;
+                // FIXME: IP information should come from API
+                let nodes_data = CommonData {
+                    machine_index: Arc::new(AtomicU32::new(0)),
+                    ip_range_from: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 195)),
+                    ip_range_to: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 206)),
+                    ip_gateway: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 193)),
+                };
+                Nodes::new(nodes_data).save().await?;
             }
         }
         Command::Reset(cmd_args) => {

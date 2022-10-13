@@ -11,13 +11,14 @@ const BRIDGE_IFACE: &str = "bvbr0";
 pub struct NetworkInterface {
     pub name: String,
     pub ip: IpAddr,
+    pub gw: IpAddr,
 }
 
 impl NetworkInterface {
     /// Creates the new network interface and add it to our bridge.
     ///
     /// The `ip` is not assigned on the host but rather by the kernel in the node.
-    pub async fn create(name: String, ip: IpAddr) -> Result<Self> {
+    pub async fn create(name: String, ip: IpAddr, gw: IpAddr) -> Result<Self> {
         // First create the interface.
         run_cmd("ip", &["tuntap", "add", &name, "mode", "tap"]).await?;
 
@@ -33,7 +34,7 @@ impl NetworkInterface {
             return Err(e);
         }
 
-        Ok(Self { name, ip })
+        Ok(Self { name, ip, gw })
     }
 
     /// Delete the network interface.
