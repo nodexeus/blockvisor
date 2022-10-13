@@ -1,9 +1,13 @@
+use std::path::Path;
 use tracing::debug;
 
+// TODO: What are we going to use as backup when vsock is disabled?
 #[cfg(feature = "vsock")]
-mod api;
+mod vsock;
 
+mod client;
 mod config;
+mod error;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -11,7 +15,7 @@ async fn main() -> eyre::Result<()> {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let cfg = config::load("/etc/babel.conf").await?;
+    let cfg = config::load(Path::new("/etc/babel.conf")).await?;
     debug!("Loaded babel configuration: {:?}", cfg);
 
     serve(cfg).await
@@ -19,7 +23,7 @@ async fn main() -> eyre::Result<()> {
 
 #[cfg(feature = "vsock")]
 async fn serve(cfg: config::Babel) -> eyre::Result<()> {
-    api::serve(cfg).await
+    vsock::serve(cfg).await
 }
 
 #[cfg(not(feature = "vsock"))]
