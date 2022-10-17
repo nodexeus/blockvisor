@@ -78,13 +78,13 @@ impl Method {
 #[derive(Debug, Deserialize)]
 pub struct JrpcResponse {
     pub code: u32,
-    pub field: String,
+    pub field: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RestResponse {
     pub status: u32,
-    pub field: String,
+    pub field: Option<String>,
     pub format: MethodResponseFormat,
 }
 
