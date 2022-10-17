@@ -1,144 +1,267 @@
-use crate::config::{self, Method, MethodResponseFormat};
-use eyre::ContextCompat;
-use futures::TryStreamExt;
-use reqwest::Client;
+use crate::config;
+use eyre::Context;
 use serde_json::json;
-use std::future::ready;
-use tokio::fs;
-use tracing::trace;
-use zbus::{fdo, Address, ConnectionBuilder, MessageStream, MessageType, VsockAddress};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const VSOCK_HOST_CID: u32 = 2;
 const VSOCK_PORT: u32 = 42;
 
-pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
-    let id = fs::read_to_string("/proc/cmdline")
-        .await?
-        .split(' ')
-        .find_map(|x| x.strip_prefix("blockvisor.node=").map(|id| id.to_string()))
-        .with_context(|| "Node UUID not passed through kernel cmdline".to_string())?;
-    let name = format!("com.BlockJoy.Babel.Node{}", id);
+#[derive(serde::Serialize)]
+struct Start {
+    start_msg: String,
+}
 
-    let addr = Address::Vsock(VsockAddress::new(VSOCK_HOST_CID, VSOCK_PORT));
-    trace!("creating DBus connection..");
-    let conn = ConnectionBuilder::address(addr)?
-        .name(name)?
-        .build()
-        .await?;
-    trace!("D-bus connection created: {:?}", conn);
-
-    let client = Client::new();
-
-    let mut stream = MessageStream::from(&conn).try_filter(|msg| {
-        trace!("got message: {:?}", msg);
-        ready(
-            msg.header().is_ok()
-                && msg.member().is_some()
-                && msg.message_type() == MessageType::MethodCall
-                && msg.interface().as_ref().map(|i| i.as_str()) == Some("com.BlockJoy.Babel")
-                && msg.path().as_ref().map(|i| i.as_str()) == Some("/com/BlockJoy/Babel"),
-        )
-    });
-    while let Some(msg) = stream.try_next().await? {
-        trace!("received Babel method message: {:?}", msg);
-        // SAFETY: The filter we setup above already ensures header and member are set.
-        let header = msg.header().unwrap();
-        let method_name = msg.member().unwrap();
-        if let Err(e) = match handle_method_call(method_name.as_str(), &client, &cfg).await {
-            Ok(response) => conn.reply(&msg, &response).await,
-            Err(e) => conn.reply_dbus_error(&header, e).await,
-        } {
-            tracing::error!("failed to reply to method call `{method_name}`: {e}");
+impl Start {
+    fn new() -> Self {
+        Self {
+            start_msg: "Oh lawd we be startin'".to_string(),
         }
     }
+}
 
+#[derive(serde::Serialize)]
+struct Stop {
+    stop_msg: String,
+}
+
+impl Stop {
+    fn new() -> Self {
+        Self {
+            stop_msg: "Oh lawd we be stoppin'".to_string(),
+        }
+    }
+}
+
+pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
+    let client = reqwest::Client::new();
+
+    tracing::trace!("creating VSock connection..");
+    let mut stream = tokio_vsock::VsockStream::connect(VSOCK_HOST_CID, VSOCK_PORT).await?;
+    tracing::trace!("connected");
+    write_json(&mut stream, Start::new()).await.unwrap(); // just testing
+    let mut buf = String::new();
+    loop {
+        if let Err(e) = handle_message(&mut buf, &mut stream, &client, &cfg).await {
+            let resp = BabelResponse::Error(e.to_string());
+            let _ = write_json(&mut stream, resp).await;
+        }
+    }
+    // write_json(&mut stream, Stop::new()).await.unwrap();
+    // Ok(())
+}
+
+async fn handle_message(
+    buf: &mut String,
+    stream: &mut tokio_vsock::VsockStream,
+    client: &reqwest::Client,
+    cfg: &config::Babel,
+) -> eyre::Result<()> {
+    stream.read_to_string(buf).await?;
+    tracing::trace!("Received message: {buf:?}");
+    let request: BabelRequest =
+        serde_json::from_str(buf).wrap_err("Could not parse request as json")?;
+    let response = request.handle(&client, &cfg).await?;
+    tracing::trace!("Sending response: {response:?}");
     Ok(())
 }
 
-async fn handle_method_call(
-    method_name: &str,
-    client: &Client,
-    cfg: &config::Babel,
-) -> fdo::Result<String> {
-    let method = match cfg.methods.get(method_name) {
-        Some(method) => method,
-        None => {
-            return Err(fdo::Error::UnknownMethod(format!(
-                "{} not found",
-                method_name
-            )))
-        }
-    };
+async fn write_json<W: tokio::io::AsyncWrite + Unpin>(
+    writer: &mut W,
+    message: impl serde::Serialize,
+) -> eyre::Result<()> {
+    let msg = serde_json::to_vec(&message)?;
+    writer.write_all(&msg).await?;
+    Ok(())
+}
 
-    match method {
-        Method::Jrpc {
-            name: _,
-            method: jrpc_method,
-            response: _,
-        } => {
-            let url = cfg.config.api_host.clone().ok_or_else(|| {
-                fdo::Error::InvalidFileContent(format!("`{jrpc_method}` specified as a JSON-RPC method in the config but no host specified"))
-            })?;
-            client
-                .post(&url)
-                .json(&json!({ "jsonrpc": "2.0", "id": "id", "method": jrpc_method }))
-                .send()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))?
-                .json()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))
-        }
-        Method::Rest {
-            name: _,
-            method: rest_method,
-            response,
-        } => {
-            let url = cfg.config.api_host.as_ref().map(|host| {
-                format!("{}/{}", host.trim_end_matches('/'), rest_method.trim_start_matches('/'))
-            }).ok_or_else(|| {
-                fdo::Error::InvalidFileContent(format!(
-                    "`{rest_method}` specified as a REST method in the config but no host specified",
-                ))
-            })?;
-            let res = client
-                .post(&url)
-                .send()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))?;
+/// Each request that comes over the VSock to babel must be a piece of JSON that can be
+/// deserialized into this struct.
+#[derive(Debug, serde::Deserialize)]
+enum BabelRequest {
+    /// List the endpoints that are available for the current blockchain. These are extracted from
+    /// the config, and just sent back as strings for now.
+    ListCapabilities,
+    /// Send a request to the current blockchain. We can identify the way to do this from the
+    /// config and forward the provided parameters.
+    BlockchainCommand(BlockchainCommand),
+}
 
-            match response.format {
-                MethodResponseFormat::Json => res.json().await,
-                MethodResponseFormat::Raw => res.text().await,
-            }
-            .map_err(|e| fdo::Error::IOError(format!("failed to call {url}: {e}")))
-        }
-        Method::Sh {
-            name: _,
-            body: command,
-            response,
-        } => {
-            let args = command.split_whitespace();
-            let output = tokio::process::Command::new("sh")
-                .args(args)
-                .output()
-                .await
-                .map_err(|e| fdo::Error::IOError(format!("failed to run {command}: {e}")))?;
+impl BabelRequest {
+    async fn handle(
+        self,
+        client: &reqwest::Client,
+        cfg: &config::Babel,
+    ) -> eyre::Result<BabelResponse> {
+        use BabelResponse::*;
+        let resp = match self {
+            Self::ListCapabilities => ListCapabilities(Self::handle_list_caps(cfg)),
+            Self::BlockchainCommand(cmd) => BlockchainResponse(cmd.handle(client, cfg).await?),
+        };
+        Ok(resp)
+    }
 
-            if !output.status.success() {
-                return Err(fdo::Error::IOError(format!(
-                    "failed to run {command}: {}",
-                    output.status,
-                )));
-            }
+    /// List the capabilities that the current blockchain node supports.
+    fn handle_list_caps(cfg: &config::Babel) -> Vec<String> {
+        cfg.methods
+            .keys()
+            .map(|method| method.to_string())
+            .collect()
+    }
+}
 
-            match response.format {
-                MethodResponseFormat::Json => serde_json::from_slice(&output.stdout),
-                MethodResponseFormat::Raw => {
-                    Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                }
-            }
-            .map_err(|e| fdo::Error::IOError(format!("failed to run {command}: {e}")))
+#[derive(Debug, serde::Deserialize)]
+struct BlockchainCommand {
+    name: String,
+}
+
+impl BlockchainCommand {
+    async fn handle(
+        self,
+        client: &reqwest::Client,
+        cfg: &config::Babel,
+    ) -> eyre::Result<BlockchainResponse> {
+        use config::Method::*;
+
+        let method = cfg
+            .methods
+            .get(&self.name)
+            .ok_or_else(|| eyre::eyre!("No method named {}", self.name))?;
+        match method {
+            Jrpc { method, .. } => Self::handle_jrpc(&method, client, cfg).await,
+            Rest {
+                method, response, ..
+            } => Self::handle_rest(method, response, client, cfg).await,
+            Sh { body, response, .. } => Self::handle_sh(&body, &response).await,
         }
     }
+
+    async fn handle_jrpc(
+        method: &str,
+        client: &reqwest::Client,
+        cfg: &config::Babel,
+    ) -> eyre::Result<BlockchainResponse> {
+        let url = cfg.config.api_host.as_deref().ok_or_else(|| {
+            eyre::eyre!(
+                "`{method}` specified as a JSON-RPC method in the config but no host specified"
+            )
+        })?;
+        let content = client
+            .post(url)
+            .json(&json!({ "jsonrpc": "2.0", "id": "id", "method": method }))
+            .send()
+            .await
+            .wrap_err(format!("failed to call {url}"))?
+            .json()
+            .await
+            .wrap_err(format!("failed to call {url}"))?;
+        let resp = BlockchainResponse {
+            content: BlockchainResponseContent::Json(content),
+        };
+        Ok(resp)
+    }
+
+    async fn handle_rest(
+        method: &str,
+        response_config: &config::RestResponse,
+        client: &reqwest::Client,
+        cfg: &config::Babel,
+    ) -> eyre::Result<BlockchainResponse> {
+        use config::MethodResponseFormat::*;
+
+        let host = cfg.config.api_host.as_ref().ok_or_else(|| {
+            eyre::eyre!("`{method}` specified as a REST method in the config but no host specified")
+        })?;
+        let url = format!(
+            "{}/{}",
+            host.trim_end_matches('/'),
+            method.trim_start_matches('/')
+        );
+
+        let res = client
+            .post(&url)
+            .send()
+            .await
+            .wrap_err(format!("failed to call {url}"))?;
+
+        match response_config.format {
+            Json => {
+                let content: serde_json::Value = res
+                    .json()
+                    .await
+                    .wrap_err(format!("Failed to receive valid json from {url}"))?;
+                Ok(content.into())
+            }
+            Raw => {
+                let content = res
+                    .text()
+                    .await
+                    .wrap_err(format!("failed to receive text from {url}"))?;
+                Ok(content.into())
+            }
+        }
+    }
+
+    async fn handle_sh(
+        command: &str,
+        response_config: &config::ShResponse,
+    ) -> eyre::Result<BlockchainResponse> {
+        use config::MethodResponseFormat::*;
+
+        let args = command.split_whitespace();
+        let output = tokio::process::Command::new("sh")
+            .args(args)
+            .output()
+            .await
+            .wrap_err(format!("failed to run {command}"))?;
+
+        if !output.status.success() {
+            eyre::bail!("failed to run {command}: {}", output.status);
+        }
+
+        match response_config.format {
+            Json => {
+                let content: serde_json::Value = serde_json::from_slice(&output.stdout)
+                    .wrap_err(format!("failed to run {command}"))?;
+                Ok(content.into())
+            }
+            Raw => {
+                let content = String::from_utf8_lossy(&output.stdout).to_string();
+                Ok(content.into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+enum BabelResponse {
+    ListCapabilities(Vec<String>),
+    BlockchainResponse(BlockchainResponse),
+    Error(String),
+}
+
+#[derive(Debug, serde::Serialize)]
+struct BlockchainResponse {
+    content: BlockchainResponseContent,
+}
+
+impl From<serde_json::Value> for BlockchainResponse {
+    fn from(content: serde_json::Value) -> Self {
+        Self {
+            content: BlockchainResponseContent::Json(content),
+        }
+    }
+}
+
+impl From<String> for BlockchainResponse {
+    fn from(content: String) -> Self {
+        Self {
+            content: BlockchainResponseContent::Text(content),
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+enum BlockchainResponseContent {
+    Json(serde_json::Value),
+    Text(String),
 }

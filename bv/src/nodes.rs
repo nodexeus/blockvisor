@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
+use tokio::net::UnixStream;
 use tokio::sync::broadcast::{self, Sender};
-use tokio::sync::OnceCell;
+use tokio::sync::{OnceCell, Mutex};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-use zbus::{Connection, ConnectionBuilder};
 
 use crate::{
     grpc::pb,
@@ -27,8 +27,7 @@ lazy_static::lazy_static! {
         .map(|p| p.join(".cache"))
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join("blockvisor");
-}
-lazy_static::lazy_static! {
+
     static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
 }
 
@@ -42,7 +41,7 @@ pub enum ServiceStatus {
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
-    babel_conn: OnceCell<Connection>,
+    babel_conn: OnceCell<Arc<Mutex<UnixStream>>>,
     data: CommonData,
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
@@ -299,13 +298,14 @@ impl Nodes {
             .await
     }
 
-    async fn babel_conn(&self) -> Result<&Connection> {
-        self.babel_conn
+    async fn babel_conn(&self) -> Result<Arc<Mutex<UnixStream>>> {
+        let stream_ref = self.babel_conn
             .get_or_try_init(|| async {
-                ConnectionBuilder::address(BABEL_BUS_ADDRESS)?.build().await
+                UnixStream::connect(BABEL_BUS_ADDRESS).await.map(Mutex::new).map(Arc::new)
             })
             .await
-            .context("Failed to connect to babel bus")
+            .context("Failed to connect to babel bus")?;
+        Ok(Arc::clone(stream_ref))
     }
 }
 

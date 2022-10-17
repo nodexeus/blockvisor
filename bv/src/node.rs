@@ -1,15 +1,15 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use firec::config::JailerMode;
 use firec::Machine;
-use futures_util::StreamExt;
-use std::{future::ready, path::Path, time::Duration};
+use std::{path::Path, time::Duration, sync::Arc};
 use tokio::{
     fs,
-    time::{sleep, timeout},
+    io::AsyncReadExt,
+    net::UnixStream,
+    time::{sleep, timeout}, sync::Mutex,
 };
-use tracing::{instrument, log::warn, trace};
+use tracing::{instrument, trace};
 use uuid::Uuid;
-use zbus::{Connection, Proxy};
 
 use crate::{
     node_data::{NodeData, NodeStatus},
@@ -20,7 +20,7 @@ use crate::{
 pub struct Node {
     pub data: NodeData,
     machine: Machine<'static>,
-    babel_proxy: Proxy<'static>,
+    babel_conn: Arc<Mutex<UnixStream>>,
 }
 
 // FIXME: Hardcoding everything for now.
@@ -33,16 +33,15 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
-const BABEL_BUS_NAME_PREFIX: &str = "com.BlockJoy.Babel.Node";
+// const BABEL_BUS_NAME_PREFIX: &str = "com.BlockJoy.Babel.Node";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
-const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+// const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 
 impl Node {
     /// Creates a new node with `id`.
     #[instrument]
-    pub async fn create(data: NodeData, babel_conn: &Connection) -> Result<Self> {
-        let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
+    pub async fn create(data: NodeData, babel_conn: Arc<Mutex<UnixStream>>) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
@@ -53,14 +52,14 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_proxy,
+            babel_conn,
         })
     }
 
     /// Returns node previously created on this host.
     #[instrument]
-    pub async fn connect(data: NodeData, babel_conn: &Connection) -> Result<Self> {
-        let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
+    pub async fn connect(data: NodeData, babel_conn: Arc<Mutex<UnixStream>>) -> Result<Self> {
+        // let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
@@ -72,7 +71,7 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_proxy,
+            babel_conn,
         })
     }
 
@@ -84,21 +83,19 @@ impl Node {
     /// Starts the node.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
-        let mut stream = self
-            .babel_proxy
-            .receive_owner_changed()
-            .await?
-            .filter(|unique_name| {
-                trace!(
-                    "New owner of {}: {:?}",
-                    self.babel_proxy.destination(),
-                    unique_name
-                );
-                // Look for the first name-owned event.
-                ready(unique_name.is_some())
-            });
         self.machine.start().await?;
-        timeout(BABEL_START_TIMEOUT, stream.next()).await?;
+        let mut buf = String::new();
+        timeout(
+            BABEL_START_TIMEOUT,
+            self.babel_conn.lock().await.read_to_string(&mut buf),
+        )
+        .await??;
+        let json: serde_json::Value = buf.parse()?;
+        if json.get("start_msg").is_none() {
+            tracing::error!("Node did not start!");
+            return Err(anyhow::anyhow!("Node did not start!"));
+        }
+
         self.data.save().await
     }
 
@@ -113,19 +110,6 @@ impl Node {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
-                let mut stream =
-                    self.babel_proxy
-                        .receive_owner_changed()
-                        .await?
-                        .filter(|unique_name| {
-                            trace!(
-                                "New owner of {}: {:?}",
-                                self.babel_proxy.destination(),
-                                unique_name
-                            );
-                            // Look for the first name-lost event.
-                            ready(unique_name.is_none())
-                        });
                 let mut shutdown_success = true;
                 if let Err(err) = self.machine.shutdown().await {
                     trace!("Graceful shutdown failed: {err}");
@@ -138,9 +122,9 @@ impl Node {
                 }
 
                 if shutdown_success {
-                    if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
-                        warn!("Babel shutdown timeout: {e}");
-                    }
+                    // if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
+                    //     warn!("Babel shutdown timeout: {e}");
+                    // }
                 }
             }
         }
@@ -197,14 +181,14 @@ impl Node {
     }
 }
 
-async fn create_babel_proxy(conn: &Connection, id: Uuid) -> Result<Proxy<'static>> {
-    let babel_bus_name = format!("{}{}", BABEL_BUS_NAME_PREFIX, id);
-    Proxy::new(
-        conn,
-        babel_bus_name,
-        "/com/BlockJoy/Babel",
-        "com.BlockJoy.Babel",
-    )
-    .await
-    .context("Failed to create Babel proxy")
-}
+// async fn create_babel_proxy(conn: &UnixStream, id: Uuid) -> Result<Proxy<'static>> {
+//     let babel_bus_name = format!("{}{}", BABEL_BUS_NAME_PREFIX, id);
+//     Proxy::new(
+//         conn,
+//         babel_bus_name,
+//         "/com/BlockJoy/Babel",
+//         "com.BlockJoy.Babel",
+//     )
+//     .await
+//     .context("Failed to create Babel proxy")
+// }

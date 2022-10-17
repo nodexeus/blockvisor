@@ -49,18 +49,29 @@ pub struct Monitor {
 #[serde(tag = "transport", rename_all = "kebab-case")]
 pub enum Method {
     Jrpc {
+        /// This field is ignored.
         name: String,
+        /// The name of the jRPC method that we are going to call into.
         method: String,
+        /// This field is ignored.
         response: JrpcResponse,
     },
     Rest {
+        /// This field is ignored.
         name: String,
+        /// This is the relative url of the rest endpoint. So if the host is `"https://api.com/"`,
+        /// and the method is `"/v1/users"`, then the url that called is
+        /// `"https://api.com/v1/users"`.
         method: String,
+        /// These are the configuration options for parsing the response.
         response: RestResponse,
     },
     Sh {
+        /// This field is ignored.
         name: String,
+        /// These are the arguments to the sh command that is executed for this `Method`.
         body: String,
+        /// These are the configuration options for parsing the response.
         response: ShResponse,
     },
 }
