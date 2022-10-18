@@ -32,6 +32,7 @@ impl Stop {
     }
 }
 
+/// This function tries to read messages from the 
 pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     let client = reqwest::Client::new();
 
@@ -56,7 +57,11 @@ async fn handle_message(
     client: &reqwest::Client,
     cfg: &config::Babel,
 ) -> eyre::Result<()> {
-    stream.read_to_string(buf).await?;
+    let read = stream.read_to_string(buf).await?;
+    if read == 0 {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        return Ok(())
+    }
     tracing::trace!("Received message: {buf:?}");
     let request: BabelRequest =
         serde_json::from_str(buf).wrap_err("Could not parse request as json")?;
