@@ -32,21 +32,26 @@ impl Client {
             Method::Jrpc {
                 name: _,
                 method: jrpc_method,
-                response: _,
+                response,
             } => {
                 let url = self.cfg.config.api_host.clone().ok_or_else(|| {
                     error::Error::NoHostSpecified {
                         method: method_name.to_string(),
                     }
                 })?;
-                Ok(self
+                let text = self
                     .inner
                     .post(&url)
                     .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": jrpc_method }))
                     .send()
                     .await?
                     .text()
-                    .await?)
+                    .await?;
+                if let Some(field) = &response.field {
+                    Ok(gjson::get(&text, field).to_string())
+                } else {
+                    Ok(text)
+                }
             }
             Method::Rest {
                 name: _,
@@ -68,11 +73,11 @@ impl Client {
                     .ok_or_else(|| error::Error::NoHostSpecified {
                         method: method_name.to_string(),
                     })?;
-                let res = self.inner.post(&url).send().await?;
-
-                match response.format {
-                    MethodResponseFormat::Json => Ok(res.json().await?),
-                    MethodResponseFormat::Raw => Ok(res.text().await?),
+                let text = self.inner.post(&url).send().await?.text().await?;
+                if let Some(field) = &response.field {
+                    Ok(gjson::get(&text, field).to_string())
+                } else {
+                    Ok(text)
                 }
             }
             Method::Sh {
@@ -168,50 +173,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_rest_raw_ok() {
-        let server = MockServer::start();
-
-        let mock = server.mock(|when, then| {
-            when.method(POST).path("/items");
-            then.status(200)
-                .header("content-type", "text/html")
-                .body("response");
-        });
-
-        let cfg = Babel {
-            urn: "".to_string(),
-            export: None,
-            env: None,
-            config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
-                node_type: "".to_string(),
-                description: None,
-                api_host: Some(format!("http://{}", server.address())),
-            },
-            monitor: None,
-            methods: BTreeMap::from([(
-                "raw items".to_string(),
-                Method::Rest {
-                    name: "raw items".to_string(),
-                    method: "items".to_string(),
-                    response: RestResponse {
-                        status: 101,
-                        field: "".to_string(),
-                        format: MethodResponseFormat::Raw,
-                    },
-                },
-            )]),
-        };
-
-        let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle_method_call("raw items").await.unwrap();
-
-        mock.assert();
-        assert_eq!(output, "response");
-    }
-
-    #[tokio::test]
     async fn test_rest_json_ok() {
         let server = MockServer::start();
 
@@ -219,7 +180,7 @@ mod tests {
             when.method(POST).path("/items");
             then.status(200)
                 .header("content-type", "application/json")
-                .json_body(json!("response"));
+                .json_body(json!({"result": [1, 2, 3]}));
         });
 
         let cfg = Babel {
@@ -241,7 +202,7 @@ mod tests {
                     method: "items".to_string(),
                     response: RestResponse {
                         status: 101,
-                        field: "".to_string(),
+                        field: Some("result".to_string()),
                         format: MethodResponseFormat::Json,
                     },
                 },
@@ -252,7 +213,51 @@ mod tests {
         let output = client.handle_method_call("json items").await.unwrap();
 
         mock.assert();
-        assert_eq!(output, "response");
+        assert_eq!(output, "[1,2,3]");
+    }
+
+    #[tokio::test]
+    async fn test_rest_json_full_response_ok() {
+        let server = MockServer::start();
+
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/items");
+            then.status(200)
+                .header("content-type", "application/json")
+                .json_body(json!({"result": [1, 2, 3]}));
+        });
+
+        let cfg = Babel {
+            urn: "".to_string(),
+            export: None,
+            env: None,
+            config: Config {
+                babel_version: "".to_string(),
+                node_version: "".to_string(),
+                node_type: "".to_string(),
+                description: None,
+                api_host: Some(format!("http://{}", server.address())),
+            },
+            monitor: None,
+            methods: BTreeMap::from([(
+                "json items".to_string(),
+                Method::Rest {
+                    name: "json items".to_string(),
+                    method: "items".to_string(),
+                    response: RestResponse {
+                        status: 101,
+                        field: None,
+                        format: MethodResponseFormat::Json,
+                    },
+                },
+            )]),
+        };
+
+        let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
+        let output = client.handle_method_call("json items").await.unwrap();
+
+        mock.assert();
+        assert_eq!(output, "{\"result\":[1,2,3]}");
     }
 
     #[tokio::test]
@@ -266,14 +271,14 @@ mod tests {
                 .json_body(json!({
                     "id": 0,
                     "jsonrpc": "2.0",
-                    "method": "height_get",
+                    "method": "info_get",
                 }));
             then.status(200)
                 .header("Content-Type", "application/json")
                 .json_body(json!({
                         "id": 0,
                         "jsonrpc": "2.0",
-                        "result": "response",
+                        "result": {"info": {"height": 123, "address": "abc"}},
                 }));
         });
 
@@ -293,10 +298,10 @@ mod tests {
                 "get height".to_string(),
                 Method::Jrpc {
                     name: "get height".to_string(),
-                    method: "height_get".to_string(),
+                    method: "info_get".to_string(),
                     response: JrpcResponse {
                         code: 101,
-                        field: "".to_string(),
+                        field: Some("result.info.height".to_string()),
                     },
                 },
             )]),
@@ -306,9 +311,6 @@ mod tests {
         let output = client.handle_method_call("get height").await.unwrap();
 
         mock.assert();
-        assert_eq!(
-            output,
-            "{\"id\":0,\"jsonrpc\":\"2.0\",\"result\":\"response\"}"
-        );
+        assert_eq!(output, "123");
     }
 }
