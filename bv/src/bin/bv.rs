@@ -223,7 +223,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Create { chain } => {
             let id = Uuid::new_v4();
-            let name = Petnames::default().generate_one(3, "-");
+            let name = Petnames::default().generate_one(3, "_");
             service_client
                 .create_node(bv_pb::CreateNodeRequest {
                     id: id.to_string(),
