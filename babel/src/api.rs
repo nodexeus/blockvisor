@@ -25,14 +25,14 @@ struct Stop {
 }
 
 impl Stop {
-    fn new() -> Self {
+    fn _new() -> Self {
         Self {
             stop_msg: "Oh lawd we be stoppin'".to_string(),
         }
     }
 }
 
-/// This function tries to read messages from the 
+/// This function tries to read messages from the vsocket and keeps responding to those messages.
 pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     let client = reqwest::Client::new();
 
@@ -60,12 +60,12 @@ async fn handle_message(
     let read = stream.read_to_string(buf).await?;
     if read == 0 {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        return Ok(())
+        return Ok(());
     }
     tracing::trace!("Received message: {buf:?}");
     let request: BabelRequest =
         serde_json::from_str(buf).wrap_err("Could not parse request as json")?;
-    let response = request.handle(&client, &cfg).await?;
+    let response = request.handle(client, cfg).await?;
     tracing::trace!("Sending response: {response:?}");
     Ok(())
 }
@@ -132,11 +132,11 @@ impl BlockchainCommand {
             .get(&self.name)
             .ok_or_else(|| eyre::eyre!("No method named {}", self.name))?;
         match method {
-            Jrpc { method, .. } => Self::handle_jrpc(&method, client, cfg).await,
+            Jrpc { method, .. } => Self::handle_jrpc(method, client, cfg).await,
             Rest {
                 method, response, ..
             } => Self::handle_rest(method, response, client, cfg).await,
-            Sh { body, response, .. } => Self::handle_sh(&body, &response).await,
+            Sh { body, response, .. } => Self::handle_sh(body, response).await,
         }
     }
 
@@ -150,18 +150,16 @@ impl BlockchainCommand {
                 "`{method}` specified as a JSON-RPC method in the config but no host specified"
             )
         })?;
-        let content = client
+        let value = client
             .post(url)
             .json(&json!({ "jsonrpc": "2.0", "id": "id", "method": method }))
             .send()
             .await
             .wrap_err(format!("failed to call {url}"))?
-            .json()
+            .text()
             .await
             .wrap_err(format!("failed to call {url}"))?;
-        let resp = BlockchainResponse {
-            content: BlockchainResponseContent::Json(content),
-        };
+        let resp = BlockchainResponse { value };
         Ok(resp)
     }
 
@@ -246,27 +244,23 @@ enum BabelResponse {
 
 #[derive(Debug, serde::Serialize)]
 struct BlockchainResponse {
-    content: BlockchainResponseContent,
+    value: String,
 }
 
 impl From<serde_json::Value> for BlockchainResponse {
     fn from(content: serde_json::Value) -> Self {
         Self {
-            content: BlockchainResponseContent::Json(content),
+            value: content
+                .get("todo we gotta get this from the config")
+                .and_then(|val| val.as_str())
+                .unwrap_or_default()
+                .to_string(),
         }
     }
 }
 
 impl From<String> for BlockchainResponse {
-    fn from(content: String) -> Self {
-        Self {
-            content: BlockchainResponseContent::Text(content),
-        }
+    fn from(value: String) -> Self {
+        Self { value }
     }
-}
-
-#[derive(Debug, serde::Serialize)]
-enum BlockchainResponseContent {
-    Json(serde_json::Value),
-    Text(String),
 }

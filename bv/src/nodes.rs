@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
 use tokio::net::UnixStream;
 use tokio::sync::broadcast::{self, Sender};
-use tokio::sync::{OnceCell, Mutex};
+use tokio::sync::{OnceCell};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -20,7 +20,7 @@ use crate::{
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
-const BABEL_BUS_ADDRESS: &str = "unix:path=/var/lib/blockvisor/vsock.socket_42";
+// const BABEL_BUS_ADDRESS: &str = "unix:path=/var/lib/blockvisor/vsock.socket_42";
 
 lazy_static::lazy_static! {
     pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
@@ -41,7 +41,6 @@ pub enum ServiceStatus {
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
-    babel_conn: OnceCell<Arc<Mutex<UnixStream>>>,
     data: CommonData,
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
@@ -74,7 +73,7 @@ impl Nodes {
             network_interface,
         };
 
-        let babel_conn = self.babel_conn().await?;
+        let babel_conn = self.babel_conn(id).await?;
         let node = Node::create(node, babel_conn).await?;
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
@@ -212,7 +211,7 @@ impl Nodes {
             }
             match NodeData::load(&path)
                 .and_then(|data| async {
-                    let babel_conn = this.babel_conn().await?;
+                    let babel_conn = this.babel_conn(data.id).await?;
                     Node::connect(data, babel_conn).await
                 })
                 .await
@@ -298,14 +297,14 @@ impl Nodes {
             .await
     }
 
-    async fn babel_conn(&self) -> Result<Arc<Mutex<UnixStream>>> {
-        let stream_ref = self.babel_conn
-            .get_or_try_init(|| async {
-                UnixStream::connect(BABEL_BUS_ADDRESS).await.map(Mutex::new).map(Arc::new)
-            })
+    async fn babel_conn(&self, id: uuid::Uuid) -> Result<UnixStream> {
+        use crate::node::CHROOT_PATH;
+        let socket = format!("{CHROOT_PATH}/{id}");
+        tracing::debug!("Connecting to node at {socket}");
+        let conn = UnixStream::connect(socket)
             .await
             .context("Failed to connect to babel bus")?;
-        Ok(Arc::clone(stream_ref))
+        Ok(conn)
     }
 }
 

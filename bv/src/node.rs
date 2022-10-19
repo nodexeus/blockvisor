@@ -1,12 +1,12 @@
 use anyhow::Result;
 use firec::config::JailerMode;
 use firec::Machine;
-use std::{path::Path, time::Duration, sync::Arc};
+use std::{path::Path, time::Duration};
 use tokio::{
     fs,
     io::AsyncReadExt,
     net::UnixStream,
-    time::{sleep, timeout}, sync::Mutex,
+    time::{sleep, timeout},
 };
 use tracing::{instrument, trace};
 use uuid::Uuid;
@@ -20,20 +20,19 @@ use crate::{
 pub struct Node {
     pub data: NodeData,
     machine: Machine<'static>,
-    babel_conn: Arc<Mutex<UnixStream>>,
+    babel_conn: UnixStream,
 }
 
 // FIXME: Hardcoding everything for now.
 pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
 const ROOT_FS: &str = "/var/lib/blockvisor/debian.ext4";
-const CHROOT_PATH: &str = "/var/lib/blockvisor";
+pub const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
-// const BABEL_BUS_NAME_PREFIX: &str = "com.BlockJoy.Babel.Node";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 // const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
@@ -41,7 +40,7 @@ const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 impl Node {
     /// Creates a new node with `id`.
     #[instrument]
-    pub async fn create(data: NodeData, babel_conn: Arc<Mutex<UnixStream>>) -> Result<Self> {
+    pub async fn create(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
@@ -58,7 +57,7 @@ impl Node {
 
     /// Returns node previously created on this host.
     #[instrument]
-    pub async fn connect(data: NodeData, babel_conn: Arc<Mutex<UnixStream>>) -> Result<Self> {
+    pub async fn connect(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
         // let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
@@ -87,7 +86,7 @@ impl Node {
         let mut buf = String::new();
         timeout(
             BABEL_START_TIMEOUT,
-            self.babel_conn.lock().await.read_to_string(&mut buf),
+            self.babel_conn.read_to_string(&mut buf),
         )
         .await??;
         let json: serde_json::Value = buf.parse()?;
