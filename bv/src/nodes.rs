@@ -1,6 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
 use futures_util::TryFutureExt;
-use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -37,7 +36,7 @@ pub enum ServiceStatus {
     Disabled,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
@@ -45,9 +44,12 @@ pub struct Nodes {
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-struct CommonData {
-    machine_index: Arc<AtomicU32>,
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+pub struct CommonData {
+    pub machine_index: Arc<AtomicU32>,
+    pub ip_range_from: IpAddr,
+    pub ip_range_to: IpAddr,
+    pub ip_gateway: IpAddr,
 }
 
 impl Nodes {
@@ -65,13 +67,15 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        let network_interface = self.next_network_interface().await?;
+        self.data.machine_index.fetch_add(1, Ordering::SeqCst);
+        let network_interface = self.create_network_interface().await?;
         let node = NodeData {
             id,
             name: name.clone(),
             chain,
             network_interface,
         };
+        self.save().await?;
 
         let babel_conn = self.babel_conn(id).await?;
         let node = Node::create(node, babel_conn).await?;
@@ -183,6 +187,15 @@ impl Nodes {
 }
 
 impl Nodes {
+    pub fn new(nodes_data: CommonData) -> Self {
+        Self {
+            data: nodes_data,
+            nodes: HashMap::new(),
+            node_ids: HashMap::new(),
+            tx: OnceCell::new(),
+        }
+    }
+
     pub async fn load() -> Result<Nodes> {
         // First load the common data file.
         info!(
@@ -196,10 +209,7 @@ impl Nodes {
             "Reading nodes config dir: {}",
             REGISTRY_CONFIG_DIR.display()
         );
-        let mut this = Nodes {
-            data: nodes_data,
-            ..Default::default()
-        };
+        let mut this = Nodes::new(nodes_data);
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {
             // blockvisord should not bail on problems with individual node files.
@@ -266,23 +276,24 @@ impl Nodes {
         Ok(())
     }
 
-    /// Get the next machine index and increment it.
-    pub async fn next_network_interface(&self) -> Result<NetworkInterface> {
-        let machine_index = self.data.machine_index.fetch_add(1, Ordering::SeqCst);
-
+    /// Create and return the next network interface using machine index
+    pub async fn create_network_interface(&self) -> Result<NetworkInterface> {
+        let machine_index = self.data.machine_index.load(Ordering::SeqCst);
         let idx_bytes = machine_index.to_be_bytes();
-        let iface = NetworkInterface::create(
-            format!("bv{}", machine_index),
-            // FIXME: Hardcoding address for now.
-            IpAddr::V4(Ipv4Addr::new(
-                idx_bytes[0] + 74,
-                idx_bytes[1] + 50,
-                idx_bytes[2] + 82,
-                idx_bytes[3] + 83,
-            )),
-        )
-        .await?;
-        self.save().await?;
+        let octets = match self.data.ip_range_from {
+            IpAddr::V4(v4) => v4.octets(),
+            IpAddr::V6(_) => unimplemented!(),
+        };
+        let ip = IpAddr::V4(Ipv4Addr::new(
+            idx_bytes[0] + octets[0],
+            idx_bytes[1] + octets[1],
+            idx_bytes[2] + octets[2],
+            idx_bytes[3] + octets[3],
+        ));
+
+        let iface =
+            NetworkInterface::create(format!("bv{}", machine_index), ip, self.data.ip_gateway)
+                .await?;
 
         Ok(iface)
     }
@@ -314,33 +325,55 @@ mod tests {
 
     #[tokio::test]
     async fn network_interface_gen() {
-        let nodes = Nodes::default();
-        clean_test_iface(&nodes, "bv0", &IpAddr::V4(Ipv4Addr::new(74, 50, 82, 83))).await;
-        clean_test_iface(&nodes, "bv1", &IpAddr::V4(Ipv4Addr::new(74, 50, 82, 84))).await;
+        let gw = IpAddr::V4(Ipv4Addr::new(216, 18, 214, 193));
+        let nodes_data = CommonData {
+            machine_index: Arc::new(AtomicU32::new(0)),
+            ip_range_from: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 195)),
+            ip_range_to: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 206)),
+            ip_gateway: gw.clone(),
+        };
+        let nodes = Nodes::new(nodes_data);
+        clean_test_iface(
+            &nodes,
+            "bv1",
+            &IpAddr::V4(Ipv4Addr::new(216, 18, 214, 196)),
+            &gw,
+        )
+        .await;
+        clean_test_iface(
+            &nodes,
+            "bv2",
+            &IpAddr::V4(Ipv4Addr::new(216, 18, 214, 197)),
+            &gw,
+        )
+        .await;
         // Let's take the machine_index beyond u8 boundry.
         nodes
             .data
             .machine_index
-            .store(u8::MAX as u32 + 1, Ordering::SeqCst);
+            .store(u8::MAX as u32, Ordering::SeqCst);
         let iface_name = format!("bv{}", u8::MAX as u32 + 1);
         clean_test_iface(
             &nodes,
             &iface_name,
-            &IpAddr::V4(Ipv4Addr::new(74, 50, 83, 83)),
+            &IpAddr::V4(Ipv4Addr::new(216, 18, 215, 195)),
+            &gw,
         )
         .await;
     }
 
-    async fn clean_test_iface(nodes: &Nodes, name: &str, ip: &IpAddr) {
+    async fn clean_test_iface(nodes: &Nodes, name: &str, ip: &IpAddr, gw: &IpAddr) {
         // Make sure the interface doesn't exist already.
         let _ = crate::network_interface::NetworkInterface {
             name: name.to_owned(),
             ip: ip.to_owned(),
+            gw: gw.to_owned(),
         }
         .delete()
         .await;
 
-        let iface = nodes.next_network_interface().await.unwrap();
+        nodes.data.machine_index.fetch_add(1, Ordering::SeqCst);
+        let iface = nodes.create_network_interface().await.unwrap();
         let next_name = iface.name.clone();
         let next_ip = iface.ip.clone();
 

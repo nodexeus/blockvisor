@@ -89,13 +89,13 @@ impl Method {
 #[derive(Debug, Deserialize)]
 pub struct JrpcResponse {
     pub code: u32,
-    pub field: String,
+    pub field: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RestResponse {
     pub status: u32,
-    pub field: String,
+    pub field: Option<String>,
     pub format: MethodResponseFormat,
 }
 
@@ -112,8 +112,7 @@ pub enum MethodResponseFormat {
     Json,
 }
 
-pub async fn load(path: &str) -> eyre::Result<Babel> {
-    let path = Path::new(&path);
+pub async fn load(path: &Path) -> eyre::Result<Babel> {
     let toml_str = fs::read_to_string(path).await?;
 
     let cfg = toml::from_str(&toml_str)?;
@@ -127,29 +126,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_load() {
-        let _ = load("examples/pokt.toml").await.unwrap();
-        let _ = load("examples/solana.toml").await.unwrap();
-        let _ = load("examples/avax.toml").await.unwrap();
-        let _ = load("examples/cosmos.toml").await.unwrap();
-        let _ = load("examples/eth.toml").await.unwrap();
-        let _ = load("examples/near.toml").await.unwrap();
-        let _ = load("examples/helium.toml").await.unwrap();
-        let _ = load("examples/pedge.toml").await.unwrap();
-        let _ = load("examples/cardano.toml").await.unwrap();
-        let _ = load("examples/casper.toml").await.unwrap();
-        let _ = load("examples/kava.toml").await.unwrap();
-        let _ = load("examples/moonbeam.toml").await.unwrap();
-        let _ = load("examples/olabs.toml").await.unwrap();
-        let _ = load("examples/osmosis.toml").await.unwrap();
-        let _ = load("examples/polkadot.toml").await.unwrap();
-        let _ = load("examples/sentinel.toml").await.unwrap();
-        let _ = load("examples/tezos.toml").await.unwrap();
-        let _ = load("examples/algo.toml").await.unwrap(); // new blockchains from here
-        let _ = load("examples/band.toml").await.unwrap();
-        let _ = load("examples/chainlink.toml").await.unwrap();
-        let _ = load("examples/edgeware.toml").await.unwrap();
-        let _ = load("examples/iris.toml").await.unwrap();
-        let _ = load("examples/juno.toml").await.unwrap();
-        let _ = load("examples/flow.toml").await.unwrap();
+        let mut dir = fs::read_dir("examples").await.unwrap();
+        while let Some(entry) = dir.next_entry().await.unwrap() {
+            println!("loading: {entry:?}");
+            load(&entry.path()).await.unwrap();
+        }
     }
 }
