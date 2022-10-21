@@ -196,6 +196,28 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 
         Ok(Response::new(reply))
     }
+
+    async fn get_height(
+        &self,
+        request: Request<bv_pb::GetHeightRequest>,
+    ) -> Result<Response<bv_pb::GetHeightResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = request
+            .node_id
+            .parse()
+            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let height = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .height()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetHeightResponse { height }))
+    }
 }
 
 impl fmt::Display for bv_pb::NodeStatus {

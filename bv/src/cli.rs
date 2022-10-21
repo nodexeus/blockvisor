@@ -145,6 +145,12 @@ pub enum NodeCommand {
         /// Node id or name
         id_or_name: String,
     },
+
+    /// Return the block height of the blockchain the node is running
+    Height {
+        /// Node id or name
+        id_or_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

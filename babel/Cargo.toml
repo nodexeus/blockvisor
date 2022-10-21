@@ -6,7 +6,7 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-vsock = ["dep:zbus", "dep:tokio-vsock"]
+vsock = ["dep:tokio-vsock"]
 
 [dependencies]
 async-io = "1.7.0"
@@ -21,8 +21,7 @@ tokio = {version = "1.0", features = ["fs", "io-std", "io-util", "macros", "proc
 tokio-vsock = {version = "0.3.2", optional = true}
 toml = "0.5.9"
 tracing = "0.1.35"
-tracing-subscriber = "0.3.15"
-zbus = {version = "3.1.0", features = ["tokio-vsock"], default-features = false, optional = true}
+tracing-subscriber = {version = "0.3.11", features = ["env-filter", "fmt", "std"], default-features = false}
 
 [dev-dependencies]
 httpmock = "0.6"

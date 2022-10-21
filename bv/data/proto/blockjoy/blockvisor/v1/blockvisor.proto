@@ -74,3 +74,11 @@ message GetNodeIdForNameRequest {
 message GetNodeIdForNameResponse {
     string id = 1;
 }
+
+message GetHeightRequest {
+    string node_id = 1;
+}
+
+message GetHeightResponse {
+    uint64 height = 1;
+}

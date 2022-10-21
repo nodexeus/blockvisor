@@ -1,10 +1,10 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{path::Path, time::Duration};
 use tokio::{
     fs,
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
     time::{sleep, timeout},
 };
@@ -35,12 +35,13 @@ const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
-// const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 
 impl Node {
     /// Creates a new node with `id`.
     #[instrument]
-    pub async fn create(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
+    pub async fn create(data: NodeData) -> Result<Self> {
+        let id = data.id;
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
@@ -51,7 +52,7 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_conn,
+            babel_conn: Self::conn(id).await?,
         })
     }
 
@@ -121,9 +122,12 @@ impl Node {
                 }
 
                 if shutdown_success {
-                    // if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
-                    //     warn!("Babel shutdown timeout: {e}");
-                    // }
+                    let mut buf = String::new();
+                    timeout(BABEL_STOP_TIMEOUT, self.babel_conn.read_to_string(&mut buf)).await??;
+                    let json: serde_json::Value = buf.parse()?;
+                    if json.get("start_msg").is_none() {
+                        tracing::error!("Node did not stop!!");
+                    }
                 }
             }
         }
@@ -177,6 +181,54 @@ impl Node {
             .build();
 
         Ok(config)
+    }
+
+    pub async fn height(&mut self) -> Result<u64> {
+        let request = serde_json::json!({
+            "BlockchainCommand": {
+                "name": "height",
+            },
+        });
+        
+        self.write_data(request).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        let resp: serde_json::Value = self.read_data().await?;
+        let height = resp
+            .get("height")
+            .ok_or_else(|| anyhow::anyhow!("No height returned from babel"))?
+            .as_str()
+            .and_then(|v| v.parse().ok())
+            .ok_or_else(|| anyhow::anyhow!("Height is not parseable as a number"))?;
+        Ok(height)
+    }
+
+    ///
+    async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
+        let mut buf = String::new();
+        tracing::debug!("Registring read intent");
+        self.babel_conn.readable().await?;
+        tracing::debug!("Readble!");
+        dbg!(self.babel_conn.read_to_string(&mut buf).await)?;
+        let res = serde_json::from_str(&buf)?;
+        Ok(res)
+    }
+
+    async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
+        tracing::debug!("Registring write intent");
+        self.babel_conn.writable().await?;
+        tracing::debug!("Writable!");
+        let data = serde_json::to_string(&data)?;
+        dbg!(self.babel_conn.write_all(data.as_bytes()).await)?;
+        Ok(())
+    }
+
+    pub async fn conn(node_id: uuid::Uuid) -> Result<UnixStream> {
+        let socket = dbg!(format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket_42"));
+        tracing::debug!("Connecting to node at {socket}");
+        let conn = UnixStream::connect(&socket)
+            .await
+            .context("Failed to connect to babel bus")?;
+        Ok(conn)
     }
 }
 

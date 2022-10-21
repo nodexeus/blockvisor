@@ -269,6 +269,15 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .status;
             println!("{}", bv_pb::NodeStatus::from_i32(status).unwrap());
         }
+        NodeCommand::Height { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let height = service_client
+                .get_height(bv_pb::GetHeightRequest { node_id: id.to_string() })
+                .await?
+                .into_inner()
+                .height;
+            println!("{}", height);
+        }
     }
     Ok(())
 }

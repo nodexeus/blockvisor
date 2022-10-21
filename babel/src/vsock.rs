@@ -36,13 +36,14 @@ impl Stop {
 pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     let client = reqwest::Client::new();
 
-    tracing::trace!("creating VSock connection..");
+    dbg!("creating VSock connection..");
     let mut stream = tokio_vsock::VsockStream::connect(VSOCK_HOST_CID, VSOCK_PORT).await?;
-    tracing::trace!("connected");
+    dbg!("connected");
     write_json(&mut stream, Start::new()).await.unwrap(); // just testing
     let mut buf = String::new();
     loop {
         if let Err(e) = handle_message(&mut buf, &mut stream, &client, &cfg).await {
+            dbg!("Failed to handle message: {e}");
             let resp = BabelResponse::Error(e.to_string());
             let _ = write_json(&mut stream, resp).await;
         }
@@ -59,14 +60,15 @@ async fn handle_message(
 ) -> eyre::Result<()> {
     let read = stream.read_to_string(buf).await?;
     if read == 0 {
+        dbg!("Stream was empty, sleeping");
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         return Ok(());
     }
-    tracing::trace!("Received message: {buf:?}");
+    dbg!("Received message: {buf:?}");
     let request: BabelRequest =
         serde_json::from_str(buf).wrap_err("Could not parse request as json")?;
     let response = request.handle(client, cfg).await?;
-    tracing::trace!("Sending response: {response:?}");
+    dbg!("Sending response: {response:?}");
     Ok(())
 }
 

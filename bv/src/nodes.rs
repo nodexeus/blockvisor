@@ -1,13 +1,12 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
-use tokio::net::UnixStream;
 use tokio::sync::broadcast::{self, Sender};
-use tokio::sync::{OnceCell};
+use tokio::sync::OnceCell;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -19,7 +18,6 @@ use crate::{
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
-// const BABEL_BUS_ADDRESS: &str = "unix:path=/var/lib/blockvisor/vsock.socket_42";
 
 lazy_static::lazy_static! {
     pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
@@ -77,8 +75,7 @@ impl Nodes {
         };
         self.save().await?;
 
-        let babel_conn = self.babel_conn(id).await?;
-        let node = Node::create(node, babel_conn).await?;
+        let node = Node::create(node).await?;
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
@@ -114,6 +111,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
+        dbg!(backtrace::Backtrace::new());
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
             error!("Cannot send node status: {error:?}");
         };
@@ -221,7 +219,7 @@ impl Nodes {
             }
             match NodeData::load(&path)
                 .and_then(|data| async {
-                    let babel_conn = this.babel_conn(data.id).await?;
+                    let babel_conn = Node::conn(data.id).await?;
                     Node::connect(data, babel_conn).await
                 })
                 .await
@@ -306,16 +304,6 @@ impl Nodes {
                 Ok(tx)
             })
             .await
-    }
-
-    async fn babel_conn(&self, id: uuid::Uuid) -> Result<UnixStream> {
-        use crate::node::CHROOT_PATH;
-        let socket = format!("{CHROOT_PATH}/{id}");
-        tracing::debug!("Connecting to node at {socket}");
-        let conn = UnixStream::connect(socket)
-            .await
-            .context("Failed to connect to babel bus")?;
-        Ok(conn)
     }
 }
 

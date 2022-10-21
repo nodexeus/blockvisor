@@ -1,5 +1,8 @@
 use std::path::Path;
+use tokio::signal::unix;
 use tracing::debug;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{self, EnvFilter, FmtSubscriber};
 
 // TODO: What are we going to use as backup when vsock is disabled?
 #[cfg(feature = "vsock")]
@@ -11,12 +14,19 @@ mod error;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+    FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish()
         .init();
 
     let cfg = config::load(Path::new("/etc/babel.conf")).await?;
     debug!("Loaded babel configuration: {:?}", cfg);
+
+    tokio::spawn(async move {
+        let mut signals = unix::signal(unix::SignalKind::interrupt()).unwrap();
+        signals.recv().await;
+        println!("Received sigint");
+    });
 
     serve(cfg).await
 }

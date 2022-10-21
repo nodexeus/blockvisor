@@ -13,4 +13,5 @@ service Blockvisor {
     rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
     rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse) {}
     rpc GetNodeIdForName(GetNodeIdForNameRequest) returns (GetNodeIdForNameResponse) {}
+    rpc GetHeight(GetHeightRequest) returns (GetHeightResponse);
 }
