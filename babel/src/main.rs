@@ -1,6 +1,5 @@
 use std::path::Path;
 use tokio::signal::unix;
-use tracing::debug;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{self, EnvFilter, FmtSubscriber};
 
@@ -20,7 +19,7 @@ async fn main() -> eyre::Result<()> {
         .init();
 
     let cfg = config::load(Path::new("/etc/babel.conf")).await?;
-    debug!("Loaded babel configuration: {:?}", cfg);
+    tracing::debug!("Loaded babel configuration: {:?}", cfg);
 
     tokio::spawn(async move {
         let mut signals = unix::signal(unix::SignalKind::interrupt()).unwrap();

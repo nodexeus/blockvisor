@@ -156,29 +156,29 @@ impl Node {
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
 
-        let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
-            // Jailer configuration.
-            .jailer_cfg()
-            .chroot_base_dir(Path::new(CHROOT_PATH))
-            .exec_file(Path::new(FC_BIN_PATH))
-            .mode(JailerMode::Tmux(Some(data.name.clone().into())))
-            .build()
-            // Machine configuration.
-            .machine_cfg()
-            .vcpu_count(1)
-            .mem_size_mib(8192)
-            .build()
-            // Add root drive.
-            .add_drive("root", Path::new(ROOT_FS))
-            .is_root_device(true)
-            .build()
-            // Network configuration.
-            .add_network_interface(iface)
-            // Rest of the configuration.
-            .socket_path(Path::new(FC_SOCKET_PATH))
-            .kernel_args(kernel_args)
-            .vsock_cfg(VSOCK_GUEST_CID, Path::new(VSOCK_PATH))
-            .build();
+    let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
+        // Jailer configuration.
+        .jailer_cfg()
+        .chroot_base_dir(Path::new(CHROOT_PATH))
+        .exec_file(Path::new(FC_BIN_PATH))
+        .mode(JailerMode::Tmux(Some(data.name.clone().into())))
+        .build()
+        // Machine configuration.
+        .machine_cfg()
+        .vcpu_count(1)
+        .mem_size_mib(8192)
+        .build()
+        // Add root drive.
+        .add_drive("root", Path::new(ROOT_FS))
+        .is_root_device(true)
+        .build()
+        // Network configuration.
+        .add_network_interface(iface)
+        // Rest of the configuration.
+        .socket_path(Path::new(FC_SOCKET_PATH))
+        .kernel_args(kernel_args)
+        .vsock_cfg(VSOCK_GUEST_CID, Path::new(VSOCK_PATH))
+        .build();
 
         Ok(config)
     }
