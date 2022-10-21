@@ -148,7 +148,7 @@ impl Node {
 
         // FIXME: for some reason firecracker socket is not created by
         // consequent start command if we do not wait a bit here
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(10)).await;
 
         Ok(())
     }
@@ -164,7 +164,7 @@ impl Node {
         let kernel_args = format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
             ip={}::{}:255.255.255.240::eth0:on blockvisor.node={}",
-            data.network_interface.ip, data.network_interface.gw, data.id,
+            data.network_interface.ip, data.network_interface.gateway, data.id,
         );
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");

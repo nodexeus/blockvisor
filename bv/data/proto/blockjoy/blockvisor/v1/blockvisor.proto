@@ -12,8 +12,9 @@ message Node {
     string id = 1;
     string name = 2;
     string chain = 3;
-    NodeStatus status = 4;
-    string ip = 5;
+    string ip = 4;
+    string gateway = 5;
+    NodeStatus status = 6;
 }
 
 enum ServiceStatus {
@@ -31,6 +32,8 @@ message CreateNodeRequest {
     string id = 1;
     string name = 2;
     string chain = 3;
+    string ip = 4;
+    string gateway = 5;
 }
 
 message CreateNodeResponse {}

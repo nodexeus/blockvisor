@@ -115,7 +115,13 @@ async fn process_node_command(
                 nodes
                     .lock()
                     .await
-                    .create(node_id, args.name, args.image.unwrap().url)
+                    .create(
+                        node_id,
+                        args.name,
+                        args.image.unwrap().url,
+                        args.ip,
+                        args.gateway,
+                    )
                     .await?;
             }
             Command::Delete(_) => {
