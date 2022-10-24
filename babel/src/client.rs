@@ -1,4 +1,5 @@
 use crate::{config, error};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 
@@ -143,7 +144,7 @@ impl Client {
 
 /// Each request that comes over the VSock to babel must be a piece of JSON that can be
 /// deserialized into this struct.
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 pub enum BabelRequest {
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
@@ -153,19 +154,19 @@ pub enum BabelRequest {
     BlockchainCommand(BlockchainCommand),
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct BlockchainCommand {
     name: String,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Serialize)]
 pub enum BabelResponse {
     ListCapabilities(Vec<String>),
     BlockchainResponse(BlockchainResponse),
     Error(String),
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Serialize)]
 pub struct BlockchainResponse {
     value: String,
 }
