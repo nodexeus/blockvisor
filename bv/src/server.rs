@@ -49,13 +49,11 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let request = request.into_inner();
         let id =
             Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
-        let name = request.name;
-        let chain = request.chain;
 
         self.nodes
             .lock()
             .await
-            .create(id, name, chain)
+            .create(id, request.name, request.chain, request.ip, request.gateway)
             .await
             .map_err(|e| Status::unknown(e.to_string()))?;
 
@@ -141,6 +139,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
                 chain: node.chain,
                 status: status.into(),
                 ip: node.network_interface.ip.to_string(),
+                gateway: node.network_interface.gateway.to_string(),
             };
             nodes.push(n);
         }
