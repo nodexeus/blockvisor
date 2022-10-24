@@ -321,6 +321,7 @@ async fn test_bv_cmd_init_localhost() {
             status: Some(ui_pb::node::NodeStatus::Provisioning.into()),
             sync_status: None,
             staking_status: None,
+            ip_gateway: None,
         }),
     };
     let node: ui_pb::CreateNodeResponse = client
