@@ -243,6 +243,9 @@ async fn test_bv_cmd_init_localhost() {
             created_at: None,
             claimed_at: None,
             install_cmd: Some("install cmd".to_string()),
+            ip_gateway: "216.18.214.193".to_string(),
+            ip_range_from: "216.18.214.195".to_string(),
+            ip_range_to: "216.18.214.206".to_string(),
         }),
     };
     let provision: ui_pb::CreateHostProvisionResponse = client
@@ -318,6 +321,7 @@ async fn test_bv_cmd_init_localhost() {
             status: Some(ui_pb::node::NodeStatus::Provisioning.into()),
             sync_status: None,
             staking_status: None,
+            ip_gateway: None,
         }),
     };
     let node: ui_pb::CreateNodeResponse = client
@@ -410,6 +414,8 @@ async fn test_bv_cmd_grpc_commands() {
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
+                    ip: "216.18.214.195".to_string(),
+                    gateway: "216.18.214.193".to_string(),
                 })),
             })),
         },
@@ -426,10 +432,12 @@ async fn test_bv_cmd_grpc_commands() {
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
+                    ip: "216.18.214.195".to_string(),
+                    gateway: "216.18.214.193".to_string(),
                 })),
             })),
         },
-        //  create with same node name
+        // create with same node name
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
                 id: Uuid::new_v4().to_string(),
@@ -442,6 +450,8 @@ async fn test_bv_cmd_grpc_commands() {
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
+                    ip: "216.18.214.195".to_string(),
+                    gateway: "216.18.214.193".to_string(),
                 })),
             })),
         },

@@ -99,6 +99,14 @@ pub enum NodeCommand {
     Create {
         /// Chain identifier
         chain: String,
+
+        /// Node IP Address
+        #[clap(long)]
+        ip: Option<String>,
+
+        /// Gateway IP Address
+        #[clap(long)]
+        gateway: Option<String>,
     },
 
     /// Start node

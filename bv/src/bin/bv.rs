@@ -1,8 +1,3 @@
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    sync::{atomic::AtomicU32, Arc},
-};
-
 use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
@@ -49,6 +44,9 @@ async fn main() -> Result<()> {
                 os: host_info.os,
                 os_version: host_info.os_version,
                 ip: Some(ip),
+                ip_range_to: None,
+                ip_range_from: None,
+                ip_gateway: None,
             };
             let create = pb::ProvisionHostRequest {
                 request_id: Some(Uuid::new_v4().to_string()),
@@ -72,13 +70,7 @@ async fn main() -> Result<()> {
             .await?;
 
             if !Nodes::exists() {
-                // FIXME: IP information should come from API
-                let nodes_data = CommonData {
-                    machine_index: Arc::new(AtomicU32::new(0)),
-                    ip_range_from: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 195)),
-                    ip_range_to: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 206)),
-                    ip_gateway: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 193)),
-                };
+                let nodes_data = CommonData { machine_index: 0 };
                 Nodes::new(nodes_data).save().await?;
             }
         }
@@ -221,14 +213,19 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 println!("No nodes found.");
             }
         }
-        NodeCommand::Create { chain } => {
+        NodeCommand::Create { chain, ip, gateway } => {
             let id = Uuid::new_v4();
             let name = Petnames::default().generate_one(3, "_");
+            // TODO: this configurations is useful for testing on CI machine
+            let gateway = gateway.as_deref().unwrap_or("216.18.214.193");
+            let ip = ip.as_deref().unwrap_or("216.18.214.195");
             service_client
                 .create_node(bv_pb::CreateNodeRequest {
                     id: id.to_string(),
                     name: name.clone(),
                     chain: chain.to_string(),
+                    ip: ip.to_string(),
+                    gateway: gateway.to_string(),
                 })
                 .await?;
             println!(

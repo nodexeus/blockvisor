@@ -1,9 +1,8 @@
 use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::{collections::HashMap, sync::Arc};
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
@@ -44,15 +43,19 @@ pub struct Nodes {
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 pub struct CommonData {
-    pub machine_index: Arc<AtomicU32>,
-    pub ip_range_from: IpAddr,
-    pub ip_range_to: IpAddr,
-    pub ip_gateway: IpAddr,
+    pub machine_index: u32,
 }
 
 impl Nodes {
     #[instrument(skip(self))]
-    pub async fn create(&mut self, id: Uuid, name: String, chain: String) -> Result<()> {
+    pub async fn create(
+        &mut self,
+        id: Uuid,
+        name: String,
+        chain: String,
+        ip: String,
+        gateway: String,
+    ) -> Result<()> {
         if self.nodes.contains_key(&id) {
             bail!(format!("Node with id `{}` exists", &id));
         }
@@ -65,8 +68,10 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        self.data.machine_index.fetch_add(1, Ordering::SeqCst);
-        let network_interface = self.create_network_interface().await?;
+        self.data.machine_index += 1;
+        let ip = ip.parse()?;
+        let gateway = gateway.parse()?;
+        let network_interface = self.create_network_interface(ip, gateway).await?;
         let node = NodeData {
             id,
             name: name.clone(),
@@ -275,23 +280,15 @@ impl Nodes {
     }
 
     /// Create and return the next network interface using machine index
-    pub async fn create_network_interface(&self) -> Result<NetworkInterface> {
-        let machine_index = self.data.machine_index.load(Ordering::SeqCst);
-        let idx_bytes = machine_index.to_be_bytes();
-        let octets = match self.data.ip_range_from {
-            IpAddr::V4(v4) => v4.octets(),
-            IpAddr::V6(_) => unimplemented!(),
-        };
-        let ip = IpAddr::V4(Ipv4Addr::new(
-            idx_bytes[0] + octets[0],
-            idx_bytes[1] + octets[1],
-            idx_bytes[2] + octets[2],
-            idx_bytes[3] + octets[3],
-        ));
+    pub async fn create_network_interface(
+        &mut self,
+        ip: IpAddr,
+        gateway: IpAddr,
+    ) -> Result<NetworkInterface> {
+        self.data.machine_index += 1;
 
         let iface =
-            NetworkInterface::create(format!("bv{}", machine_index), ip, self.data.ip_gateway)
-                .await?;
+            NetworkInterface::create(format!("bv{}", self.data.machine_index), ip, gateway).await?;
 
         Ok(iface)
     }
@@ -304,71 +301,5 @@ impl Nodes {
                 Ok(tx)
             })
             .await
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn network_interface_gen() {
-        let gw = IpAddr::V4(Ipv4Addr::new(216, 18, 214, 193));
-        let nodes_data = CommonData {
-            machine_index: Arc::new(AtomicU32::new(0)),
-            ip_range_from: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 195)),
-            ip_range_to: IpAddr::V4(Ipv4Addr::new(216, 18, 214, 206)),
-            ip_gateway: gw.clone(),
-        };
-        let nodes = Nodes::new(nodes_data);
-        clean_test_iface(
-            &nodes,
-            "bv1",
-            &IpAddr::V4(Ipv4Addr::new(216, 18, 214, 196)),
-            &gw,
-        )
-        .await;
-        clean_test_iface(
-            &nodes,
-            "bv2",
-            &IpAddr::V4(Ipv4Addr::new(216, 18, 214, 197)),
-            &gw,
-        )
-        .await;
-        // Let's take the machine_index beyond u8 boundry.
-        nodes
-            .data
-            .machine_index
-            .store(u8::MAX as u32, Ordering::SeqCst);
-        let iface_name = format!("bv{}", u8::MAX as u32 + 1);
-        clean_test_iface(
-            &nodes,
-            &iface_name,
-            &IpAddr::V4(Ipv4Addr::new(216, 18, 215, 195)),
-            &gw,
-        )
-        .await;
-    }
-
-    async fn clean_test_iface(nodes: &Nodes, name: &str, ip: &IpAddr, gw: &IpAddr) {
-        // Make sure the interface doesn't exist already.
-        let _ = crate::network_interface::NetworkInterface {
-            name: name.to_owned(),
-            ip: ip.to_owned(),
-            gw: gw.to_owned(),
-        }
-        .delete()
-        .await;
-
-        nodes.data.machine_index.fetch_add(1, Ordering::SeqCst);
-        let iface = nodes.create_network_interface().await.unwrap();
-        let next_name = iface.name.clone();
-        let next_ip = iface.ip.clone();
-
-        // Clean up
-        let _ = iface.delete().await;
-
-        assert_eq!(&next_name, name);
-        assert_eq!(&next_ip, ip);
     }
 }
