@@ -28,6 +28,7 @@ impl Client {
         match req {
             BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
             BabelRequest::BlockchainCommand(cmd) => {
+                tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
             }
         }
@@ -50,6 +51,8 @@ impl Client {
             .methods
             .get(&cmd.name)
             .ok_or_else(|| error::Error::unknown_method(cmd.name))?;
+        tracing::debug!("Chosen method is {method:?}");
+
         match method {
             Jrpc {
                 method, response, ..
@@ -80,6 +83,7 @@ impl Client {
             .text()
             .await?;
         let value = if let Some(field) = &resp_config.field {
+            tracing::debug!("Retrieving field `{field}` from the body `{text}`");
             gjson::get(&text, field).to_string()
         } else {
             text

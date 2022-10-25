@@ -1,74 +1,97 @@
-use std::time;
+use std::{sync::Arc, time};
 
-use crate::{client, config};
+use crate::{config, client};
 use eyre::Context;
+use futures::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_vsock::VsockStream;
 
-const VSOCK_HOST_CID: u32 = 2;
+const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_PORT: u32 = 42;
 
-/// This message will be sent to blockvisor on startup once we get rid of dbus.
-#[derive(serde::Serialize)]
-struct Start {
-    start_msg: String,
-}
+// #[derive(serde::Serialize)]
+// struct Start {
+//     start_msg: String,
+// }
 
-impl Start {
-    fn new() -> Self {
-        Self {
-            start_msg: "Oh lawd we be startin'".to_string(),
-        }
-    }
-}
+// impl Start {
+//     fn new() -> Self {
+//         Self {
+//             start_msg: "Oh lawd we be startin'".to_string(),
+//         }
+//     }
+// }
 
-#[derive(serde::Serialize)]
-struct Stop {
-    stop_msg: String,
-}
+// #[derive(serde::Serialize)]
+// struct Stop {
+//     stop_msg: String,
+// }
 
-impl Stop {
-    fn _new() -> Self {
-        Self {
-            stop_msg: "Oh lawd we be stoppin'".to_string(),
-        }
-    }
-}
+// impl Stop {
+//     fn _new() -> Self {
+//         Self {
+//             stop_msg: "Oh lawd we be stoppin'".to_string(),
+//         }
+//     }
+// }
 
 /// This function tries to read messages from the vsocket and keeps responding to those messages.
+/// Each opened connection gets handled separately by a tokio task and then the listener starts
+/// listening for new messages. This means that we do not need to care if blockvisor shuts down or
+/// restarts.
 pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     let client = client::Client::new(cfg, time::Duration::from_secs(10))?;
+    let client = Arc::new(client);
 
-    tracing::debug!("creating VSock connection..");
-    let mut stream = tokio_vsock::VsockStream::connect(VSOCK_HOST_CID, VSOCK_PORT).await?;
-    tracing::debug!("connected");
-    write_json(&mut stream, Start::new()).await.unwrap(); // just testing
-    let mut buf = String::new();
+    tracing::debug!("Binding to virtual socket...");
+    let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
+    tracing::debug!("Bound");
+    let mut incoming = listener.incoming();
+    tracing::debug!("Receiving incoming messages");
+    while let Some(res) = incoming.next().await {
+        match res {
+            Ok(stream) => {
+                tracing::debug!("Stream opened, delegating to handler.");
+                tokio::spawn(serve_stream(stream, Arc::clone(&client)));
+            },
+            Err(_) => {
+                tracing::debug!("Receiving streams failed. Aborting babel.");
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn serve_stream(mut stream: VsockStream, client: Arc<client::Client>) {
     loop {
-        if let Err(e) = handle_message(&mut buf, &mut stream, &client).await {
+        let mut buf = vec![0u8; 5000];
+        let len = stream.read(&mut buf).await.unwrap();
+        if len == 0 {
+            tracing::info!("Vsock stream closed. Shutting down connection handler.");
+            break;
+        }
+        buf.resize(len, 0);
+        let msg = std::str::from_utf8(&buf).unwrap();
+        if let Err(e) = handle_message(msg, &mut stream, &client).await {
             tracing::debug!("Failed to handle message: {e}");
             let resp = client::BabelResponse::Error(e.to_string());
             let _ = write_json(&mut stream, resp).await;
         }
     }
-    // write_json(&mut stream, Stop::new()).await.unwrap();
-    // Ok(())
 }
 
 async fn handle_message(
-    buf: &mut String,
+    msg: &str,
     stream: &mut tokio_vsock::VsockStream,
     client: &client::Client,
 ) -> eyre::Result<()> {
-    let read = stream.read_to_string(buf).await?;
-    if read == 0 {
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        return Ok(());
-    }
-    tracing::debug!("Received message: {buf:?}");
+    tracing::debug!("Received message: `{msg}`");
     let request: client::BabelRequest =
-        serde_json::from_str(buf).wrap_err("Could not parse request as json")?;
-    let response = client.handle(request).await;
+        serde_json::from_str(msg).wrap_err("Could not parse request as json")?;
+    let response = client.handle(request).await?;
     tracing::debug!("Sending response: {response:?}");
+    write_json(stream, response).await?;
     Ok(())
 }
 

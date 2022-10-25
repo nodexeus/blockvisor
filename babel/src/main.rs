@@ -18,7 +18,9 @@ async fn main() -> eyre::Result<()> {
         .finish()
         .init();
 
-    let cfg = config::load(Path::new("/etc/babel.conf")).await?;
+    let cfg_path = Path::new("/etc/babel.conf");
+    tracing::info!("Loading babel configuration at {}", cfg_path.display());
+    let cfg = config::load(cfg_path).await?;
     tracing::debug!("Loaded babel configuration: {:?}", cfg);
 
     tokio::spawn(async move {

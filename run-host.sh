@@ -14,5 +14,5 @@ cd luuk/repo &&\
     echo "Node ID is $NODE_ID, Node IP is $NODE_IP" &&\
     bv node start ${NODE_ID}
 
-scp -r babel -r bv Cargo.lock Cargo.toml root@${NODE_IP}:/root
+scp -r babel bv Cargo.lock Cargo.toml root@${NODE_IP}:/root
 ssh root@${NODE_IP} -o "StrictHostKeyChecking=no"

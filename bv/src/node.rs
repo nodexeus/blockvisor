@@ -32,6 +32,7 @@ const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
+const BABEL_VSOCK_PORT: u32 = 42;
 const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
@@ -189,12 +190,14 @@ impl Node {
                 "name": "height",
             },
         });
-        
-        self.write_data(request).await?;
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        let resp: serde_json::Value = self.read_data().await?;
-        let height = resp
-            .get("height")
+
+        let resp: serde_json::Value = self.rw(request).await?;
+        let height = dbg!(dbg!(resp)
+            .get("BlockchainResponse"))
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .get("value")
             .ok_or_else(|| anyhow::anyhow!("No height returned from babel"))?
             .as_str()
             .and_then(|v| v.parse().ok())
@@ -202,44 +205,96 @@ impl Node {
         Ok(height)
     }
 
-    ///
-    async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
-        let mut buf = String::new();
-        tracing::debug!("Registring read intent");
-        self.babel_conn.readable().await?;
-        tracing::debug!("Readble!");
-        dbg!(self.babel_conn.read_to_string(&mut buf).await)?;
-        let res = serde_json::from_str(&buf)?;
-        Ok(res)
+    // ///
+    // async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
+    //     let mut buf = String::new();
+        
+    //     tracing::debug!("Registring read intent");
+    //     self.babel_conn.readable().await?;
+    //     tracing::debug!("Readble!");
+    //     dbg!(self.babel_conn.read_to_string(&mut buf).await)?;
+    //     let res = serde_json::from_str(&buf)?;
+    //     Ok(res)
+    // }
+
+    // async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
+    //     tracing::debug!("Registring write intent");
+    //     self.babel_conn.writable().await?;
+    //     tracing::debug!("Writable!");
+    //     let data = serde_json::to_string(&data)?;
+    //     dbg!(self.babel_conn.write_all(data.as_bytes()).await)?;
+    //     Ok(())
+    // }
+
+    async fn rw<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(&mut self, data: S) -> Result<D> {
+        let mut should_write = true;
+        loop {
+            let ready = self.babel_conn.ready(tokio::io::Interest::READABLE | tokio::io::Interest::WRITABLE).await.unwrap();
+    
+            if ready.is_readable() {
+                let mut data = vec![0; 1024];
+                // Try to read data, this may still fail with `WouldBlock`
+                // if the readiness event is a false positive.
+                match self.babel_conn.try_read(&mut data) {
+                    Ok(n) => {
+                        println!("read {} bytes", n);
+                        data.resize(n, 0);
+                        println!("Received message: `{data:?}`");
+                        let s = std::str::from_utf8(&data).unwrap();
+                        println!("As string: `{s}`");
+                        if s.starts_with("OK ") {
+                            // This is the init message, skip
+                            continue;
+                        }
+                        return Ok(serde_json::from_str(s).unwrap());
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        println!("Readable sad times {e}");
+                        panic!();
+                    }
+                }
+    
+            }
+    
+            if should_write && ready.is_writable() {
+                should_write = false;
+                // Try to write data, this may still fail with `WouldBlock`
+                // if the readiness event is a false positive.
+                let data = serde_json::to_string(&data)?;
+                match self.babel_conn.try_write(data.as_bytes()) {
+                    Ok(n) => {
+                        println!("wrote {n} bytes");
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        continue;
+                    }
+                    Err(e) => {
+                        println!("Writable sad times {e}");
+                        panic!();
+                    }
+                }
+            }
+        }
     }
 
-    async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
-        tracing::debug!("Registring write intent");
-        self.babel_conn.writable().await?;
-        tracing::debug!("Writable!");
-        let data = serde_json::to_string(&data)?;
-        dbg!(self.babel_conn.write_all(data.as_bytes()).await)?;
-        Ok(())
-    }
-
+    /// Establishes a new connection to the VM. Note that this fails if the VM hasn't started yet.
+    /// It also initializes that connection by sending the opening message. Therefore, if this
+    /// function succeeds the connection is guaranteed to be writeable at the moment of returning.
     pub async fn conn(node_id: uuid::Uuid) -> Result<UnixStream> {
-        let socket = dbg!(format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket_42"));
-        tracing::debug!("Connecting to node at {socket}");
-        let conn = UnixStream::connect(&socket)
+        // We are going to connect to the central socket for this VM. Later we will specify which
+        // port we want to talk to.
+        let socket = dbg!(format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket"));
+        tracing::debug!("Connecting to node at `{socket}`");
+        let mut conn = UnixStream::connect(&socket)
             .await
             .context("Failed to connect to babel bus")?;
+        // For host initiated connections we have to send a message to the guess socket that
+        // contains the port number.
+        let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
+        conn.write(open_message.as_bytes()).await?;
         Ok(conn)
     }
 }
-
-// async fn create_babel_proxy(conn: &UnixStream, id: Uuid) -> Result<Proxy<'static>> {
-//     let babel_bus_name = format!("{}{}", BABEL_BUS_NAME_PREFIX, id);
-//     Proxy::new(
-//         conn,
-//         babel_bus_name,
-//         "/com/BlockJoy/Babel",
-//         "com.BlockJoy.Babel",
-//     )
-//     .await
-//     .context("Failed to create Babel proxy")
-// }

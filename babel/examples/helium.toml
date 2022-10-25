@@ -8,7 +8,7 @@ babel_version = "0.0.1"
 node_version = "1.14.0"
 node_type = "validator"
 description = "helium blockchain validator"
-jrpc_host = "http://localhost:4467/"
+api_host = "http://localhost:4467/v1/"
 
 [monitor]
 pid_file = "/var/run/helium.pid" #this is likely not necessary
