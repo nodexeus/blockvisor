@@ -123,6 +123,54 @@ fn test_bv_cmd_node_lifecycle() {
     bv_run(&["node", "delete", vm_id], "Deleted node");
 }
 
+#[tokio::test]
+#[serial]
+#[cfg(target_os = "linux")]
+async fn test_bv_cmd_node_recovery() {
+    use blockvisord::{node::FC_BIN_NAME, utils};
+    use std::str;
+
+    let chain_id = "test_bv_cmd_node_recovery".to_string();
+
+    println!("create a node");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    let cmd = cmd.args(&["node", "create", &chain_id]);
+    let output = cmd.output().unwrap();
+    let stdout = str::from_utf8(&output.stdout).unwrap();
+    let stderr = str::from_utf8(&output.stderr).unwrap();
+    println!("create stdout: {stdout}");
+    println!("create stderr: {stderr}");
+    let vm_id = stdout
+        .trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "))
+        .split('`')
+        .nth(1)
+        .unwrap();
+    println!("create vm_id: {vm_id}");
+
+    println!("start stopped node");
+    bv_run(&["node", "start", vm_id], "Started node");
+
+    println!("list running node");
+    bv_run(&["node", "status", vm_id], "Running");
+
+    let process_id = utils::get_process_pid(FC_BIN_NAME, vm_id).unwrap();
+    println!("impolitelly kill node with process id {process_id}");
+    utils::run_cmd("kill", &["-9", &process_id.to_string()])
+        .await
+        .unwrap();
+
+    println!("list running node before recovery");
+    bv_run(&["node", "status", vm_id], "Failed");
+
+    sleep(Duration::from_secs(10)).await;
+
+    println!("list running node after recovery");
+    bv_run(&["node", "status", vm_id], "Running");
+
+    println!("delete started node");
+    bv_run(&["node", "delete", vm_id], "Deleted node");
+}
+
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]

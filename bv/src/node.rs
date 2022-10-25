@@ -99,12 +99,18 @@ impl Node {
             });
         self.machine.start().await?;
         timeout(BABEL_START_TIMEOUT, stream.next()).await?;
+        self.data.expected_status = NodeStatus::Running;
         self.data.save().await
     }
 
-    /// Returns the status of the node.
-    pub async fn status(&self) -> Result<NodeStatus> {
-        Ok(self.data.status())
+    /// Returns the actual status of the node.
+    pub fn status(&self) -> NodeStatus {
+        self.data.status()
+    }
+
+    /// Returns the expected status of the node.
+    pub fn expected_status(&self) -> NodeStatus {
+        self.data.expected_status
     }
 
     /// Stops the running node.
@@ -144,6 +150,7 @@ impl Node {
                 }
             }
         }
+        self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
 
         // FIXME: for some reason firecracker socket is not created by
