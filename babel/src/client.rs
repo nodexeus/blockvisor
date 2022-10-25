@@ -1,122 +1,214 @@
-use crate::{
-    config::{self, Method, MethodResponseFormat},
-    error,
-};
+use crate::{config, error};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
 
-#[allow(dead_code)]
 pub struct Client {
     inner: reqwest::Client,
     cfg: config::Babel,
 }
 
-#[allow(dead_code)]
+impl std::ops::Deref for Client {
+    type Target = reqwest::Client;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl Client {
-    pub fn new(cfg: config::Babel, timeout: Duration) -> eyre::Result<Self> {
+    pub fn new(cfg: config::Babel, timeout: Duration) -> Result<Self, error::Error> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
         Ok(Self { inner: client, cfg })
     }
 
-    pub async fn handle_method_call(&self, method_name: &str) -> Result<String, error::Error> {
-        let method = match self.cfg.methods.get(method_name) {
-            Some(method) => method,
-            None => {
-                return Err(error::Error::UnknownMethod {
-                    method: method_name.to_string(),
-                })
-            }
-        };
+    pub async fn handle(&self, req: BabelRequest) -> Result<BabelResponse, error::Error> {
+        use BabelResponse::*;
 
-        match method {
-            Method::Jrpc {
-                name: _,
-                method: jrpc_method,
-                response,
-            } => {
-                let url = self.cfg.config.api_host.clone().ok_or_else(|| {
-                    error::Error::NoHostSpecified {
-                        method: method_name.to_string(),
-                    }
-                })?;
-                let text = self
-                    .inner
-                    .post(&url)
-                    .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": jrpc_method }))
-                    .send()
-                    .await?
-                    .text()
-                    .await?;
-                if let Some(field) = &response.field {
-                    Ok(gjson::get(&text, field).to_string())
-                } else {
-                    Ok(text)
-                }
-            }
-            Method::Rest {
-                name: _,
-                method: rest_method,
-                response,
-            } => {
-                let url = self
-                    .cfg
-                    .config
-                    .api_host
-                    .as_ref()
-                    .map(|host| {
-                        format!(
-                            "{}/{}",
-                            host.trim_end_matches('/'),
-                            rest_method.trim_start_matches('/')
-                        )
-                    })
-                    .ok_or_else(|| error::Error::NoHostSpecified {
-                        method: method_name.to_string(),
-                    })?;
-                let text = self.inner.post(&url).send().await?.text().await?;
-                if let Some(field) = &response.field {
-                    Ok(gjson::get(&text, field).to_string())
-                } else {
-                    Ok(text)
-                }
-            }
-            Method::Sh {
-                name: _,
-                body: command,
-                response,
-            } => {
-                let output = tokio::process::Command::new("sh")
-                    .args(&["-c", &command.to_string()])
-                    .output()
-                    .await?;
-
-                if !output.status.success() {
-                    return Err(error::Error::Command {
-                        args: command.to_string(),
-                        output: format!("{output:?}"),
-                    });
-                }
-
-                match response.format {
-                    MethodResponseFormat::Json => {
-                        println!("{:?}", &output);
-                        Ok(serde_json::from_slice(&output.stdout)?)
-                    }
-                    MethodResponseFormat::Raw => {
-                        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-                    }
-                }
+        match req {
+            BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
+            BabelRequest::BlockchainCommand(cmd) => {
+                self.handle_cmd(cmd).await.map(BlockchainResponse)
             }
         }
+    }
+
+    /// List the capabilities that the current blockchain node supports.
+    fn handle_list_caps(&self) -> Vec<String> {
+        self.cfg
+            .methods
+            .keys()
+            .map(|method| method.to_string())
+            .collect()
+    }
+
+    async fn handle_cmd(&self, cmd: BlockchainCommand) -> Result<BlockchainResponse, error::Error> {
+        use config::Method::*;
+
+        let method = self
+            .cfg
+            .methods
+            .get(&cmd.name)
+            .ok_or_else(|| error::Error::unknown_method(cmd.name))?;
+        match method {
+            Jrpc {
+                method, response, ..
+            } => self.handle_jrpc(method, response).await,
+            Rest {
+                method, response, ..
+            } => self.handle_rest(method, response).await,
+            Sh { body, response, .. } => Self::handle_sh(body, response).await,
+        }
+    }
+
+    async fn handle_jrpc(
+        &self,
+        method: &str,
+        resp_config: &config::JrpcResponse,
+    ) -> Result<BlockchainResponse, error::Error> {
+        let url = self
+            .cfg
+            .config
+            .api_host
+            .as_deref()
+            .ok_or_else(|| error::Error::no_host(method))?;
+        let text: String = self
+            .post(url)
+            .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": method }))
+            .send()
+            .await?
+            .text()
+            .await?;
+        let value = if let Some(field) = &resp_config.field {
+            gjson::get(&text, field).to_string()
+        } else {
+            text
+        };
+        let resp = BlockchainResponse { value };
+        Ok(resp)
+    }
+
+    async fn handle_rest(
+        &self,
+        method: &str,
+        resp_config: &config::RestResponse,
+    ) -> Result<BlockchainResponse, error::Error> {
+        let host = self
+            .cfg
+            .config
+            .api_host
+            .as_ref()
+            .ok_or_else(|| error::Error::no_host(method))?;
+        let url = format!(
+            "{}/{}",
+            host.trim_end_matches('/'),
+            method.trim_start_matches('/')
+        );
+
+        let text = self.post(&url).send().await?.text().await?;
+        let value = match &resp_config.field {
+            Some(field) => gjson::get(&text, field).to_string(),
+            None => text,
+        };
+        Ok(BlockchainResponse { value })
+    }
+
+    async fn handle_sh(
+        command: &str,
+        response_config: &config::ShResponse,
+    ) -> Result<BlockchainResponse, error::Error> {
+        use config::MethodResponseFormat::*;
+
+        let args = command.split_whitespace();
+        let output = tokio::process::Command::new("sh")
+            .args(args)
+            .output()
+            .await?;
+
+        if !output.status.success() {
+            return Err(error::Error::command(command, output));
+        }
+
+        match response_config.format {
+            Json => {
+                let content: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+                Ok(content.into())
+            }
+            Raw => {
+                let content = String::from_utf8_lossy(&output.stdout).to_string();
+                Ok(content.into())
+            }
+        }
+    }
+}
+
+/// Each request that comes over the VSock to babel must be a piece of JSON that can be
+/// deserialized into this struct.
+#[derive(Debug, Deserialize)]
+pub enum BabelRequest {
+    /// List the endpoints that are available for the current blockchain. These are extracted from
+    /// the config, and just sent back as strings for now.
+    ListCapabilities,
+    /// Send a request to the current blockchain. We can identify the way to do this from the
+    /// config and forward the provided parameters.
+    BlockchainCommand(BlockchainCommand),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BlockchainCommand {
+    name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub enum BabelResponse {
+    ListCapabilities(Vec<String>),
+    BlockchainResponse(BlockchainResponse),
+    Error(String),
+}
+
+#[derive(Debug, Serialize)]
+pub struct BlockchainResponse {
+    value: String,
+}
+
+impl From<serde_json::Value> for BlockchainResponse {
+    fn from(content: serde_json::Value) -> Self {
+        Self {
+            value: content
+                .get("todo we gotta get this from the config")
+                .and_then(|val| val.as_str())
+                .unwrap_or_default()
+                .to_string(),
+        }
+    }
+}
+
+impl From<String> for BlockchainResponse {
+    fn from(value: String) -> Self {
+        Self { value }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Babel, Config, JrpcResponse, Method, RestResponse, ShResponse};
+    use crate::config::{
+        Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
+    };
     use httpmock::prelude::*;
     use std::collections::BTreeMap;
+
+    impl BabelResponse {
+        fn unwrap_blockchain(self) -> BlockchainResponse {
+            use BabelResponse::*;
+
+            match self {
+                ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
+                BabelResponse::BlockchainResponse(resp) => resp,
+                Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_sh() {
@@ -159,15 +251,24 @@ mod tests {
         };
         let client = Client::new(cfg, Duration::from_secs(10)).unwrap();
 
-        let output = client.handle_method_call("raw").await.unwrap();
-        assert_eq!(output, "make a toast\n");
+        let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "raw".to_string(),
+        });
+        let output = client.handle(raw_cmd).await.unwrap();
+        assert_eq!(output.unwrap_blockchain().value, "make a toast\n");
 
-        let output = client.handle_method_call("json").await.unwrap();
-        assert_eq!(output, "make a toast");
+        let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "json".to_string(),
+        });
+        let output = client.handle(json_cmd).await.unwrap();
+        assert_eq!(output.unwrap_blockchain().value, "make a toast");
 
-        let output = client.handle_method_call("unknown").await;
+        let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "unknown".to_string(),
+        });
+        let output = client.handle(unknown_cmd).await;
         assert_eq!(
-            output.err().unwrap().to_string(),
+            output.unwrap_err().to_string(),
             "Method `unknown` not found"
         );
     }
@@ -209,11 +310,14 @@ mod tests {
             )]),
         };
 
+        let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "json items".to_string(),
+        });
         let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle_method_call("json items").await.unwrap();
+        let output = client.handle(json_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output, "[1,2,3]");
+        assert_eq!(output.unwrap_blockchain().value, "[1,2,3]");
     }
 
     #[tokio::test]
@@ -253,11 +357,14 @@ mod tests {
             )]),
         };
 
+        let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "json items".to_string(),
+        });
         let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle_method_call("json items").await.unwrap();
+        let output = client.handle(json_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output, "{\"result\":[1,2,3]}");
+        assert_eq!(output.unwrap_blockchain().value, "{\"result\":[1,2,3]}");
     }
 
     #[tokio::test]
@@ -307,10 +414,13 @@ mod tests {
             )]),
         };
 
+        let height_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
+            name: "get height".to_string(),
+        });
         let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle_method_call("get height").await.unwrap();
+        let output = client.handle(height_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output, "123");
+        assert_eq!(output.unwrap_blockchain().value, "123");
     }
 }
