@@ -196,6 +196,30 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         Ok(Response::new(reply))
     }
 
+    async fn list_capabilities(
+        &self,
+        request: Request<bv_pb::ListCapabilitiesRequest>,
+    ) -> Result<Response<bv_pb::ListCapabilitiesResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = request
+            .node_id
+            .parse()
+            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let capabilities = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .capabilities()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::ListCapabilitiesResponse {
+            capabilities,
+        }))
+    }
+
     async fn get_height(
         &self,
         request: Request<bv_pb::GetHeightRequest>,
@@ -216,6 +240,28 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .await
             .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::GetHeightResponse { height }))
+    }
+
+    async fn get_age(
+        &self,
+        request: Request<bv_pb::GetAgeRequest>,
+    ) -> Result<Response<bv_pb::GetAgeResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = request
+            .node_id
+            .parse()
+            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let block_age = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .block_age()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetAgeResponse { block_age }))
     }
 }
 

@@ -4,14 +4,9 @@ urn  = "helium:node"
 path_append = "/blockjoy/bin/"
 
 [config]
-babel_version = "0.0.1"
-node_version = "1.14.0"
 node_type = "validator"
 description = "helium blockchain validator"
-api_host = "http://localhost:4467/v1/"
-
-[monitor]
-pid_file = "/var/run/helium.pid" #this is likely not necessary
+api_host = "http://localhost:4467/"
 
 # METHOD BLOCK-HEIGHT
 # example:
@@ -56,7 +51,7 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result.keys.public_key"
+    field = "result.peer_addr"
 
 # METHOD name
 # example:
@@ -78,7 +73,7 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.name"
 
 # METHOD: consensus status
 # example:
@@ -100,10 +95,10 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.in_consensus"
 
-#METHOD: block age
-#DESC: The age of the last block received.
+# METHOD: block age
+# DESC: The age (in seconds) of the last block received.
 # example:
 # curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_block_age"}' | jq .
@@ -123,11 +118,11 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.block_age"
 
 
-#METHOD: summary
-#DESC: The age of the last block received.
+# METHOD: summary
+# DESC: The age of the last block received.
 # example:
 # curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_summary"}' | jq .
@@ -177,4 +172,3 @@ params = []
     [methods.response]
     code = 200
     field = "result"
-

@@ -1,7 +1,7 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
-use std::{path::Path, time::Duration};
+use std::{path::Path, str::FromStr, time::Duration};
 use tokio::{
     fs,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -27,7 +27,7 @@ pub struct Node {
 pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
 const ROOT_FS: &str = "/var/lib/blockvisor/debian.ext4";
-pub const CHROOT_PATH: &str = "/var/lib/blockvisor";
+const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
@@ -37,6 +37,7 @@ const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl Node {
     /// Creates a new node with `id`.
@@ -157,144 +158,197 @@ impl Node {
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
 
-    let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
-        // Jailer configuration.
-        .jailer_cfg()
-        .chroot_base_dir(Path::new(CHROOT_PATH))
-        .exec_file(Path::new(FC_BIN_PATH))
-        .mode(JailerMode::Tmux(Some(data.name.clone().into())))
-        .build()
-        // Machine configuration.
-        .machine_cfg()
-        .vcpu_count(1)
-        .mem_size_mib(8192)
-        .build()
-        // Add root drive.
-        .add_drive("root", Path::new(ROOT_FS))
-        .is_root_device(true)
-        .build()
-        // Network configuration.
-        .add_network_interface(iface)
-        // Rest of the configuration.
-        .socket_path(Path::new(FC_SOCKET_PATH))
-        .kernel_args(kernel_args)
-        .vsock_cfg(VSOCK_GUEST_CID, Path::new(VSOCK_PATH))
-        .build();
+        let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
+            // Jailer configuration.
+            .jailer_cfg()
+            .chroot_base_dir(Path::new(CHROOT_PATH))
+            .exec_file(Path::new(FC_BIN_PATH))
+            .mode(JailerMode::Tmux(Some(data.name.clone().into())))
+            .build()
+            // Machine configuration.
+            .machine_cfg()
+            .vcpu_count(1)
+            .mem_size_mib(8192)
+            .build()
+            // Add root drive.
+            .add_drive("root", Path::new(ROOT_FS))
+            .is_root_device(true)
+            .build()
+            // Network configuration.
+            .add_network_interface(iface)
+            // Rest of the configuration.
+            .socket_path(Path::new(FC_SOCKET_PATH))
+            .kernel_args(kernel_args)
+            .vsock_cfg(VSOCK_GUEST_CID, Path::new(VSOCK_PATH))
+            .build();
 
         Ok(config)
     }
 
+    /// Returns the height of the blockchain (in blocks).
     pub async fn height(&mut self) -> Result<u64> {
-        let request = serde_json::json!({
-            "BlockchainCommand": {
-                "name": "height",
-            },
-        });
+        self.call_method("height").await
+    }
 
-        let resp: serde_json::Value = self.rw(request).await?;
-        let height = dbg!(dbg!(resp)
-            .get("BlockchainResponse"))
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("value")
-            .ok_or_else(|| anyhow::anyhow!("No height returned from babel"))?
-            .as_str()
-            .and_then(|v| v.parse().ok())
-            .ok_or_else(|| anyhow::anyhow!("Height is not parseable as a number"))?;
+    /// Returns the height of the blockchain (in blocks).
+    pub async fn block_age(&mut self) -> Result<u64> {
+        self.call_method("block_age").await
+    }
+
+    async fn call_method<T>(&mut self, method: &str) -> Result<T>
+    where
+        T: FromStr,
+        <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
+    {
+        let request = BabelRequest::BlockchainCommand { name: method };
+        let resp: BabelResponse = self.send(request).await?;
+        let inner = match resp {
+            BabelResponse::BlockchainResponse { value } => {
+                value.parse().context(format!("Could not parse {method}"))?
+            }
+            e => anyhow::bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
+        };
+        Ok(inner)
+    }
+
+    /// Returns the methods that are supported by this blockchain. Calling any method on this
+    /// blockchain that is not listed here will result in an error being returned.
+    pub async fn capabilities(&mut self) -> Result<Vec<String>> {
+        let request = BabelRequest::ListCapabilities;
+        let resp: BabelResponse = self.send(request).await?;
+        let height = match resp {
+            BabelResponse::ListCapabilities(caps) => caps,
+            e => anyhow::bail!("Unexpected BabelResponse for `height`: `{e:?}`"),
+        };
         Ok(height)
     }
 
-    // ///
-    // async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
-    //     let mut buf = String::new();
-        
-    //     tracing::debug!("Registring read intent");
-    //     self.babel_conn.readable().await?;
-    //     tracing::debug!("Readble!");
-    //     dbg!(self.babel_conn.read_to_string(&mut buf).await)?;
-    //     let res = serde_json::from_str(&buf)?;
-    //     Ok(res)
-    // }
+    async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(
+        &mut self,
+        data: S,
+    ) -> Result<D> {
+        self.write_data(data).await?;
+        self.read_data().await
+    }
 
-    // async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
-    //     tracing::debug!("Registring write intent");
-    //     self.babel_conn.writable().await?;
-    //     tracing::debug!("Writable!");
-    //     let data = serde_json::to_string(&data)?;
-    //     dbg!(self.babel_conn.write_all(data.as_bytes()).await)?;
-    //     Ok(())
-    // }
+    /// Waits for the socket to become readable, then writes the data as json to the socket. The max
+    /// time that is allowed to elapse  is `SOCKET_TIMEOUT`.
+    async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
+        use std::io::ErrorKind::WouldBlock;
 
-    async fn rw<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(&mut self, data: S) -> Result<D> {
-        let mut should_write = true;
-        loop {
-            let ready = self.babel_conn.ready(tokio::io::Interest::READABLE | tokio::io::Interest::WRITABLE).await.unwrap();
-    
-            if ready.is_readable() {
+        let data = serde_json::to_string(&data)?;
+        let write_data = async {
+            loop {
+                // Wait for the socket to become ready to write to.
+                self.babel_conn.writable().await?;
+                // Try to write data, this may still fail with `WouldBlock` if the readiness event
+                // is a false positive.
+                match self.babel_conn.try_write(data.as_bytes()) {
+                    Ok(_) => break,
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
+                }
+            }
+            Ok(())
+        };
+        timeout(SOCKET_TIMEOUT, write_data).await?
+    }
+
+    /// Waits for the socket to become readable, then reads data from it. The max time that is
+    /// allowed to elapse (per read) is `SOCKET_TIMEOUT`. When data is sent over the vsock, this
+    /// data is parsed as json and returned as the requested type.
+    async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
+        use std::io::ErrorKind::WouldBlock;
+
+        let read_data = async {
+            loop {
+                // Wait for the socket to become ready to read from.
+                self.babel_conn.readable().await?;
                 let mut data = vec![0; 1024];
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
                 match self.babel_conn.try_read(&mut data) {
                     Ok(n) => {
-                        println!("read {} bytes", n);
                         data.resize(n, 0);
-                        println!("Received message: `{data:?}`");
-                        let s = std::str::from_utf8(&data).unwrap();
-                        println!("As string: `{s}`");
-                        if s.starts_with("OK ") {
-                            // This is the init message, skip
-                            continue;
-                        }
-                        return Ok(serde_json::from_str(s).unwrap());
+                        let s = std::str::from_utf8(&data)?;
+                        return Ok(serde_json::from_str(s)?);
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        continue;
-                    }
-                    Err(e) => {
-                        println!("Readable sad times {e}");
-                        panic!();
-                    }
-                }
-    
-            }
-    
-            if should_write && ready.is_writable() {
-                should_write = false;
-                // Try to write data, this may still fail with `WouldBlock`
-                // if the readiness event is a false positive.
-                let data = serde_json::to_string(&data)?;
-                match self.babel_conn.try_write(data.as_bytes()) {
-                    Ok(n) => {
-                        println!("wrote {n} bytes");
-                    }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        continue;
-                    }
-                    Err(e) => {
-                        println!("Writable sad times {e}");
-                        panic!();
-                    }
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
                 }
             }
-        }
+        };
+        timeout(SOCKET_TIMEOUT, read_data).await?
     }
 
     /// Establishes a new connection to the VM. Note that this fails if the VM hasn't started yet.
     /// It also initializes that connection by sending the opening message. Therefore, if this
     /// function succeeds the connection is guaranteed to be writeable at the moment of returning.
     pub async fn conn(node_id: uuid::Uuid) -> Result<UnixStream> {
+        use std::io::ErrorKind::WouldBlock;
+
         // We are going to connect to the central socket for this VM. Later we will specify which
         // port we want to talk to.
-        let socket = dbg!(format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket"));
+        let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket");
         tracing::debug!("Connecting to node at `{socket}`");
-        let mut conn = UnixStream::connect(&socket)
-            .await
-            .context("Failed to connect to babel bus")?;
+        let now = || std::time::Instant::now();
+        let start = now();
+        let mut conn = loop {
+            let maybe_conn = UnixStream::connect(&socket).await;
+            match maybe_conn {
+                Ok(conn) => break Ok(conn),
+                Err(_) if (now() - start).as_secs() < 5 => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await
+                }
+                Err(e) => break Err(e),
+            };
+        }
+        .context("Failed to connect to babel bus")?;
         // For host initiated connections we have to send a message to the guess socket that
-        // contains the port number.
+        // contains the port number. As a response we expect a message of the format `Ok <num>\n`.
+        // We check this by asserting that the first message received starts with `OK`. Popping
+        // this message here prevents us from having to check for the opening message elsewhere
+        // were we expect the response to be valid json.
         let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
-        conn.write(open_message.as_bytes()).await?;
-        Ok(conn)
+        timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
+        let mut sock_opened_msg = vec![0; 1024];
+        let resp = async {
+            loop {
+                conn.readable().await?;
+                match conn.try_read(&mut sock_opened_msg) {
+                    Ok(n) => {
+                        sock_opened_msg.resize(n, 0);
+                        let sock_opened_msg = std::str::from_utf8(&sock_opened_msg).unwrap();
+                        let msg_valid = sock_opened_msg.starts_with("OK ");
+                        anyhow::ensure!(msg_valid, "Invalid opening message for new socket");
+                        break;
+                    }
+                    // Ignore false-positive readable events
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Establishing socket failed with `{e}`"),
+                }
+            }
+            Ok(conn)
+        };
+        timeout(SOCKET_TIMEOUT, resp).await?
     }
+}
+
+/// Each request that comes over the VSock to babel must be a piece of JSON that can be
+/// deserialized into this struct.
+#[derive(Debug, serde::Serialize)]
+pub enum BabelRequest<'a> {
+    /// List the endpoints that are available for the current blockchain. These are extracted from
+    /// the config, and just sent back as strings for now.
+    ListCapabilities,
+    /// Send a request to the current blockchain. We can identify the way to do this from the
+    /// config and forward the provided parameters.
+    BlockchainCommand { name: &'a str },
+}
+
+#[derive(Debug, serde::Deserialize)]
+enum BabelResponse {
+    ListCapabilities(Vec<String>),
+    BlockchainResponse { value: String },
+    Error(String),
 }

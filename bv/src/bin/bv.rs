@@ -266,14 +266,40 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .status;
             println!("{}", bv_pb::NodeStatus::from_i32(status).unwrap());
         }
+        NodeCommand::Capabilities { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let capabilities = service_client
+                .list_capabilities(bv_pb::ListCapabilitiesRequest {
+                    node_id: id.to_string(),
+                })
+                .await?
+                .into_inner()
+                .capabilities;
+            for cap in capabilities {
+                println!("{cap}");
+            }
+        }
         NodeCommand::Height { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let height = service_client
-                .get_height(bv_pb::GetHeightRequest { node_id: id.to_string() })
+                .get_height(bv_pb::GetHeightRequest {
+                    node_id: id.to_string(),
+                })
                 .await?
                 .into_inner()
                 .height;
-            println!("{}", height);
+            println!("{height}");
+        }
+        NodeCommand::BlockAge { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let block_age = service_client
+                .get_age(bv_pb::GetAgeRequest {
+                    node_id: id.to_string(),
+                })
+                .await?
+                .into_inner()
+                .block_age;
+            println!("{block_age}");
         }
     }
     Ok(())

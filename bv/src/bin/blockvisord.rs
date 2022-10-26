@@ -78,4 +78,3 @@ async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
         }
     }
 }
-        

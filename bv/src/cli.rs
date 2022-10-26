@@ -155,7 +155,20 @@ pub enum NodeCommand {
     },
 
     /// Return the block height of the blockchain the node is running
+    #[clap(alias = "caps")]
+    Capabilities {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block height of the blockchain the node is running
     Height {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block height of the blockchain the node is running
+    BlockAge {
         /// Node id or name
         id_or_name: String,
     },

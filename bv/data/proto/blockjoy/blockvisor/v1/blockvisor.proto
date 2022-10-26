@@ -78,10 +78,27 @@ message GetNodeIdForNameResponse {
     string id = 1;
 }
 
+message ListCapabilitiesRequest {
+    string node_id = 1;
+}
+
+message ListCapabilitiesResponse {
+    repeated string capabilities = 1;
+}
+
 message GetHeightRequest {
     string node_id = 1;
 }
 
 message GetHeightResponse {
     uint64 height = 1;
+}
+
+
+message GetAgeRequest {
+    string node_id = 1;
+}
+
+message GetAgeResponse {
+    uint64 block_age = 1;
 }

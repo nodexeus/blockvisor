@@ -1,6 +1,6 @@
 use std::{sync::Arc, time};
 
-use crate::{config, client};
+use crate::{client, config};
 use eyre::Context;
 use futures::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -53,7 +53,7 @@ pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
             Ok(stream) => {
                 tracing::debug!("Stream opened, delegating to handler.");
                 tokio::spawn(serve_stream(stream, Arc::clone(&client)));
-            },
+            }
             Err(_) => {
                 tracing::debug!("Receiving streams failed. Aborting babel.");
                 break;
