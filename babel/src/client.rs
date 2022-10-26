@@ -27,6 +27,7 @@ impl Client {
 
         match req {
             BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
+            BabelRequest::Ping => Ok(Pong),
             BabelRequest::BlockchainCommand(cmd) => {
                 tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
@@ -153,6 +154,8 @@ pub enum BabelRequest {
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
     ListCapabilities,
+    /// Returns `Pong`. Useful to check for the liveness of the node.
+    Ping,
     /// Send a request to the current blockchain. We can identify the way to do this from the
     /// config and forward the provided parameters.
     BlockchainCommand(BlockchainCommand),
@@ -166,6 +169,7 @@ pub struct BlockchainCommand {
 #[derive(Debug, Serialize)]
 pub enum BabelResponse {
     ListCapabilities(Vec<String>),
+    Pong,
     BlockchainResponse(BlockchainResponse),
     Error(String),
 }
@@ -208,6 +212,7 @@ mod tests {
 
             match self {
                 ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
+                Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
                 BabelResponse::BlockchainResponse(resp) => resp,
                 Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
             }
@@ -221,8 +226,6 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: None,
@@ -293,8 +296,6 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -340,8 +341,6 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -398,8 +397,6 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),

@@ -33,8 +33,6 @@ pub struct Env {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub babel_version: String,
-    pub node_version: String,
     pub node_type: String,
     pub description: Option<String>,
     pub api_host: Option<String>,

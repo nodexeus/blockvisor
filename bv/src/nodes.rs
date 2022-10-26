@@ -116,7 +116,6 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        dbg!(backtrace::Backtrace::new());
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
             error!("Cannot send node status: {error:?}");
         };

@@ -9,32 +9,6 @@ use tokio_vsock::VsockStream;
 const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_PORT: u32 = 42;
 
-// #[derive(serde::Serialize)]
-// struct Start {
-//     start_msg: String,
-// }
-
-// impl Start {
-//     fn new() -> Self {
-//         Self {
-//             start_msg: "Oh lawd we be startin'".to_string(),
-//         }
-//     }
-// }
-
-// #[derive(serde::Serialize)]
-// struct Stop {
-//     stop_msg: String,
-// }
-
-// impl Stop {
-//     fn _new() -> Self {
-//         Self {
-//             stop_msg: "Oh lawd we be stoppin'".to_string(),
-//         }
-//     }
-// }
-
 /// This function tries to read messages from the vsocket and keeps responding to those messages.
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or

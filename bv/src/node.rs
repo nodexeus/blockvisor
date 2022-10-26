@@ -61,7 +61,6 @@ impl Node {
     /// Returns node previously created on this host.
     #[instrument]
     pub async fn connect(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
-        // let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
@@ -86,18 +85,10 @@ impl Node {
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await?;
-        let mut buf = String::new();
-        timeout(
-            BABEL_START_TIMEOUT,
-            self.babel_conn.read_to_string(&mut buf),
-        )
-        .await??;
-        let json: serde_json::Value = buf.parse()?;
-        if json.get("start_msg").is_none() {
-            tracing::error!("Node did not start!");
-            return Err(anyhow::anyhow!("Node did not start!"));
+        let resp = self.send(BabelRequest::Ping).await;
+        if !matches!(resp, Ok(BabelResponse::Pong)) {
+            tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
-
         self.data.save().await
     }
 
@@ -291,13 +282,14 @@ impl Node {
         // port we want to talk to.
         let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket");
         tracing::debug!("Connecting to node at `{socket}`");
-        let now = || std::time::Instant::now();
-        let start = now();
+        let start = std::time::Instant::now();
+        let secs_elapsed = || (start - std::time::Instant::now()).as_secs();
         let mut conn = loop {
             let maybe_conn = UnixStream::connect(&socket).await;
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
-                Err(_) if (now() - start).as_secs() < 5 => {
+                Err(e) if secs_elapsed() < 5 => {
+                    tracing::debug!("No socket file yet, retrying in 1 second: {e}");
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await
                 }
                 Err(e) => break Err(e),
@@ -341,6 +333,8 @@ pub enum BabelRequest<'a> {
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
     ListCapabilities,
+    /// Returns `Pong`. Useful to check for the liveness of the node.
+    Ping,
     /// Send a request to the current blockchain. We can identify the way to do this from the
     /// config and forward the provided parameters.
     BlockchainCommand { name: &'a str },
@@ -349,6 +343,7 @@ pub enum BabelRequest<'a> {
 #[derive(Debug, serde::Deserialize)]
 enum BabelResponse {
     ListCapabilities(Vec<String>),
+    Pong,
     BlockchainResponse { value: String },
     Error(String),
 }
