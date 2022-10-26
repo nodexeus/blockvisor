@@ -16,4 +16,7 @@ service Blockvisor {
     rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
     rpc GetHeight(GetHeightRequest) returns (GetHeightResponse);
     rpc GetAge(GetAgeRequest) returns (GetAgeResponse);
+    rpc GetName(GetNameRequest) returns (GetNameResponse);
+    rpc GetAddress(GetAddressRequest) returns (GetAddressResponse);
+    rpc GetConsensus(GetConsensusRequest) returns (GetConsensusResponse);
 }

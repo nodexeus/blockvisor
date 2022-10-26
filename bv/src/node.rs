@@ -8,7 +8,7 @@ use tokio::{
     net::UnixStream,
     time::{sleep, timeout},
 };
-use tracing::{instrument, trace};
+use tracing::{error, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -115,11 +115,20 @@ impl Node {
                 }
 
                 if shutdown_success {
-                    let mut buf = String::new();
-                    timeout(BABEL_STOP_TIMEOUT, self.babel_conn.read_to_string(&mut buf)).await??;
-                    let json: serde_json::Value = buf.parse()?;
-                    if json.get("start_msg").is_none() {
-                        tracing::error!("Node did not stop!!");
+                    // We can verify successful shutdown success by checking whether we can read
+                    // into a buffer of nonzero length. If the stream is closed, the number of
+                    // bytes read should be zero.
+                    let read = timeout(BABEL_STOP_TIMEOUT, self.babel_conn.read(&mut [0])).await;
+                    match read {
+                        // Successful shutdown in this case
+                        Ok(Ok(0)) => {}
+                        // The babel stream has more to say...
+                        Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
+                        // The read timed out. It is still live so the node did not shut down.
+                        Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
+                        // Reading returned _before_ the timeout, but was otherwise unsuccessful.
+                        // Could happpen I guess? Lets log the error.
+                        Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
                     }
                 }
             }
@@ -181,11 +190,32 @@ impl Node {
         self.call_method("height").await
     }
 
-    /// Returns the height of the blockchain (in blocks).
+    /// Returns the block age of the blockchain (in seconds).
     pub async fn block_age(&mut self) -> Result<u64> {
         self.call_method("block_age").await
     }
 
+    /// Returns the name of the node. This is usually some random generated name that you may use
+    /// to recognise the node, but the purpose may vary per blockchain.
+    /// ### Example
+    /// `chilly-peach-kangaroo`
+    pub async fn name(&mut self) -> Result<String> {
+        self.call_method("name").await
+    }
+
+    /// The address of the node. The meaning of this varies from blockchain to blockchain.
+    /// ### Example
+    /// `/p2p/11Uxv9YpMpXvLf8ZyvGWBdbgq3BXv8z1pra1LBqkRS5wmTEHNW3`
+    pub async fn address(&mut self) -> Result<String> {
+        self.call_method("address").await
+    }
+
+    /// Returns whether this node is in consensus or not.
+    pub async fn consensus(&mut self) -> Result<bool> {
+        self.call_method("consensus").await
+    }
+
+    /// This function calls babel by sending a blockchain command using the specified method name.
     async fn call_method<T>(&mut self, method: &str) -> Result<T>
     where
         T: FromStr,
@@ -214,6 +244,8 @@ impl Node {
         Ok(height)
     }
 
+    /// This function combines the capabilities from `write_data` and `read_data` to allow you to
+    /// send some request and then obtain a response back.
     async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(
         &mut self,
         data: S,
@@ -282,15 +314,19 @@ impl Node {
         // port we want to talk to.
         let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket");
         tracing::debug!("Connecting to node at `{socket}`");
+
+        // We need to implement retrying when reading from the socket, as it may take a little bit
+        // of time for the socket file to get created on disk, because this is done asynchronously
+        // by Firecracker.
         let start = std::time::Instant::now();
-        let secs_elapsed = || (start - std::time::Instant::now()).as_secs();
+        let elapsed = || std::time::Instant::now() - start;
         let mut conn = loop {
             let maybe_conn = UnixStream::connect(&socket).await;
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
-                Err(e) if secs_elapsed() < 5 => {
-                    tracing::debug!("No socket file yet, retrying in 1 second: {e}");
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await
+                Err(e) if elapsed() < BABEL_START_TIMEOUT => {
+                    tracing::debug!("No socket file yet, retrying in 5 seconds: {e}");
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
                 Err(e) => break Err(e),
             };

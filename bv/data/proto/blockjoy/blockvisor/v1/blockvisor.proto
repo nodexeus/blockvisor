@@ -102,3 +102,27 @@ message GetAgeRequest {
 message GetAgeResponse {
     uint64 block_age = 1;
 }
+
+message GetNameRequest {
+    string node_id = 1;
+}
+
+message GetNameResponse {
+    string name = 1;
+}
+
+message GetAddressRequest {
+    string node_id = 1;
+}
+
+message GetAddressResponse {
+    string address = 1;
+}
+
+message GetConsensusRequest {
+    string node_id = 1;
+}
+
+message GetConsensusResponse {
+    bool consensus = 1;
+}

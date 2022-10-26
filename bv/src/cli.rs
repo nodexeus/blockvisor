@@ -167,8 +167,26 @@ pub enum NodeCommand {
         id_or_name: String,
     },
 
-    /// Return the block height of the blockchain the node is running
+    /// Return the block age of the blockchain the node is running
     BlockAge {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the name node.
+    Name {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the address of the blockchain the node is running
+    Address {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return whether the node that is running is in consensus or not.
+    Consensus {
         /// Node id or name
         id_or_name: String,
     },

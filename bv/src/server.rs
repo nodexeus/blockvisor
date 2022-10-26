@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
 use tonic::{transport::Endpoint, Request, Response, Status};
-use uuid::Uuid;
 
 pub const BLOCKVISOR_SERVICE_PORT: usize = 9001;
 pub const BLOCKVISOR_SERVICE_URL: &str = "http://localhost:9001";
@@ -47,8 +46,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::CreateNodeRequest>,
     ) -> Result<Response<bv_pb::CreateNodeResponse>, Status> {
         let request = request.into_inner();
-        let id =
-            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
             .lock()
@@ -67,8 +65,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::DeleteNodeRequest>,
     ) -> Result<Response<bv_pb::DeleteNodeResponse>, Status> {
         let request = request.into_inner();
-        let id =
-            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
             .lock()
@@ -87,8 +84,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::StartNodeRequest>,
     ) -> Result<Response<bv_pb::StartNodeResponse>, Status> {
         let request = request.into_inner();
-        let id =
-            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
             .lock()
@@ -107,8 +103,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::StopNodeRequest>,
     ) -> Result<Response<bv_pb::StopNodeResponse>, Status> {
         let request = request.into_inner();
-        let id =
-            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
             .lock()
@@ -154,8 +149,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::GetNodeStatusRequest>,
     ) -> Result<Response<bv_pb::GetNodeStatusResponse>, Status> {
         let request = request.into_inner();
-        let id =
-            Uuid::parse_str(&request.id).map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let id = helpers::parse_uuid(request.id)?;
 
         let status = self
             .nodes
@@ -201,10 +195,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::ListCapabilitiesRequest>,
     ) -> Result<Response<bv_pb::ListCapabilitiesResponse>, Status> {
         let request = request.into_inner();
-        let node_id = request
-            .node_id
-            .parse()
-            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let node_id = helpers::parse_uuid(request.node_id)?;
         let capabilities = self
             .nodes
             .lock()
@@ -225,10 +216,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::GetHeightRequest>,
     ) -> Result<Response<bv_pb::GetHeightResponse>, Status> {
         let request = request.into_inner();
-        let node_id = request
-            .node_id
-            .parse()
-            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let node_id = helpers::parse_uuid(request.node_id)?;
         let height = self
             .nodes
             .lock()
@@ -247,10 +235,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         request: Request<bv_pb::GetAgeRequest>,
     ) -> Result<Response<bv_pb::GetAgeResponse>, Status> {
         let request = request.into_inner();
-        let node_id = request
-            .node_id
-            .parse()
-            .map_err(|_| Status::invalid_argument("Unparsable node_id"))?;
+        let node_id = helpers::parse_uuid(request.node_id)?;
         let block_age = self
             .nodes
             .lock()
@@ -263,10 +248,75 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::GetAgeResponse { block_age }))
     }
+
+    async fn get_name(
+        &self,
+        request: Request<bv_pb::GetNameRequest>,
+    ) -> Result<Response<bv_pb::GetNameResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.node_id)?;
+        let name = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .name()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetNameResponse { name }))
+    }
+
+    async fn get_address(
+        &self,
+        request: Request<bv_pb::GetAddressRequest>,
+    ) -> Result<Response<bv_pb::GetAddressResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.node_id)?;
+        let address = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .address()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetAddressResponse { address }))
+    }
+
+    async fn get_consensus(
+        &self,
+        request: Request<bv_pb::GetConsensusRequest>,
+    ) -> Result<Response<bv_pb::GetConsensusResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.node_id)?;
+        let consensus = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .consensus()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetConsensusResponse { consensus }))
+    }
 }
 
 impl fmt::Display for bv_pb::NodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+mod helpers {
+    pub(super) fn parse_uuid(uuid: impl AsRef<str>) -> Result<uuid::Uuid, tonic::Status> {
+        uuid.as_ref()
+            .parse()
+            .map_err(|_| tonic::Status::invalid_argument("Unparsable node id"))
     }
 }

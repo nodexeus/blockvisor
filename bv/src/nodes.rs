@@ -1,11 +1,13 @@
 use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
+use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -41,7 +43,7 @@ pub struct Nodes {
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CommonData {
     pub machine_index: u32,
 }
@@ -223,7 +225,11 @@ impl Nodes {
             }
             match NodeData::load(&path)
                 .and_then(|data| async {
-                    let babel_conn = Node::conn(data.id).await?;
+                    // Since this is the startup phase it doesn't make sense to wait a long time
+                    // for the nodes to come online. For that reason we restrict the allowed delay
+                    // further down to one second.
+                    let max_delay = std::time::Duration::from_secs(1);
+                    let babel_conn = timeout(max_delay, Node::conn(data.id)).await??;
                     Node::connect(data, babel_conn).await
                 })
                 .await

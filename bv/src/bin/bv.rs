@@ -301,6 +301,39 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .block_age;
             println!("{block_age}");
         }
+        NodeCommand::Name { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let name = service_client
+                .get_name(bv_pb::GetNameRequest {
+                    node_id: id.to_string(),
+                })
+                .await?
+                .into_inner()
+                .name;
+            println!("{name}");
+        }
+        NodeCommand::Address { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let address = service_client
+                .get_address(bv_pb::GetAddressRequest {
+                    node_id: id.to_string(),
+                })
+                .await?
+                .into_inner()
+                .address;
+            println!("{address}");
+        }
+        NodeCommand::Consensus { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let consensus = service_client
+                .get_consensus(bv_pb::GetConsensusRequest {
+                    node_id: id.to_string(),
+                })
+                .await?
+                .into_inner()
+                .consensus;
+            println!("{consensus}");
+        }
     }
     Ok(())
 }
