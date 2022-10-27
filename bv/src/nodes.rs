@@ -81,6 +81,7 @@ impl Nodes {
             id,
             name: name.clone(),
             chain,
+            expected_status: NodeStatus::Stopped,
             network_interface,
         };
         self.save().await?;
@@ -178,7 +179,7 @@ impl Nodes {
             .get(&id)
             .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
 
-        node.status().await
+        Ok(node.status())
     }
 
     // TODO: Rest of the NodeCommand variants.

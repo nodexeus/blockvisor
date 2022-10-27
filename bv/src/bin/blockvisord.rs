@@ -3,6 +3,7 @@ use blockvisord::{
     config::Config,
     grpc,
     logging::setup_logging,
+    node_data::NodeStatus,
     nodes::Nodes,
     server::{bv_pb, BlockvisorServer, BLOCKVISOR_SERVICE_PORT},
 };
@@ -48,9 +49,40 @@ async fn main() -> Result<()> {
         }
     };
 
+    let nodes_recovery_future = async {
+        loop {
+            let list = nodes.lock().await.list().await;
+
+            for node in list {
+                let id = &node.id;
+                if node.status() == NodeStatus::Failed {
+                    match node.expected_status {
+                        NodeStatus::Running => {
+                            info!("Recovery: starting node with ID `{id}`");
+                            if let Err(e) = nodes.lock().await.start(node.id).await {
+                                error!("Recovery: starting node with ID `{id}` failed: {e}");
+                            }
+                        }
+                        NodeStatus::Stopped => {
+                            info!("Recovery: stopping node with ID `{id}`");
+                            if let Err(e) = nodes.lock().await.stop(node.id).await {
+                                error!("Recovery: stopping node with ID `{id}` failed: {e}",);
+                            }
+                        }
+                        NodeStatus::Failed => {
+                            info!("Recovery: node with ID `{id}` cannot be recovered");
+                        }
+                    }
+                }
+            }
+            sleep(Duration::from_secs(5)).await;
+        }
+    };
+
     tokio::select! {
         _ = internal_api_server_future => {},
-        _ = external_api_client_future => {}
+        _ = external_api_client_future => {},
+        _ = nodes_recovery_future => {},
     }
 
     info!("Stopping...");

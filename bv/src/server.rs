@@ -132,6 +132,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             let status = match node.status() {
                 NodeStatus::Running => bv_pb::NodeStatus::Running,
                 NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
+                NodeStatus::Failed => bv_pb::NodeStatus::Failed,
             };
             let n = bv_pb::Node {
                 id: node.id.to_string(),
@@ -167,6 +168,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let status = match status {
             NodeStatus::Running => bv_pb::NodeStatus::Running,
             NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
+            NodeStatus::Failed => bv_pb::NodeStatus::Failed,
         };
 
         let reply = bv_pb::GetNodeStatusResponse {
