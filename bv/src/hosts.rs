@@ -13,11 +13,16 @@ pub struct HostInfo {
 pub fn get_host_info() -> HostInfo {
     let sys = System::new_all();
 
+    let disk_size = sys
+        .disks()
+        .iter()
+        .fold(0, |acc, disk| acc + disk.total_space());
+
     HostInfo {
         name: sys.host_name(),
         cpu_count: sys.physical_core_count().map(|x| x as i64),
         mem_size: Some(sys.total_memory() as i64 * 1024),
-        disk_size: Some(sys.disks()[0].total_space() as i64), // todo: display either for all disks or install partition
+        disk_size: Some(disk_size as i64),
         os: sys.name(),
         os_version: sys.os_version(),
     }
