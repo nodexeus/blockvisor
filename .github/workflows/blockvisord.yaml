@@ -26,10 +26,11 @@ jobs:
         with:
           toolchain: stable
           profile: minimal
+          target: x86_64-unknown-linux-musl
           override: true
       - name: Build
         run: >
-          cargo build -p blockvisord
+          make build
       - name: Reinstall
         run: >
           make reinstall
