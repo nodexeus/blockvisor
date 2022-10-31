@@ -230,15 +230,20 @@ impl Nodes {
                     // further down to one second.
                     let max_delay = std::time::Duration::from_secs(1);
                     let babel_conn = timeout(max_delay, Node::conn(data.id)).await??;
+                    tracing::debug!("Established babel connection");
                     Node::connect(data, babel_conn).await
                 })
                 .await
             {
                 Ok(node) => {
-                    this.node_ids.insert(node.data.name.clone(), *node.id());
+                    this.node_ids.insert(node.data.name.clone(), node.id());
                     this.nodes.insert(node.data.id, node);
                 }
-                Err(e) => warn!("Failed to read node file `{}`: {}", path.display(), e),
+                Err(e) => warn!(
+                    "Failed to connect to node from file `{}`: {}",
+                    path.display(),
+                    e
+                ),
             }
         }
 

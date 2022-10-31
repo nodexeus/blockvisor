@@ -8,7 +8,7 @@ use tokio::{
     net::UnixStream,
     time::{sleep, timeout},
 };
-use tracing::{error, instrument, trace, warn};
+use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -20,7 +20,30 @@ use crate::{
 pub struct Node {
     pub data: NodeData,
     machine: Machine<'static>,
-    babel_conn: UnixStream,
+    babel_conn: Connection,
+}
+
+#[derive(Debug)]
+enum Connection {
+    Closed,
+    Open { babel_conn: UnixStream },
+}
+
+impl Connection {
+    /// Returns the open babel connection, if there is one.
+    fn conn_mut(&mut self) -> Option<&mut UnixStream> {
+        use Connection::*;
+        match self {
+            Closed => None,
+            Open { babel_conn } => Some(babel_conn),
+        }
+    }
+
+    /// Tries to return the babel connection, and if there isn't one, returns an error message.
+    fn try_conn_mut(&mut self) -> Result<&mut UnixStream> {
+        self.conn_mut()
+            .ok_or_else(|| anyhow::anyhow!("Tried to get babel connection while there isn't one"))
+    }
 }
 
 // FIXME: Hardcoding everything for now.
@@ -43,7 +66,6 @@ impl Node {
     /// Creates a new node with `id`.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
-        let id = data.id;
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
@@ -54,7 +76,7 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_conn: Self::conn(id).await?,
+            babel_conn: Connection::Closed,
         })
     }
 
@@ -72,19 +94,22 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_conn,
+            babel_conn: Connection::Open { babel_conn },
         })
     }
 
     /// Returns the node's `id`.
-    pub fn id(&self) -> &Uuid {
-        &self.data.id
+    pub fn id(&self) -> Uuid {
+        self.data.id
     }
 
     /// Starts the node.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await?;
+        self.babel_conn = Connection::Open {
+            babel_conn: Self::conn(self.id()).await?,
+        };
         let resp = self.send(BabelRequest::Ping).await;
         if !matches!(resp, Ok(BabelResponse::Pong)) {
             tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
@@ -115,25 +140,30 @@ impl Node {
                 }
 
                 if shutdown_success {
-                    // We can verify successful shutdown success by checking whether we can read
-                    // into a buffer of nonzero length. If the stream is closed, the number of
-                    // bytes read should be zero.
-                    let read = timeout(BABEL_STOP_TIMEOUT, self.babel_conn.read(&mut [0])).await;
-                    match read {
-                        // Successful shutdown in this case
-                        Ok(Ok(0)) => {}
-                        // The babel stream has more to say...
-                        Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
-                        // The read timed out. It is still live so the node did not shut down.
-                        Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
-                        // Reading returned _before_ the timeout, but was otherwise unsuccessful.
-                        // Could happpen I guess? Lets log the error.
-                        Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
+                    if let Some(babel_conn) = self.babel_conn.conn_mut() {
+                        // We can verify successful shutdown success by checking whether we can read
+                        // into a buffer of nonzero length. If the stream is closed, the number of
+                        // bytes read should be zero.
+                        let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
+                        match read {
+                            // Successful shutdown in this case
+                            Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
+                            // The babel stream has more to say...
+                            Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
+                            // The read timed out. It is still live so the node did not shut down.
+                            Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
+                            // Reading returned _before_ the timeout, but was otherwise unsuccessful.
+                            // Could happpen I guess? Lets log the error.
+                            Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
+                        }
+                    } else {
+                        tracing::warn!("Terminating node has no babel conn!");
                     }
                 }
             }
         }
         self.data.save().await?;
+        self.babel_conn = Connection::Closed;
 
         // FIXME: for some reason firecracker socket is not created by
         // consequent start command if we do not wait a bit here
@@ -216,7 +246,7 @@ impl Node {
     }
 
     /// This function calls babel by sending a blockchain command using the specified method name.
-    async fn call_method<T>(&mut self, method: &str) -> Result<T>
+    pub async fn call_method<T>(&mut self, method: &str) -> Result<T>
     where
         T: FromStr,
         <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
@@ -260,13 +290,14 @@ impl Node {
         use std::io::ErrorKind::WouldBlock;
 
         let data = serde_json::to_string(&data)?;
+        let babel_conn = self.babel_conn.try_conn_mut()?;
         let write_data = async {
             loop {
                 // Wait for the socket to become ready to write to.
-                self.babel_conn.writable().await?;
+                babel_conn.writable().await?;
                 // Try to write data, this may still fail with `WouldBlock` if the readiness event
                 // is a false positive.
-                match self.babel_conn.try_write(data.as_bytes()) {
+                match babel_conn.try_write(data.as_bytes()) {
                     Ok(_) => break,
                     Err(e) if e.kind() == WouldBlock => continue,
                     Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
@@ -283,14 +314,15 @@ impl Node {
     async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
         use std::io::ErrorKind::WouldBlock;
 
+        let babel_conn = self.babel_conn.try_conn_mut()?;
         let read_data = async {
             loop {
                 // Wait for the socket to become ready to read from.
-                self.babel_conn.readable().await?;
+                babel_conn.readable().await?;
                 let mut data = vec![0; 1024];
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
-                match self.babel_conn.try_read(&mut data) {
+                match babel_conn.try_read(&mut data) {
                     Ok(n) => {
                         data.resize(n, 0);
                         let s = std::str::from_utf8(&data)?;
@@ -321,7 +353,7 @@ impl Node {
         let start = std::time::Instant::now();
         let elapsed = || std::time::Instant::now() - start;
         let mut conn = loop {
-            let maybe_conn = UnixStream::connect(&socket).await;
+            let maybe_conn = dbg!(UnixStream::connect(&socket).await);
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
                 Err(e) if elapsed() < BABEL_START_TIMEOUT => {
@@ -338,15 +370,18 @@ impl Node {
         // this message here prevents us from having to check for the opening message elsewhere
         // were we expect the response to be valid json.
         let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
+        tracing::debug!("Sending open message : `{open_message:?}`.");
         timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
-        let mut sock_opened_msg = vec![0; 1024];
+        tracing::debug!("Sent open message.");
+        let mut sock_opened_msg = vec![0; 20];
         let resp = async {
             loop {
-                conn.readable().await?;
-                match conn.try_read(&mut sock_opened_msg) {
+                dbg!(conn.readable().await)?;
+                match dbg!(conn.try_read(&mut sock_opened_msg)) {
                     Ok(n) => {
                         sock_opened_msg.resize(n, 0);
                         let sock_opened_msg = std::str::from_utf8(&sock_opened_msg).unwrap();
+                        dbg!(sock_opened_msg);
                         let msg_valid = sock_opened_msg.starts_with("OK ");
                         anyhow::ensure!(msg_valid, "Invalid opening message for new socket");
                         break;

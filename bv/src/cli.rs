@@ -190,6 +190,12 @@ pub enum NodeCommand {
         /// Node id or name
         id_or_name: String,
     },
+
+    /// Create the genesis block for this node.
+    Genesis {
+        /// Node id or name
+        id_or_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

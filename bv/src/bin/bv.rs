@@ -282,56 +282,79 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Height { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let height = service_client
-                .get_height(bv_pb::GetHeightRequest {
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "height".to_string(),
                     node_id: id.to_string(),
+                    payload: None,
                 })
                 .await?
                 .into_inner()
-                .height;
+                .value;
             println!("{height}");
         }
         NodeCommand::BlockAge { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let block_age = service_client
-                .get_age(bv_pb::GetAgeRequest {
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "block-age".to_string(),
                     node_id: id.to_string(),
+                    payload: None,
                 })
                 .await?
                 .into_inner()
-                .block_age;
+                .value;
             println!("{block_age}");
         }
         NodeCommand::Name { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let name = service_client
-                .get_name(bv_pb::GetNameRequest {
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "name".to_string(),
                     node_id: id.to_string(),
+                    payload: None,
                 })
                 .await?
                 .into_inner()
-                .name;
+                .value;
             println!("{name}");
         }
         NodeCommand::Address { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let address = service_client
-                .get_address(bv_pb::GetAddressRequest {
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "address".to_string(),
                     node_id: id.to_string(),
+                    payload: None,
                 })
                 .await?
                 .into_inner()
-                .address;
+                .value;
             println!("{address}");
         }
         NodeCommand::Consensus { id_or_name } => {
             let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
             let consensus = service_client
-                .get_consensus(bv_pb::GetConsensusRequest {
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "consensus".to_string(),
                     node_id: id.to_string(),
+                    payload: None,
                 })
                 .await?
                 .into_inner()
-                .consensus;
+                .value;
+            println!("{consensus}");
+        }
+        NodeCommand::Genesis { id_or_name } => {
+            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
+            let consensus = service_client
+                .blockchain(bv_pb::BlockchainRequest {
+                    method: "genesis".to_string(),
+                    node_id: id.to_string(),
+                    payload: None,
+                })
+                .await?
+                .into_inner()
+                .value;
             println!("{consensus}");
         }
     }

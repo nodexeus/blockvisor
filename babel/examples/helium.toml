@@ -172,3 +172,13 @@ params = []
     [methods.response]
     code = 200
     field = "result"
+
+[[methods]]
+name = "genesis"
+transport = "sh"
+body = "curl https://snapshots.helium.wtf/genesis.mainnet > /h && miner genesis load /h"
+
+    [methods.response]
+    # something?
+    status = 0
+    format = "raw"

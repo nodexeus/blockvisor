@@ -211,99 +211,23 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         }))
     }
 
-    async fn get_height(
+    async fn blockchain(
         &self,
-        request: Request<bv_pb::GetHeightRequest>,
-    ) -> Result<Response<bv_pb::GetHeightResponse>, Status> {
+        request: Request<bv_pb::BlockchainRequest>,
+    ) -> Result<Response<bv_pb::BlockchainResponse>, Status> {
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.node_id)?;
-        let height = self
+        let value = self
             .nodes
             .lock()
             .await
             .nodes
             .get_mut(&node_id)
             .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .height()
+            .call_method(&request.method)
             .await
             .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
-        Ok(Response::new(bv_pb::GetHeightResponse { height }))
-    }
-
-    async fn get_age(
-        &self,
-        request: Request<bv_pb::GetAgeRequest>,
-    ) -> Result<Response<bv_pb::GetAgeResponse>, Status> {
-        let request = request.into_inner();
-        let node_id = helpers::parse_uuid(request.node_id)?;
-        let block_age = self
-            .nodes
-            .lock()
-            .await
-            .nodes
-            .get_mut(&node_id)
-            .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .block_age()
-            .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
-        Ok(Response::new(bv_pb::GetAgeResponse { block_age }))
-    }
-
-    async fn get_name(
-        &self,
-        request: Request<bv_pb::GetNameRequest>,
-    ) -> Result<Response<bv_pb::GetNameResponse>, Status> {
-        let request = request.into_inner();
-        let node_id = helpers::parse_uuid(request.node_id)?;
-        let name = self
-            .nodes
-            .lock()
-            .await
-            .nodes
-            .get_mut(&node_id)
-            .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .name()
-            .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
-        Ok(Response::new(bv_pb::GetNameResponse { name }))
-    }
-
-    async fn get_address(
-        &self,
-        request: Request<bv_pb::GetAddressRequest>,
-    ) -> Result<Response<bv_pb::GetAddressResponse>, Status> {
-        let request = request.into_inner();
-        let node_id = helpers::parse_uuid(request.node_id)?;
-        let address = self
-            .nodes
-            .lock()
-            .await
-            .nodes
-            .get_mut(&node_id)
-            .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .address()
-            .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
-        Ok(Response::new(bv_pb::GetAddressResponse { address }))
-    }
-
-    async fn get_consensus(
-        &self,
-        request: Request<bv_pb::GetConsensusRequest>,
-    ) -> Result<Response<bv_pb::GetConsensusResponse>, Status> {
-        let request = request.into_inner();
-        let node_id = helpers::parse_uuid(request.node_id)?;
-        let consensus = self
-            .nodes
-            .lock()
-            .await
-            .nodes
-            .get_mut(&node_id)
-            .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .consensus()
-            .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
-        Ok(Response::new(bv_pb::GetConsensusResponse { consensus }))
+        Ok(Response::new(bv_pb::BlockchainResponse { value }))
     }
 }
 
