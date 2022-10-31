@@ -54,7 +54,7 @@ impl Nodes {
         &mut self,
         id: Uuid,
         name: String,
-        chain: String,
+        image: String,
         ip: String,
         gateway: String,
     ) -> Result<()> {
@@ -77,7 +77,7 @@ impl Nodes {
         let node = NodeData {
             id,
             name: name.clone(),
-            chain,
+            image,
             expected_status: NodeStatus::Stopped,
             network_interface,
         };

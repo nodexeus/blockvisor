@@ -12,7 +12,7 @@ enum NodeStatus {
 message Node {
     string id = 1;
     string name = 2;
-    string chain = 3;
+    string image = 3;
     string ip = 4;
     string gateway = 5;
     NodeStatus status = 6;
@@ -32,7 +32,7 @@ message HealthResponse {
 message CreateNodeRequest {
     string id = 1;
     string name = 2;
-    string chain = 3;
+    string image = 3;
     string ip = 4;
     string gateway = 5;
 }
