@@ -112,26 +112,30 @@ pub enum NodeCommand {
     /// Start node
     Start {
         /// Node id or name
-        id_or_name: String,
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Stop node
     Stop {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Restart node
     Restart {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Delete node and clean up resources
     #[clap(alias = "d")]
     Delete {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Attach to node console
@@ -150,8 +154,9 @@ pub enum NodeCommand {
 
     /// Get node status
     Status {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 }
 
