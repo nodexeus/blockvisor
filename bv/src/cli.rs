@@ -128,7 +128,7 @@ pub enum NodeCommand {
     },
 
     /// Delete node and clean up resources
-    #[clap(alias = "d")]
+    #[clap(alias = "d", alias = "rm")]
     Delete {
         /// Node id or name
         id_or_name: String,
