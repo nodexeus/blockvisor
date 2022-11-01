@@ -1,6 +1,6 @@
 build:
 	cargo build -p blockvisord
-	cargo build -p babel --target x86_64-unknown-linux-musl
+	cargo build -p babel --target x86_64-unknown-linux-musl --features vsock
 
 install:
 	install -m u=rwx,g=rx,o=rx target/debug/blockvisord /usr/bin/
