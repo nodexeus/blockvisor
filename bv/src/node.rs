@@ -366,7 +366,7 @@ impl Node {
         let start = std::time::Instant::now();
         let elapsed = || std::time::Instant::now() - start;
         let mut conn = loop {
-            let maybe_conn = dbg!(UnixStream::connect(&socket).await);
+            let maybe_conn = UnixStream::connect(&socket).await;
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
                 Err(e) if elapsed() < BABEL_START_TIMEOUT => {
@@ -390,14 +390,13 @@ impl Node {
         let resp = async {
             loop {
                 conn.readable().await?;
-                match dbg!(conn.try_read(&mut sock_opened_buf)) {
+                match conn.try_read(&mut sock_opened_buf) {
                     Ok(0) => {
                         tracing::error!("Socket responded to open message with empty message :(");
                         anyhow::bail!("Socket responded to open message with empty message :(");
                     }
                     Ok(n) => {
                         let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
-                        dbg!(sock_opened_msg);
                         let msg_valid = sock_opened_msg.starts_with("OK ");
                         anyhow::ensure!(msg_valid, "Invalid opening message for new socket");
                         break;
