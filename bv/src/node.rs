@@ -120,12 +120,18 @@ impl Node {
         if !matches!(resp, Ok(BabelResponse::Pong)) {
             tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
+        self.data.expected_status = NodeStatus::Running;
         self.data.save().await
     }
 
-    /// Returns the status of the node.
-    pub async fn status(&self) -> Result<NodeStatus> {
-        Ok(self.data.status())
+    /// Returns the actual status of the node.
+    pub fn status(&self) -> NodeStatus {
+        self.data.status()
+    }
+
+    /// Returns the expected status of the node.
+    pub fn expected_status(&self) -> NodeStatus {
+        self.data.expected_status
     }
 
     /// Stops the running node.
@@ -168,6 +174,7 @@ impl Node {
                 }
             }
         }
+        self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
         self.babel_conn = Connection::Closed;
 
@@ -350,7 +357,7 @@ impl Node {
 
         // We are going to connect to the central socket for this VM. Later we will specify which
         // port we want to talk to.
-        let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root/vsock.socket");
+        let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root{VSOCK_PATH}");
         tracing::debug!("Connecting to node at `{socket}`");
 
         // We need to implement retrying when reading from the socket, as it may take a little bit

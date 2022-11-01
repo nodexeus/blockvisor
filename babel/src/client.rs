@@ -124,7 +124,7 @@ impl Client {
     ) -> Result<BlockchainResponse, error::Error> {
         use config::MethodResponseFormat::*;
 
-        let args = vec!["-c".to_string(), format!("{command}")];
+        let args = vec!["-c", &command];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()

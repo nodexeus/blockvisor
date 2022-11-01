@@ -14,6 +14,7 @@ use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
 pub enum NodeStatus {
     Running,
     Stopped,
+    Failed,
 }
 
 impl fmt::Display for NodeStatus {
@@ -27,6 +28,7 @@ pub struct NodeData {
     pub id: Uuid,
     pub name: String,
     pub chain: String,
+    pub expected_status: NodeStatus,
     pub network_interface: NetworkInterface,
 }
 
@@ -65,9 +67,14 @@ impl NodeData {
 
     pub fn status(&self) -> NodeStatus {
         let cmd = self.id.to_string();
-        match get_process_pid(FC_BIN_NAME, &cmd) {
+        let actual_status = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(_) => NodeStatus::Running,
             Err(_) => NodeStatus::Stopped,
+        };
+        if actual_status == self.expected_status {
+            actual_status
+        } else {
+            NodeStatus::Failed
         }
     }
 }
