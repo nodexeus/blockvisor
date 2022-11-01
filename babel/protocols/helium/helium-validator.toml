@@ -1,14 +1,19 @@
-urn  = "helium:node"
+protocol = "helium"
+node_type = "validator"
+entry_point = "/blockjoy/miner/bin/miner foreground"
 
-[env]
-path_append = "/blockjoy/bin/"
+
+[requirements]
+vcpu = 8
+ram = 16
+disk = 200
 
 [config]
 babel_version = "0.0.1"
-node_version = "1.14.0"
-node_type = "validator"
+node_version = "1.15.9"
 description = "helium blockchain validator"
 jrpc_host = "http://localhost:4467/"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/helium.pid" #this is likely not necessary
