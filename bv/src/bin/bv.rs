@@ -233,40 +233,59 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 chain, &id, &name
             );
         }
-        NodeCommand::Start { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            service_client
-                .start_node(bv_pb::StartNodeRequest { id: id.to_string() })
-                .await?;
-            println!("Started node `{}`", id_or_name);
+        NodeCommand::Start { id_or_names } => {
+            for id_or_name in id_or_names {
+                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                    .await?
+                    .to_string();
+                service_client
+                    .start_node(bv_pb::StartNodeRequest { id })
+                    .await?;
+                println!("Started node `{}`", id_or_name);
+            }
         }
-        NodeCommand::Stop { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            service_client
-                .stop_node(bv_pb::StopNodeRequest { id: id.to_string() })
-                .await?;
-            println!("Stopped node `{}`", id_or_name);
+        NodeCommand::Stop { id_or_names } => {
+            for id_or_name in id_or_names {
+                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                    .await?
+                    .to_string();
+                service_client
+                    .stop_node(bv_pb::StopNodeRequest { id })
+                    .await?;
+                println!("Stopped node `{}`", id_or_name);
+            }
         }
-        NodeCommand::Delete { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            service_client
-                .delete_node(bv_pb::DeleteNodeRequest { id: id.to_string() })
-                .await?;
-            println!("Deleted node `{}`", id_or_name);
+        NodeCommand::Delete { id_or_names } => {
+            for id_or_name in id_or_names {
+                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                    .await?
+                    .to_string();
+                service_client
+                    .delete_node(bv_pb::DeleteNodeRequest { id })
+                    .await?;
+                println!("Deleted node `{id_or_name}`");
+            }
         }
-        NodeCommand::Restart { id_or_name: _ } => todo!(),
+        NodeCommand::Restart { id_or_names: _ } => todo!(),
         NodeCommand::Console { id_or_name: _ } => todo!(),
         NodeCommand::Logs { id_or_name: _ } => todo!(),
-        NodeCommand::Status { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let status = service_client
-                .get_node_status(bv_pb::GetNodeStatusRequest { id: id.to_string() })
-                .await?
-                .into_inner()
-                .status;
-            println!("{}", bv_pb::NodeStatus::from_i32(status).unwrap());
+        NodeCommand::Status { id_or_names } => {
+            for id_or_name in id_or_names {
+                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                    .await?
+                    .to_string();
+                let status = service_client
+                    .get_node_status(bv_pb::GetNodeStatusRequest { id })
+                    .await?;
+                let status = status.into_inner().status;
+                match bv_pb::NodeStatus::from_i32(status) {
+                    Some(status) => println!("{status}"),
+                    None => eprintln!("Invalid status {status}"),
+                }
+            }
         }
     }
+
     Ok(())
 }
 
