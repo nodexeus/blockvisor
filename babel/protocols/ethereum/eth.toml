@@ -43,3 +43,13 @@ method = "eth/v1/node/syncing"
     status = 200
     field = "data.is_syncing"
     format = "json"
+
+[[methods]]
+name = "genesis_info"
+transport = "rest"
+method = "/eth/v1/beacon/genesis" 
+
+    [methods.response]
+    status = 200
+    field = "data"
+    format = "json"
