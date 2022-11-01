@@ -124,7 +124,7 @@ impl Client {
     ) -> Result<BlockchainResponse, error::Error> {
         use config::MethodResponseFormat::*;
 
-        let args = command.split_whitespace();
+        let args = vec!["-c".to_string(), format!("{command}")];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()
@@ -226,6 +226,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: None,
@@ -296,6 +298,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -341,6 +345,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -397,6 +403,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),

@@ -107,9 +107,15 @@ impl Node {
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
         self.machine.start().await?;
-        self.babel_conn = Connection::Open {
-            babel_conn: Self::conn(self.id()).await?,
-        };
+        let babel_conn = match Self::conn(self.id()).await {
+            Ok(conn) => Ok(conn),
+            Err(_) => {
+                // Extremely scientific retrying mechanism
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                Self::conn(self.id()).await
+            }
+        }?;
+        self.babel_conn = Connection::Open { babel_conn };
         let resp = self.send(BabelRequest::Ping).await;
         if !matches!(resp, Ok(BabelResponse::Pong)) {
             tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
@@ -319,7 +325,7 @@ impl Node {
             loop {
                 // Wait for the socket to become ready to read from.
                 babel_conn.readable().await?;
-                let mut data = vec![0; 1024];
+                let mut data = vec![0; 2048];
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
                 match babel_conn.try_read(&mut data) {
@@ -373,14 +379,17 @@ impl Node {
         tracing::debug!("Sending open message : `{open_message:?}`.");
         timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
         tracing::debug!("Sent open message.");
-        let mut sock_opened_msg = vec![0; 20];
+        let mut sock_opened_buf = [0; 20];
         let resp = async {
             loop {
-                dbg!(conn.readable().await)?;
-                match dbg!(conn.try_read(&mut sock_opened_msg)) {
+                conn.readable().await?;
+                match dbg!(conn.try_read(&mut sock_opened_buf)) {
+                    Ok(0) => {
+                        tracing::error!("Socket responded to open message with empty message :(");
+                        anyhow::bail!("Socket responded to open message with empty message :(");
+                    }
                     Ok(n) => {
-                        sock_opened_msg.resize(n, 0);
-                        let sock_opened_msg = std::str::from_utf8(&sock_opened_msg).unwrap();
+                        let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
                         dbg!(sock_opened_msg);
                         let msg_valid = sock_opened_msg.starts_with("OK ");
                         anyhow::ensure!(msg_valid, "Invalid opening message for new socket");

@@ -32,25 +32,25 @@ async fn main() -> Result<()> {
 
     let token = grpc::AuthToken(config.token.to_owned());
     let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
-    // let external_api_client_future = async {
-    //     let channel = wait_for_channel(&endpoint).await;
+    let external_api_client_future = async {
+        let channel = wait_for_channel(&endpoint).await;
 
-    //     info!("Creating gRPC client...");
-    //     let mut client = grpc::Client::with_auth(channel, token);
+        info!("Creating gRPC client...");
+        let mut client = grpc::Client::with_auth(channel, token);
 
-    //     loop {
-    //         if let Err(e) =
-    //             grpc::process_commands_stream(&mut client, nodes.clone(), updates_tx.clone()).await
-    //         {
-    //             error!("Error processing pending commands: {:?}", e);
-    //         }
-    //         sleep(Duration::from_secs(5)).await;
-    //     }
-    // };
+        loop {
+            if let Err(e) =
+                grpc::process_commands_stream(&mut client, nodes.clone(), updates_tx.clone()).await
+            {
+                error!("Error processing pending commands: {:?}", e);
+            }
+            sleep(Duration::from_secs(5)).await;
+        }
+    };
 
     tokio::select! {
         _ = internal_api_server_future => {},
-        // _ = external_api_client_future => {}
+        _ = external_api_client_future => {}
     }
 
     info!("Stopping...");

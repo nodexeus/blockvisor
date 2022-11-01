@@ -15,11 +15,4 @@ service Blockvisor {
     rpc GetNodeIdForName(GetNodeIdForNameRequest) returns (GetNodeIdForNameResponse) {}
     rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
     rpc Blockchain(BlockchainRequest) returns (BlockchainResponse);
-
-    // rpc GetHeight(GetHeightRequest) returns (GetHeightResponse);
-    // rpc GetAge(GetAgeRequest) returns (GetAgeResponse);
-    // rpc GetName(GetNameRequest) returns (GetNameResponse);
-    // rpc GetAddress(GetAddressRequest) returns (GetAddressResponse);
-    // rpc GetConsensus(GetConsensusRequest) returns (GetConsensusResponse);
-    // rpc Genesis(GenesisRequest) returns (GenesisResponse);
 }
