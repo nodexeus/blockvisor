@@ -184,3 +184,13 @@ body = "/usr/bin/curl -s https://snapshots.helium.wtf/genesis.mainnet -o /h && /
     # something?
     status = 0
     format = "raw"
+
+[[methods]]
+name = "version"
+transport = "sh"
+body = "miner versions | tail -n +2 | awk '{print $2}'"
+
+    [methods.response]
+    # something?
+    status = 0
+    format = "raw"
