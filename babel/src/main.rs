@@ -1,5 +1,5 @@
 use std::path::Path;
-use tracing::debug;
+use tracing_subscriber::util::SubscriberInitExt;
 
 // TODO: What are we going to use as backup when vsock is disabled?
 #[cfg(feature = "vsock")]
@@ -11,12 +11,15 @@ mod vsock;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .finish()
         .init();
 
-    let cfg = config::load(Path::new("/etc/babel.conf")).await?;
-    debug!("Loaded babel configuration: {:?}", cfg);
+    let cfg_path = Path::new("/etc/babel.conf");
+    tracing::info!("Loading babel configuration at {}", cfg_path.display());
+    let cfg = config::load(cfg_path).await?;
+    tracing::debug!("Loaded babel configuration: {:?}", cfg);
 
     serve(cfg).await
 }

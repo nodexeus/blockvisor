@@ -27,7 +27,7 @@ impl fmt::Display for NodeStatus {
 pub struct NodeData {
     pub id: Uuid,
     pub name: String,
-    pub chain: String,
+    pub image: String,
     pub expected_status: NodeStatus,
     pub network_interface: NetworkInterface,
 }

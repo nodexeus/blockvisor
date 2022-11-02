@@ -89,16 +89,16 @@ pub enum NodeCommand {
         #[clap(long, short)]
         running: bool,
 
-        /// Display nodes of particular chain
+        /// Display nodes of particular image (as a substring)
         #[clap(long, short)]
-        chain: Option<String>,
+        image: Option<String>,
     },
 
     /// Create node
     #[clap(alias = "c")]
     Create {
-        /// Chain identifier
-        chain: String,
+        /// Node Image identifier
+        image: String,
 
         /// Node IP Address
         #[clap(long)]
@@ -112,26 +112,30 @@ pub enum NodeCommand {
     /// Start node
     Start {
         /// Node id or name
-        id_or_name: String,
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Stop node
     Stop {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Restart node
     Restart {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Delete node and clean up resources
-    #[clap(alias = "d")]
+    #[clap(alias = "d", alias = "rm")]
     Delete {
-        /// Node id or name
-        id_or_name: String,
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
     },
 
     /// Attach to node console
@@ -150,6 +154,50 @@ pub enum NodeCommand {
 
     /// Get node status
     Status {
+        /// One or more node id or names.
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
+    },
+
+    /// Return the block height of the blockchain the node is running
+    #[clap(alias = "caps")]
+    Capabilities {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block height of the blockchain the node is running
+    Height {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block age of the blockchain the node is running
+    BlockAge {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the name node.
+    Name {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the address of the blockchain the node is running
+    Address {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return whether the node that is running is in consensus or not.
+    Consensus {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Create the genesis block for this node.
+    Genesis {
         /// Node id or name
         id_or_name: String,
     },
