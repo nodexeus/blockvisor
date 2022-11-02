@@ -33,10 +33,17 @@ pub struct Env {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    /// A semver version of the babel program, indicating the versions of the babel program that a
+    /// config file is compatible with.
     pub babel_version: String,
+    /// A semver version of the blockchain node program. This is used to indicate the minimal
+    /// version that this config file requires, or the maximal version up to which this config is
+    /// compatible with the node.
     pub node_version: String,
     pub node_type: String,
     pub description: Option<String>,
+    /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
+    /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
 }
 
@@ -49,18 +56,29 @@ pub struct Monitor {
 #[serde(tag = "transport", rename_all = "kebab-case")]
 pub enum Method {
     Jrpc {
+        /// This field is ignored.
         name: String,
+        /// The name of the jRPC method that we are going to call into.
         method: String,
+        /// This field is ignored.
         response: JrpcResponse,
     },
     Rest {
+        /// This field is ignored.
         name: String,
+        /// This is the relative url of the rest endpoint. So if the host is `"https://api.com/"`,
+        /// and the method is `"/v1/users"`, then the url that called is
+        /// `"https://api.com/v1/users"`.
         method: String,
+        /// These are the configuration options for parsing the response.
         response: RestResponse,
     },
     Sh {
+        /// This field is ignored.
         name: String,
+        /// These are the arguments to the sh command that is executed for this `Method`.
         body: String,
+        /// These are the configuration options for parsing the response.
         response: ShResponse,
     },
 }

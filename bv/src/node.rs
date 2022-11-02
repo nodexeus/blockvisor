@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
-use futures_util::StreamExt;
-use std::{future::ready, path::Path, time::Duration};
+use std::{path::Path, str::FromStr, time::Duration};
 use tokio::{
     fs,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::UnixStream,
     time::{sleep, timeout},
 };
-use tracing::{instrument, log::warn, trace};
+use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
-use zbus::{Connection, Proxy};
 
 use crate::{
     node_data::{NodeData, NodeStatus},
@@ -20,7 +20,30 @@ use crate::{
 pub struct Node {
     pub data: NodeData,
     machine: Machine<'static>,
-    babel_proxy: Proxy<'static>,
+    babel_conn: Connection,
+}
+
+#[derive(Debug)]
+enum Connection {
+    Closed,
+    Open { babel_conn: UnixStream },
+}
+
+impl Connection {
+    /// Returns the open babel connection, if there is one.
+    fn conn_mut(&mut self) -> Option<&mut UnixStream> {
+        use Connection::*;
+        match self {
+            Closed => None,
+            Open { babel_conn } => Some(babel_conn),
+        }
+    }
+
+    /// Tries to return the babel connection, and if there isn't one, returns an error message.
+    fn try_conn_mut(&mut self) -> Result<&mut UnixStream> {
+        self.conn_mut()
+            .ok_or_else(|| anyhow::anyhow!("Tried to get babel connection while there isn't one"))
+    }
 }
 
 // FIXME: Hardcoding everything for now.
@@ -32,17 +55,17 @@ const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
+const BABEL_VSOCK_PORT: u32 = 42;
 const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
-const BABEL_BUS_NAME_PREFIX: &str = "com.BlockJoy.Babel.Node";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl Node {
     /// Creates a new node with `id`.
     #[instrument]
-    pub async fn create(data: NodeData, babel_conn: &Connection) -> Result<Self> {
-        let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
+    pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
         let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
@@ -53,14 +76,13 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_proxy,
+            babel_conn: Connection::Closed,
         })
     }
 
     /// Returns node previously created on this host.
     #[instrument]
-    pub async fn connect(data: NodeData, babel_conn: &Connection) -> Result<Self> {
-        let babel_proxy = create_babel_proxy(babel_conn, data.id).await?;
+    pub async fn connect(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
         let state = match get_process_pid(FC_BIN_NAME, &cmd) {
@@ -72,33 +94,32 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_proxy,
+            babel_conn: Connection::Open { babel_conn },
         })
     }
 
     /// Returns the node's `id`.
-    pub fn id(&self) -> &Uuid {
-        &self.data.id
+    pub fn id(&self) -> Uuid {
+        self.data.id
     }
 
     /// Starts the node.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
-        let mut stream = self
-            .babel_proxy
-            .receive_owner_changed()
-            .await?
-            .filter(|unique_name| {
-                trace!(
-                    "New owner of {}: {:?}",
-                    self.babel_proxy.destination(),
-                    unique_name
-                );
-                // Look for the first name-owned event.
-                ready(unique_name.is_some())
-            });
         self.machine.start().await?;
-        timeout(BABEL_START_TIMEOUT, stream.next()).await?;
+        let babel_conn = match Self::conn(self.id()).await {
+            Ok(conn) => Ok(conn),
+            Err(_) => {
+                // Extremely scientific retrying mechanism
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                Self::conn(self.id()).await
+            }
+        }?;
+        self.babel_conn = Connection::Open { babel_conn };
+        let resp = self.send(BabelRequest::Ping).await;
+        if !matches!(resp, Ok(BabelResponse::Pong)) {
+            tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
+        }
         self.data.expected_status = NodeStatus::Running;
         self.data.save().await
     }
@@ -119,19 +140,6 @@ impl Node {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
-                let mut stream =
-                    self.babel_proxy
-                        .receive_owner_changed()
-                        .await?
-                        .filter(|unique_name| {
-                            trace!(
-                                "New owner of {}: {:?}",
-                                self.babel_proxy.destination(),
-                                unique_name
-                            );
-                            // Look for the first name-lost event.
-                            ready(unique_name.is_none())
-                        });
                 let mut shutdown_success = true;
                 if let Err(err) = self.machine.shutdown().await {
                     trace!("Graceful shutdown failed: {err}");
@@ -144,14 +152,31 @@ impl Node {
                 }
 
                 if shutdown_success {
-                    if let Err(e) = timeout(BABEL_STOP_TIMEOUT, stream.next()).await {
-                        warn!("Babel shutdown timeout: {e}");
+                    if let Some(babel_conn) = self.babel_conn.conn_mut() {
+                        // We can verify successful shutdown success by checking whether we can read
+                        // into a buffer of nonzero length. If the stream is closed, the number of
+                        // bytes read should be zero.
+                        let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
+                        match read {
+                            // Successful shutdown in this case
+                            Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
+                            // The babel stream has more to say...
+                            Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
+                            // The read timed out. It is still live so the node did not shut down.
+                            Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
+                            // Reading returned _before_ the timeout, but was otherwise unsuccessful.
+                            // Could happpen I guess? Lets log the error.
+                            Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
+                        }
+                    } else {
+                        tracing::warn!("Terminating node has no babel conn!");
                     }
                 }
             }
         }
         self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
+        self.babel_conn = Connection::Closed;
 
         // FIXME: for some reason firecracker socket is not created by
         // consequent start command if we do not wait a bit here
@@ -202,16 +227,209 @@ impl Node {
 
         Ok(config)
     }
+
+    /// Returns the height of the blockchain (in blocks).
+    pub async fn height(&mut self) -> Result<u64> {
+        self.call_method("height").await
+    }
+
+    /// Returns the block age of the blockchain (in seconds).
+    pub async fn block_age(&mut self) -> Result<u64> {
+        self.call_method("block_age").await
+    }
+
+    /// Returns the name of the node. This is usually some random generated name that you may use
+    /// to recognise the node, but the purpose may vary per blockchain.
+    /// ### Example
+    /// `chilly-peach-kangaroo`
+    pub async fn name(&mut self) -> Result<String> {
+        self.call_method("name").await
+    }
+
+    /// The address of the node. The meaning of this varies from blockchain to blockchain.
+    /// ### Example
+    /// `/p2p/11Uxv9YpMpXvLf8ZyvGWBdbgq3BXv8z1pra1LBqkRS5wmTEHNW3`
+    pub async fn address(&mut self) -> Result<String> {
+        self.call_method("address").await
+    }
+
+    /// Returns whether this node is in consensus or not.
+    pub async fn consensus(&mut self) -> Result<bool> {
+        self.call_method("consensus").await
+    }
+
+    /// This function calls babel by sending a blockchain command using the specified method name.
+    pub async fn call_method<T>(&mut self, method: &str) -> Result<T>
+    where
+        T: FromStr,
+        <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
+    {
+        let request = BabelRequest::BlockchainCommand { name: method };
+        let resp: BabelResponse = self.send(request).await?;
+        let inner = match resp {
+            BabelResponse::BlockchainResponse { value } => {
+                value.parse().context(format!("Could not parse {method}"))?
+            }
+            e => anyhow::bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
+        };
+        Ok(inner)
+    }
+
+    /// Returns the methods that are supported by this blockchain. Calling any method on this
+    /// blockchain that is not listed here will result in an error being returned.
+    pub async fn capabilities(&mut self) -> Result<Vec<String>> {
+        let request = BabelRequest::ListCapabilities;
+        let resp: BabelResponse = self.send(request).await?;
+        let height = match resp {
+            BabelResponse::ListCapabilities(caps) => caps,
+            e => anyhow::bail!("Unexpected BabelResponse for `height`: `{e:?}`"),
+        };
+        Ok(height)
+    }
+
+    /// This function combines the capabilities from `write_data` and `read_data` to allow you to
+    /// send some request and then obtain a response back.
+    async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(
+        &mut self,
+        data: S,
+    ) -> Result<D> {
+        self.write_data(data).await?;
+        self.read_data().await
+    }
+
+    /// Waits for the socket to become readable, then writes the data as json to the socket. The max
+    /// time that is allowed to elapse  is `SOCKET_TIMEOUT`.
+    async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
+        use std::io::ErrorKind::WouldBlock;
+
+        let data = serde_json::to_string(&data)?;
+        let babel_conn = self.babel_conn.try_conn_mut()?;
+        let write_data = async {
+            loop {
+                // Wait for the socket to become ready to write to.
+                babel_conn.writable().await?;
+                // Try to write data, this may still fail with `WouldBlock` if the readiness event
+                // is a false positive.
+                match babel_conn.try_write(data.as_bytes()) {
+                    Ok(_) => break,
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
+                }
+            }
+            Ok(())
+        };
+        timeout(SOCKET_TIMEOUT, write_data).await?
+    }
+
+    /// Waits for the socket to become readable, then reads data from it. The max time that is
+    /// allowed to elapse (per read) is `SOCKET_TIMEOUT`. When data is sent over the vsock, this
+    /// data is parsed as json and returned as the requested type.
+    async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
+        use std::io::ErrorKind::WouldBlock;
+
+        let babel_conn = self.babel_conn.try_conn_mut()?;
+        let read_data = async {
+            loop {
+                // Wait for the socket to become ready to read from.
+                babel_conn.readable().await?;
+                let mut data = vec![0; 2048];
+                // Try to read data, this may still fail with `WouldBlock`
+                // if the readiness event is a false positive.
+                match babel_conn.try_read(&mut data) {
+                    Ok(n) => {
+                        data.resize(n, 0);
+                        let s = std::str::from_utf8(&data)?;
+                        return Ok(serde_json::from_str(s)?);
+                    }
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
+                }
+            }
+        };
+        timeout(SOCKET_TIMEOUT, read_data).await?
+    }
+
+    /// Establishes a new connection to the VM. Note that this fails if the VM hasn't started yet.
+    /// It also initializes that connection by sending the opening message. Therefore, if this
+    /// function succeeds the connection is guaranteed to be writeable at the moment of returning.
+    pub async fn conn(node_id: uuid::Uuid) -> Result<UnixStream> {
+        use std::io::ErrorKind::WouldBlock;
+
+        // We are going to connect to the central socket for this VM. Later we will specify which
+        // port we want to talk to.
+        let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root{VSOCK_PATH}");
+        tracing::debug!("Connecting to node at `{socket}`");
+
+        // We need to implement retrying when reading from the socket, as it may take a little bit
+        // of time for the socket file to get created on disk, because this is done asynchronously
+        // by Firecracker.
+        let start = std::time::Instant::now();
+        let elapsed = || std::time::Instant::now() - start;
+        let mut conn = loop {
+            let maybe_conn = UnixStream::connect(&socket).await;
+            match maybe_conn {
+                Ok(conn) => break Ok(conn),
+                Err(e) if elapsed() < BABEL_START_TIMEOUT => {
+                    tracing::debug!("No socket file yet, retrying in 5 seconds: {e}");
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+                Err(e) => break Err(e),
+            };
+        }
+        .context("Failed to connect to babel bus")?;
+        // For host initiated connections we have to send a message to the guess socket that
+        // contains the port number. As a response we expect a message of the format `Ok <num>\n`.
+        // We check this by asserting that the first message received starts with `OK`. Popping
+        // this message here prevents us from having to check for the opening message elsewhere
+        // were we expect the response to be valid json.
+        let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
+        tracing::debug!("Sending open message : `{open_message:?}`.");
+        timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
+        tracing::debug!("Sent open message.");
+        let mut sock_opened_buf = [0; 20];
+        let resp = async {
+            loop {
+                conn.readable().await?;
+                match conn.try_read(&mut sock_opened_buf) {
+                    Ok(0) => {
+                        tracing::error!("Socket responded to open message with empty message :(");
+                        anyhow::bail!("Socket responded to open message with empty message :(");
+                    }
+                    Ok(n) => {
+                        let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
+                        let msg_valid = sock_opened_msg.starts_with("OK ");
+                        anyhow::ensure!(msg_valid, "Invalid opening message for new socket");
+                        break;
+                    }
+                    // Ignore false-positive readable events
+                    Err(e) if e.kind() == WouldBlock => continue,
+                    Err(e) => anyhow::bail!("Establishing socket failed with `{e}`"),
+                }
+            }
+            Ok(conn)
+        };
+        timeout(SOCKET_TIMEOUT, resp).await?
+    }
 }
 
-async fn create_babel_proxy(conn: &Connection, id: Uuid) -> Result<Proxy<'static>> {
-    let babel_bus_name = format!("{}{}", BABEL_BUS_NAME_PREFIX, id);
-    Proxy::new(
-        conn,
-        babel_bus_name,
-        "/com/BlockJoy/Babel",
-        "com.BlockJoy.Babel",
-    )
-    .await
-    .context("Failed to create Babel proxy")
+/// Each request that comes over the VSock to babel must be a piece of JSON that can be
+/// deserialized into this struct.
+#[derive(Debug, serde::Serialize)]
+pub enum BabelRequest<'a> {
+    /// List the endpoints that are available for the current blockchain. These are extracted from
+    /// the config, and just sent back as strings for now.
+    ListCapabilities,
+    /// Returns `Pong`. Useful to check for the liveness of the node.
+    Ping,
+    /// Send a request to the current blockchain. We can identify the way to do this from the
+    /// config and forward the provided parameters.
+    BlockchainCommand { name: &'a str },
+}
+
+#[derive(Debug, serde::Deserialize)]
+enum BabelResponse {
+    ListCapabilities(Vec<String>),
+    Pong,
+    BlockchainResponse { value: String },
+    Error(String),
 }

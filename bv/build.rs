@@ -1,5 +1,5 @@
 fn main() {
-    tonic_build::configure()
+    if let Err(e) = tonic_build::configure()
         .build_server(true)
         .build_client(true)
         .compile(
@@ -28,5 +28,8 @@ fn main() {
                 "data/proto/blockjoy/blockvisor/v1",
             ],
         )
-        .unwrap();
+    {
+        eprintln!("Building protos failed with:\n{e}");
+        std::process::exit(1);
+    }
 }

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
+use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-use zbus::{Connection, ConnectionBuilder};
 
 use crate::{
     grpc::pb,
@@ -19,15 +19,13 @@ use crate::{
 };
 
 const NODES_CONFIG_FILENAME: &str = "nodes.toml";
-const BABEL_BUS_ADDRESS: &str = "unix:path=/var/lib/blockvisor/vsock.socket_42";
 
 lazy_static::lazy_static! {
     pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
         .map(|p| p.join(".cache"))
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join("blockvisor");
-}
-lazy_static::lazy_static! {
+
     static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
 }
 
@@ -41,7 +39,6 @@ pub enum ServiceStatus {
 pub struct Nodes {
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
-    babel_conn: OnceCell<Connection>,
     data: CommonData,
     tx: OnceCell<Sender<pb::InfoUpdate>>,
 }
@@ -86,8 +83,7 @@ impl Nodes {
         };
         self.save().await?;
 
-        let babel_conn = self.babel_conn().await?;
-        let node = Node::create(node, babel_conn).await?;
+        let node = Node::create(node).await?;
         self.nodes.insert(id, node);
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
@@ -201,7 +197,6 @@ impl Nodes {
             data: nodes_data,
             nodes: HashMap::new(),
             node_ids: HashMap::new(),
-            babel_conn: OnceCell::new(),
             tx: OnceCell::new(),
         }
     }
@@ -231,16 +226,25 @@ impl Nodes {
             }
             match NodeData::load(&path)
                 .and_then(|data| async {
-                    let babel_conn = this.babel_conn().await?;
+                    // Since this is the startup phase it doesn't make sense to wait a long time
+                    // for the nodes to come online. For that reason we restrict the allowed delay
+                    // further down to one second.
+                    let max_delay = std::time::Duration::from_secs(1);
+                    let babel_conn = timeout(max_delay, Node::conn(data.id)).await??;
+                    tracing::debug!("Established babel connection");
                     Node::connect(data, babel_conn).await
                 })
                 .await
             {
                 Ok(node) => {
-                    this.node_ids.insert(node.data.name.clone(), *node.id());
+                    this.node_ids.insert(node.data.name.clone(), node.id());
                     this.nodes.insert(node.data.id, node);
                 }
-                Err(e) => warn!("Failed to read node file `{}`: {}", path.display(), e),
+                Err(e) => warn!(
+                    "Failed to connect to node from file `{}`: {}",
+                    path.display(),
+                    e
+                ),
             }
         }
 
@@ -308,14 +312,5 @@ impl Nodes {
                 Ok(tx)
             })
             .await
-    }
-
-    async fn babel_conn(&self) -> Result<&Connection> {
-        self.babel_conn
-            .get_or_try_init(|| async {
-                ConnectionBuilder::address(BABEL_BUS_ADDRESS)?.build().await
-            })
-            .await
-            .context("Failed to connect to babel bus")
     }
 }

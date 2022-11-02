@@ -8,14 +8,11 @@ babel_version = "0.0.1"
 node_version = "1.14.0"
 node_type = "validator"
 description = "helium blockchain validator"
-jrpc_host = "http://localhost:4467/"
-
-[monitor]
-pid_file = "/var/run/helium.pid" #this is likely not necessary
+api_host = "http://localhost:4467/"
 
 # METHOD BLOCK-HEIGHT
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_height"}' | jq .
 # response:
 # {
@@ -38,7 +35,7 @@ params = []
 
 # METHOD: P2P Address
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"peer_addr"}' | jq .
 # response:
 # {
@@ -56,11 +53,11 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result.keys.public_key"
+    field = "result.peer_addr"
 
 # METHOD name
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_name"}' | jq .
 # response:
 # {
@@ -78,11 +75,11 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.name"
 
 # METHOD: consensus status
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_in_consensus"}' | jq .
 # response:
 # {
@@ -100,12 +97,12 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.in_consensus"
 
-#METHOD: block age
-#DESC: The age of the last block received.
+# METHOD: block age
+# DESC: The age (in seconds) of the last block received.
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_block_age"}' | jq .
 # response:
 # {
@@ -123,13 +120,13 @@ params = []
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.block_age"
 
 
-#METHOD: summary
-#DESC: The age of the last block received.
+# METHOD: summary
+# DESC: The age of the last block received.
 # example:
-# curl -v -X POST http://localhost:4467 \
+# curl -X POST http://localhost:4467 \
 #      -d '{"jsonrpc":"2.0","id":"id","method":"info_summary"}' | jq .
 # response:
 # {
@@ -178,3 +175,12 @@ params = []
     code = 200
     field = "result"
 
+[[methods]]
+name = "genesis"
+transport = "sh"
+body = "/usr/bin/curl -s https://snapshots.helium.wtf/genesis.mainnet -o /h && /usr/local/bin/miner genesis load /h"
+
+    [methods.response]
+    # something?
+    status = 0
+    format = "raw"

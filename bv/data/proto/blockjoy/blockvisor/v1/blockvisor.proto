@@ -78,3 +78,25 @@ message GetNodeIdForNameRequest {
 message GetNodeIdForNameResponse {
     string id = 1;
 }
+
+message ListCapabilitiesRequest {
+    string node_id = 1;
+}
+
+message ListCapabilitiesResponse {
+    repeated string capabilities = 1;
+}
+
+message BlockchainRequest {
+    /// The method that we are calling
+    string method = 1;
+    /// The id of the node that this message should be sent to.
+    string node_id = 2;
+    /// This string should be a json-encoded request
+    optional string payload = 3;
+}
+
+message BlockchainResponse {
+    // Nothing is guaranteed about the layout of this field, it varies from request to request.
+    string value = 1;
+}

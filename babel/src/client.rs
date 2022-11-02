@@ -27,7 +27,9 @@ impl Client {
 
         match req {
             BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
+            BabelRequest::Ping => Ok(Pong),
             BabelRequest::BlockchainCommand(cmd) => {
+                tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
             }
         }
@@ -50,6 +52,8 @@ impl Client {
             .methods
             .get(&cmd.name)
             .ok_or_else(|| error::Error::unknown_method(cmd.name))?;
+        tracing::debug!("Chosen method is {method:?}");
+
         match method {
             Jrpc {
                 method, response, ..
@@ -80,6 +84,7 @@ impl Client {
             .text()
             .await?;
         let value = if let Some(field) = &resp_config.field {
+            tracing::debug!("Retrieving field `{field}` from the body `{text}`");
             gjson::get(&text, field).to_string()
         } else {
             text
@@ -119,7 +124,7 @@ impl Client {
     ) -> Result<BlockchainResponse, error::Error> {
         use config::MethodResponseFormat::*;
 
-        let args = command.split_whitespace();
+        let args = vec!["-c", &command];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()
@@ -149,6 +154,8 @@ pub enum BabelRequest {
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
     ListCapabilities,
+    /// Returns `Pong`. Useful to check for the liveness of the node.
+    Ping,
     /// Send a request to the current blockchain. We can identify the way to do this from the
     /// config and forward the provided parameters.
     BlockchainCommand(BlockchainCommand),
@@ -162,6 +169,7 @@ pub struct BlockchainCommand {
 #[derive(Debug, Serialize)]
 pub enum BabelResponse {
     ListCapabilities(Vec<String>),
+    Pong,
     BlockchainResponse(BlockchainResponse),
     Error(String),
 }
@@ -204,6 +212,7 @@ mod tests {
 
             match self {
                 ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
+                Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
                 BabelResponse::BlockchainResponse(resp) => resp,
                 Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
             }
@@ -217,8 +226,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: None,
@@ -289,8 +298,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -336,8 +345,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
@@ -394,8 +403,8 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
                 node_type: "".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),

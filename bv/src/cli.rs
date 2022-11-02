@@ -158,6 +158,49 @@ pub enum NodeCommand {
         #[clap(required(true))]
         id_or_names: Vec<String>,
     },
+
+    /// Return the block height of the blockchain the node is running
+    #[clap(alias = "caps")]
+    Capabilities {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block height of the blockchain the node is running
+    Height {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the block age of the blockchain the node is running
+    BlockAge {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the name node.
+    Name {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return the address of the blockchain the node is running
+    Address {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Return whether the node that is running is in consensus or not.
+    Consensus {
+        /// Node id or name
+        id_or_name: String,
+    },
+
+    /// Create the genesis block for this node.
+    Genesis {
+        /// Node id or name
+        id_or_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
