@@ -7,7 +7,6 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    fs,
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
     time::{sleep, timeout},
@@ -59,7 +58,6 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PORT: u32 = 42;
-const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
@@ -74,14 +72,12 @@ lazy_static::lazy_static! {
 }
 
 impl Node {
-    /// Creates a new node with `id`.
+    /// Creates a new node according to specs.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let machine = firec::Machine::create(config).await?;
-        let workspace_dir = machine.config().jailer_cfg().expect("").workspace_dir();
-        let babel_socket_link = workspace_dir.join("vsock.socket_42");
-        fs::hard_link(BABEL_VSOCK_PATH, babel_socket_link).await?;
+
         data.save().await?;
 
         Ok(Self {
