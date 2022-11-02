@@ -51,7 +51,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         self.nodes
             .lock()
             .await
-            .create(id, request.name, request.chain, request.ip, request.gateway)
+            .create(id, request.name, request.image, request.ip, request.gateway)
             .await
             .map_err(|e| Status::unknown(e.to_string()))?;
 
@@ -132,7 +132,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             let n = bv_pb::Node {
                 id: node.id.to_string(),
                 name: node.name,
-                chain: node.chain,
+                image: node.image,
                 status: status.into(),
                 ip: node.network_interface.ip.to_string(),
                 gateway: node.network_interface.gateway.to_string(),

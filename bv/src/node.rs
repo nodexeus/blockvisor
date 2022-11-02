@@ -1,7 +1,11 @@
 use anyhow::{anyhow, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
-use std::{path::Path, str::FromStr, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::Duration,
+};
 use tokio::{
     fs,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -49,7 +53,6 @@ impl Connection {
 // FIXME: Hardcoding everything for now.
 pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
-const ROOT_FS: &str = "/var/lib/blockvisor/debian.ext4";
 const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
@@ -61,6 +64,14 @@ const BABEL_VSOCK_PATH: &str = "/var/lib/blockvisor/vsock.socket_42";
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
+
+lazy_static::lazy_static! {
+    static ref IMAGE_CACHE_DIR: PathBuf = home::home_dir()
+        .map(|p| p.join(".cache"))
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("blockvisor")
+        .join("images");
+}
 
 impl Node {
     /// Creates a new node with `id`.
@@ -207,6 +218,16 @@ impl Node {
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
 
+        let root_fs_path = IMAGE_CACHE_DIR.join(data.image.clone());
+        let root_fs_path = if root_fs_path.exists() {
+            root_fs_path
+        } else {
+            // TODO: download from remote images repository into cache dir
+            // return error if not present in remote
+            // for now we just return a default one
+            IMAGE_CACHE_DIR.join("debian.ext4")
+        };
+
         let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
             // Jailer configuration.
             .jailer_cfg()
@@ -220,7 +241,7 @@ impl Node {
             .mem_size_mib(8192)
             .build()
             // Add root drive.
-            .add_drive("root", Path::new(ROOT_FS))
+            .add_drive("root", root_fs_path)
             .is_root_device(true)
             .build()
             // Network configuration.

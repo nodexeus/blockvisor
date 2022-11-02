@@ -181,7 +181,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
     let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
 
     match command {
-        NodeCommand::List { running, chain } => {
+        NodeCommand::List { running, image } => {
             let nodes = service_client
                 .get_nodes(bv_pb::GetNodesRequest {})
                 .await?
@@ -189,12 +189,12 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .nodes;
             let mut nodes = nodes
                 .iter()
-                .filter(|c| {
-                    chain
+                .filter(|n| {
+                    image
                         .as_ref()
-                        .map(|chain| c.chain.contains(chain))
+                        .map(|image| n.image.contains(image))
                         .unwrap_or(true)
-                        && (!running || (c.status == bv_pb::NodeStatus::Running as i32))
+                        && (!running || (n.status == bv_pb::NodeStatus::Running as i32))
                 })
                 .peekable();
             if nodes.peek().is_some() {
@@ -203,7 +203,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                     table.push(PrettyTableRow {
                         id: node.id,
                         name: node.name,
-                        chain: node.chain,
+                        image: node.image,
                         status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
                         ip: node.ip,
                     })
@@ -213,7 +213,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 println!("No nodes found.");
             }
         }
-        NodeCommand::Create { chain, ip, gateway } => {
+        NodeCommand::Create { image, ip, gateway } => {
             let id = Uuid::new_v4();
             let name = Petnames::default().generate_one(3, "_");
             // TODO: this configurations is useful for testing on CI machine
@@ -223,14 +223,14 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
                 .create_node(bv_pb::CreateNodeRequest {
                     id: id.to_string(),
                     name: name.clone(),
-                    chain: chain.to_string(),
+                    image: image.to_string(),
                     ip: ip.to_string(),
                     gateway: gateway.to_string(),
                 })
                 .await?;
             println!(
-                "Created new node for `{}` chain with ID `{}` and name `{}`",
-                chain, &id, &name
+                "Created new node from `{}` image with ID `{}` and name `{}`",
+                image, &id, &name
             );
         }
         NodeCommand::Start { id_or_names } => {

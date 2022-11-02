@@ -89,16 +89,16 @@ pub enum NodeCommand {
         #[clap(long, short)]
         running: bool,
 
-        /// Display nodes of particular chain
+        /// Display nodes of particular image (as a substring)
         #[clap(long, short)]
-        chain: Option<String>,
+        image: Option<String>,
     },
 
     /// Create node
     #[clap(alias = "c")]
     Create {
-        /// Chain identifier
-        chain: String,
+        /// Node Image identifier
+        image: String,
 
         /// Node IP Address
         #[clap(long)]

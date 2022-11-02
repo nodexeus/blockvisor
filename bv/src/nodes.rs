@@ -24,7 +24,8 @@ lazy_static::lazy_static! {
     pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
         .map(|p| p.join(".cache"))
         .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("blockvisor");
+        .join("blockvisor")
+        .join("nodes");
 
     static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
 }
@@ -54,7 +55,7 @@ impl Nodes {
         &mut self,
         id: Uuid,
         name: String,
-        chain: String,
+        image: String,
         ip: String,
         gateway: String,
     ) -> Result<()> {
@@ -77,7 +78,7 @@ impl Nodes {
         let node = NodeData {
             id,
             name: name.clone(),
-            chain,
+            image,
             expected_status: NodeStatus::Stopped,
             network_interface,
         };

@@ -89,7 +89,9 @@ fn test_bv_cmd_node_lifecycle() {
     println!("create stdout: {stdout}");
     println!("create stderr: {stderr}");
     let vm_id = stdout
-        .trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "))
+        .trim_start_matches(&format!(
+            "Created new node from `{chain_id}` image with ID "
+        ))
         .split('`')
         .nth(1)
         .unwrap();
@@ -141,7 +143,9 @@ async fn test_bv_cmd_node_recovery() {
     println!("create stdout: {stdout}");
     println!("create stderr: {stderr}");
     let vm_id = stdout
-        .trim_start_matches(&format!("Created new node for `{chain_id}` chain with ID "))
+        .trim_start_matches(&format!(
+            "Created new node from `{chain_id}` image with ID "
+        ))
         .split('`')
         .nth(1)
         .unwrap();
