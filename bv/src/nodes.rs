@@ -230,7 +230,10 @@ impl Nodes {
                     // for the nodes to come online. For that reason we restrict the allowed delay
                     // further down to one second.
                     let max_delay = std::time::Duration::from_secs(1);
-                    let babel_conn = timeout(max_delay, Node::conn(data.id)).await??;
+                    let babel_conn = timeout(max_delay, Node::conn(data.id))
+                        .await
+                        .ok()
+                        .and_then(Result::ok);
                     tracing::debug!("Established babel connection");
                     Node::connect(data, babel_conn).await
                 })

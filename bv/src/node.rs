@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{path::Path, str::FromStr, time::Duration};
@@ -82,19 +82,25 @@ impl Node {
 
     /// Returns node previously created on this host.
     #[instrument]
-    pub async fn connect(data: NodeData, babel_conn: UnixStream) -> Result<Self> {
+    pub async fn connect(data: NodeData, babel_conn: Option<UnixStream>) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
-        let state = match get_process_pid(FC_BIN_NAME, &cmd) {
-            Ok(pid) => firec::MachineState::RUNNING { pid },
-            Err(_) => firec::MachineState::SHUTOFF,
+        let (state, babel_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
+            Ok(pid) => {
+                let c = babel_conn.ok_or_else(|| anyhow!("Node running, need babel_conn"))?;
+                (
+                    firec::MachineState::RUNNING { pid },
+                    Connection::Open { babel_conn: c },
+                )
+            }
+            Err(_) => (firec::MachineState::SHUTOFF, Connection::Closed),
         };
         let machine = firec::Machine::connect(config, state).await;
 
         Ok(Self {
             data,
             machine,
-            babel_conn: Connection::Open { babel_conn },
+            babel_conn,
         })
     }
 
