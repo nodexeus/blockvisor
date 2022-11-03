@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 use tokio::{
+    fs::DirBuilder,
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
     time::{sleep, timeout},
@@ -16,7 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     node_data::{NodeData, NodeStatus},
-    utils::get_process_pid,
+    utils::{get_process_pid, run_cmd},
 };
 
 #[derive(Debug)]
@@ -52,6 +53,7 @@ impl Connection {
 // FIXME: Hardcoding everything for now.
 pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
+const DATA_PATH: &str = "/var/lib/blockvisor/data.img";
 const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
@@ -76,6 +78,7 @@ impl Node {
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
+        Node::copy_data_image(&data).await?;
         let machine = firec::Machine::create(config).await?;
 
         data.save().await?;
@@ -205,6 +208,23 @@ impl Node {
         self.data.delete().await
     }
 
+    async fn copy_data_image(data: &NodeData) -> Result<()> {
+        // Workaround: using system `cp` because unlike std one it works well with sparse files
+        // https://github.com/rust-lang/rust/issues/58635
+        // firec will not overwrite the file if it's already present
+        //
+        // TODO: we need to create a new data image according to spec
+        // At the time of writing we use the same 10 Gb empty image for every node
+        let data_dir = Path::new(CHROOT_PATH)
+            .join(FC_BIN_NAME)
+            .join(data.id.to_string())
+            .join("root");
+        DirBuilder::new().recursive(true).create(&data_dir).await?;
+        run_cmd("cp", &[DATA_PATH, &data_dir.to_string_lossy()]).await?;
+
+        Ok(())
+    }
+
     fn create_config(data: &NodeData) -> Result<firec::config::Config<'static>> {
         let kernel_args = format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
@@ -239,6 +259,9 @@ impl Node {
             // Add root drive.
             .add_drive("root", root_fs_path)
             .is_root_device(true)
+            .build()
+            // Add data drive.
+            .add_drive("data", Path::new(DATA_PATH))
             .build()
             // Network configuration.
             .add_network_interface(iface)

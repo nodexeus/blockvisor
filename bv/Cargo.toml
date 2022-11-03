@@ -24,7 +24,7 @@ base64 = "0.13.0"
 chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive"]}
 cli-table = "0.4"
-firec = {git = "https://github.com/blockjoy/firec.git", rev = "758e4b64"}
+firec = {git = "https://github.com/blockjoy/firec.git", rev = "88c3dec"}
 futures-util = "0.3"
 home = "0.5.3"
 lazy_static = "1.4.0"
