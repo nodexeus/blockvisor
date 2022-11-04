@@ -13,7 +13,7 @@ install:
 		mount $$image /mnt/fc; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babel /mnt/fc/usr/bin/; \
 		install -m u=rw,g=r,o=r babel/data/babel.service /mnt/fc/etc/systemd/system/; \
-		install -m u=rw,g=r,o=r babel/examples/helium.toml /mnt/fc/etc/babel.conf; \
+		install -m u=rw,g=r,o=r babel/protocols/helium/helium-validator.toml /mnt/fc/etc/babel.conf; \
 		umount /mnt/fc; \
 	done
 

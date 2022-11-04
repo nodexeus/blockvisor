@@ -133,10 +133,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_load() {
-        let mut dir = fs::read_dir("examples").await.unwrap();
-        while let Some(entry) = dir.next_entry().await.unwrap() {
-            println!("loading: {entry:?}");
-            load(&entry.path()).await.unwrap();
+        use walkdir::WalkDir;
+
+        for entry in WalkDir::new("protocols") {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() && path.extension().unwrap_or_default() == "toml" {
+                println!("loading: {path:?}");
+                load(path).await.unwrap();
+            }
         }
     }
 }
