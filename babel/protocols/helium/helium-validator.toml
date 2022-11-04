@@ -1,7 +1,4 @@
-protocol = "helium"
-node_type = "validator"
-entry_point = "/blockjoy/miner/bin/miner foreground"
-
+urn  = "helium:validator"
 
 [requirements]
 vcpu = 8
@@ -9,10 +6,13 @@ ram = 16
 disk = 200
 
 [config]
+protocol = "helium"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.15.9"
 description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
+entry_point = "/blockjoy/miner/bin/miner foreground"
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
