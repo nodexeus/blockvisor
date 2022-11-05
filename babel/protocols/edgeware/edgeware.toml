@@ -7,7 +7,7 @@ node_type = "validator"
 babel_version = "0.0.1"
 node_version = "3.3.3"
 description = "edgeware blockchain validator"
-jrpc_host = "http://localhost:9933/" 
+api_host = "http://localhost:9933/"
 entry_point = "find"
 data_directory_mount_point = "/blockjoy/miner/data"
 
