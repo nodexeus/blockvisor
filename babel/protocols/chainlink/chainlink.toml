@@ -8,6 +8,8 @@ babel_version = "0.0.1"
 node_version = "1.8..0" 
 description = "chainlink blockchain validator"
 api_host = "http://localhost:8000/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/chainlink.pid"

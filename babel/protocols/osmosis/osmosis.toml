@@ -8,6 +8,8 @@ babel_version = "0.0.1"
 node_version = "11.0.1"
 description = "osmosis blockchain validator"
 api_host = "http://localhost:26657/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/osmosis.pid"

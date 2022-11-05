@@ -8,6 +8,8 @@ babel_version = "0.0.1"
 node_version = "0.8.3" #VERSION TBD
 description = "pokt blockchain validator"
 api_host = "http://localhost:8081/v1/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/pokt.pid"

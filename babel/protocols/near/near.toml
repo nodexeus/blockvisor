@@ -8,6 +8,8 @@ babel_version = "0.0.1"
 node_version = "1.28.0"
 description = "near blockchain validator"
 api_host = "http://localhost:3030" 
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/near.pid"
