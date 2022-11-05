@@ -1,12 +1,11 @@
-urn  = "near:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "near"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.28.0"
-node_type = "validator"
 description = "near blockchain validator"
 api_host = "http://localhost:3030" 
 

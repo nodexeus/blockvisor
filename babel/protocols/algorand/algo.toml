@@ -1,12 +1,11 @@
-urn  = "algo:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "algo"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "3.9.4"
-node_type = "validator"
 description = "algo blockchain validator"
 api_host = "https://localhost:8443/"
 

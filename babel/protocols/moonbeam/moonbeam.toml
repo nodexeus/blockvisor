@@ -1,12 +1,11 @@
-urn  = "moonbeam:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "moonbeam"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1701"
-node_type = "validator"
 description = "moonbeam blockchain validator"
 api_host = "http://localhost:9933/" 
 

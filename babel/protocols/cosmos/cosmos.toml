@@ -1,12 +1,11 @@
-urn  = "cosmos:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "cosmos"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "0.45.7" # cosmos sdk
-node_type = "validator"
 description = "cosmos blockchain validator"
 api_host = "http://localhost:26657/"
 

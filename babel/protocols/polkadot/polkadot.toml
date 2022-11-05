@@ -1,12 +1,11 @@
-urn  = "polkadot:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "polkadot"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "0.9.27"
-node_type = "validator"
 description = "polkadot blockchain validator"
 api_host = "http://localhost:9933/" 
 

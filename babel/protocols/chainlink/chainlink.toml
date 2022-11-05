@@ -1,12 +1,11 @@
-urn  = "chainlink:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "chainlink"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.8..0" 
-node_type = "validator"
 description = "chainlink blockchain validator"
 api_host = "http://localhost:8000/"
 

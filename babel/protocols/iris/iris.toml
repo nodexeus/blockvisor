@@ -1,12 +1,11 @@
-urn  = "iris:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "iris"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.1.1"
-node_type = "validator"
 description = "iris blockchain validator"
 api_host = "http://localhost:26657/"
 

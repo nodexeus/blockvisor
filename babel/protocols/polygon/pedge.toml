@@ -1,12 +1,11 @@
-urn  = "pedge:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "pedge"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "0.5.0"
-node_type = "validator"
 description = "pedge blockchain validator"
 api_host = "http://localhost:8545/"
 

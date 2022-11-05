@@ -1,12 +1,11 @@
-urn  = "solana:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "solana"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.10.34"
-node_type = "validator"
 description = "solana blockchain validator"
 api_host = "http://localhost:8899/"
 

@@ -1,12 +1,11 @@
-urn  = "juno:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "juno"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "9.0.0"
-node_type = "validator"
 description = "juno blockchain validator"
 api_host = "http://localhost:26657/"
 

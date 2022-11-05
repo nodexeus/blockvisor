@@ -1,12 +1,11 @@
-urn  = "kava:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "kava"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "0.16.1" # recc mainnet
-node_type = "validator"
 description = "kava blockchain validator"
 api_host = "http://localhost:26656/"
 # kava evm endopoint to connect to metamask: http://localhost:8545 

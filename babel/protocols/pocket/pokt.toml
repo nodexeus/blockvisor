@@ -1,12 +1,11 @@
-urn  = "pokt:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "pokt"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "0.8.3" #VERSION TBD
-node_type = "validator"
 description = "pokt blockchain validator"
 api_host = "http://localhost:8081/v1/"
 

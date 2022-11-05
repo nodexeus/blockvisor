@@ -1,5 +1,3 @@
-urn  = "helium:validator"
-
 [requirements]
 vcpu = 8
 ram = 16
