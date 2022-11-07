@@ -124,7 +124,7 @@ impl Client {
     ) -> Result<BlockchainResponse, error::Error> {
         use config::MethodResponseFormat::*;
 
-        let args = vec!["-c", &command];
+        let args = vec!["-c", command];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()
@@ -137,7 +137,7 @@ impl Client {
         match response_config.format {
             Json => {
                 let content: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                Ok(content.into())
+                content.try_into()
             }
             Raw => {
                 let content = String::from_utf8_lossy(&output.stdout).to_string();
@@ -179,15 +179,14 @@ pub struct BlockchainResponse {
     value: String,
 }
 
-impl From<serde_json::Value> for BlockchainResponse {
-    fn from(content: serde_json::Value) -> Self {
-        Self {
-            value: content
-                .get("todo we gotta get this from the config")
-                .and_then(|val| val.as_str())
-                .unwrap_or_default()
-                .to_string(),
-        }
+impl TryFrom<serde_json::Value> for BlockchainResponse {
+    type Error = error::Error;
+
+    fn try_from(content: serde_json::Value) -> Result<Self, Self::Error> {
+        let res = Self {
+            value: serde_json::to_string(&content)?,
+        };
+        Ok(res)
     }
 }
 
@@ -222,13 +221,15 @@ mod tests {
     #[tokio::test]
     async fn test_sh() {
         let cfg = Babel {
-            urn: "".to_string(),
             export: None,
             env: None,
             config: Config {
                 babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
                 node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: None,
             },
@@ -270,7 +271,7 @@ mod tests {
             name: "json".to_string(),
         });
         let output = client.handle(json_cmd).await.unwrap();
-        assert_eq!(output.unwrap_blockchain().value, "make a toast");
+        assert_eq!(output.unwrap_blockchain().value, "\"make a toast\"");
 
         let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "unknown".to_string(),
@@ -294,13 +295,15 @@ mod tests {
         });
 
         let cfg = Babel {
-            urn: "".to_string(),
             export: None,
             env: None,
             config: Config {
                 babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
                 node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
@@ -341,13 +344,15 @@ mod tests {
         });
 
         let cfg = Babel {
-            urn: "".to_string(),
             export: None,
             env: None,
             config: Config {
                 babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
                 node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
@@ -399,13 +404,15 @@ mod tests {
         });
 
         let cfg = Babel {
-            urn: "".to_string(),
             export: None,
             env: None,
             config: Config {
                 babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
                 node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
