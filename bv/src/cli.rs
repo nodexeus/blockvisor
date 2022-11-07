@@ -112,14 +112,14 @@ pub enum NodeCommand {
     /// Start node
     Start {
         /// Node id or name
-        #[clap(required(true))]
+        #[clap(required(false))]
         id_or_names: Vec<String>,
     },
 
     /// Stop node
     Stop {
         /// One or more node id or names.
-        #[clap(required(true))]
+        #[clap(required(false))]
         id_or_names: Vec<String>,
     },
 

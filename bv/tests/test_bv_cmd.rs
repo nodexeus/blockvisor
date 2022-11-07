@@ -95,6 +95,50 @@ fn test_bv_cmd_restart() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
+fn test_bv_cmd_node_start_and_stop_all() {
+    use std::str;
+    use uuid::Uuid;
+
+    const NODES_COUNT: usize = 3;
+    println!("create {NODES_COUNT} nodes");
+    let mut nodes: Vec<String> = Default::default();
+    for _ in 0..NODES_COUNT {
+        let chain_id = Uuid::new_v4().to_string();
+        let mut cmd = Command::cargo_bin("bv").unwrap();
+        let cmd = cmd.args(&["node", "create", &chain_id]);
+        let output = cmd.output().unwrap();
+        let stdout = str::from_utf8(&output.stdout).unwrap();
+        let stderr = str::from_utf8(&output.stderr).unwrap();
+        println!("create stdout: {stdout}");
+        println!("create stderr: {stderr}");
+        let vm_id = stdout
+            .trim_start_matches(&format!(
+                "Created new node from `{chain_id}` image with ID "
+            ))
+            .split('`')
+            .nth(1)
+            .unwrap();
+        println!("create vm_id: {vm_id}");
+        nodes.push(vm_id.to_owned());
+    }
+
+    println!("start all created nodes");
+    bv_run(&["node", "start"], "Started node");
+    println!("check all nodes are running");
+    for id in &nodes {
+        bv_run(&["node", "status", id], "Running");
+    }
+    println!("stop all nodes");
+    bv_run(&["node", "stop"], "Stopped node");
+    println!("check all nodes are stopped");
+    for id in &nodes {
+        bv_run(&["node", "status", id], "Stopped");
+    }
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     use uuid::Uuid;
 
