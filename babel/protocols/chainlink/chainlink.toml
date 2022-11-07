@@ -1,0 +1,45 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "chainlink"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "1.8..0" 
+description = "chainlink blockchain validator"
+api_host = "http://localhost:8000/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/chainlink.pid"
+
+[[methods]]
+name = "height"
+transport = "rest"
+method = "" # find 
+
+    [methods.response]
+    status = 200
+    field = "" # find
+    format = "raw" # find
+
+[[methods]]
+name = "address"
+transport = "rest"
+method = "/eth/v1/node/identity" 
+
+    [methods.response]
+    status = 200
+    field = "data.peer_id" 
+    format = "json"
+
+[[methods]]
+name = "status"
+transport = "rest"
+method = "/eth/v1/node/syncing" 
+
+    [methods.response]
+    status = 200
+    field = "data.is_syncing"
+    format = "json"

@@ -4,7 +4,6 @@ use tokio::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct Babel {
-    pub urn: String,
     pub export: Option<Vec<String>>,
     pub env: Option<Env>,
     pub config: Config,
@@ -40,11 +39,16 @@ pub struct Config {
     /// version that this config file requires, or the maximal version up to which this config is
     /// compatible with the node.
     pub node_version: String,
+    pub protocol: String,
     pub node_type: String,
     pub description: Option<String>,
     /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
     /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
+    /// Command to start blockchain node
+    pub entry_point: String,
+    /// Path to mount data drive to
+    pub data_directory_mount_point: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,10 +137,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_load() {
-        let mut dir = fs::read_dir("examples").await.unwrap();
-        while let Some(entry) = dir.next_entry().await.unwrap() {
-            println!("loading: {entry:?}");
-            load(&entry.path()).await.unwrap();
+        use walkdir::WalkDir;
+
+        for entry in WalkDir::new("protocols") {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() && path.extension().unwrap_or_default() == "toml" {
+                println!("loading: {path:?}");
+                load(path).await.unwrap();
+            }
         }
     }
 }

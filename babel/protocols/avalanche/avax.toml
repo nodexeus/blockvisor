@@ -1,0 +1,43 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "avax"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "1.7.16"
+description = "avax blockchain validator"
+api_host = "http://localhost:9650/ext/bc/P/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/avax.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "platform.getHeight"
+
+    [methods.response]
+    code = 200
+    field = "result.height"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "platform.listAddresses" 
+
+    [methods.response]
+    code = 200
+    field = "resut.addresses" 
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "platform.getBlockchainStatus"
+
+    [methods.response]
+    code = 200
+    field = "result.status"
+    # status_enum = { syncing = "Syncing", follower = "Created"}

@@ -166,40 +166,17 @@ pub enum NodeCommand {
         id_or_name: String,
     },
 
-    /// Return the block height of the blockchain the node is running
-    Height {
-        /// Node id or name
+    /// Runs a command against the blockchain node inside the guest operating system that babel is
+    /// talking to.
+    Run {
+        /// The id or name of the node that the command should be run against.
         id_or_name: String,
-    },
-
-    /// Return the block age of the blockchain the node is running
-    BlockAge {
-        /// Node id or name
-        id_or_name: String,
-    },
-
-    /// Return the name node.
-    Name {
-        /// Node id or name
-        id_or_name: String,
-    },
-
-    /// Return the address of the blockchain the node is running
-    Address {
-        /// Node id or name
-        id_or_name: String,
-    },
-
-    /// Return whether the node that is running is in consensus or not.
-    Consensus {
-        /// Node id or name
-        id_or_name: String,
-    },
-
-    /// Create the genesis block for this node.
-    Genesis {
-        /// Node id or name
-        id_or_name: String,
+        /// The method that should be called. This should be one of the methods listed when
+        /// `nv node capabilities <id_or_name>` is ran.
+        method: String,
+        /// The payload that should be passed to the endpoint. This should be a json encoded blob.
+        #[clap(long)]
+        payload: Option<String>,
     },
 }
 

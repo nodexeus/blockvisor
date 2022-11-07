@@ -147,15 +147,15 @@ async fn main() -> Result<()> {
                 println!("Service stopped");
             }
         }
-        Command::Host { command } => process_host_command(&command).await?,
-        Command::Chain { command } => process_chain_command(&command).await?,
-        Command::Node { command } => process_node_command(&command).await?,
+        Command::Host { command } => process_host_command(command).await?,
+        Command::Chain { command } => process_chain_command(command).await?,
+        Command::Node { command } => process_node_command(command).await?,
     }
 
     Ok(())
 }
 
-async fn process_host_command(command: &HostCommand) -> Result<()> {
+async fn process_host_command(command: HostCommand) -> Result<()> {
     match command {
         HostCommand::Info => {
             let info = get_host_info();
@@ -167,7 +167,7 @@ async fn process_host_command(command: &HostCommand) -> Result<()> {
 }
 
 #[allow(unreachable_code)]
-async fn process_chain_command(command: &ChainCommand) -> Result<()> {
+async fn process_chain_command(command: ChainCommand) -> Result<()> {
     match command {
         ChainCommand::List => todo!(),
         ChainCommand::Status { id: _ } => todo!(),
@@ -177,7 +177,7 @@ async fn process_chain_command(command: &ChainCommand) -> Result<()> {
     Ok(())
 }
 
-async fn process_node_command(command: &NodeCommand) -> Result<()> {
+async fn process_node_command(command: NodeCommand) -> Result<()> {
     let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
 
     match command {
@@ -217,25 +217,25 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             let id = Uuid::new_v4();
             let name = Petnames::default().generate_one(3, "_");
             // TODO: this configurations is useful for testing on CI machine
-            let gateway = gateway.as_deref().unwrap_or("216.18.214.193");
-            let ip = ip.as_deref().unwrap_or("216.18.214.195");
+            let gateway = gateway.unwrap_or_else(|| "216.18.214.193".to_string());
+            let ip = ip.unwrap_or_else(|| "216.18.214.195".to_string());
             service_client
                 .create_node(bv_pb::CreateNodeRequest {
                     id: id.to_string(),
                     name: name.clone(),
                     image: image.to_string(),
-                    ip: ip.to_string(),
-                    gateway: gateway.to_string(),
+                    ip,
+                    gateway,
                 })
                 .await?;
             println!(
                 "Created new node from `{}` image with ID `{}` and name `{}`",
-                image, &id, &name
+                image, id, &name
             );
         }
         NodeCommand::Start { id_or_names } => {
             for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                let id = resolve_id_or_name(&mut service_client, &id_or_name)
                     .await?
                     .to_string();
                 service_client
@@ -246,7 +246,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Stop { id_or_names } => {
             for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                let id = resolve_id_or_name(&mut service_client, &id_or_name)
                     .await?
                     .to_string();
                 service_client
@@ -257,7 +257,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         }
         NodeCommand::Delete { id_or_names } => {
             for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                let id = resolve_id_or_name(&mut service_client, &id_or_name)
                     .await?
                     .to_string();
                 service_client
@@ -271,7 +271,7 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
         NodeCommand::Logs { id_or_name: _ } => todo!(),
         NodeCommand::Status { id_or_names } => {
             for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, id_or_name)
+                let id = resolve_id_or_name(&mut service_client, &id_or_name)
                     .await?
                     .to_string();
                 let status = service_client
@@ -285,99 +285,54 @@ async fn process_node_command(command: &NodeCommand) -> Result<()> {
             }
         }
         NodeCommand::Capabilities { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let capabilities = service_client
-                .list_capabilities(bv_pb::ListCapabilitiesRequest {
-                    node_id: id.to_string(),
-                })
-                .await?
-                .into_inner()
-                .capabilities;
-            for cap in capabilities {
-                println!("{cap}");
+            let node_id = resolve_id_or_name(&mut service_client, &id_or_name).await?;
+            let caps = list_capabilities(&mut service_client, node_id).await?;
+            print!("{caps}");
+        }
+        NodeCommand::Run {
+            id_or_name,
+            method,
+            payload,
+        } => {
+            let node_id = resolve_id_or_name(&mut service_client, &id_or_name).await?;
+            let req = bv_pb::BlockchainRequest {
+                method,
+                node_id: node_id.to_string(),
+                payload,
+            };
+            match service_client.blockchain(req).await {
+                Ok(result) => println!("{}", result.into_inner().value),
+                Err(e) => {
+                    if e.message().contains("not found") {
+                        let msg = "Method not found. Options are:";
+                        let caps = list_capabilities(&mut service_client, node_id).await?;
+                        anyhow::bail!("{msg}\n{caps}");
+                    }
+                    return Err(anyhow::Error::from(e));
+                }
             }
-        }
-        NodeCommand::Height { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let height = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "height".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{height}");
-        }
-        NodeCommand::BlockAge { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let block_age = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "block-age".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{block_age}");
-        }
-        NodeCommand::Name { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let name = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "name".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{name}");
-        }
-        NodeCommand::Address { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let address = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "address".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{address}");
-        }
-        NodeCommand::Consensus { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let consensus = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "consensus".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{consensus}");
-        }
-        NodeCommand::Genesis { id_or_name } => {
-            let id = resolve_id_or_name(&mut service_client, id_or_name).await?;
-            let consensus = service_client
-                .blockchain(bv_pb::BlockchainRequest {
-                    method: "genesis".to_string(),
-                    node_id: id.to_string(),
-                    payload: None,
-                })
-                .await?
-                .into_inner()
-                .value;
-            println!("{consensus}");
         }
     }
 
     Ok(())
+}
+
+async fn list_capabilities(
+    client: &mut BlockvisorClient<Channel>,
+    node_id: uuid::Uuid,
+) -> Result<String> {
+    let req = bv_pb::ListCapabilitiesRequest {
+        node_id: node_id.to_string(),
+    };
+    let caps = client
+        .list_capabilities(req)
+        .await?
+        .into_inner()
+        .capabilities
+        .into_iter()
+        .reduce(|msg, cap| msg + "\n" + &cap)
+        .unwrap_or_default();
+    Ok(caps)
 }
 
 async fn resolve_id_or_name(

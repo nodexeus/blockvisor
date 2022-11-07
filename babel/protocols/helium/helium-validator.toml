@@ -1,0 +1,202 @@
+[requirements]
+vcpu = 8
+ram = 16
+disk = 200
+
+[config]
+protocol = "helium"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "1.15.9"
+description = "helium blockchain validator"
+api_host = "http://localhost:4467/"
+entry_point = "/blockjoy/miner/bin/miner foreground"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/helium.pid" #this is likely not necessary
+
+# METHOD BLOCK-HEIGHT
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_height"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "epoch": 40440,
+#     "height": 1492344
+#   }
+# }
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "info_height"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.height"
+
+# METHOD: P2P Address
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"peer_addr"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "peer_addr": "/p2p/11jD9oGmS8bqnMM6tDsxMoq9aAUrNjfSqjBDMtKAjXCYyvgbpLU"
+#   }
+# }
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "peer_addr"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.peer_addr"
+
+# METHOD name
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_name"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "name": "rare-jade-barbel"
+#   }
+# }
+[[methods]]
+name = "name"
+transport = "jrpc"
+method = "info_name"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.name"
+
+# METHOD: consensus status
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_in_consensus"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "in_consensus": false
+#   }
+# }
+[[methods]]
+name = "consensus"
+transport = "jrpc"
+method = "info_in_consensus"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.in_consensus"
+
+# METHOD: block age
+# DESC: The age (in seconds) of the last block received.
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_block_age"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "block_age": 41
+#   }
+# }
+[[methods]]
+name = "block_age"
+transport = "jrpc"
+method = "info_block_age"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result.block_age"
+
+
+# METHOD: summary
+# DESC: The age of the last block received.
+# example:
+# curl -X POST http://localhost:4467 \
+#      -d '{"jsonrpc":"2.0","id":"id","method":"info_summary"}' | jq .
+# response:
+# {
+#   "id": "id",
+#   "jsonrpc": "2.0",
+#   "result": {
+#     "block_age": 77,
+#     "epoch": 40441,
+#     "firmware_version": "cat: /etc/lsb_release: No such file or directory\n",
+#     "gateway_details": "undefined",
+#     "height": 1492366,
+#     "mac_addresses": [
+#       {
+#         "bge3": "1402EC400C07"
+#       },
+#       {
+#         "bge2": "1402EC400C06"
+#       },
+#       {
+#         "bge1": "1402EC400C05"
+#       },
+#       {
+#         "bge0": "1402EC400C04"
+#       },
+#       {
+#         "bxe1": "A0D3C1F6F924"
+#       },
+#       {
+#         "bxe0": "A0D3C1F6F920"
+#       }
+#     ],
+#     "name": "rare-jade-barbel",
+#     "peer_book_entry_count": 30829,
+#     "sync_height": 1492366,
+#     "uptime": 367135,
+#     "version": "1.14.0"
+#   }
+# }
+[[methods]]
+name = "info"
+transport = "jrpc"
+method = "info_summary"
+params = []
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "genesis"
+transport = "sh"
+body = "/usr/bin/curl -s https://snapshots.helium.wtf/genesis.mainnet -o /h && /usr/local/bin/miner genesis load /h"
+
+    [methods.response]
+    # something?
+    status = 0
+    format = "raw"
+
+[[methods]]
+name = "version"
+transport = "sh"
+body = "miner versions | tail -n +2 | awk '{print $2}'"
+
+    [methods.response]
+    # something?
+    status = 0
+    format = "raw"

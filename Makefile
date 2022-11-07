@@ -7,17 +7,13 @@ install:
 	install -m u=rwx,g=rx,o=rx target/debug/bv /usr/bin/
 	install -m u=rw,g=r,o=r bv/data/tmux.service /etc/systemd/system/
 	install -m u=rw,g=r,o=r bv/data/blockvisor.service /etc/systemd/system/
-	install -m u=rw,g=r,o=r bv/data/com.BlockJoy.blockvisor.conf /etc/dbus-1/system.d/
-	install -m u=rw,g=r,o=r bv/data/babel-bus.conf /etc/
-	install -m u=rw,g=r,o=r bv/data/babel-bus.service /etc/systemd/system/
-	install -m u=rw,g=r,o=r bv/data/babel-bus.socket /etc/systemd/system/
 	systemctl daemon-reload
 	systemctl enable blockvisor.service
 	for image in $(wildcard /root/.cache/blockvisor/images/*.img /root/.cache/blockvisor/images/*.ext4); do \
 		mount $$image /mnt/fc; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babel /mnt/fc/usr/bin/; \
 		install -m u=rw,g=r,o=r babel/data/babel.service /mnt/fc/etc/systemd/system/; \
-		install -m u=rw,g=r,o=r babel/examples/helium.toml /mnt/fc/etc/babel.conf; \
+		install -m u=rw,g=r,o=r babel/protocols/helium/helium-validator.toml /mnt/fc/etc/babel.conf; \
 		umount /mnt/fc; \
 	done
 

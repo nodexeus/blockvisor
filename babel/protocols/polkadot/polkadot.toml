@@ -1,0 +1,42 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "polkadot"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "0.9.27"
+description = "polkadot blockchain validator"
+api_host = "http://localhost:9933/" 
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/polkadot.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "chain_getFinalizedHead"
+
+    [methods.response]
+    code = 200
+    field = "result" # need to figure out data with testing
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "system_localPeerId" 
+
+    [methods.response]
+    code = 200
+    field = "result" # find this
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "system_syncState"
+
+    [methods.response]
+    code = 200
+    field = "result" # find this
