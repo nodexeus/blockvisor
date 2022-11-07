@@ -208,11 +208,14 @@ impl Node {
         self.data.delete().await
     }
 
+    /// Copy data drive into chroot location.
+    ///
+    /// NOTE: this is a workaround using system `cp` instead of `std::fs::copy`
+    /// to be able to preserve sparsity of the file. Firec will not overwrite
+    /// the file in chroot if it's already present.
+    ///
+    /// See discussion here for more details: https://github.com/rust-lang/rust/issues/58635
     async fn copy_data_image(data: &NodeData) -> Result<()> {
-        // Workaround: using system `cp` because unlike std one it works well with sparse files
-        // https://github.com/rust-lang/rust/issues/58635
-        // firec will not overwrite the file if it's already present
-        //
         // TODO: we need to create a new data image according to spec
         // At the time of writing we use the same 10 Gb empty image for every node
         let data_dir = Path::new(CHROOT_PATH)
