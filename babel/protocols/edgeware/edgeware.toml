@@ -1,14 +1,15 @@
-urn  = "edgeware:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "edgeware"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "3.3.3"
-node_type = "validator"
 description = "edgeware blockchain validator"
-jrpc_host = "http://localhost:9933/" 
+api_host = "http://localhost:9933/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/edgeware.pid"

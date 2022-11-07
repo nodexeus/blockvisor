@@ -1,14 +1,15 @@
-urn  = "band:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "band"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "2.3.4"
-node_type = "validator"
 description = "band blockchain validator"
 api_host = "http://localhost:26657/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/band.pid"

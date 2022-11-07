@@ -1,14 +1,15 @@
-urn  = "eth:validator"
-
 [env]
 path_append = "/blockjoy/bin/"
 
 [config]
+protocol = "eth"
+node_type = "validator"
 babel_version = "0.0.1"
 node_version = "2.3.0" # beacon chain 
-node_type = "validator"
 description = "eth blockchain validator"
 api_host = "http://localhost:8000/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
 pid_file = "/var/run/eth.pid"
