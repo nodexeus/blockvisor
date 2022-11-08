@@ -96,7 +96,6 @@ fn test_bv_cmd_restart() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_start_and_stop_all() {
-    use std::str;
     use uuid::Uuid;
 
     const NODES_COUNT: usize = 3;
@@ -104,22 +103,7 @@ fn test_bv_cmd_node_start_and_stop_all() {
     let mut nodes: Vec<String> = Default::default();
     for _ in 0..NODES_COUNT {
         let chain_id = Uuid::new_v4().to_string();
-        let mut cmd = Command::cargo_bin("bv").unwrap();
-        let cmd = cmd.args(&["node", "create", &chain_id]);
-        let output = cmd.output().unwrap();
-        let stdout = str::from_utf8(&output.stdout).unwrap();
-        let stderr = str::from_utf8(&output.stderr).unwrap();
-        println!("create stdout: {stdout}");
-        println!("create stderr: {stderr}");
-        let vm_id = stdout
-            .trim_start_matches(&format!(
-                "Created new node from `{chain_id}` image with ID "
-            ))
-            .split('`')
-            .nth(1)
-            .unwrap();
-        println!("create vm_id: {vm_id}");
-        nodes.push(vm_id.to_owned());
+        nodes.push(create_node(&chain_id));
     }
 
     println!("start all created nodes");
