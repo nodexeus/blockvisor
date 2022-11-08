@@ -46,6 +46,27 @@ fn bv_run(commands: &[&str], stdout_pattern: &str) {
         .stdout(predicate::str::contains(stdout_pattern));
 }
 
+#[cfg(target_os = "linux")]
+fn create_node(chain_id: &str) -> String {
+    use std::str;
+
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    let cmd = cmd.args(&["node", "create", chain_id]);
+    let output = cmd.output().unwrap();
+    let stdout = str::from_utf8(&output.stdout).unwrap();
+    let stderr = str::from_utf8(&output.stderr).unwrap();
+    println!("create stdout: {stdout}");
+    println!("create stderr: {stderr}");
+    stdout
+        .trim_start_matches(&format!(
+            "Created new node from `{chain_id}` image with ID "
+        ))
+        .split('`')
+        .nth(1)
+        .unwrap()
+        .to_string()
+}
+
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
@@ -75,26 +96,11 @@ fn test_bv_cmd_restart() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
-    use std::str;
     use uuid::Uuid;
 
     let chain_id = Uuid::new_v4().to_string();
-
     println!("create a node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", &chain_id]);
-    let output = cmd.output().unwrap();
-    let stdout = str::from_utf8(&output.stdout).unwrap();
-    let stderr = str::from_utf8(&output.stderr).unwrap();
-    println!("create stdout: {stdout}");
-    println!("create stderr: {stderr}");
-    let vm_id = stdout
-        .trim_start_matches(&format!(
-            "Created new node from `{chain_id}` image with ID "
-        ))
-        .split('`')
-        .nth(1)
-        .unwrap();
+    let vm_id = &create_node(&chain_id);
     println!("create vm_id: {vm_id}");
 
     println!("stop stopped node");
@@ -130,25 +136,10 @@ fn test_bv_cmd_node_lifecycle() {
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_node_recovery() {
     use blockvisord::{node::FC_BIN_NAME, utils};
-    use std::str;
 
     let chain_id = "test_bv_cmd_node_recovery".to_string();
-
     println!("create a node");
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", &chain_id]);
-    let output = cmd.output().unwrap();
-    let stdout = str::from_utf8(&output.stdout).unwrap();
-    let stderr = str::from_utf8(&output.stderr).unwrap();
-    println!("create stdout: {stdout}");
-    println!("create stderr: {stderr}");
-    let vm_id = stdout
-        .trim_start_matches(&format!(
-            "Created new node from `{chain_id}` image with ID "
-        ))
-        .split('`')
-        .nth(1)
-        .unwrap();
+    let vm_id = &create_node(&chain_id);
     println!("create vm_id: {vm_id}");
 
     println!("start stopped node");
