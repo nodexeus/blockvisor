@@ -628,14 +628,8 @@ async fn test_bv_cmd_grpc_commands() {
         node_update(&node_id, pb::node_info::ContainerStatus::Creating),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
-        error_command_update(
-            &command_id,
-            format!("Node with id `{node_id}` exists"),
-        ),
-        error_command_update(
-            &command_id,
-            format!("Node with name `{node_name}` exists"),
-        ),
+        error_command_update(&command_id, format!("Node with id `{node_id}` exists")),
+        error_command_update(&command_id, format!("Node with name `{node_name}` exists")),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
@@ -643,10 +637,8 @@ async fn test_bv_cmd_grpc_commands() {
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
-        error_command_update(
-            &command_id,
-            "Firecracker API call failed with status=400 Bad Request, body=Some(\"{\\\"fault_message\\\":\\\"The requested operation is not supported after starting the microVM.\\\"}\")".to_string(),
-        ),
+        node_update(&node_id, pb::node_info::ContainerStatus::Running),
+        success_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
@@ -669,7 +661,7 @@ async fn test_bv_cmd_grpc_commands() {
         assert_eq!(actual.unwrap(), expected);
     }
 
-    assert_eq!(updates_count, 29);
+    assert_eq!(updates_count, 30);
 }
 
 #[cfg(target_os = "linux")]

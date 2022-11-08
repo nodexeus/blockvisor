@@ -122,6 +122,13 @@ impl Node {
     /// Starts the node.
     #[instrument(skip(self))]
     pub async fn start(&mut self) -> Result<()> {
+        if self.status() == NodeStatus::Running
+            || (self.status() == NodeStatus::Failed
+                && self.expected_status() == NodeStatus::Stopped)
+        {
+            return Ok(());
+        }
+
         self.machine.start().await?;
         let babel_conn = match Self::conn(self.id()).await {
             Ok(conn) => Ok(conn),
@@ -136,6 +143,7 @@ impl Node {
         if !matches!(resp, Ok(BabelResponse::Pong)) {
             tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
+
         self.data.expected_status = NodeStatus::Running;
         self.data.save().await
     }
