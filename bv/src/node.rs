@@ -208,6 +208,11 @@ impl Node {
         self.data.delete().await
     }
 
+    pub async fn set_self_update(&mut self, self_update: bool) -> Result<()> {
+        self.data.self_update = self_update;
+        self.data.save().await
+    }
+
     /// Copy data drive into chroot location.
     ///
     /// NOTE: this is a workaround using system `cp` instead of `std::fs::copy`
