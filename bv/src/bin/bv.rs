@@ -7,7 +7,8 @@ use blockvisord::{
     nodes::{CommonData, Nodes},
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
-        bv_pb, bv_pb::blockvisor_client::BlockvisorClient, BlockvisorServer, BLOCKVISOR_SERVICE_URL,
+        bv_pb, bv_pb::blockvisor_client::BlockvisorClient, bv_pb::Node, BlockvisorServer,
+        BLOCKVISOR_SERVICE_URL,
     },
     utils::run_cmd,
 };
@@ -149,7 +150,12 @@ async fn main() -> Result<()> {
         }
         Command::Host { command } => process_host_command(command).await?,
         Command::Chain { command } => process_chain_command(command).await?,
-        Command::Node { command } => process_node_command(command).await?,
+        Command::Node { command } => {
+            NodeClient::new()
+                .await?
+                .process_node_command(command)
+                .await?
+        }
     }
 
     Ok(())
@@ -177,181 +183,196 @@ async fn process_chain_command(command: ChainCommand) -> Result<()> {
     Ok(())
 }
 
-async fn process_node_command(command: NodeCommand) -> Result<()> {
-    let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
+struct NodeClient {
+    client: BlockvisorClient<Channel>,
+}
 
-    match command {
-        NodeCommand::List { running, image } => {
-            let nodes = service_client
-                .get_nodes(bv_pb::GetNodesRequest {})
-                .await?
-                .into_inner()
-                .nodes;
-            let mut nodes = nodes
-                .iter()
-                .filter(|n| {
-                    image
-                        .as_ref()
-                        .map(|image| n.image.contains(image))
-                        .unwrap_or(true)
-                        && (!running || (n.status == bv_pb::NodeStatus::Running as i32))
-                })
-                .peekable();
-            if nodes.peek().is_some() {
-                let mut table = vec![];
-                for node in nodes.cloned() {
-                    table.push(PrettyTableRow {
-                        id: node.id,
-                        name: node.name,
-                        image: node.image,
-                        status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
-                        ip: node.ip,
-                    })
-                }
-                print_stdout(table.to_pretty_table())?;
-            } else {
-                println!("No nodes found.");
-            }
-        }
-        NodeCommand::Create { image, ip, gateway } => {
-            let id = Uuid::new_v4();
-            let name = Petnames::default().generate_one(3, "_");
-            // TODO: this configurations is useful for testing on CI machine
-            let gateway = gateway.unwrap_or_else(|| "216.18.214.193".to_string());
-            let ip = ip.unwrap_or_else(|| "216.18.214.195".to_string());
-            service_client
-                .create_node(bv_pb::CreateNodeRequest {
-                    id: id.to_string(),
-                    name: name.clone(),
-                    image: image.to_string(),
-                    ip,
-                    gateway,
-                })
-                .await?;
-            println!(
-                "Created new node from `{}` image with ID `{}` and name `{}`",
-                image, id, &name
-            );
-        }
-        NodeCommand::Start { id_or_names } => {
-            for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, &id_or_name)
-                    .await?
-                    .to_string();
-                service_client
-                    .start_node(bv_pb::StartNodeRequest { id })
-                    .await?;
-                println!("Started node `{}`", id_or_name);
-            }
-        }
-        NodeCommand::Stop { id_or_names } => {
-            for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, &id_or_name)
-                    .await?
-                    .to_string();
-                service_client
-                    .stop_node(bv_pb::StopNodeRequest { id })
-                    .await?;
-                println!("Stopped node `{}`", id_or_name);
-            }
-        }
-        NodeCommand::Delete { id_or_names } => {
-            for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, &id_or_name)
-                    .await?
-                    .to_string();
-                service_client
-                    .delete_node(bv_pb::DeleteNodeRequest { id })
-                    .await?;
-                println!("Deleted node `{id_or_name}`");
-            }
-        }
-        NodeCommand::Restart { id_or_names: _ } => todo!(),
-        NodeCommand::Console { id_or_name: _ } => todo!(),
-        NodeCommand::Logs { id_or_name: _ } => todo!(),
-        NodeCommand::Status { id_or_names } => {
-            for id_or_name in id_or_names {
-                let id = resolve_id_or_name(&mut service_client, &id_or_name)
-                    .await?
-                    .to_string();
-                let status = service_client
-                    .get_node_status(bv_pb::GetNodeStatusRequest { id })
-                    .await?;
-                let status = status.into_inner().status;
-                match bv_pb::NodeStatus::from_i32(status) {
-                    Some(status) => println!("{status}"),
-                    None => eprintln!("Invalid status {status}"),
-                }
-            }
-        }
-        NodeCommand::Capabilities { id_or_name } => {
-            let node_id = resolve_id_or_name(&mut service_client, &id_or_name).await?;
-            let caps = list_capabilities(&mut service_client, node_id).await?;
-            print!("{caps}");
-        }
-        NodeCommand::Run {
-            id_or_name,
-            method,
-            payload,
-        } => {
-            let node_id = resolve_id_or_name(&mut service_client, &id_or_name).await?;
-            let req = bv_pb::BlockchainRequest {
-                method,
-                node_id: node_id.to_string(),
-                payload,
-            };
-            match service_client.blockchain(req).await {
-                Ok(result) => println!("{}", result.into_inner().value),
-                Err(e) => {
-                    if e.message().contains("not found") {
-                        let msg = "Method not found. Options are:";
-                        let caps = list_capabilities(&mut service_client, node_id).await?;
-                        anyhow::bail!("{msg}\n{caps}");
-                    }
-                    return Err(anyhow::Error::from(e));
-                }
-            }
-        }
+impl NodeClient {
+    async fn new() -> Result<Self> {
+        Ok(Self {
+            client: BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?,
+        })
     }
 
-    Ok(())
-}
+    async fn fetch_nodes(&mut self) -> Result<Vec<Node>> {
+        Ok(self
+            .client
+            .get_nodes(bv_pb::GetNodesRequest {})
+            .await?
+            .into_inner()
+            .nodes)
+    }
 
-async fn list_capabilities(
-    client: &mut BlockvisorClient<Channel>,
-    node_id: uuid::Uuid,
-) -> Result<String> {
-    let req = bv_pb::ListCapabilitiesRequest {
-        node_id: node_id.to_string(),
-    };
-    let caps = client
-        .list_capabilities(req)
-        .await?
-        .into_inner()
-        .capabilities
-        .into_iter()
-        .reduce(|msg, cap| msg + "\n" + &cap)
-        .unwrap_or_default();
-    Ok(caps)
-}
+    async fn list_capabilities(&mut self, node_id: uuid::Uuid) -> Result<String> {
+        let req = bv_pb::ListCapabilitiesRequest {
+            node_id: node_id.to_string(),
+        };
+        let caps = self
+            .client
+            .list_capabilities(req)
+            .await?
+            .into_inner()
+            .capabilities
+            .into_iter()
+            .reduce(|msg, cap| msg + "\n" + &cap)
+            .unwrap_or_default();
+        Ok(caps)
+    }
 
-async fn resolve_id_or_name(
-    service_client: &mut BlockvisorClient<Channel>,
-    id_or_name: &str,
-) -> Result<Uuid> {
-    let uuid = match Uuid::parse_str(id_or_name) {
-        Ok(v) => v,
-        Err(_) => {
-            let uuid = service_client
-                .get_node_id_for_name(bv_pb::GetNodeIdForNameRequest {
-                    name: id_or_name.to_string(),
-                })
-                .await?
-                .into_inner()
-                .id;
-            Uuid::parse_str(&uuid)?
+    async fn resolve_id_or_name(&mut self, id_or_name: &str) -> Result<Uuid> {
+        let uuid = match Uuid::parse_str(id_or_name) {
+            Ok(v) => v,
+            Err(_) => {
+                let uuid = self
+                    .client
+                    .get_node_id_for_name(bv_pb::GetNodeIdForNameRequest {
+                        name: id_or_name.to_string(),
+                    })
+                    .await?
+                    .into_inner()
+                    .id;
+                Uuid::parse_str(&uuid)?
+            }
+        };
+
+        Ok(uuid)
+    }
+
+    async fn get_node_ids(&mut self, id_or_names: Vec<String>) -> Result<Vec<String>> {
+        let mut ids: Vec<String> = Default::default();
+        if id_or_names.is_empty() {
+            for node in self.fetch_nodes().await? {
+                ids.push(node.id);
+            }
+        } else {
+            for id_or_name in id_or_names {
+                ids.push(self.resolve_id_or_name(&id_or_name).await?.to_string());
+            }
+        };
+        Ok(ids)
+    }
+
+    async fn process_node_command(mut self, command: NodeCommand) -> Result<()> {
+        match command {
+            NodeCommand::List { running, image } => {
+                let nodes = self.fetch_nodes().await?;
+                let mut nodes = nodes
+                    .iter()
+                    .filter(|n| {
+                        image
+                            .as_ref()
+                            .map(|image| n.image.contains(image))
+                            .unwrap_or(true)
+                            && (!running || (n.status == bv_pb::NodeStatus::Running as i32))
+                    })
+                    .peekable();
+                if nodes.peek().is_some() {
+                    let mut table = vec![];
+                    for node in nodes.cloned() {
+                        table.push(PrettyTableRow {
+                            id: node.id,
+                            name: node.name,
+                            image: node.image,
+                            status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
+                            ip: node.ip,
+                        })
+                    }
+                    print_stdout(table.to_pretty_table())?;
+                } else {
+                    println!("No nodes found.");
+                }
+            }
+            NodeCommand::Create { image, ip, gateway } => {
+                let id = Uuid::new_v4();
+                let name = Petnames::default().generate_one(3, "_");
+                // TODO: this configurations is useful for testing on CI machine
+                let gateway = gateway.unwrap_or_else(|| "216.18.214.193".to_string());
+                let ip = ip.unwrap_or_else(|| "216.18.214.195".to_string());
+                self.client
+                    .create_node(bv_pb::CreateNodeRequest {
+                        id: id.to_string(),
+                        name: name.clone(),
+                        image: image.to_string(),
+                        ip,
+                        gateway,
+                    })
+                    .await?;
+                println!(
+                    "Created new node from `{}` image with ID `{}` and name `{}`",
+                    image, id, &name
+                );
+            }
+            NodeCommand::Start { id_or_names } => {
+                for id in self.get_node_ids(id_or_names).await? {
+                    self.client
+                        .start_node(bv_pb::StartNodeRequest { id: id.clone() })
+                        .await?;
+                    println!("Started node `{}`", id);
+                }
+            }
+            NodeCommand::Stop { id_or_names } => {
+                for id in self.get_node_ids(id_or_names).await? {
+                    self.client
+                        .stop_node(bv_pb::StopNodeRequest { id: id.clone() })
+                        .await?;
+                    println!("Stopped node `{}`", id);
+                }
+            }
+            NodeCommand::Delete { id_or_names } => {
+                for id_or_name in id_or_names {
+                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                    self.client
+                        .delete_node(bv_pb::DeleteNodeRequest { id })
+                        .await?;
+                    println!("Deleted node `{id_or_name}`");
+                }
+            }
+            NodeCommand::Restart { id_or_names: _ } => todo!(),
+            NodeCommand::Console { id_or_name: _ } => todo!(),
+            NodeCommand::Logs { id_or_name: _ } => todo!(),
+            NodeCommand::Status { id_or_names } => {
+                for id_or_name in id_or_names {
+                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                    let status = self
+                        .client
+                        .get_node_status(bv_pb::GetNodeStatusRequest { id })
+                        .await?;
+                    let status = status.into_inner().status;
+                    match bv_pb::NodeStatus::from_i32(status) {
+                        Some(status) => println!("{status}"),
+                        None => eprintln!("Invalid status {status}"),
+                    }
+                }
+            }
+            NodeCommand::Capabilities { id_or_name } => {
+                let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                let caps = self.list_capabilities(node_id).await?;
+                print!("{caps}");
+            }
+            NodeCommand::Run {
+                id_or_name,
+                method,
+                payload,
+            } => {
+                let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                let req = bv_pb::BlockchainRequest {
+                    method,
+                    node_id: node_id.to_string(),
+                    payload,
+                };
+                match self.client.blockchain(req).await {
+                    Ok(result) => println!("{}", result.into_inner().value),
+                    Err(e) => {
+                        if e.message().contains("not found") {
+                            let msg = "Method not found. Options are:";
+                            let caps = self.list_capabilities(node_id).await?;
+                            anyhow::bail!("{msg}\n{caps}");
+                        }
+                        return Err(anyhow::Error::from(e));
+                    }
+                }
+            }
         }
-    };
-
-    Ok(uuid)
+        Ok(())
+    }
 }
