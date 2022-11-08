@@ -81,7 +81,7 @@ impl Nodes {
             image,
             expected_status: NodeStatus::Stopped,
             network_interface,
-            self_update: true,
+            self_update: false,
         };
         self.save().await?;
 
