@@ -30,12 +30,11 @@ pub struct NodeData {
     pub image: String,
     pub expected_status: NodeStatus,
     pub network_interface: NetworkInterface,
-    /// Whether or not this node should check for updates and then t
-    #[serde(default = "default_true")]
+    /// Whether or not this node should check for updates and then update itself. The default is
+    /// `false`.
+    #[serde(default)]
     pub self_update: bool,
 }
-
-fn default_true() -> bool { true }
 
 impl NodeData {
     pub async fn load(path: &Path) -> Result<Self> {
