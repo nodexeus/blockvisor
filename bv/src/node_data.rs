@@ -29,6 +29,10 @@ pub struct NodeData {
     pub name: String,
     pub image: String,
     pub expected_status: NodeStatus,
+    /// Whether or not this node should check for updates and then update itself. The default is
+    /// `false`.
+    #[serde(default)]
+    pub self_update: bool,
     pub network_interface: NetworkInterface,
 }
 
