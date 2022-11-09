@@ -1,0 +1,42 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "klaytn"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "1.9.1"
+description = "klaytn blockchain validator"
+api_host = "http://localhost:8551"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/klaytn.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "eth_blockNumber"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "eth_accounts"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "eth_syncing"
+
+    [methods.response]
+    code = 200
+    field = "result"

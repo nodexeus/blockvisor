@@ -1,0 +1,43 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "harmony"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "4.3.12"
+description = "harmony blockchain validator"
+api_host = "http://localhost:9599" # shard 1 = 9598
+# mainnet:  https://rpc.s0.t.hmny.io
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/harmony.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "hmyv2_blockNumber"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "hmyv2_getNodeMetadata"
+
+    [methods.response]
+    code = 200
+    field = "peerid"
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "hmyv2_getNodeMetadata"
+
+    [methods.response]
+    code = 200
+    field = "consensus.mode"

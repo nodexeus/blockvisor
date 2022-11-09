@@ -1,0 +1,42 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "cronos"
+node_type = "validator"
+babel_version = "0.0.1"
+node_version = "0.8.0"
+description = "cronos blockchain validator"
+api_host = "http://localhost:8545/"
+entry_point = "find"
+data_directory_mount_point = "/blockjoy/miner/data"
+
+[monitor]
+pid_file = "/var/run/cronos.pid"
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "eth_syncing" # only if syncing
+
+    [methods.response]
+    code = 200
+    field = "result.highestBlock"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "eth_accounts"
+
+    [methods.response]
+    code = 200
+    field = "result" 
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "eth_syncing"
+
+    [methods.response]
+    code = 200
+    field = "result"
