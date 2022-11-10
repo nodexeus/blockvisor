@@ -3,8 +3,6 @@ use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
-use base64;
-#[cfg(target_os = "linux")]
 use blockvisord::grpc::{self, pb};
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
@@ -35,6 +33,9 @@ pub mod ui_pb {
 
 #[cfg(target_os = "linux")]
 mod stub_server;
+
+#[cfg(target_os = "linux")]
+mod token;
 
 #[cfg(target_os = "linux")]
 fn bv_run(commands: &[&str], stdout_pattern: &str) {
@@ -98,7 +99,7 @@ fn test_bv_cmd_restart() {
 fn test_bv_cmd_node_start_and_stop_all() {
     use uuid::Uuid;
 
-    const NODES_COUNT: usize = 3;
+    const NODES_COUNT: usize = 2;
     println!("create {NODES_COUNT} nodes");
     let mut nodes: Vec<String> = Default::default();
     for _ in 0..NODES_COUNT {
@@ -227,7 +228,6 @@ async fn test_bv_cmd_init_localhost() {
     let url = "http://localhost:8080";
     let email = "user1@example.com";
     let password = "user1pass";
-    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
 
     let mut client = ui_pb::user_service_client::UserServiceClient::connect(url)
         .await
@@ -257,32 +257,9 @@ async fn test_bv_cmd_init_localhost() {
     assert_eq!(user.meta.as_ref().unwrap().origin_request_id, request_id);
     let user_id = get_first_message(user.meta);
 
-    println!("make admin");
-    let db_query = format!(
-        r#"update tokens set role='admin'::enum_token_role where user_id='{user_id}'::uuid"#
-    );
-
-    Command::new("docker")
-        .args(&[
-            "compose", "run", "-it", "database", "psql", db_url, "-c", &db_query,
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("UPDATE 1"));
-
-    println!("login user");
-    let mut client =
-        ui_pb::authentication_service_client::AuthenticationServiceClient::connect(url)
-            .await
-            .unwrap();
-    let login_user = ui_pb::LoginUserRequest {
-        meta: Some(ui_pb::RequestMeta::default()),
-        email: email.to_string(),
-        password: password.to_string(),
-    };
-    let login: ui_pb::LoginUserResponse = client.login(login_user).await.unwrap().into_inner();
-    println!("user login: {login:?}");
-    let token = login.token.unwrap();
+    let id = uuid::Uuid::parse_str(&user_id).unwrap();
+    let auth_token = token::TokenGenerator::create_auth(id, "1245456".to_string());
+    let refresh_token = token::TokenGenerator::create_refresh(id, "23942390".to_string());
 
     println!("get user organization id");
     let mut client = ui_pb::organization_service_client::OrganizationServiceClient::connect(url)
@@ -293,7 +270,7 @@ async fn test_bv_cmd_init_localhost() {
         meta: Some(ui_pb::RequestMeta::default()),
     };
     let orgs: ui_pb::GetOrganizationsResponse = client
-        .get(with_auth(org_get, &token.value))
+        .get(with_auth(org_get, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
@@ -320,7 +297,7 @@ async fn test_bv_cmd_init_localhost() {
         }),
     };
     let provision: ui_pb::CreateHostProvisionResponse = client
-        .create(with_auth(provision_create, &token.value))
+        .create(with_auth(provision_create, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
@@ -360,7 +337,7 @@ async fn test_bv_cmd_init_localhost() {
         meta: Some(ui_pb::RequestMeta::default()),
     };
     let list: ui_pb::ListBlockchainsResponse = client
-        .list(with_auth(list_blockchains, &token.value))
+        .list(with_auth(list_blockchains, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
@@ -396,7 +373,7 @@ async fn test_bv_cmd_init_localhost() {
         }),
     };
     let node: ui_pb::CreateNodeResponse = client
-        .create(with_auth(node_create, &token.value))
+        .create(with_auth(node_create, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
@@ -421,7 +398,7 @@ async fn test_bv_cmd_init_localhost() {
         }],
     };
     let command: ui_pb::CommandResponse = client
-        .start_node(with_auth(node_start, &token.value))
+        .start_node(with_auth(node_start, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
@@ -439,14 +416,21 @@ fn get_first_message(meta: Option<ui_pb::ResponseMeta>) -> String {
 }
 
 #[cfg(target_os = "linux")]
-fn with_auth<T>(inner: T, token: &str) -> Request<T> {
+fn with_auth<T>(inner: T, auth_token: &str, refresh_token: &str) -> Request<T> {
     let mut request = Request::new(inner);
     request.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}", base64::encode(token.to_string()))
+        format!("Bearer {}", auth_token.to_string())
             .parse()
             .unwrap(),
     );
+    request.metadata_mut().insert(
+        "cookie",
+        format!("refresh={}", refresh_token.to_string())
+            .parse()
+            .unwrap(),
+    );
+    println!("{:?}", request.metadata());
     request
 }
 
