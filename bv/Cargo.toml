@@ -22,7 +22,7 @@ path = "src/bin/blockvisord.rs"
 anyhow = "1.0.56"
 base64 = "0.13.0"
 chrono = {version = "0.4", features = ["serde"]}
-clap = {version = "3.1.15", features = ["derive"]}
+clap = {version = "3.1.15", features = ["derive", "cargo"]}
 cli-table = "0.4"
 firec = {git = "https://github.com/blockjoy/firec.git", rev = "88c3dec"}
 futures-util = "0.3"

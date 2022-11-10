@@ -12,7 +12,7 @@ use blockvisord::{
     },
     utils::run_cmd,
 };
-use clap::Parser;
+use clap::{crate_version, Parser};
 use cli_table::print_stdout;
 use petname::Petnames;
 use tokio::time::{sleep, Duration};
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
             let info = pb::HostInfo {
                 id: None,
                 name: host_info.name,
-                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                version: Some(crate_version!().to_string()),
                 location: None,
                 cpu_count: host_info.cpu_count,
                 mem_size: host_info.mem_size,
@@ -252,6 +252,26 @@ impl NodeClient {
         Ok(ids)
     }
 
+    async fn start_nodes(&mut self, ids: &Vec<String>) -> Result<()> {
+        for id in ids {
+            self.client
+                .start_node(bv_pb::StartNodeRequest { id: id.clone() })
+                .await?;
+            println!("Started node `{}`", id);
+        }
+        Ok(())
+    }
+
+    async fn stop_nodes(&mut self, ids: &Vec<String>) -> Result<()> {
+        for id in ids {
+            self.client
+                .stop_node(bv_pb::StopNodeRequest { id: id.clone() })
+                .await?;
+            println!("Stopped node `{}`", id);
+        }
+        Ok(())
+    }
+
     async fn process_node_command(mut self, command: NodeCommand) -> Result<()> {
         match command {
             NodeCommand::List { running, image } => {
@@ -303,20 +323,12 @@ impl NodeClient {
                 );
             }
             NodeCommand::Start { id_or_names } => {
-                for id in self.get_node_ids(id_or_names).await? {
-                    self.client
-                        .start_node(bv_pb::StartNodeRequest { id: id.clone() })
-                        .await?;
-                    println!("Started node `{}`", id);
-                }
+                let ids = self.get_node_ids(id_or_names).await?;
+                self.start_nodes(&ids).await?;
             }
             NodeCommand::Stop { id_or_names } => {
-                for id in self.get_node_ids(id_or_names).await? {
-                    self.client
-                        .stop_node(bv_pb::StopNodeRequest { id: id.clone() })
-                        .await?;
-                    println!("Stopped node `{}`", id);
-                }
+                let ids = self.get_node_ids(id_or_names).await?;
+                self.stop_nodes(&ids).await?;
             }
             NodeCommand::Delete { id_or_names } => {
                 for id_or_name in id_or_names {
@@ -327,7 +339,11 @@ impl NodeClient {
                     println!("Deleted node `{id_or_name}`");
                 }
             }
-            NodeCommand::Restart { id_or_names: _ } => todo!(),
+            NodeCommand::Restart { id_or_names } => {
+                let ids = self.get_node_ids(id_or_names).await?;
+                self.stop_nodes(&ids).await?;
+                self.start_nodes(&ids).await?;
+            }
             NodeCommand::Console { id_or_name: _ } => todo!(),
             NodeCommand::Logs { id_or_name: _ } => todo!(),
             NodeCommand::Status { id_or_names } => {
