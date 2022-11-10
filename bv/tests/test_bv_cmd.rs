@@ -101,7 +101,7 @@ fn test_bv_cmd_node_start_and_stop_all() {
     println!("create {NODES_COUNT} nodes");
     let mut nodes: Vec<String> = Default::default();
     for _ in 0..NODES_COUNT {
-        nodes.push(create_node("debian.ext4"));
+        nodes.push(create_node("test"));
     }
 
     println!("start all created nodes");
@@ -123,7 +123,7 @@ fn test_bv_cmd_node_start_and_stop_all() {
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     println!("create a node");
-    let vm_id = &create_node("debian.ext4");
+    let vm_id = &create_node("test");
     println!("create vm_id: {vm_id}");
 
     println!("stop stopped node");
@@ -150,6 +150,15 @@ fn test_bv_cmd_node_lifecycle() {
     println!("list running node after service restart");
     bv_run(&["node", "status", vm_id], "Running");
 
+    println!("upgrade running node");
+    bv_run(
+        &["node", "upgrade", vm_id, "helium/validator/0.0.2/os.img"],
+        "Upgraded node",
+    );
+
+    println!("list running node after node upgrade");
+    bv_run(&["node", "status", vm_id], "Running");
+
     println!("delete started node");
     bv_run(&["node", "delete", vm_id], "Deleted node");
 }
@@ -160,9 +169,8 @@ fn test_bv_cmd_node_lifecycle() {
 async fn test_bv_cmd_node_recovery() {
     use blockvisord::{node::FC_BIN_NAME, utils};
 
-    let chain_id = "test_bv_cmd_node_recovery".to_string();
     println!("create a node");
-    let vm_id = &create_node("debian.ext4");
+    let vm_id = &create_node("test");
     println!("create vm_id: {vm_id}");
 
     println!("start stopped node");
@@ -460,7 +468,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "debian.ext4".to_string(),
+                        url: "test".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -478,7 +486,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: "some-new-name".to_string(),
                     image: Some(pb::ContainerImage {
-                        url: "debian.ext4".to_string(),
+                        url: "test".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -496,7 +504,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "debian.ext4".to_string(),
+                        url: "test".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -557,6 +565,19 @@ async fn test_bv_cmd_grpc_commands() {
                 api_command_id: command_id.clone(),
                 created_at: None,
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
+            })),
+        },
+        // upgrade running
+        pb::Command {
+            r#type: Some(pb::command::Type::Node(pb::NodeCommand {
+                id: id.clone(),
+                api_command_id: command_id.clone(),
+                created_at: None,
+                command: Some(pb::node_command::Command::Upgrade(pb::NodeUpgrade {
+                    image: Some(pb::ContainerImage {
+                        url: "helium/validator/0.0.2/os.img".to_string(),
+                    }),
+                })),
             })),
         },
         // delete
@@ -650,6 +671,13 @@ async fn test_bv_cmd_grpc_commands() {
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
+        node_update(&node_id, pb::node_info::ContainerStatus::Upgrading),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
+        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
+        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
+        node_update(&node_id, pb::node_info::ContainerStatus::Running),
+        node_update(&node_id, pb::node_info::ContainerStatus::Upgraded),
+        success_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleting),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleted),
         success_command_update(&command_id),
@@ -659,7 +687,7 @@ async fn test_bv_cmd_grpc_commands() {
         assert_eq!(actual.unwrap(), expected);
     }
 
-    assert_eq!(updates_count, 30);
+    assert_eq!(updates_count, 37);
 }
 
 #[cfg(target_os = "linux")]

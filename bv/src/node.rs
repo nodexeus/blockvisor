@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{
+    ffi::OsStr,
     path::{Path, PathBuf},
     str::FromStr,
     time::Duration,
@@ -54,6 +55,7 @@ impl Connection {
 pub const FC_BIN_NAME: &str = "firecracker";
 const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
 const DATA_PATH: &str = "/var/lib/blockvisor/data.img";
+const ROOT_FS_FILE: &str = "os.img";
 const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
@@ -78,7 +80,7 @@ impl Node {
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
-        Node::copy_data_image(&data).await?;
+        Node::copy_data_image(&data.id).await?;
         let machine = firec::Machine::create(config).await?;
 
         data.save().await?;
@@ -117,6 +119,18 @@ impl Node {
     /// Returns the node's `id`.
     pub fn id(&self) -> Uuid {
         self.data.id
+    }
+
+    /// Updates OS image for VM.
+    #[instrument(skip(self))]
+    pub async fn upgrade(&mut self, image: &str) -> Result<()> {
+        if self.status() != NodeStatus::Stopped {
+            bail!("Node should be stopped before running upgrade");
+        }
+
+        Node::copy_os_image(&self.data.id, image).await?;
+        self.data.image = image.to_string();
+        self.data.save().await
     }
 
     /// Starts the node.
@@ -221,6 +235,47 @@ impl Node {
         self.data.save().await
     }
 
+    /// Copy OS drive into chroot location.
+    async fn copy_os_image(id: &Uuid, image: &str) -> Result<()> {
+        // TODO: we need to check blockchain and node type as well
+        // E.g. it makes little sense to upgrade helium validator into eth beacon
+        let root_fs_path = Self::get_normalized_root_fs_path(image)?;
+
+        let data_dir = Path::new(CHROOT_PATH)
+            .join(FC_BIN_NAME)
+            .join(id.to_string())
+            .join("root");
+        DirBuilder::new().recursive(true).create(&data_dir).await?;
+
+        run_cmd(
+            "cp",
+            &[&root_fs_path.to_string_lossy(), &data_dir.to_string_lossy()],
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Check root if fs source path is correct and exists
+    ///
+    /// Also resolve symlinks into canonical path
+    fn get_normalized_root_fs_path(image: &str) -> Result<PathBuf> {
+        let root_fs_path = IMAGE_CACHE_DIR.join(image).canonicalize()?;
+        if root_fs_path.file_name() != Some(OsStr::new(ROOT_FS_FILE)) {
+            bail!(
+                "Bad root image file name: `{:?}` in `{}`",
+                root_fs_path.file_name(),
+                root_fs_path.display()
+            )
+        }
+        if !root_fs_path.try_exists()? {
+            // TODO: download from remote images repository into cache dir
+            // return error if not present in remote
+            bail!("Root image file not found: `{}`", root_fs_path.display())
+        }
+        Ok(root_fs_path)
+    }
+
     /// Copy data drive into chroot location.
     ///
     /// NOTE: this is a workaround using system `cp` instead of `std::fs::copy`
@@ -228,12 +283,12 @@ impl Node {
     /// the file in chroot if it's already present.
     ///
     /// See discussion here for more details: https://github.com/rust-lang/rust/issues/58635
-    async fn copy_data_image(data: &NodeData) -> Result<()> {
+    async fn copy_data_image(id: &Uuid) -> Result<()> {
         // TODO: we need to create a new data image according to spec
         // At the time of writing we use the same 10 Gb empty image for every node
         let data_dir = Path::new(CHROOT_PATH)
             .join(FC_BIN_NAME)
-            .join(data.id.to_string())
+            .join(id.to_string())
             .join("root");
         DirBuilder::new().recursive(true).create(&data_dir).await?;
         run_cmd("cp", &[DATA_PATH, &data_dir.to_string_lossy()]).await?;
@@ -249,13 +304,7 @@ impl Node {
         );
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
-
-        let root_fs_path = IMAGE_CACHE_DIR.join(data.image.clone());
-        if !root_fs_path.exists() {
-            // TODO: download from remote images repository into cache dir
-            // return error if not present in remote
-            bail!("Root image file not found: `{}`", root_fs_path.display())
-        }
+        let root_fs_path = Self::get_normalized_root_fs_path(&data.image)?;
 
         let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
             // Jailer configuration.

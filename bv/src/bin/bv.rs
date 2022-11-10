@@ -302,6 +302,18 @@ impl NodeClient {
                     image, id, &name
                 );
             }
+            NodeCommand::Upgrade { id_or_names, image } => {
+                for id_or_name in id_or_names {
+                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                    self.client
+                        .upgrade_node(bv_pb::UpgradeNodeRequest {
+                            id: id.clone(),
+                            image: image.to_string(),
+                        })
+                        .await?;
+                    println!("Upgraded node `{}` to `{}` image", id, image);
+                }
+            }
             NodeCommand::Start { id_or_names } => {
                 for id in self.get_node_ids(id_or_names).await? {
                     self.client

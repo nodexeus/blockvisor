@@ -109,6 +109,17 @@ pub enum NodeCommand {
         gateway: Option<String>,
     },
 
+    /// Upgrade node
+    #[clap(alias = "u")]
+    Upgrade {
+        /// Node id or name
+        #[clap(required(true))]
+        id_or_names: Vec<String>,
+
+        /// Node Image identifier
+        image: String,
+    },
+
     /// Start node
     Start {
         /// Node id or name
