@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{
@@ -251,14 +251,11 @@ impl Node {
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
 
         let root_fs_path = IMAGE_CACHE_DIR.join(data.image.clone());
-        let root_fs_path = if root_fs_path.exists() {
-            root_fs_path
-        } else {
+        if !root_fs_path.exists() {
             // TODO: download from remote images repository into cache dir
             // return error if not present in remote
-            // for now we just return a default one
-            IMAGE_CACHE_DIR.join("debian.ext4")
-        };
+            bail!("Root image file not found: `{}`", root_fs_path.display())
+        }
 
         let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
             // Jailer configuration.
