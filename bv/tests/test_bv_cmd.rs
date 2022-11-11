@@ -97,14 +97,11 @@ fn test_bv_cmd_restart() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_start_and_stop_all() {
-    use uuid::Uuid;
-
     const NODES_COUNT: usize = 2;
     println!("create {NODES_COUNT} nodes");
     let mut nodes: Vec<String> = Default::default();
     for _ in 0..NODES_COUNT {
-        let chain_id = Uuid::new_v4().to_string();
-        nodes.push(create_node(&chain_id));
+        nodes.push(create_node("debian.ext4"));
     }
 
     println!("start all created nodes");
@@ -125,11 +122,8 @@ fn test_bv_cmd_node_start_and_stop_all() {
 #[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
-    use uuid::Uuid;
-
-    let chain_id = Uuid::new_v4().to_string();
     println!("create a node");
-    let vm_id = &create_node(&chain_id);
+    let vm_id = &create_node("debian.ext4");
     println!("create vm_id: {vm_id}");
 
     println!("stop stopped node");
@@ -168,7 +162,7 @@ async fn test_bv_cmd_node_recovery() {
 
     let chain_id = "test_bv_cmd_node_recovery".to_string();
     println!("create a node");
-    let vm_id = &create_node(&chain_id);
+    let vm_id = &create_node("debian.ext4");
     println!("create vm_id: {vm_id}");
 
     println!("start stopped node");
@@ -341,8 +335,9 @@ async fn test_bv_cmd_init_localhost() {
         .await
         .unwrap()
         .into_inner();
-    let blockchain_id = list.blockchains.first().unwrap().id.as_ref().unwrap();
-    println!("got blockchain_id: {blockchain_id}");
+    let blockchain = list.blockchains.first().unwrap();
+    println!("got blockchain: {:?}", &blockchain);
+    let blockchain_id = blockchain.id.as_ref().unwrap();
 
     let mut client = ui_pb::node_service_client::NodeServiceClient::connect(url)
         .await
@@ -465,7 +460,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "helium/node/latest".to_string(),
+                        url: "debian.ext4".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -483,7 +478,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: "some-new-name".to_string(),
                     image: Some(pb::ContainerImage {
-                        url: "helium/node/latest".to_string(),
+                        url: "debian.ext4".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -501,7 +496,7 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "helium/node/latest".to_string(),
+                        url: "debian.ext4".to_string(),
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
