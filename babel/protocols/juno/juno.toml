@@ -41,3 +41,12 @@ method = "health"
     code = 200
     field = "result"
 
+[[methods]]
+name = "genesis_info"
+transport = "jrpc"
+method = "genesis"
+
+    [methods.response]
+    code = 200
+    field = "result"
+

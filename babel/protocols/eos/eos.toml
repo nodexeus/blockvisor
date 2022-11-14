@@ -2,41 +2,41 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "moonbeam"
+protocol = "eos"
 node_type = "validator"
 babel_version = "0.0.1"
-node_version = "0.27.1"
-description = "moonbeam blockchain validator"
-api_host = "http://localhost:9933/" 
+node_version = "2.0.13"
+description = "eos blockchain validator"
+api_host = "http://localhost:8080" # default
 entry_point = "find"
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
-pid_file = "/var/run/moonbeam.pid"
+pid_file = "/var/run/eos.pid"
 
 [[methods]]
 name = "height"
 transport = "jrpc"
-method = "chain_getFinalizedHead"
+method = "vi/chain/get_info"
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "last_irreversible_block_num"
 
 [[methods]]
 name = "address"
 transport = "jrpc"
-method = "system_localPeerId" 
+method = "" # find 
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "" # find 
 
 [[methods]]
 name = "status"
 transport = "jrpc"
-method = "system_syncState"
+method = "v1/net/connections"
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "syncing"

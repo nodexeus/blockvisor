@@ -2,41 +2,41 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "moonbeam"
+protocol = "tron"
 node_type = "validator"
 babel_version = "0.0.1"
-node_version = "0.27.1"
-description = "moonbeam blockchain validator"
-api_host = "http://localhost:9933/" 
+node_version = "0.5.0"
+description = "tron blockchain validator"
+api_host = "http://localhost:50545/"
 entry_point = "find"
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [monitor]
-pid_file = "/var/run/moonbeam.pid"
+pid_file = "/var/run/pedge.pid"
 
 [[methods]]
 name = "height"
 transport = "jrpc"
-method = "chain_getFinalizedHead"
+method = "eth_syncing" # only if syncing
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "result.highestBlock"
 
 [[methods]]
 name = "address"
 transport = "jrpc"
-method = "system_localPeerId" 
+method = "eth_accounts"
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "result" 
 
 [[methods]]
 name = "status"
 transport = "jrpc"
-method = "system_syncState"
+method = "eth_syncing"
 
     [methods.response]
     code = 200
-    field = "result" # find this
+    field = "result"

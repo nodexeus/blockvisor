@@ -5,7 +5,7 @@ path_append = "/blockjoy/bin/"
 protocol = "band"
 node_type = "validator"
 babel_version = "0.0.1"
-node_version = "2.3.4"
+node_version = "2.4.1"
 description = "band blockchain validator"
 api_host = "http://localhost:26657/"
 entry_point = "find"
@@ -36,6 +36,15 @@ method = "status"
 name = "status"
 transport = "jrpc"
 method = "health"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "genesis_info"
+transport = "jrpc"
+method = "genesis"
 
     [methods.response]
     code = 200
