@@ -39,6 +39,13 @@ message CreateNodeRequest {
 
 message CreateNodeResponse {}
 
+message UpgradeNodeRequest {
+    string id = 1;
+    string image = 2;
+}
+
+message UpgradeNodeResponse {}
+
 message DeleteNodeRequest {
     string id = 1;
 }

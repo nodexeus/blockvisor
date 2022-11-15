@@ -7,6 +7,7 @@ import "blockvisor.proto";
 service Blockvisor {
     rpc Health(HealthRequest) returns (HealthResponse) {}
     rpc CreateNode(CreateNodeRequest) returns (CreateNodeResponse) {}
+    rpc UpgradeNode(UpgradeNodeRequest) returns (UpgradeNodeResponse) {}
     rpc DeleteNode(DeleteNodeRequest) returns (DeleteNodeResponse) {}
     rpc StartNode(StartNodeRequest) returns (StartNodeResponse) {}
     rpc StopNode(StopNodeRequest) returns (StopNodeResponse) {}

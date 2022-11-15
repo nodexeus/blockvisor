@@ -9,11 +9,12 @@ install:
 	install -m u=rw,g=r,o=r bv/data/blockvisor.service /etc/systemd/system/
 	systemctl daemon-reload
 	systemctl enable blockvisor.service
-	for image in $(wildcard /root/.cache/blockvisor/images/*.img /root/.cache/blockvisor/images/*.ext4); do \
+	for image in $(wildcard /root/.cache/blockvisor/images/*.img); do \
 		mount $$image /mnt/fc; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babel /mnt/fc/usr/bin/; \
 		install -m u=rw,g=r,o=r babel/data/babel.service /mnt/fc/etc/systemd/system/; \
 		install -m u=rw,g=r,o=r babel/protocols/helium/helium-validator.toml /mnt/fc/etc/babel.conf; \
+		ln -s /mnt/fc/etc/systemd/system/babel.service /mnt/fc/etc/systemd/system/multi-user.target.wants/babel.service; \
 		umount /mnt/fc; \
 	done
 

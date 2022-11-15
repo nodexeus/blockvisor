@@ -98,6 +98,35 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
+    pub async fn upgrade(&mut self, id: Uuid, image: String) -> Result<()> {
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgrading) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        let need_to_restart = self.status(id).await? == NodeStatus::Running;
+        self.stop(id).await?;
+
+        let node = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        debug!("found node");
+
+        node.upgrade(&image).await?;
+        debug!("upgraded");
+
+        if need_to_restart {
+            self.start(id).await?;
+        }
+
+        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgraded) {
+            error!("Cannot send node status: {error:?}");
+        };
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
         let node = self
             .nodes

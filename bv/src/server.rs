@@ -60,6 +60,25 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         Ok(Response::new(reply))
     }
 
+    async fn upgrade_node(
+        &self,
+        request: Request<bv_pb::UpgradeNodeRequest>,
+    ) -> Result<Response<bv_pb::UpgradeNodeResponse>, Status> {
+        let request = request.into_inner();
+        let id = helpers::parse_uuid(request.id)?;
+
+        self.nodes
+            .lock()
+            .await
+            .upgrade(id, request.image)
+            .await
+            .map_err(|e| Status::unknown(e.to_string()))?;
+
+        let reply = bv_pb::UpgradeNodeResponse {};
+
+        Ok(Response::new(reply))
+    }
+
     async fn delete_node(
         &self,
         request: Request<bv_pb::DeleteNodeRequest>,

@@ -1,5 +1,5 @@
 use crate::nodes::Nodes;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use pb::command_flow_client::CommandFlowClient;
 use pb::node_command::Command;
 use std::{str::FromStr, sync::Arc};
@@ -112,16 +112,11 @@ async fn process_node_command(
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url;
                 nodes
                     .lock()
                     .await
-                    .create(
-                        node_id,
-                        args.name,
-                        args.image.unwrap().url,
-                        args.ip,
-                        args.gateway,
-                    )
+                    .create(node_id, args.name, image, args.ip, args.gateway)
                     .await?;
             }
             Command::Delete(_) => {
@@ -137,7 +132,10 @@ async fn process_node_command(
                 nodes.lock().await.stop(node_id).await?;
                 nodes.lock().await.start(node_id).await?;
             }
-            Command::Upgrade(_) => unimplemented!(),
+            Command::Upgrade(args) => {
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url;
+                nodes.lock().await.upgrade(node_id, image).await?;
+            }
             Command::Update(_) => unimplemented!(),
             Command::InfoGet(_) => unimplemented!(),
             Command::Generic(_) => unimplemented!(),
