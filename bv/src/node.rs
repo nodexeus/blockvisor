@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{
@@ -47,7 +47,7 @@ impl Connection {
     /// Tries to return the babel connection, and if there isn't one, returns an error message.
     fn try_conn_mut(&mut self) -> Result<&mut UnixStream> {
         self.conn_mut()
-            .ok_or_else(|| anyhow::anyhow!("Tried to get babel connection while there isn't one"))
+            .ok_or_else(|| anyhow!("Tried to get babel connection while there isn't one"))
     }
 }
 
@@ -155,7 +155,7 @@ impl Node {
         self.babel_conn = Connection::Open { babel_conn };
         let resp = self.send(BabelRequest::Ping).await;
         if !matches!(resp, Ok(BabelResponse::Pong)) {
-            tracing::warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
+            warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
 
         self.data.expected_status = NodeStatus::Running;
@@ -178,37 +178,32 @@ impl Node {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
-                let mut shutdown_success = true;
                 if let Err(err) = self.machine.shutdown().await {
                     trace!("Graceful shutdown failed: {err}");
 
-                    // FIXME: Perhaps we should be just bailing out on this one?
                     if let Err(err) = self.machine.force_shutdown().await {
-                        trace!("Forced shutdown failed: {err}");
-                        shutdown_success = false;
+                        bail!("Forced shutdown failed: {err}");
                     }
                 }
 
-                if shutdown_success {
-                    if let Some(babel_conn) = self.babel_conn.conn_mut() {
-                        // We can verify successful shutdown success by checking whether we can read
-                        // into a buffer of nonzero length. If the stream is closed, the number of
-                        // bytes read should be zero.
-                        let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
-                        match read {
-                            // Successful shutdown in this case
-                            Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
-                            // The babel stream has more to say...
-                            Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
-                            // The read timed out. It is still live so the node did not shut down.
-                            Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
-                            // Reading returned _before_ the timeout, but was otherwise unsuccessful.
-                            // Could happpen I guess? Lets log the error.
-                            Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
-                        }
-                    } else {
-                        tracing::warn!("Terminating node has no babel conn!");
+                if let Some(babel_conn) = self.babel_conn.conn_mut() {
+                    // We can verify successful shutdown success by checking whether we can read
+                    // into a buffer of nonzero length. If the stream is closed, the number of
+                    // bytes read should be zero.
+                    let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
+                    match read {
+                        // Successful shutdown in this case
+                        Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
+                        // The babel stream has more to say...
+                        Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
+                        // The read timed out. It is still live so the node did not shut down.
+                        Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
+                        // Reading returned _before_ the timeout, but was otherwise unsuccessful.
+                        // Could happpen I guess? Lets log the error.
+                        Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
                     }
+                } else {
+                    warn!("Terminating node has no babel conn!");
                 }
             }
         }
@@ -378,7 +373,7 @@ impl Node {
             BabelResponse::BlockchainResponse { value } => {
                 value.parse().context(format!("Could not parse {method}"))?
             }
-            e => anyhow::bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
+            e => bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
         };
         Ok(inner)
     }
@@ -390,7 +385,7 @@ impl Node {
         let resp: BabelResponse = self.send(request).await?;
         let height = match resp {
             BabelResponse::ListCapabilities(caps) => caps,
-            e => anyhow::bail!("Unexpected BabelResponse for `height`: `{e:?}`"),
+            e => bail!("Unexpected BabelResponse for `height`: `{e:?}`"),
         };
         Ok(height)
     }
@@ -421,7 +416,7 @@ impl Node {
                 match babel_conn.try_write(data.as_bytes()) {
                     Ok(_) => break,
                     Err(e) if e.kind() == WouldBlock => continue,
-                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
+                    Err(e) => bail!("Writing socket failed with `{e}`"),
                 }
             }
             Ok(())
@@ -450,7 +445,7 @@ impl Node {
                         return Ok(serde_json::from_str(s)?);
                     }
                     Err(e) if e.kind() == WouldBlock => continue,
-                    Err(e) => anyhow::bail!("Writing socket failed with `{e}`"),
+                    Err(e) => bail!("Writing socket failed with `{e}`"),
                 }
             }
         };
@@ -466,7 +461,7 @@ impl Node {
         // We are going to connect to the central socket for this VM. Later we will specify which
         // port we want to talk to.
         let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root{VSOCK_PATH}");
-        tracing::debug!("Connecting to node at `{socket}`");
+        debug!("Connecting to node at `{socket}`");
 
         // We need to implement retrying when reading from the socket, as it may take a little bit
         // of time for the socket file to get created on disk, because this is done asynchronously
@@ -478,7 +473,7 @@ impl Node {
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
                 Err(e) if elapsed() < BABEL_START_TIMEOUT => {
-                    tracing::debug!("No socket file yet, retrying in 5 seconds: {e}");
+                    debug!("No socket file yet, retrying in 5 seconds: {e}");
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
                 Err(e) => break Err(e),
@@ -491,27 +486,27 @@ impl Node {
         // this message here prevents us from having to check for the opening message elsewhere
         // were we expect the response to be valid json.
         let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
-        tracing::debug!("Sending open message : `{open_message:?}`.");
+        debug!("Sending open message : `{open_message:?}`.");
         timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
-        tracing::debug!("Sent open message.");
+        debug!("Sent open message.");
         let mut sock_opened_buf = [0; 20];
         let resp = async {
             loop {
                 conn.readable().await?;
                 match conn.try_read(&mut sock_opened_buf) {
                     Ok(0) => {
-                        tracing::error!("Socket responded to open message with empty message :(");
-                        anyhow::bail!("Socket responded to open message with empty message :(");
+                        error!("Socket responded to open message with empty message :(");
+                        bail!("Socket responded to open message with empty message :(");
                     }
                     Ok(n) => {
                         let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
                         let msg_valid = sock_opened_msg.starts_with("OK ");
-                        anyhow::ensure!(msg_valid, "Invalid opening message for new socket");
+                        ensure!(msg_valid, "Invalid opening message for new socket");
                         break;
                     }
                     // Ignore false-positive readable events
                     Err(e) if e.kind() == WouldBlock => continue,
-                    Err(e) => anyhow::bail!("Establishing socket failed with `{e}`"),
+                    Err(e) => bail!("Establishing socket failed with `{e}`"),
                 }
             }
             Ok(conn)

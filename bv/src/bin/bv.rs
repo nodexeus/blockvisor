@@ -394,7 +394,7 @@ impl NodeClient {
                         if e.message().contains("not found") {
                             let msg = "Method not found. Options are:";
                             let caps = self.list_capabilities(node_id).await?;
-                            anyhow::bail!("{msg}\n{caps}");
+                            bail!("{msg}\n{caps}");
                         }
                         return Err(anyhow::Error::from(e));
                     }

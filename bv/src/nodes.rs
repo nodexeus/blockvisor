@@ -265,7 +265,7 @@ impl Nodes {
                         .await
                         .ok()
                         .and_then(Result::ok);
-                    tracing::debug!("Established babel connection");
+                    debug!("Established babel connection");
                     Node::connect(data, babel_conn).await
                 })
                 .await
