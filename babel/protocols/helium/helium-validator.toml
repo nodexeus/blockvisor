@@ -10,8 +10,15 @@ babel_version = "0.0.1"
 node_version = "1.15.9"
 description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
-entry_point = "/blockjoy/miner/bin/miner foreground"
 data_directory_mount_point = "/blockjoy/miner/data"
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+
+    [[supervisor.entry_point]]
+    command = "todo"
+    args = []
 
 [monitor]
 pid_file = "/var/run/helium.pid" #this is likely not necessary

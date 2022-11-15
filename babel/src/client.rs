@@ -202,6 +202,7 @@ mod tests {
     use crate::config::{
         Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
     };
+    use crate::supervisor;
     use httpmock::prelude::*;
     use std::collections::BTreeMap;
 
@@ -229,9 +230,13 @@ mod tests {
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
                 data_directory_mount_point: "/tmp".to_string(),
-                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: None,
+            },
+            supervisor: supervisor::Config {
+                backoff_timeout_ms: 10,
+                backoff_base_ms: 1,
+                entry_point: vec![],
             },
             monitor: None,
             methods: BTreeMap::from([
@@ -303,9 +308,13 @@ mod tests {
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
                 data_directory_mount_point: "/tmp".to_string(),
-                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
+            },
+            supervisor: supervisor::Config {
+                backoff_timeout_ms: 10,
+                backoff_base_ms: 1,
+                entry_point: vec![],
             },
             monitor: None,
             methods: BTreeMap::from([(
@@ -352,9 +361,13 @@ mod tests {
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
                 data_directory_mount_point: "/tmp".to_string(),
-                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
+            },
+            supervisor: supervisor::Config {
+                backoff_timeout_ms: 10,
+                backoff_base_ms: 1,
+                entry_point: vec![],
             },
             monitor: None,
             methods: BTreeMap::from([(
@@ -412,9 +425,13 @@ mod tests {
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
                 data_directory_mount_point: "/tmp".to_string(),
-                entry_point: "echo 1".to_string(),
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
+            },
+            supervisor: supervisor::Config {
+                backoff_timeout_ms: 10,
+                backoff_base_ms: 1,
+                entry_point: vec![],
             },
             monitor: None,
             methods: BTreeMap::from([(

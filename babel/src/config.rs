@@ -1,3 +1,5 @@
+use crate::supervisor;
+use eyre::bail;
 use serde::Deserialize;
 use std::{collections::BTreeMap, path::Path};
 use tokio::fs;
@@ -7,6 +9,8 @@ pub struct Babel {
     pub export: Option<Vec<String>>,
     pub env: Option<Env>,
     pub config: Config,
+    /// Commands to start blockchain node
+    pub supervisor: supervisor::Config,
     pub monitor: Option<Monitor>,
     #[serde(deserialize_with = "deserialize_methods")]
     pub methods: BTreeMap<String, Method>,
@@ -45,8 +49,6 @@ pub struct Config {
     /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
     /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
-    /// Command to start blockchain node
-    pub entry_point: String,
     /// Path to mount data drive to
     pub data_directory_mount_point: String,
 }
@@ -126,8 +128,10 @@ pub enum MethodResponseFormat {
 pub async fn load(path: &Path) -> eyre::Result<Babel> {
     let toml_str = fs::read_to_string(path).await?;
 
-    let cfg = toml::from_str(&toml_str)?;
-
+    let cfg: Babel = toml::from_str(&toml_str)?;
+    if cfg.supervisor.entry_point.is_empty() {
+        bail!("no entry point defined");
+    }
     Ok(cfg)
 }
 

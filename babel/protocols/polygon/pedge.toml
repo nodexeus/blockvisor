@@ -8,8 +8,15 @@ babel_version = "0.0.1"
 node_version = "0.5.0"
 description = "pedge blockchain validator"
 api_host = "http://localhost:8545/"
-entry_point = "find"
 data_directory_mount_point = "/blockjoy/miner/data"
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+
+    [[supervisor.entry_point]]
+    command = "todo"
+    args = []
 
 [monitor]
 pid_file = "/var/run/pedge.pid"

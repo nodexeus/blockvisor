@@ -1,5 +1,6 @@
 use std::{sync::Arc, time};
 
+use crate::run_flag::RunFlag;
 use crate::{client, config};
 use eyre::Context;
 use futures::StreamExt;
@@ -13,7 +14,7 @@ const VSOCK_PORT: u32 = 42;
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or
 /// restarts.
-pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
+pub async fn serve(mut run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
     let client = client::Client::new(cfg, time::Duration::from_secs(10))?;
     let client = Arc::new(client);
 
@@ -22,17 +23,24 @@ pub async fn serve(cfg: config::Babel) -> eyre::Result<()> {
     tracing::debug!("Bound");
     let mut incoming = listener.incoming();
     tracing::debug!("Receiving incoming messages");
-    while let Some(res) = incoming.next().await {
-        match res {
-            Ok(stream) => {
-                tracing::debug!("Stream opened, delegating to handler.");
-                tokio::spawn(serve_stream(stream, Arc::clone(&client)));
-            }
-            Err(_) => {
-                tracing::debug!("Receiving streams failed. Aborting babel.");
-                break;
-            }
-        }
+    while run.load() {
+        tokio::select!(
+            res = incoming.next() => {
+                if let Some(res) = res {
+                    match res {
+                        Ok(stream) => {
+                            tracing::debug!("Stream opened, delegating to handler.");
+                            tokio::spawn(serve_stream(stream, Arc::clone(&client)));
+                        }
+                        Err(_) => {
+                            tracing::debug!("Receiving streams failed. Aborting babel.");
+                            run.stop();
+                        }
+                    }
+                }
+            },
+            _ = run.wait() => {},
+        )
     }
     Ok(())
 }
