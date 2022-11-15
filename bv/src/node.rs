@@ -178,37 +178,32 @@ impl Node {
         match self.machine.state() {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
-                let mut shutdown_success = true;
                 if let Err(err) = self.machine.shutdown().await {
                     trace!("Graceful shutdown failed: {err}");
 
-                    // FIXME: Perhaps we should be just bailing out on this one?
                     if let Err(err) = self.machine.force_shutdown().await {
-                        trace!("Forced shutdown failed: {err}");
-                        shutdown_success = false;
+                        bail!("Forced shutdown failed: {err}");
                     }
                 }
 
-                if shutdown_success {
-                    if let Some(babel_conn) = self.babel_conn.conn_mut() {
-                        // We can verify successful shutdown success by checking whether we can read
-                        // into a buffer of nonzero length. If the stream is closed, the number of
-                        // bytes read should be zero.
-                        let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
-                        match read {
-                            // Successful shutdown in this case
-                            Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
-                            // The babel stream has more to say...
-                            Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
-                            // The read timed out. It is still live so the node did not shut down.
-                            Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
-                            // Reading returned _before_ the timeout, but was otherwise unsuccessful.
-                            // Could happpen I guess? Lets log the error.
-                            Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
-                        }
-                    } else {
-                        tracing::warn!("Terminating node has no babel conn!");
+                if let Some(babel_conn) = self.babel_conn.conn_mut() {
+                    // We can verify successful shutdown success by checking whether we can read
+                    // into a buffer of nonzero length. If the stream is closed, the number of
+                    // bytes read should be zero.
+                    let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
+                    match read {
+                        // Successful shutdown in this case
+                        Ok(Ok(0)) => debug!("Node {} gracefully shut down", self.id()),
+                        // The babel stream has more to say...
+                        Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
+                        // The read timed out. It is still live so the node did not shut down.
+                        Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
+                        // Reading returned _before_ the timeout, but was otherwise unsuccessful.
+                        // Could happpen I guess? Lets log the error.
+                        Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
                     }
+                } else {
+                    tracing::warn!("Terminating node has no babel conn!");
                 }
             }
         }
