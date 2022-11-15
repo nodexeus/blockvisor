@@ -320,6 +320,8 @@ dependencies = [
  "serial_test",
  "thiserror",
  "tokio",
+ "tokio-stream",
+ "tokio-util",
  "tokio-vsock",
  "toml",
  "tracing",

@@ -3,6 +3,7 @@
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod log_buffer;
 pub mod run_flag;
 pub mod supervisor;
 #[cfg(feature = "vsock")]

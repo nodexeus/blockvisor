@@ -132,6 +132,9 @@ pub async fn load(path: &Path) -> eyre::Result<Babel> {
     if cfg.supervisor.entry_point.is_empty() {
         bail!("no entry point defined");
     }
+    if cfg.supervisor.log_buffer_capacity_ln == 0 {
+        bail!("invalid log_buffer_capacity_ln - can't be 0");
+    }
     Ok(cfg)
 }
 

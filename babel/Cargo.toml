@@ -35,6 +35,8 @@ async-trait = "0.1.58"
 
 [dev-dependencies]
 mockall = "0.11.3"
+tokio-stream = "0.1.11"
+tokio-util = {version = "0.7.4", features = ["io"]}
 serial_test = "0.9.0"
 httpmock = "0.6"
 walkdir = "2"
