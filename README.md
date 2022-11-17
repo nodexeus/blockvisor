@@ -39,6 +39,8 @@ sequenceDiagram
 
 ## Add Node
 
+### Overview
+
 ```mermaid
 sequenceDiagram
     participant backend as API
@@ -55,6 +57,53 @@ sequenceDiagram
     babel->>fc: listen for messages on vsock
 ```
 
+### More detailed view including key exchange and node initialization
+
+```mermaid
+sequenceDiagram
+    participant frontend as Frontend
+    participant backend as API
+    participant bv as BV
+    participant babel as Babel
+
+    frontend ->> backend: Create Node
+    backend ->> bv: Create Node
+    bv ->> bv: Download os.img
+    bv ->> bv: Create data.img
+
+    frontend ->> backend: Start Node
+    backend ->> bv: Start Node
+
+    bv ->> babel: Start Node
+    babel ->> babel: Load config
+    babel ->> babel: Mount data.img
+    babel ->> babel: Supervisor: wait for init
+
+    bv ->> babel: Ping
+    babel -->> bv: Pong
+    bv ->> babel: Setup genesis block
+    babel ->> babel: Init completed
+    babel ->> babel: Start Supervisor
+    babel ->> babel: Start blockchain
+
+    bv ->> backend: Get keys
+    backend -->> bv: Keys?
+    alt Got keys
+        bv ->> babel: Setup keys
+    else No keys found
+        bv ->> babel: Generate new keys
+        babel -->> bv: Keys
+        bv ->> backend: Save keys
+    end
+
+    opt Restart needed
+        babel ->> babel: Supervisor: restart processes
+    end
+
+    frontend ->> backend: Get keys
+    backend -->> frontend: Keys
+```
+
 ## Execute Method on Blockchain
 
 ```mermaid
@@ -62,7 +111,7 @@ sequenceDiagram
     participant cli as BV CLI
     participant bv as BlockvisorD
     participant babel as Babel
-    
+
     cli->>bv: Blockchain Method
     bv->>babel: send(method)
     babel->>babel: map method to Blockchain API as defined in config.toml
