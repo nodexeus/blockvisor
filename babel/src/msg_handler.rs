@@ -1,14 +1,15 @@
-use crate::{config, error};
-use serde::{Deserialize, Serialize};
+use crate::config;
+use crate::error;
+use babel_api::*;
 use serde_json::json;
 use std::time::Duration;
 
-pub struct Client {
+pub struct MsgHandler {
     inner: reqwest::Client,
     cfg: config::Babel,
 }
 
-impl std::ops::Deref for Client {
+impl std::ops::Deref for MsgHandler {
     type Target = reqwest::Client;
 
     fn deref(&self) -> &Self::Target {
@@ -16,7 +17,7 @@ impl std::ops::Deref for Client {
     }
 }
 
-impl Client {
+impl MsgHandler {
     pub fn new(cfg: config::Babel, timeout: Duration) -> Result<Self, error::Error> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
         Ok(Self { inner: client, cfg })
@@ -51,7 +52,7 @@ impl Client {
             .cfg
             .methods
             .get(&cmd.name)
-            .ok_or_else(|| error::Error::unknown_method(cmd.name))?;
+            .ok_or_else(|| crate::error::Error::unknown_method(cmd.name))?;
         tracing::debug!("Chosen method is {method:?}");
 
         match method {
@@ -137,62 +138,16 @@ impl Client {
         match response_config.format {
             Json => {
                 let content: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                content.try_into()
+                let res = babel_api::BlockchainResponse {
+                    value: serde_json::to_string(&content)?,
+                };
+                Ok(res)
             }
             Raw => {
                 let content = String::from_utf8_lossy(&output.stdout).to_string();
                 Ok(content.into())
             }
         }
-    }
-}
-
-/// Each request that comes over the VSock to babel must be a piece of JSON that can be
-/// deserialized into this struct.
-#[derive(Debug, Deserialize)]
-pub enum BabelRequest {
-    /// List the endpoints that are available for the current blockchain. These are extracted from
-    /// the config, and just sent back as strings for now.
-    ListCapabilities,
-    /// Returns `Pong`. Useful to check for the liveness of the node.
-    Ping,
-    /// Send a request to the current blockchain. We can identify the way to do this from the
-    /// config and forward the provided parameters.
-    BlockchainCommand(BlockchainCommand),
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BlockchainCommand {
-    name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub enum BabelResponse {
-    ListCapabilities(Vec<String>),
-    Pong,
-    BlockchainResponse(BlockchainResponse),
-    Error(String),
-}
-
-#[derive(Debug, Serialize)]
-pub struct BlockchainResponse {
-    value: String,
-}
-
-impl TryFrom<serde_json::Value> for BlockchainResponse {
-    type Error = error::Error;
-
-    fn try_from(content: serde_json::Value) -> Result<Self, Self::Error> {
-        let res = Self {
-            value: serde_json::to_string(&content)?,
-        };
-        Ok(res)
-    }
-}
-
-impl From<String> for BlockchainResponse {
-    fn from(value: String) -> Self {
-        Self { value }
     }
 }
 
@@ -206,16 +161,14 @@ mod tests {
     use httpmock::prelude::*;
     use std::collections::BTreeMap;
 
-    impl BabelResponse {
-        fn unwrap_blockchain(self) -> BlockchainResponse {
-            use BabelResponse::*;
+    fn unwrap_blockchain(resp: BabelResponse) -> BlockchainResponse {
+        use BabelResponse::*;
 
-            match self {
-                ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
-                Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
-                BabelResponse::BlockchainResponse(resp) => resp,
-                Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
-            }
+        match resp {
+            ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
+            Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
+            BabelResponse::BlockchainResponse(resp) => resp,
+            Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
         }
     }
 
@@ -265,24 +218,24 @@ mod tests {
                 ),
             ]),
         };
-        let client = Client::new(cfg, Duration::from_secs(10)).unwrap();
+        let server = MsgHandler::new(cfg, Duration::from_secs(10)).unwrap();
 
         let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "raw".to_string(),
         });
-        let output = client.handle(raw_cmd).await.unwrap();
-        assert_eq!(output.unwrap_blockchain().value, "make a toast\n");
+        let output = server.handle(raw_cmd).await.unwrap();
+        assert_eq!(unwrap_blockchain(output).value, "make a toast\n");
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json".to_string(),
         });
-        let output = client.handle(json_cmd).await.unwrap();
-        assert_eq!(output.unwrap_blockchain().value, "\"make a toast\"");
+        let output = server.handle(json_cmd).await.unwrap();
+        assert_eq!(unwrap_blockchain(output).value, "\"make a toast\"");
 
         let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "unknown".to_string(),
         });
-        let output = client.handle(unknown_cmd).await;
+        let output = server.handle(unknown_cmd).await;
         assert_eq!(
             output.unwrap_err().to_string(),
             "Method `unknown` not found"
@@ -336,11 +289,11 @@ mod tests {
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
         });
-        let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle(json_cmd).await.unwrap();
+        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
+        let output = server.handle(json_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output.unwrap_blockchain().value, "[1,2,3]");
+        assert_eq!(unwrap_blockchain(output).value, "[1,2,3]");
     }
 
     #[tokio::test]
@@ -390,11 +343,11 @@ mod tests {
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
         });
-        let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle(json_cmd).await.unwrap();
+        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
+        let output = server.handle(json_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output.unwrap_blockchain().value, "{\"result\":[1,2,3]}");
+        assert_eq!(unwrap_blockchain(output).value, "{\"result\":[1,2,3]}");
     }
 
     #[tokio::test]
@@ -454,10 +407,10 @@ mod tests {
         let height_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "get height".to_string(),
         });
-        let client = Client::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = client.handle(height_cmd).await.unwrap();
+        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
+        let output = server.handle(height_cmd).await.unwrap();
 
         mock.assert();
-        assert_eq!(output.unwrap_blockchain().value, "123");
+        assert_eq!(unwrap_blockchain(output).value, "123");
     }
 }

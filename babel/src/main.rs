@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-#[cfg(feature = "vsock")]
+#[cfg(target_os = "linux")]
 use babel::vsock;
 use babel::{config, run_flag::RunFlag, supervisor};
 use std::path::Path;
@@ -58,12 +58,12 @@ impl supervisor::Timer for SysTimer {
     }
 }
 
-#[cfg(feature = "vsock")]
+#[cfg(target_os = "linux")]
 async fn serve(run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
     vsock::serve(run, cfg).await
 }
 
-#[cfg(not(feature = "vsock"))]
-async fn serve(_run: RunFlag, _cfg: config::Babel) -> eyre::Result<()> {
-    unimplemented!()
+#[cfg(not(target_os = "linux"))]
+async fn serve(run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
+    Ok(())
 }

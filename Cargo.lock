@@ -308,6 +308,7 @@ version = "0.1.0"
 dependencies = [
  "async-io",
  "async-trait",
+ "babel_api",
  "ctrlc",
  "eyre",
  "futures",
@@ -327,6 +328,13 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "walkdir",
+]
+
+[[package]]
+name = "babel_api"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -394,6 +402,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "assert_fs",
+ "babel_api",
  "base64 0.13.0",
  "chrono",
  "clap",
