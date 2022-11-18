@@ -36,8 +36,9 @@ async fn main() -> eyre::Result<()> {
 
     let run = RunFlag::run_until_ctrlc();
     let supervisor_cfg = cfg.supervisor.clone();
+
     let (supervisor, server) = tokio::join!(
-        supervisor::run::<SysTimer>(run.clone(), supervisor_cfg),
+        supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg).run(),
         serve(run, cfg)
     );
     supervisor?;

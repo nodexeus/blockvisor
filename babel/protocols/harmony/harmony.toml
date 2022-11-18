@@ -15,6 +15,7 @@ data_directory_mount_point = "/blockjoy/miner/data"
 [supervisor]
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
 
     [[supervisor.entry_point]]
     command = "todo"

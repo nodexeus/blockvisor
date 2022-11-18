@@ -236,6 +236,7 @@ mod tests {
             supervisor: supervisor::Config {
                 backoff_timeout_ms: 10,
                 backoff_base_ms: 1,
+                log_buffer_capacity_ln: 1,
                 entry_point: vec![],
             },
             monitor: None,
@@ -314,6 +315,7 @@ mod tests {
             supervisor: supervisor::Config {
                 backoff_timeout_ms: 10,
                 backoff_base_ms: 1,
+                log_buffer_capacity_ln: 1,
                 entry_point: vec![],
             },
             monitor: None,
@@ -367,6 +369,7 @@ mod tests {
             supervisor: supervisor::Config {
                 backoff_timeout_ms: 10,
                 backoff_base_ms: 1,
+                log_buffer_capacity_ln: 1,
                 entry_point: vec![],
             },
             monitor: None,
@@ -431,6 +434,7 @@ mod tests {
             supervisor: supervisor::Config {
                 backoff_timeout_ms: 10,
                 backoff_base_ms: 1,
+                log_buffer_capacity_ln: 1,
                 entry_point: vec![],
             },
             monitor: None,
