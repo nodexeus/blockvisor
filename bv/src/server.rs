@@ -4,6 +4,7 @@ pub mod bv_pb {
     tonic::include_proto!("blockjoy.blockvisor.v1");
 }
 
+use crate::server::bv_pb::{GetNodeLogsRequest, GetNodeLogsResponse};
 use crate::{node_data::NodeStatus, nodes::Nodes};
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
@@ -189,6 +190,25 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         };
 
         Ok(Response::new(reply))
+    }
+
+    async fn get_node_logs(
+        &self,
+        request: Request<GetNodeLogsRequest>,
+    ) -> Result<Response<GetNodeLogsResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.id)?;
+        let logs = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .logs()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))
     }
 
     async fn get_node_id_for_name(

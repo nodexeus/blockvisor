@@ -5,6 +5,7 @@ use babel::{config, run_flag::RunFlag, supervisor};
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 use tokio::fs::DirBuilder;
+use tokio::sync::broadcast;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
@@ -37,10 +38,9 @@ async fn main() -> eyre::Result<()> {
     let run = RunFlag::run_until_ctrlc();
     let supervisor_cfg = cfg.supervisor.clone();
 
-    let (supervisor, server) = tokio::join!(
-        supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg).run(),
-        serve(run, cfg)
-    );
+    let supervisor = supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg);
+    let logs_rx = supervisor.get_logs_rx();
+    let (supervisor, server) = tokio::join!(supervisor.run(), serve(run, cfg, logs_rx));
     supervisor?;
     server
 }
@@ -59,11 +59,19 @@ impl supervisor::Timer for SysTimer {
 }
 
 #[cfg(target_os = "linux")]
-async fn serve(run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
-    vsock::serve(run, cfg).await
+async fn serve(
+    run: RunFlag,
+    cfg: config::Babel,
+    logs_rx: broadcast::Receiver<String>,
+) -> eyre::Result<()> {
+    vsock::serve(run, cfg, logs_rx).await
 }
 
 #[cfg(not(target_os = "linux"))]
-async fn serve(_run: RunFlag, _cfg: config::Babel) -> eyre::Result<()> {
-    Ok(())
+async fn serve(
+    _run: RunFlag,
+    _cfg: config::Babel,
+    _logs_rx: broadcast::Receiver<String>,
+) -> eyre::Result<()> {
+    unimplemented!()
 }

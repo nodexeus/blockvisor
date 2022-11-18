@@ -78,6 +78,14 @@ message GetNodeStatusResponse {
     NodeStatus status = 1;
 }
 
+message GetNodeLogsRequest {
+    string id = 1;
+}
+
+message GetNodeLogsResponse {
+    repeated string logs = 1;
+}
+
 message GetNodeIdForNameRequest {
     string name = 1;   
 }

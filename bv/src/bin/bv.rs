@@ -357,7 +357,16 @@ impl NodeClient {
                 self.start_nodes(&ids).await?;
             }
             NodeCommand::Console { id_or_name: _ } => todo!(),
-            NodeCommand::Logs { id_or_name: _ } => todo!(),
+            NodeCommand::Logs { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let logs = self
+                    .client
+                    .get_node_logs(bv_pb::GetNodeLogsRequest { id: id.clone() })
+                    .await?;
+                for log in logs.into_inner().logs {
+                    print!("{}", log);
+                }
+            }
             NodeCommand::Status { id_or_names } => {
                 for id_or_name in id_or_names {
                     let id = self.resolve_id_or_name(&id_or_name).await?.to_string();

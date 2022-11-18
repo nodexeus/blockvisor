@@ -7,6 +7,8 @@ pub enum BabelRequest {
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
     ListCapabilities,
+    /// List of logs from blockchain entry_points.
+    Logs,
     /// Returns `Pong`. Useful to check for the liveness of the node.
     Ping,
     /// Send a request to the current blockchain. We can identify the way to do this from the
@@ -23,6 +25,7 @@ pub struct BlockchainCommand {
 pub enum BabelResponse {
     ListCapabilities(Vec<String>),
     Pong,
+    Logs(Vec<String>),
     BlockchainResponse(BlockchainResponse),
     Error(String),
 }

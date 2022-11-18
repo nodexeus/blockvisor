@@ -121,6 +121,27 @@ fn test_bv_cmd_node_start_and_stop_all() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
+fn test_bv_cmd_logs() {
+    println!("create a node");
+    let vm_id = &create_node("test");
+    println!("create vm_id: {vm_id}");
+
+    println!("start node");
+    bv_run(&["node", "start", vm_id], "Started node");
+
+    println!("get logs");
+    bv_run(
+        &["node", "logs", vm_id],
+        "Helium entry_point not configured!",
+    );
+
+    println!("stop started node");
+    bv_run(&["node", "stop", vm_id], "Stopped node");
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     println!("create a node");
     let vm_id = &create_node("test");
