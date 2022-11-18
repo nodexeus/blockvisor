@@ -12,7 +12,7 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
-    grpc::pb,
+    grpc::{pb, pb::node_info::ContainerStatus},
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeStatus},
@@ -28,6 +28,14 @@ lazy_static::lazy_static! {
         .join("nodes");
 
     static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
+}
+
+fn id_not_found(id: &Uuid) -> anyhow::Error {
+    anyhow!("Node with id `{}` not found", id)
+}
+
+fn name_not_found(name: &str) -> anyhow::Error {
+    anyhow!("Node with name `{}` not found", name)
 }
 
 #[derive(Clone, Debug)]
@@ -67,9 +75,7 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
         self.data.machine_index += 1;
         let ip = ip.parse()?;
@@ -90,133 +96,92 @@ impl Nodes {
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Stopped);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: String) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgrading) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         self.stop(id).await?;
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
-        debug!("found node");
-
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         node.upgrade(&image).await?;
-        debug!("upgraded");
+        debug!("Node upgraded");
 
         if need_to_restart {
             self.start(id).await?;
         }
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgraded) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Upgraded);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
-        let node = self
-            .nodes
-            .remove(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(&id))?;
         self.node_ids.remove(&node.data.name);
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Deleting);
 
         node.delete().await?;
-        debug!("deleted");
+        debug!("Node deleted");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Deleted);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Starting);
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
-        debug!("found node");
-
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         node.start().await?;
-        debug!("started");
+        debug!("Node started");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Running);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn stop(&mut self, id: Uuid) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Stopping);
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
-        debug!("found node");
-
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         node.stop().await?;
-        debug!("stopped");
+        debug!("Node stopped");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_container_status(&id, ContainerStatus::Stopped);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn list(&self) -> Vec<NodeData> {
-        debug!("listing {} nodes", self.nodes.len());
+        debug!("Listing {} nodes", self.nodes.len());
 
         self.nodes.values().map(|n| n.data.clone()).collect()
     }
 
     #[instrument(skip(self))]
     pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
-        let node = self
-            .nodes
-            .get(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(&id))?;
 
         Ok(node.status())
     }
-
-    // TODO: Rest of the NodeCommand variants.
 
     pub async fn node_id_for_name(&self, name: &str) -> Result<Uuid> {
         let uuid = self
             .node_ids
             .get(name)
             .cloned()
-            .ok_or_else(|| anyhow!("Node with name `{}` not found", name))?;
+            .ok_or_else(|| name_not_found(name))?;
 
         Ok(uuid)
     }
@@ -303,25 +268,28 @@ impl Nodes {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
-    pub fn send_node_status(
-        &self,
-        id: &Uuid,
-        status: pb::node_info::ContainerStatus,
-    ) -> Result<()> {
+    pub fn send_container_status(&self, id: &Uuid, status: ContainerStatus) -> Result<()> {
         if !self.tx.initialized() {
             bail!("Updates channel not initialized")
         }
 
         let node_id = id.to_string();
-        self.tx.get().unwrap().send(pb::InfoUpdate {
+        let update = pb::InfoUpdate {
             info: Some(pb::info_update::Info::Node(pb::NodeInfo {
                 id: node_id,
                 container_status: Some(status.into()),
                 ..Default::default()
             })),
-        })?;
+        };
 
-        Ok(())
+        match self.tx.get().unwrap().send(update) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let msg = format!("Cannot send node status: {error:?}");
+                error!(msg);
+                Err(anyhow!(msg))
+            }
+        }
     }
 
     /// Create and return the next network interface using machine index

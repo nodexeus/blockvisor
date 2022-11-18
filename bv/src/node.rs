@@ -383,11 +383,11 @@ impl Node {
     pub async fn capabilities(&mut self) -> Result<Vec<String>> {
         let request = BabelRequest::ListCapabilities;
         let resp: BabelResponse = self.send(request).await?;
-        let height = match resp {
+        let capabilities = match resp {
             BabelResponse::ListCapabilities(caps) => caps,
-            e => bail!("Unexpected BabelResponse for `height`: `{e:?}`"),
+            e => bail!("Unexpected BabelResponse for `capabilities`: `{e:?}`"),
         };
-        Ok(height)
+        Ok(capabilities)
     }
 
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to
