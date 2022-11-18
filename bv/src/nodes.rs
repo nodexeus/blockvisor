@@ -30,6 +30,14 @@ lazy_static::lazy_static! {
     static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
 }
 
+fn id_not_found(id: &Uuid) -> anyhow::Error {
+    anyhow!("Node with id `{}` not found", id)
+}
+
+fn name_not_found(name: &str) -> anyhow::Error {
+    anyhow!("Node with name `{}` not found", name)
+}
+
 #[derive(Clone, Debug)]
 pub enum ServiceStatus {
     Enabled,
@@ -106,10 +114,7 @@ impl Nodes {
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         self.stop(id).await?;
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
 
         node.upgrade(&image).await?;
@@ -128,10 +133,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
-        let node = self
-            .nodes
-            .remove(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(&id))?;
         self.node_ids.remove(&node.data.name);
 
         if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
@@ -154,10 +156,7 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
 
         node.start().await?;
@@ -176,10 +175,7 @@ impl Nodes {
             error!("Cannot send node status: {error:?}");
         };
 
-        let node = self
-            .nodes
-            .get_mut(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
 
         node.stop().await?;
@@ -201,10 +197,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
-        let node = self
-            .nodes
-            .get(&id)
-            .ok_or_else(|| anyhow!("Node with id `{}` not found", &id))?;
+        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(&id))?;
 
         Ok(node.status())
     }
@@ -216,7 +209,7 @@ impl Nodes {
             .node_ids
             .get(name)
             .cloned()
-            .ok_or_else(|| anyhow!("Node with name `{}` not found", name))?;
+            .ok_or_else(|| name_not_found(name))?;
 
         Ok(uuid)
     }
