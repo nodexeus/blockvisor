@@ -153,8 +153,8 @@ impl Node {
             }
         }?;
         self.babel_conn = Connection::Open { babel_conn };
-        let resp = self.send(BabelRequest::Ping).await;
-        if !matches!(resp, Ok(BabelResponse::Pong)) {
+        let resp = self.send(babel_api::BabelRequest::Ping).await;
+        if !matches!(resp, Ok(babel_api::BabelResponse::Pong)) {
             warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
 
@@ -367,12 +367,14 @@ impl Node {
         T: FromStr,
         <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
     {
-        let request = BabelRequest::BlockchainCommand { name: method };
-        let resp: BabelResponse = self.send(request).await?;
+        let request = babel_api::BabelRequest::BlockchainCommand(babel_api::BlockchainCommand {
+            name: method.to_string(),
+        });
+        let resp: babel_api::BabelResponse = self.send(request).await?;
         let inner = match resp {
-            BabelResponse::BlockchainResponse { value } => {
-                value.parse().context(format!("Could not parse {method}"))?
-            }
+            babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
+                value,
+            }) => value.parse().context(format!("Could not parse {method}"))?,
             e => bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
         };
         Ok(inner)
@@ -381,10 +383,10 @@ impl Node {
     /// Returns the methods that are supported by this blockchain. Calling any method on this
     /// blockchain that is not listed here will result in an error being returned.
     pub async fn capabilities(&mut self) -> Result<Vec<String>> {
-        let request = BabelRequest::ListCapabilities;
-        let resp: BabelResponse = self.send(request).await?;
+        let request = babel_api::BabelRequest::ListCapabilities;
+        let resp: babel_api::BabelResponse = self.send(request).await?;
         let capabilities = match resp {
-            BabelResponse::ListCapabilities(caps) => caps,
+            babel_api::BabelResponse::ListCapabilities(caps) => caps,
             e => bail!("Unexpected BabelResponse for `capabilities`: `{e:?}`"),
         };
         Ok(capabilities)
@@ -513,26 +515,4 @@ impl Node {
         };
         timeout(SOCKET_TIMEOUT, resp).await?
     }
-}
-
-/// Each request that comes over the VSock to babel must be a piece of JSON that can be
-/// deserialized into this struct.
-#[derive(Debug, serde::Serialize)]
-pub enum BabelRequest<'a> {
-    /// List the endpoints that are available for the current blockchain. These are extracted from
-    /// the config, and just sent back as strings for now.
-    ListCapabilities,
-    /// Returns `Pong`. Useful to check for the liveness of the node.
-    Ping,
-    /// Send a request to the current blockchain. We can identify the way to do this from the
-    /// config and forward the provided parameters.
-    BlockchainCommand { name: &'a str },
-}
-
-#[derive(Debug, serde::Deserialize)]
-enum BabelResponse {
-    ListCapabilities(Vec<String>),
-    Pong,
-    BlockchainResponse { value: String },
-    Error(String),
 }

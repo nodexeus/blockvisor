@@ -19,6 +19,7 @@ name = "blockvisord"
 path = "src/bin/blockvisord.rs"
 
 [dependencies]
+babel_api = {version = "*", path = "../babel_api"}
 anyhow = "1.0.56"
 base64 = "0.13.0"
 chrono = {version = "0.4", features = ["serde"]}

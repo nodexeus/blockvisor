@@ -1,7 +1,7 @@
 use std::{sync::Arc, time};
 
 use crate::run_flag::RunFlag;
-use crate::{client, config};
+use crate::{config, msg_handler};
 use eyre::Context;
 use futures::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -15,7 +15,7 @@ const VSOCK_PORT: u32 = 42;
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or
 /// restarts.
 pub async fn serve(mut run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
-    let client = client::Client::new(cfg, time::Duration::from_secs(10))?;
+    let client = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10))?;
     let client = Arc::new(client);
 
     tracing::debug!("Binding to virtual socket...");
@@ -45,7 +45,7 @@ pub async fn serve(mut run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
     Ok(())
 }
 
-async fn serve_stream(mut stream: VsockStream, client: Arc<client::Client>) {
+async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandler>) {
     loop {
         let mut buf = vec![0u8; 5000];
         let len = stream.read(&mut buf).await.unwrap();
@@ -57,7 +57,7 @@ async fn serve_stream(mut stream: VsockStream, client: Arc<client::Client>) {
         let msg = std::str::from_utf8(&buf).unwrap();
         if let Err(e) = handle_message(msg, &mut stream, &client).await {
             tracing::debug!("Failed to handle message: {e}");
-            let resp = client::BabelResponse::Error(e.to_string());
+            let resp = babel_api::BabelResponse::Error(e.to_string());
             let _ = write_json(&mut stream, resp).await;
         }
     }
@@ -66,12 +66,12 @@ async fn serve_stream(mut stream: VsockStream, client: Arc<client::Client>) {
 async fn handle_message(
     msg: &str,
     stream: &mut tokio_vsock::VsockStream,
-    client: &client::Client,
+    server: &msg_handler::MsgHandler,
 ) -> eyre::Result<()> {
     tracing::debug!("Received message: `{msg}`");
-    let request: client::BabelRequest =
+    let request: babel_api::BabelRequest =
         serde_json::from_str(msg).wrap_err("Could not parse request as json")?;
-    let response = client.handle(request).await?;
+    let response = server.handle(request).await?;
     tracing::debug!("Sending response: {response:?}");
     write_json(stream, response).await?;
     Ok(())
