@@ -1,7 +1,7 @@
 use crate::supervisor;
 use eyre::bail;
 use serde::Deserialize;
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, collections::HashMap, path::Path};
 use tokio::fs;
 
 #[derive(Debug, Deserialize)]
@@ -12,6 +12,7 @@ pub struct Babel {
     /// Commands to start blockchain node
     pub supervisor: supervisor::Config,
     pub monitor: Option<Monitor>,
+    pub keys: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "deserialize_methods")]
     pub methods: BTreeMap<String, Method>,
 }
