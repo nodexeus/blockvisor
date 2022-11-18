@@ -109,10 +109,8 @@ impl Nodes {
         self.stop(id).await?;
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
-        debug!("found node");
-
         node.upgrade(&image).await?;
-        debug!("upgraded");
+        debug!("Node upgraded");
 
         if need_to_restart {
             self.start(id).await?;
@@ -131,7 +129,7 @@ impl Nodes {
         let _ = self.send_container_status(&id, ContainerStatus::Deleting);
 
         node.delete().await?;
-        debug!("deleted");
+        debug!("Node deleted");
 
         let _ = self.send_container_status(&id, ContainerStatus::Deleted);
 
@@ -143,10 +141,8 @@ impl Nodes {
         let _ = self.send_container_status(&id, ContainerStatus::Starting);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
-        debug!("found node");
-
         node.start().await?;
-        debug!("started");
+        debug!("Node started");
 
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
@@ -158,10 +154,8 @@ impl Nodes {
         let _ = self.send_container_status(&id, ContainerStatus::Stopping);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
-        debug!("found node");
-
         node.stop().await?;
-        debug!("stopped");
+        debug!("Node stopped");
 
         let _ = self.send_container_status(&id, ContainerStatus::Stopped);
 
@@ -170,7 +164,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn list(&self) -> Vec<NodeData> {
-        debug!("listing {} nodes", self.nodes.len());
+        debug!("Listing {} nodes", self.nodes.len());
 
         self.nodes.values().map(|n| n.data.clone()).collect()
     }
@@ -181,8 +175,6 @@ impl Nodes {
 
         Ok(node.status())
     }
-
-    // TODO: Rest of the NodeCommand variants.
 
     pub async fn node_id_for_name(&self, name: &str) -> Result<Uuid> {
         let uuid = self
