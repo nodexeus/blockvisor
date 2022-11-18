@@ -75,9 +75,7 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Creating);
 
         self.data.machine_index += 1;
         let ip = ip.parse()?;
@@ -98,18 +96,14 @@ impl Nodes {
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: String) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgrading) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgrading);
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         self.stop(id).await?;
@@ -124,9 +118,7 @@ impl Nodes {
             self.start(id).await?;
         }
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgraded) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Upgraded);
 
         Ok(())
     }
@@ -136,25 +128,19 @@ impl Nodes {
         let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(&id))?;
         self.node_ids.remove(&node.data.name);
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleting);
 
         node.delete().await?;
         debug!("deleted");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Deleted);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Starting);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
@@ -162,18 +148,14 @@ impl Nodes {
         node.start().await?;
         debug!("started");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Running) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Running);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn stop(&mut self, id: Uuid) -> Result<()> {
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopping);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
@@ -181,9 +163,7 @@ impl Nodes {
         node.stop().await?;
         debug!("stopped");
 
-        if let Err(error) = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped) {
-            error!("Cannot send node status: {error:?}");
-        };
+        let _ = self.send_node_status(&id, pb::node_info::ContainerStatus::Stopped);
 
         Ok(())
     }
@@ -306,15 +286,22 @@ impl Nodes {
         }
 
         let node_id = id.to_string();
-        self.tx.get().unwrap().send(pb::InfoUpdate {
+        let update = pb::InfoUpdate {
             info: Some(pb::info_update::Info::Node(pb::NodeInfo {
                 id: node_id,
                 container_status: Some(status.into()),
                 ..Default::default()
             })),
-        })?;
+        };
 
-        Ok(())
+        match self.tx.get().unwrap().send(update) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let msg = format!("Cannot send node status: {error:?}");
+                error!(msg);
+                Err(anyhow!(msg))
+            }
+        }
     }
 
     /// Create and return the next network interface using machine index
