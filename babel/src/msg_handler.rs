@@ -193,6 +193,7 @@ mod tests {
                 entry_point: vec![],
             },
             monitor: None,
+            keys: None,
             methods: BTreeMap::from([
                 (
                     "raw".to_string(),
@@ -272,6 +273,7 @@ mod tests {
                 entry_point: vec![],
             },
             monitor: None,
+            keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
                 Method::Rest {
@@ -326,6 +328,7 @@ mod tests {
                 entry_point: vec![],
             },
             monitor: None,
+            keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
                 Method::Rest {
@@ -391,6 +394,7 @@ mod tests {
                 entry_point: vec![],
             },
             monitor: None,
+            keys: None,
             methods: BTreeMap::from([(
                 "get height".to_string(),
                 Method::Jrpc {

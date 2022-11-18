@@ -24,6 +24,11 @@ log_buffer_capacity_ln = 1000
 [monitor]
 pid_file = "/var/run/helium.pid" #this is likely not necessary
 
+[keys] # this is just an example
+first = "/opt/secrets/first.key"
+second = "/opt/secrets/second.key"
+"*" = "/tmp"
+
 # METHOD BLOCK-HEIGHT
 # example:
 # curl -X POST http://localhost:4467 \
@@ -41,7 +46,6 @@ pid_file = "/var/run/helium.pid" #this is likely not necessary
 name = "height"
 transport = "jrpc"
 method = "info_height"
-params = []
 
     [methods.response]
     code = 200
@@ -63,7 +67,6 @@ params = []
 name = "address"
 transport = "jrpc"
 method = "peer_addr"
-params = []
 
     [methods.response]
     code = 200
@@ -85,7 +88,6 @@ params = []
 name = "name"
 transport = "jrpc"
 method = "info_name"
-params = []
 
     [methods.response]
     code = 200
@@ -107,7 +109,6 @@ params = []
 name = "consensus"
 transport = "jrpc"
 method = "info_in_consensus"
-params = []
 
     [methods.response]
     code = 200
@@ -130,7 +131,6 @@ params = []
 name = "block_age"
 transport = "jrpc"
 method = "info_block_age"
-params = []
 
     [methods.response]
     code = 200
@@ -183,7 +183,6 @@ params = []
 name = "info"
 transport = "jrpc"
 method = "info_summary"
-params = []
 
     [methods.response]
     code = 200
@@ -206,5 +205,14 @@ body = "miner versions | tail -n +2 | awk '{print $2}'"
 
     [methods.response]
     # something?
+    status = 0
+    format = "raw"
+
+[[methods]]
+name = "generate_keys"
+transport = "sh"
+body = "echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
+
+    [methods.response]
     status = 0
     format = "raw"
