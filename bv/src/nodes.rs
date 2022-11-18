@@ -75,7 +75,7 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
-        let _ = self.send_node_status(&id, ContainerStatus::Creating);
+        let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
         self.data.machine_index += 1;
         let ip = ip.parse()?;
@@ -96,14 +96,14 @@ impl Nodes {
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
 
-        let _ = self.send_node_status(&id, ContainerStatus::Stopped);
+        let _ = self.send_container_status(&id, ContainerStatus::Stopped);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: String) -> Result<()> {
-        let _ = self.send_node_status(&id, ContainerStatus::Upgrading);
+        let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         self.stop(id).await?;
@@ -118,7 +118,7 @@ impl Nodes {
             self.start(id).await?;
         }
 
-        let _ = self.send_node_status(&id, ContainerStatus::Upgraded);
+        let _ = self.send_container_status(&id, ContainerStatus::Upgraded);
 
         Ok(())
     }
@@ -128,19 +128,19 @@ impl Nodes {
         let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(&id))?;
         self.node_ids.remove(&node.data.name);
 
-        let _ = self.send_node_status(&id, ContainerStatus::Deleting);
+        let _ = self.send_container_status(&id, ContainerStatus::Deleting);
 
         node.delete().await?;
         debug!("deleted");
 
-        let _ = self.send_node_status(&id, ContainerStatus::Deleted);
+        let _ = self.send_container_status(&id, ContainerStatus::Deleted);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        let _ = self.send_node_status(&id, ContainerStatus::Starting);
+        let _ = self.send_container_status(&id, ContainerStatus::Starting);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
@@ -148,14 +148,14 @@ impl Nodes {
         node.start().await?;
         debug!("started");
 
-        let _ = self.send_node_status(&id, ContainerStatus::Running);
+        let _ = self.send_container_status(&id, ContainerStatus::Running);
 
         Ok(())
     }
 
     #[instrument(skip(self))]
     pub async fn stop(&mut self, id: Uuid) -> Result<()> {
-        let _ = self.send_node_status(&id, ContainerStatus::Stopping);
+        let _ = self.send_container_status(&id, ContainerStatus::Stopping);
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
         debug!("found node");
@@ -163,7 +163,7 @@ impl Nodes {
         node.stop().await?;
         debug!("stopped");
 
-        let _ = self.send_node_status(&id, ContainerStatus::Stopped);
+        let _ = self.send_container_status(&id, ContainerStatus::Stopped);
 
         Ok(())
     }
@@ -276,7 +276,7 @@ impl Nodes {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
-    pub fn send_node_status(&self, id: &Uuid, status: ContainerStatus) -> Result<()> {
+    pub fn send_container_status(&self, id: &Uuid, status: ContainerStatus) -> Result<()> {
         if !self.tx.initialized() {
             bail!("Updates channel not initialized")
         }
