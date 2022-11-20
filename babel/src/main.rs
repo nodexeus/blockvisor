@@ -64,6 +64,6 @@ async fn serve(run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
 }
 
 #[cfg(not(target_os = "linux"))]
-async fn serve(run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
+async fn serve(_run: RunFlag, _cfg: config::Babel) -> eyre::Result<()> {
     Ok(())
 }
