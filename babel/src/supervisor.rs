@@ -35,6 +35,17 @@ pub struct Entrypoint {
     pub args: Vec<String>,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            backoff_timeout_ms: 60_000,
+            backoff_base_ms: 100,
+            log_buffer_capacity_ln: 1_000,
+            entry_point: vec![],
+        }
+    }
+}
+
 /// This module implements supervisor for node entry points. It spawn child processes as defined in
 /// given config and watch them. Stopped child (whatever reason) is respawned with exponential backoff
 /// timeout. Backoff timeout is reset after child stays alive for at least `backoff_timeout_ms`.
@@ -166,11 +177,11 @@ mod tests {
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
-            log_buffer_capacity_ln: 100,
             entry_point: vec![Entrypoint {
                 command: "echo".to_owned(),
                 args: vec!["test".to_owned()],
             }],
+            ..Default::default()
         };
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
@@ -195,11 +206,11 @@ mod tests {
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
-            log_buffer_capacity_ln: 100,
             entry_point: vec![Entrypoint {
                 command: "echo".to_owned(),
                 args: vec!["test".to_owned()],
             }],
+            ..Default::default()
         };
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
@@ -236,7 +247,6 @@ mod tests {
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
-            log_buffer_capacity_ln: 100,
             entry_point: vec![
                 Entrypoint {
                     command: "sleep".to_owned(),
@@ -251,6 +261,7 @@ mod tests {
                     args: vec![file_path.to_str().unwrap().to_string()],
                 },
             ],
+            ..Default::default()
         };
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
@@ -283,10 +294,8 @@ mod tests {
     #[serial]
     async fn test_no_entry_points() {
         let cfg = Config {
-            backoff_timeout_ms: 600,
-            backoff_base_ms: 10,
-            log_buffer_capacity_ln: 100,
             entry_point: vec![],
+            ..Default::default()
         };
         assert!(Supervisor::<MockTestTimer>::new(Default::default(), cfg)
             .run()
