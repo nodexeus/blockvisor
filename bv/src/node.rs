@@ -392,6 +392,17 @@ impl Node {
         Ok(capabilities)
     }
 
+    /// Returns the list of logs from blockchain entry_points.
+    pub async fn logs(&mut self) -> Result<Vec<String>> {
+        let request = babel_api::BabelRequest::Logs;
+        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let logs = match resp {
+            babel_api::BabelResponse::Logs(logs) => logs,
+            e => bail!("Unexpected BabelResponse for `logs`: `{e:?}`"),
+        };
+        Ok(logs)
+    }
+
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to
     /// send some request and then obtain a response back.
     async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(

@@ -3,10 +3,12 @@ use crate::error;
 use babel_api::*;
 use serde_json::json;
 use std::time::Duration;
+use tokio::sync::{broadcast, Mutex};
 
 pub struct MsgHandler {
     inner: reqwest::Client,
     cfg: config::Babel,
+    logs_rx: Mutex<broadcast::Receiver<String>>,
 }
 
 impl std::ops::Deref for MsgHandler {
@@ -18,9 +20,17 @@ impl std::ops::Deref for MsgHandler {
 }
 
 impl MsgHandler {
-    pub fn new(cfg: config::Babel, timeout: Duration) -> Result<Self, error::Error> {
+    pub fn new(
+        cfg: config::Babel,
+        timeout: Duration,
+        logs_rx: broadcast::Receiver<String>,
+    ) -> Result<Self, error::Error> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
-        Ok(Self { inner: client, cfg })
+        Ok(Self {
+            inner: client,
+            cfg,
+            logs_rx: Mutex::new(logs_rx),
+        })
     }
 
     pub async fn handle(&self, req: BabelRequest) -> Result<BabelResponse, error::Error> {
@@ -29,6 +39,7 @@ impl MsgHandler {
         match req {
             BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
             BabelRequest::Ping => Ok(Pong),
+            BabelRequest::Logs => Ok(Logs(self.handle_logs().await)),
             BabelRequest::BlockchainCommand(cmd) => {
                 tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
@@ -43,6 +54,16 @@ impl MsgHandler {
             .keys()
             .map(|method| method.to_string())
             .collect()
+    }
+
+    /// List logs from blockchain entry_points.
+    async fn handle_logs(&self) -> Vec<String> {
+        let mut logs = Vec::default();
+        let mut rx = self.logs_rx.lock().await;
+        while let Ok(log) = rx.try_recv() {
+            logs.push(log)
+        }
+        logs
     }
 
     async fn handle_cmd(&self, cmd: BlockchainCommand) -> Result<BlockchainResponse, error::Error> {
@@ -167,8 +188,50 @@ mod tests {
         match resp {
             ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
             Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
+            Logs(_) => panic!("Called `unwrap_blockchain` on `Logs`"),
             BabelResponse::BlockchainResponse(resp) => resp,
             Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_logs() {
+        let cfg = Babel {
+            export: None,
+            env: None,
+            config: Config {
+                babel_version: "".to_string(),
+                node_version: "".to_string(),
+                protocol: "".to_string(),
+                node_type: "".to_string(),
+                description: None,
+                api_host: None,
+                data_directory_mount_point: "".to_string(),
+            },
+            supervisor: supervisor::Config {
+                backoff_timeout_ms: 10,
+                backoff_base_ms: 1,
+                log_buffer_capacity_ln: 4,
+                entry_point: vec![],
+            },
+            monitor: None,
+            keys: None,
+            methods: Default::default(),
+        };
+        let (tx, logs_rx) = broadcast::channel(16);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+        tx.send("log1".to_string()).expect("failed to send log");
+        tx.send("log2".to_string()).expect("failed to send log");
+        tx.send("log3".to_string()).expect("failed to send log");
+
+        if let BabelResponse::Logs(logs) = msg_handler
+            .handle(BabelRequest::Logs)
+            .await
+            .expect("failed to handle logs request")
+        {
+            assert_eq!(vec!["log1", "log2", "log3"], logs)
+        } else {
+            panic!("invalid logs response")
         }
     }
 
@@ -214,24 +277,25 @@ mod tests {
                 ),
             ]),
         };
-        let server = MsgHandler::new(cfg, Duration::from_secs(10)).unwrap();
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
 
         let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "raw".to_string(),
         });
-        let output = server.handle(raw_cmd).await.unwrap();
+        let output = msg_handler.handle(raw_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "make a toast\n");
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json".to_string(),
         });
-        let output = server.handle(json_cmd).await.unwrap();
+        let output = msg_handler.handle(json_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "\"make a toast\"");
 
         let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "unknown".to_string(),
         });
-        let output = server.handle(unknown_cmd).await;
+        let output = msg_handler.handle(unknown_cmd).await;
         assert_eq!(
             output.unwrap_err().to_string(),
             "Method `unknown` not found"
@@ -281,8 +345,9 @@ mod tests {
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
         });
-        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = server.handle(json_cmd).await.unwrap();
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
         assert_eq!(unwrap_blockchain(output).value, "[1,2,3]");
@@ -331,8 +396,9 @@ mod tests {
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
         });
-        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = server.handle(json_cmd).await.unwrap();
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
         assert_eq!(unwrap_blockchain(output).value, "{\"result\":[1,2,3]}");
@@ -391,8 +457,9 @@ mod tests {
         let height_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "get height".to_string(),
         });
-        let server = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
-        let output = server.handle(height_cmd).await.unwrap();
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let output = msg_handler.handle(height_cmd).await.unwrap();
 
         mock.assert();
         assert_eq!(unwrap_blockchain(output).value, "123");

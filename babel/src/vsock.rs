@@ -5,6 +5,7 @@ use crate::{config, msg_handler};
 use eyre::Context;
 use futures::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::broadcast;
 use tokio_vsock::VsockStream;
 
 const VSOCK_HOST_CID: u32 = 3;
@@ -14,9 +15,13 @@ const VSOCK_PORT: u32 = 42;
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or
 /// restarts.
-pub async fn serve(mut run: RunFlag, cfg: config::Babel) -> eyre::Result<()> {
-    let client = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10))?;
-    let client = Arc::new(client);
+pub async fn serve(
+    mut run: RunFlag,
+    cfg: config::Babel,
+    logs_rx: broadcast::Receiver<String>,
+) -> eyre::Result<()> {
+    let msf_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
+    let client = Arc::new(msf_handler);
 
     tracing::debug!("Binding to virtual socket...");
     let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
@@ -66,12 +71,12 @@ async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandl
 async fn handle_message(
     msg: &str,
     stream: &mut tokio_vsock::VsockStream,
-    server: &msg_handler::MsgHandler,
+    msg_handler: &msg_handler::MsgHandler,
 ) -> eyre::Result<()> {
     tracing::debug!("Received message: `{msg}`");
     let request: babel_api::BabelRequest =
-        serde_json::from_str(msg).wrap_err("Could not parse request as json")?;
-    let response = server.handle(request).await?;
+        serde_json::from_str(msg).wrap_err(format!("Could not parse request as json '{msg}'"))?;
+    let response = msg_handler.handle(request).await?;
     tracing::debug!("Sending response: {response:?}");
     write_json(stream, response).await?;
     Ok(())

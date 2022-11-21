@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use std::process::Stdio;
 use std::time::SystemTime;
 use tokio::process::Command;
+use tokio::sync::broadcast;
 use tokio::time::Duration;
 use tracing::{info, warn};
 
@@ -65,6 +66,10 @@ impl<T: Timer> Supervisor<T> {
             log_buffer,
             phantom: Default::default(),
         }
+    }
+
+    pub fn get_logs_rx(&self) -> broadcast::Receiver<String> {
+        self.log_buffer.subscribe()
     }
 
     pub async fn run(self) -> eyre::Result<()> {
@@ -328,7 +333,7 @@ mod tests {
             test_run.stop();
         });
         let supervisor = Supervisor::<MockTestTimer>::new(run, cfg);
-        let mut rx = supervisor.log_buffer.subscribe();
+        let mut rx = supervisor.get_logs_rx();
         assert!(supervisor.run().await.is_ok());
 
         let mut lines = Vec::default();
