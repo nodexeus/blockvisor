@@ -186,12 +186,7 @@ mod tests {
                 description: None,
                 api_host: None,
             },
-            supervisor: supervisor::Config {
-                backoff_timeout_ms: 10,
-                backoff_base_ms: 1,
-                log_buffer_capacity_ln: 1,
-                entry_point: vec![],
-            },
+            supervisor: supervisor::Config::default(),
             monitor: None,
             keys: None,
             methods: BTreeMap::from([
@@ -266,12 +261,7 @@ mod tests {
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
-            supervisor: supervisor::Config {
-                backoff_timeout_ms: 10,
-                backoff_base_ms: 1,
-                log_buffer_capacity_ln: 1,
-                entry_point: vec![],
-            },
+            supervisor: supervisor::Config::default(),
             monitor: None,
             keys: None,
             methods: BTreeMap::from([(
@@ -321,12 +311,7 @@ mod tests {
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
-            supervisor: supervisor::Config {
-                backoff_timeout_ms: 10,
-                backoff_base_ms: 1,
-                log_buffer_capacity_ln: 1,
-                entry_point: vec![],
-            },
+            supervisor: supervisor::Config::default(),
             monitor: None,
             keys: None,
             methods: BTreeMap::from([(
@@ -387,12 +372,7 @@ mod tests {
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
             },
-            supervisor: supervisor::Config {
-                backoff_timeout_ms: 10,
-                backoff_base_ms: 1,
-                log_buffer_capacity_ln: 1,
-                entry_point: vec![],
-            },
+            supervisor: supervisor::Config::default(),
             monitor: None,
             keys: None,
             methods: BTreeMap::from([(
