@@ -214,7 +214,6 @@ mod tests {
                 log_buffer_capacity_ln: 4,
                 entry_point: vec![],
             },
-            monitor: None,
             keys: None,
             methods: Default::default(),
         };
@@ -250,7 +249,6 @@ mod tests {
                 api_host: None,
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: None,
             methods: BTreeMap::from([
                 (
@@ -326,7 +324,6 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
@@ -377,7 +374,6 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
@@ -439,7 +435,6 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: None,
             methods: BTreeMap::from([(
                 "get height".to_string(),

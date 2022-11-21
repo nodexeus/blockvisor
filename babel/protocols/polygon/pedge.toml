@@ -19,9 +19,6 @@ log_buffer_capacity_ln = 1000
     command = "todo"
     args = []
 
-[monitor]
-pid_file = "/var/run/pedge.pid"
-
 [[methods]]
 name = "height"
 transport = "jrpc"

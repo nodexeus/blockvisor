@@ -11,7 +11,6 @@ pub struct Babel {
     pub config: Config,
     /// Commands to start blockchain node
     pub supervisor: supervisor::Config,
-    pub monitor: Option<Monitor>,
     pub keys: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "deserialize_methods")]
     pub methods: BTreeMap<String, Method>,
@@ -52,11 +51,6 @@ pub struct Config {
     pub api_host: Option<String>,
     /// Path to mount data drive to
     pub data_directory_mount_point: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Monitor {
-    pub pid_file: String,
 }
 
 #[derive(Debug, Deserialize)]
