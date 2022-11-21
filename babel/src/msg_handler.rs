@@ -2,8 +2,13 @@ use crate::config;
 use crate::error;
 use babel_api::*;
 use serde_json::json;
+use std::path::Path;
 use std::time::Duration;
+use tokio::fs::{self, DirBuilder, File};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{broadcast, Mutex};
+
+const WILDCARD_KEY_NAME: &str = "*";
 
 pub struct MsgHandler {
     inner: reqwest::Client,
@@ -44,6 +49,14 @@ impl MsgHandler {
                 tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
             }
+            BabelRequest::DownloadKeys => {
+                tracing::debug!("Downloading keys");
+                Ok(Keys(self.handle_download_keys().await?))
+            }
+            BabelRequest::UploadKeys(keys) => {
+                tracing::debug!("Uploading keys: `{keys:?}`");
+                self.handle_upload_keys(keys).await.map(BlockchainResponse)
+            }
         }
     }
 
@@ -64,6 +77,92 @@ impl MsgHandler {
             logs.push(log)
         }
         logs
+    }
+
+    async fn handle_download_keys(&self) -> Result<Vec<BlockchainKey>, error::Error> {
+        let config = self
+            .cfg
+            .keys
+            .as_ref()
+            .ok_or_else(|| error::Error::keys("No `keys` section found in config"))?;
+
+        let mut results = vec![];
+
+        for (name, location) in config.iter() {
+            // TODO: open questions about keys download:
+            // should we bail if some key does not exist?
+            // should we return files from star dir? (potentially not secure)
+            if name != WILDCARD_KEY_NAME && Path::new(&location).exists() {
+                let content = fs::read(location).await?;
+                results.push(BlockchainKey {
+                    name: name.clone(),
+                    content,
+                })
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn handle_upload_keys(
+        &self,
+        keys: Vec<BlockchainKey>,
+    ) -> Result<BlockchainResponse, error::Error> {
+        if keys.is_empty() {
+            return Err(error::Error::keys("No keys provided"));
+        }
+
+        let config = self
+            .cfg
+            .keys
+            .as_ref()
+            .ok_or_else(|| error::Error::keys("No `keys` section found in config"))?;
+
+        if !config.contains_key(WILDCARD_KEY_NAME) {
+            for key in &keys {
+                let name = &key.name;
+                if !config.contains_key(name) {
+                    return Err(error::Error::keys(format!(
+                        "Key `{name}` not found in `keys` config"
+                    )));
+                }
+            }
+        }
+
+        let mut results: Vec<String> = vec![];
+        for key in &keys {
+            let name = &key.name;
+
+            // Calculate destination file name
+            // Use location as is, if key is recognized
+            // If key is not recognized, but there is a star dir, put file into dir
+            let (filename, parent_dir) = if let Some(location) = config.get(name) {
+                let location = Path::new(location);
+                (location.to_path_buf(), location.parent())
+            } else {
+                let location = config.get(WILDCARD_KEY_NAME).unwrap(); // checked
+                let location = Path::new(location);
+                (location.join(name), Some(location))
+            };
+            if let Some(parent) = parent_dir {
+                DirBuilder::new().recursive(true).create(parent).await?;
+            }
+
+            // Write key content into file
+            let mut f = File::create(filename.clone()).await?;
+            f.write_all(&key.content).await?;
+            let count = key.content.len();
+            results.push(format!(
+                "Done writing {count} bytes of key `{name}` into `{}`",
+                filename.to_string_lossy()
+            ));
+        }
+
+        let resp = BlockchainResponse {
+            value: results.join("\n"),
+        };
+
+        Ok(resp)
     }
 
     async fn handle_cmd(&self, cmd: BlockchainCommand) -> Result<BlockchainResponse, error::Error> {
@@ -179,18 +278,23 @@ mod tests {
         Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
     };
     use crate::supervisor;
+    use assert_fs::TempDir;
     use httpmock::prelude::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     fn unwrap_blockchain(resp: BabelResponse) -> BlockchainResponse {
-        use BabelResponse::*;
+        if let BabelResponse::BlockchainResponse(inner) = resp {
+            inner
+        } else {
+            panic!("Expected `BlockchainResponse`, but received `{resp:?}`")
+        }
+    }
 
-        match resp {
-            ListCapabilities(_) => panic!("Called `unwrap_blockchain` on `ListCapabilities`"),
-            Pong => panic!("Called `unwrap_blockchain` on `Pong`"),
-            Logs(_) => panic!("Called `unwrap_blockchain` on `Logs`"),
-            BabelResponse::BlockchainResponse(resp) => resp,
-            Error(_) => panic!("Called `unwrap_blockchain` on `Error`"),
+    fn unwrap_keys(resp: BabelResponse) -> Vec<BlockchainKey> {
+        if let BabelResponse::Keys(inner) = resp {
+            inner
+        } else {
+            panic!("Expected `Keys`, but received `{resp:?}`")
         }
     }
 
@@ -280,6 +384,18 @@ mod tests {
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
 
+        let caps = msg_handler
+            .handle(BabelRequest::ListCapabilities)
+            .await
+            .unwrap();
+        match caps {
+            BabelResponse::ListCapabilities(caps) => {
+                assert_eq!(caps[0], "json");
+                assert_eq!(caps[1], "raw");
+            }
+            _ => panic!("expected ListCapabilities"),
+        };
+
         let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "raw".to_string(),
         });
@@ -300,6 +416,157 @@ mod tests {
             output.unwrap_err().to_string(),
             "Method `unknown` not found"
         );
+    }
+
+    #[tokio::test]
+    async fn test_upload_download_keys() {
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_dir_str = format!("{}", tmp_dir.to_string_lossy());
+
+        let cfg = Babel {
+            export: None,
+            env: None,
+            config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
+                node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                description: None,
+                api_host: None,
+            },
+            supervisor: supervisor::Config::default(),
+            monitor: None,
+            keys: Some(HashMap::from([
+                ("first".to_string(), format!("{tmp_dir_str}/first/key")),
+                ("second".to_string(), format!("{tmp_dir_str}/second/key")),
+                ("third".to_string(), format!("{tmp_dir_str}/third/key")),
+            ])),
+            methods: BTreeMap::new(),
+        };
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+
+        println!("no files uploaded yet");
+        let output = msg_handler
+            .handle(BabelRequest::DownloadKeys)
+            .await
+            .unwrap();
+        let keys = unwrap_keys(output);
+        assert_eq!(keys.len(), 0);
+
+        println!("upload bad keys");
+        let err = msg_handler
+            .handle(BabelRequest::UploadKeys(vec![]))
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "Keys management error: No keys provided");
+        let err = msg_handler
+            .handle(BabelRequest::UploadKeys(vec![BlockchainKey {
+                name: "unknown".to_string(),
+                content: vec![],
+            }]))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Keys management error: Key `unknown` not found in `keys` config"
+        );
+
+        println!("upload good keys");
+        let output = msg_handler
+            .handle(BabelRequest::UploadKeys(vec![
+                BlockchainKey {
+                    name: "second".to_string(),
+                    content: b"123".to_vec(),
+                },
+                BlockchainKey {
+                    name: "third".to_string(),
+                    content: b"abcd".to_vec(),
+                },
+            ]))
+            .await
+            .unwrap();
+        assert_eq!(
+            unwrap_blockchain(output).value,
+            format!(
+                "Done writing 3 bytes of key `second` into `{tmp_dir_str}/second/key`\n\
+                 Done writing 4 bytes of key `third` into `{tmp_dir_str}/third/key`"
+            )
+        );
+
+        println!("download uploaded keys");
+        let output = msg_handler
+            .handle(BabelRequest::DownloadKeys)
+            .await
+            .unwrap();
+        let mut keys = unwrap_keys(output);
+        assert_eq!(keys.len(), 2);
+        keys.sort_by_key(|k| k.name.clone());
+        assert_eq!(
+            keys[0],
+            BlockchainKey {
+                name: "second".to_string(),
+                content: b"123".to_vec(),
+            }
+        );
+        assert_eq!(
+            keys[1],
+            BlockchainKey {
+                name: "third".to_string(),
+                content: b"abcd".to_vec(),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_upload_download_keys_with_star() {
+        let tmp_dir = TempDir::new().unwrap();
+        let tmp_dir_str = format!("{}", tmp_dir.to_string_lossy());
+
+        let cfg = Babel {
+            export: None,
+            env: None,
+            config: Config {
+                babel_version: "0.1.0".to_string(),
+                node_version: "1.51.3".to_string(),
+                protocol: "helium".to_string(),
+                node_type: "".to_string(),
+                data_directory_mount_point: "/tmp".to_string(),
+                description: None,
+                api_host: None,
+            },
+            supervisor: supervisor::Config::default(),
+            monitor: None,
+            keys: Some(HashMap::from([(
+                WILDCARD_KEY_NAME.to_string(),
+                format!("{tmp_dir_str}/star/"),
+            )])),
+            methods: BTreeMap::new(),
+        };
+        let (_, logs_rx) = broadcast::channel(1);
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+
+        println!("upload unknown keys");
+        let output = msg_handler
+            .handle(BabelRequest::UploadKeys(vec![BlockchainKey {
+                name: "unknown".to_string(),
+                content: b"12345".to_vec(),
+            }]))
+            .await
+            .unwrap();
+        assert_eq!(
+            unwrap_blockchain(output).value,
+            format!("Done writing 5 bytes of key `unknown` into `{tmp_dir_str}/star/unknown`")
+        );
+
+        println!("files in star dir should not be downloading");
+        let output = msg_handler
+            .handle(BabelRequest::DownloadKeys)
+            .await
+            .unwrap();
+        let keys = unwrap_keys(output);
+        assert_eq!(keys.len(), 0);
     }
 
     #[tokio::test]

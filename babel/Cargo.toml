@@ -34,6 +34,7 @@ async-trait = "0.1.58"
 tokio-vsock = "0.3.2"
 
 [dev-dependencies]
+assert_fs = "1.0.7"
 mockall = "0.11.3"
 tokio-stream = "0.1.11"
 tokio-util = {version = "0.7.4", features = ["io"]}

@@ -11,6 +11,9 @@ pub enum Error {
     /// Error while running sh command
     #[error("Failed to run command `{args}`, got output `{output}`")]
     Command { args: String, output: String },
+    /// Keys management error
+    #[error("Keys management error: {output}")]
+    Keys { output: String },
 
     /// Reqwest error
     #[error("Reqwest error: {0}")]
@@ -42,6 +45,12 @@ impl Error {
         Self::Command {
             args: args.to_string(),
             output: format!("{out:?}"),
+        }
+    }
+
+    pub fn keys(out: impl std::fmt::Display) -> Self {
+        Self::Keys {
+            output: format!("{out}"),
         }
     }
 }
