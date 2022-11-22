@@ -14,6 +14,10 @@ pub enum BabelRequest {
     /// Send a request to the current blockchain. We can identify the way to do this from the
     /// config and forward the provided parameters.
     BlockchainCommand(BlockchainCommand),
+    /// Download key files from locations specified in `keys` section of Babel config.
+    DownloadKeys,
+    /// Upload files into locations specified in `keys` section of Babel config.
+    UploadKeys(Vec<BlockchainKey>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +31,7 @@ pub enum BabelResponse {
     Pong,
     Logs(Vec<String>),
     BlockchainResponse(BlockchainResponse),
+    Keys(Vec<BlockchainKey>),
     Error(String),
 }
 
@@ -39,4 +44,11 @@ impl From<String> for BlockchainResponse {
     fn from(value: String) -> Self {
         Self { value }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BlockchainKey {
+    pub name: String,
+    #[serde(with = "serde_bytes")]
+    pub content: Vec<u8>,
 }
