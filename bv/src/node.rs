@@ -370,6 +370,7 @@ impl Node {
         let request = babel_api::BabelRequest::BlockchainCommand(babel_api::BlockchainCommand {
             name: method.to_string(),
         });
+        debug!("Calling method: {method}");
         let resp: babel_api::BabelResponse = self.send(request).await?;
         let inner = match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
@@ -401,6 +402,41 @@ impl Node {
             e => bail!("Unexpected BabelResponse for `logs`: `{e:?}`"),
         };
         Ok(logs)
+    }
+
+    /// Returns blockchain node keys.
+    pub async fn download_keys(&mut self) -> Result<Vec<babel_api::BlockchainKey>> {
+        let request = babel_api::BabelRequest::DownloadKeys;
+        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let keys = match resp {
+            babel_api::BabelResponse::Keys(keys) => keys,
+            e => bail!("Unexpected BabelResponse for `download_keys`: `{e:?}`"),
+        };
+        Ok(keys)
+    }
+
+    /// Sets blockchain node keys.
+    pub async fn upload_keys(&mut self, keys: Vec<babel_api::BlockchainKey>) -> Result<()> {
+        let request = babel_api::BabelRequest::UploadKeys(keys);
+        let resp: babel_api::BabelResponse = self.send(request).await?;
+        match resp {
+            babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
+                value,
+            }) => debug!("Upload keys: {value}"),
+            e => bail!("Unexpected BabelResponse for `upload_keys`: `{e:?}`"),
+        };
+        Ok(())
+    }
+
+    /// Generates keys on node
+    pub async fn generate_keys(&mut self) -> Result<String> {
+        self.call_method("generate_keys").await
+    }
+
+    /// Checks if node has capability to generate keys
+    pub async fn can_generate_keys(&mut self) -> Result<bool> {
+        let caps = self.capabilities().await?;
+        Ok(caps.contains(&"generate_keys".to_string()))
     }
 
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to
