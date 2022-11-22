@@ -12,6 +12,7 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
+    config::Config,
     grpc::{pb, pb::node_info::ContainerStatus},
     network_interface::NetworkInterface,
     node::Node,
@@ -46,6 +47,7 @@ pub enum ServiceStatus {
 
 #[derive(Debug)]
 pub struct Nodes {
+    pub api_config: Config,
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
@@ -188,8 +190,9 @@ impl Nodes {
 }
 
 impl Nodes {
-    pub fn new(nodes_data: CommonData) -> Self {
+    pub fn new(api_config: Config, nodes_data: CommonData) -> Self {
         Self {
+            api_config,
             data: nodes_data,
             nodes: HashMap::new(),
             node_ids: HashMap::new(),
@@ -197,7 +200,7 @@ impl Nodes {
         }
     }
 
-    pub async fn load() -> Result<Nodes> {
+    pub async fn load(api_config: Config) -> Result<Nodes> {
         // First load the common data file.
         info!(
             "Reading nodes common config file: {}",
@@ -210,7 +213,7 @@ impl Nodes {
             "Reading nodes config dir: {}",
             REGISTRY_CONFIG_DIR.display()
         );
-        let mut this = Nodes::new(nodes_data);
+        let mut this = Nodes::new(api_config, nodes_data);
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {
             // blockvisord should not bail on problems with individual node files.

@@ -62,17 +62,16 @@ async fn main() -> Result<()> {
 
             let host = client.provision(create).await?.into_inner();
 
-            Config {
+            let api_config = Config {
                 id: host.host_id,
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
-            }
-            .save()
-            .await?;
+            };
+            api_config.save().await?;
 
             if !Nodes::exists() {
                 let nodes_data = CommonData { machine_index: 0 };
-                Nodes::new(nodes_data).save().await?;
+                Nodes::new(api_config, nodes_data).save().await?;
             }
         }
         Command::Reset(cmd_args) => {
