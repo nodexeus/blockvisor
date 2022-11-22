@@ -23,9 +23,6 @@ log_buffer_capacity_ln = 1000
     command = "/usr/bin/lighthouse"
     args = ["--datadir", "/blockjoy/lighthouse", "bn", "--checkpoint-sync-url", "https://mainnet-checkpoint-sync.stakely.io", "--execution-endpoint", "http://localhost:8551", "--execution-jwt", "/blockjoy/.ethereum/geth/jwtsecret"]
 
-[monitor]
-pid_file = "/var/run/eth.pid"
-
 [keys]
 "*" = "/opt/secrets"
 

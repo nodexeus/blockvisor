@@ -21,9 +21,6 @@ log_buffer_capacity_ln = 1000
     command = "echo"
     args = ["Helium entry_point not configured!"]
 
-[monitor]
-pid_file = "/var/run/helium.pid" #this is likely not necessary
-
 [keys] # this is just an example
 first = "/opt/secrets/first.key"
 second = "/opt/secrets/second.key"
