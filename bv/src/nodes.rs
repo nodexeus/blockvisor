@@ -1,7 +1,7 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, read_dir};
@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
-    grpc::{pb, pb::node_info::ContainerStatus},
+    grpc::{pb, pb::node_info::ContainerStatus, with_auth},
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeStatus},
@@ -148,6 +148,10 @@ impl Nodes {
 
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
+        if let Err(e) = self.exchange_keys(&id).await {
+            warn!("Key exchange error: {e:?}")
+        }
+
         Ok(())
     }
 
@@ -186,6 +190,93 @@ impl Nodes {
             .ok_or_else(|| name_not_found(name))?;
 
         Ok(uuid)
+    }
+
+    pub async fn exchange_keys(&mut self, id: &Uuid) -> Result<()> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(id))?;
+        let api_token = self.api_config.token.clone();
+
+        // Make request to Key Service to get stored Node keys
+        let mut client =
+            pb::key_files_client::KeyFilesClient::connect(self.api_config.blockjoy_api_url.clone())
+                .await
+                .context("Failed to connect to key service")?;
+
+        let req = pb::KeyFilesGetRequest {
+            request_id: Some(Uuid::new_v4().to_string()),
+            node_id: id.to_string(),
+        };
+        let resp = client.get(with_auth(req, &api_token)).await?.into_inner();
+        let api_keys: HashMap<String, Vec<u8>> = resp
+            .key_files
+            .iter()
+            .map(|k| (k.name.clone(), k.content.clone()))
+            .collect();
+        let api_keys_set: HashSet<String> = HashSet::from_iter(api_keys.keys().cloned());
+        debug!("Received API keys: {api_keys_set:?}");
+
+        // Get keys present on the Node
+        let node_keys: HashMap<String, Vec<u8>> = node
+            .download_keys()
+            .await?
+            .iter()
+            .map(|k| (k.name.clone(), k.content.clone()))
+            .collect();
+        let node_keys_set: HashSet<String> = HashSet::from_iter(node_keys.keys().cloned());
+        debug!("Received Node keys: {node_keys_set:?}");
+
+        // Keys present in API, but not on Node, will be sent to Node
+        let keys1: Vec<_> = api_keys_set
+            .difference(&node_keys_set)
+            .map(|n| babel_api::BlockchainKey {
+                name: n.clone(),
+                content: api_keys.get(n).unwrap().to_vec(), // checked
+            })
+            .collect();
+        if !keys1.is_empty() {
+            node.upload_keys(keys1).await?;
+        }
+
+        // Keys present on Node, but not in API, will be sent to API
+        let keys2: Vec<_> = node_keys_set
+            .difference(&api_keys_set)
+            .map(|n| pb::Keyfile {
+                name: n.clone(),
+                content: node_keys.get(n).unwrap().to_vec(), // checked
+            })
+            .collect();
+        if !keys2.is_empty() {
+            let req = pb::KeyFilesSaveRequest {
+                request_id: Some(Uuid::new_v4().to_string()),
+                node_id: id.to_string(),
+                key_files: keys2,
+            };
+            client.save(with_auth(req, &api_token)).await?;
+        }
+
+        // Generate keys if we should (and can)
+        if api_keys_set.is_empty() && node_keys_set.is_empty() && node.can_generate_keys().await? {
+            node.generate_keys().await?;
+            // Download generated keys
+            let gen_keys: Vec<_> = node
+                .download_keys()
+                .await?
+                .iter()
+                .map(|k| pb::Keyfile {
+                    name: k.name.clone(),
+                    content: k.content.clone(),
+                })
+                .collect();
+            // Send generated keys to API
+            let req = pb::KeyFilesSaveRequest {
+                request_id: Some(Uuid::new_v4().to_string()),
+                node_id: id.to_string(),
+                key_files: gen_keys,
+            };
+            client.save(with_auth(req, &api_token)).await?;
+        }
+
+        Ok(())
     }
 }
 

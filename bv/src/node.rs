@@ -65,7 +65,7 @@ const BABEL_VSOCK_PORT: u32 = 42;
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
-const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
+const SOCKET_TIMEOUT: Duration = Duration::from_secs(15);
 
 lazy_static::lazy_static! {
     static ref IMAGE_CACHE_DIR: PathBuf = home::home_dir()

@@ -462,6 +462,7 @@ fn with_auth<T>(inner: T, auth_token: &str, refresh_token: &str) -> Request<T> {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_grpc_commands() {
+    use blockvisord::config::Config;
     use blockvisord::grpc::process_commands_stream;
     use blockvisord::nodes::Nodes;
     use serde_json::json;
@@ -633,12 +634,17 @@ async fn test_bv_cmd_grpc_commands() {
             .unwrap()
     };
 
-    let nodes = Nodes::load().await.unwrap();
+    let config = Config {
+        id: Uuid::new_v4().to_string(),
+        token: "any token".to_string(),
+        blockjoy_api_url: "http://localhost:8081".to_string(),
+    };
+    let nodes = Nodes::load(config.clone()).await.unwrap();
     let updates_tx = nodes.get_updates_sender().await.unwrap().clone();
     let nodes = Arc::new(Mutex::new(nodes));
 
-    let token = grpc::AuthToken("any token".to_string());
-    let endpoint = Endpoint::from_str("http://localhost:8081").unwrap();
+    let token = grpc::AuthToken(config.token);
+    let endpoint = Endpoint::from_str(&config.blockjoy_api_url).unwrap();
     let client_future = async {
         sleep(Duration::from_secs(5)).await;
         let channel = Endpoint::connect(&endpoint).await.unwrap();
