@@ -434,7 +434,6 @@ mod tests {
                 api_host: None,
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: Some(HashMap::from([
                 ("first".to_string(), format!("{tmp_dir_str}/first/key")),
                 ("second".to_string(), format!("{tmp_dir_str}/second/key")),
@@ -535,7 +534,6 @@ mod tests {
                 api_host: None,
             },
             supervisor: supervisor::Config::default(),
-            monitor: None,
             keys: Some(HashMap::from([(
                 WILDCARD_KEY_NAME.to_string(),
                 format!("{tmp_dir_str}/star/"),
