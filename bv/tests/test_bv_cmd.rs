@@ -652,7 +652,7 @@ async fn test_bv_cmd_grpc_commands() {
     tokio::select! {
         _ = server_future => {},
         _ = client_future => {},
-        _ = sleep(Duration::from_secs(120)) => {},
+        _ = sleep(Duration::from_secs(240)) => {},
     };
 
     println!("check received updates");
