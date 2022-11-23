@@ -380,6 +380,16 @@ impl NodeClient {
                     }
                 }
             }
+            NodeCommand::Keys { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let keys = self
+                    .client
+                    .get_node_keys(bv_pb::GetNodeKeysRequest { id: id.clone() })
+                    .await?;
+                for name in keys.into_inner().names {
+                    print!("{}", name);
+                }
+            }
             NodeCommand::Capabilities { id_or_name } => {
                 let node_id = self.resolve_id_or_name(&id_or_name).await?;
                 let caps = self.list_capabilities(node_id).await?;

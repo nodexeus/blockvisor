@@ -163,6 +163,13 @@ pub enum NodeCommand {
         id_or_name: String,
     },
 
+    /// Get installed key names
+    #[clap(alias = "k")]
+    Keys {
+        /// Node id or name
+        id_or_name: String,
+    },
+
     /// Get node status
     Status {
         /// One or more node id or names.
