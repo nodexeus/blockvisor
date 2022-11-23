@@ -180,6 +180,12 @@ fn test_bv_cmd_node_lifecycle() {
     println!("list running node after node upgrade");
     bv_run(&["node", "status", vm_id], "Running");
 
+    println!("generate node keys");
+    bv_run(&["node", "run", vm_id, "generate_keys"], "");
+
+    println!("check node keys");
+    bv_run(&["node", "keys", vm_id], "first");
+
     println!("delete started node");
     bv_run(&["node", "delete", vm_id], "Deleted node");
 }
@@ -432,6 +438,9 @@ async fn test_bv_cmd_init_localhost() {
 
     println!("get node status");
     bv_run(&["node", "status", &node_id], "Running");
+
+    println!("check node keys");
+    bv_run(&["node", "keys", &node_id], "first");
 }
 
 #[cfg(target_os = "linux")]

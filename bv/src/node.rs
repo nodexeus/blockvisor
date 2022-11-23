@@ -148,7 +148,7 @@ impl Node {
             Ok(conn) => Ok(conn),
             Err(_) => {
                 // Extremely scientific retrying mechanism
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                 Self::conn(self.id()).await
             }
         }?;

@@ -387,7 +387,7 @@ impl NodeClient {
                     .get_node_keys(bv_pb::GetNodeKeysRequest { id: id.clone() })
                     .await?;
                 for name in keys.into_inner().names {
-                    print!("{}", name);
+                    println!("{}", name);
                 }
             }
             NodeCommand::Capabilities { id_or_name } => {
