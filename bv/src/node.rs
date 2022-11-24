@@ -448,7 +448,7 @@ impl Node {
             loop {
                 // Wait for the socket to become ready to read from.
                 babel_conn.readable().await?;
-                let mut data = vec![0; 2048];
+                let mut data = vec![0; 4194304];
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
                 match babel_conn.try_read(&mut data) {

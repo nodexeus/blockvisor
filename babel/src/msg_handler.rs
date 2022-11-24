@@ -73,8 +73,12 @@ impl MsgHandler {
     async fn handle_logs(&self) -> Vec<String> {
         let mut logs = Vec::default();
         let mut rx = self.logs_rx.lock().await;
-        while let Ok(log) = rx.try_recv() {
-            logs.push(log)
+        loop {
+            match rx.try_recv() {
+                Ok(log) => logs.push(log),
+                Err(broadcast::error::TryRecvError::Lagged(_)) => {}
+                Err(_) => break,
+            }
         }
         logs
     }
