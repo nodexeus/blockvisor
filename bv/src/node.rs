@@ -148,7 +148,7 @@ impl Node {
             Ok(conn) => Ok(conn),
             Err(_) => {
                 // Extremely scientific retrying mechanism
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 Self::conn(self.id()).await
             }
         }?;
@@ -448,7 +448,7 @@ impl Node {
             loop {
                 // Wait for the socket to become ready to read from.
                 babel_conn.readable().await?;
-                let mut data = vec![0; 2048];
+                let mut data = vec![0; 4194304];
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
                 match babel_conn.try_read(&mut data) {
