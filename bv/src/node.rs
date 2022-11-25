@@ -393,6 +393,12 @@ impl Node {
         Ok(capabilities)
     }
 
+    /// Checks if node has some particular capability
+    pub async fn has_capability(&mut self, method: &str) -> Result<bool> {
+        let caps = self.capabilities().await?;
+        Ok(caps.contains(&method.to_owned()))
+    }
+
     /// Returns the list of logs from blockchain entry_points.
     pub async fn logs(&mut self) -> Result<Vec<String>> {
         let request = babel_api::BabelRequest::Logs;
@@ -430,13 +436,8 @@ impl Node {
 
     /// Generates keys on node
     pub async fn generate_keys(&mut self) -> Result<String> {
-        self.call_method("generate_keys").await
-    }
-
-    /// Checks if node has capability to generate keys
-    pub async fn can_generate_keys(&mut self) -> Result<bool> {
-        let caps = self.capabilities().await?;
-        Ok(caps.contains(&"generate_keys".to_string()))
+        self.call_method(&babel_api::BabelMethod::GenerateKeys.to_string())
+            .await
     }
 
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to

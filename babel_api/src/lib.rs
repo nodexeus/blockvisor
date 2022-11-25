@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 /// Each request that comes over the VSock to babel must be a piece of JSON that can be
 /// deserialized into this struct.
@@ -51,4 +52,15 @@ pub struct BlockchainKey {
     pub name: String,
     #[serde(with = "serde_bytes")]
     pub content: Vec<u8>,
+}
+
+#[derive(Debug, Display)]
+#[strum(serialize_all = "snake_case")]
+pub enum BabelMethod {
+    Address,
+    BlockAge,
+    Consensus,
+    GenerateKeys,
+    Height,
+    Name,
 }
