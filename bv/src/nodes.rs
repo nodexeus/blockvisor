@@ -212,7 +212,7 @@ impl Nodes {
             .iter()
             .map(|k| (k.name.clone(), k.content.clone()))
             .collect();
-        let api_keys_set: HashSet<String> = HashSet::from_iter(api_keys.keys().cloned());
+        let api_keys_set: HashSet<&String> = HashSet::from_iter(api_keys.keys());
         debug!("Received API keys: {api_keys_set:?}");
 
         // Get keys present on the Node
@@ -222,15 +222,16 @@ impl Nodes {
             .iter()
             .map(|k| (k.name.clone(), k.content.clone()))
             .collect();
-        let node_keys_set: HashSet<String> = HashSet::from_iter(node_keys.keys().cloned());
+        let node_keys_set: HashSet<&String> = HashSet::from_iter(node_keys.keys());
         debug!("Received Node keys: {node_keys_set:?}");
 
         // Keys present in API, but not on Node, will be sent to Node
         let keys1: Vec<_> = api_keys_set
             .difference(&node_keys_set)
+            .into_iter()
             .map(|n| babel_api::BlockchainKey {
-                name: n.clone(),
-                content: api_keys.get(n).unwrap().to_vec(), // checked
+                name: n.to_string(),
+                content: api_keys.get(*n).unwrap().to_vec(), // checked
             })
             .collect();
         if !keys1.is_empty() {
@@ -241,8 +242,8 @@ impl Nodes {
         let keys2: Vec<_> = node_keys_set
             .difference(&api_keys_set)
             .map(|n| pb::Keyfile {
-                name: n.clone(),
-                content: node_keys.get(n).unwrap().to_vec(), // checked
+                name: n.to_string(),
+                content: node_keys.get(*n).unwrap().to_vec(), // checked
             })
             .collect();
         if !keys2.is_empty() {
