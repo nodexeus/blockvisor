@@ -307,7 +307,6 @@ name = "babel"
 version = "0.1.0"
 dependencies = [
  "assert_fs",
- "async-io",
  "async-trait",
  "babel_api",
  "ctrlc",
@@ -406,7 +405,6 @@ dependencies = [
  "assert_fs",
  "babel_api",
  "base64 0.13.0",
- "chrono",
  "clap",
  "cli-table",
  "firec",
@@ -507,7 +505,6 @@ dependencies = [
  "js-sys",
  "num-integer",
  "num-traits",
- "serde",
  "time",
  "wasm-bindgen",
  "winapi",

@@ -19,10 +19,9 @@ name = "blockvisord"
 path = "src/bin/blockvisord.rs"
 
 [dependencies]
-babel_api = {version = "*", path = "../babel_api"}
 anyhow = "1.0.56"
+babel_api = {version = "*", path = "../babel_api"}
 base64 = "0.13.0"
-chrono = {version = "0.4", features = ["serde"]}
 clap = {version = "3.1.15", features = ["derive", "cargo"]}
 cli-table = "0.4"
 firec = {git = "https://github.com/blockjoy/firec.git", rev = "88c3dec"}
@@ -50,6 +49,6 @@ tonic-build = {version = "0.7", features = ["prost"]}
 [dev-dependencies]
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
+jsonwebtoken = "7.2.0"
 predicates = "2.1.1"
 serial_test = "0.9.0"
-jsonwebtoken = "7.2.0"

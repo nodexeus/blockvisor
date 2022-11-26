@@ -15,7 +15,6 @@ path = "src/main.rs"
 
 [dependencies]
 babel_api = {version = "*", path = "../babel_api"}
-async-io = "1.7.0"
 eyre = "0.6.8"
 futures = "0.3.21"
 gjson = "0.8"
