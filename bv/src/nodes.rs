@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -13,7 +13,8 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
-    grpc::{pb, pb::node_info::ContainerStatus, with_auth},
+    grpc::{pb, pb::node_info::ContainerStatus},
+    key_service::KeyService,
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeStatus},
@@ -194,28 +195,19 @@ impl Nodes {
 
     pub async fn exchange_keys(&mut self, id: &Uuid) -> Result<()> {
         let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(id))?;
-        let api_token = self.api_config.token.clone();
 
-        // Make request to Key Service to get stored Node keys
-        let mut client =
-            pb::key_files_client::KeyFilesClient::connect(self.api_config.blockjoy_api_url.clone())
-                .await
-                .context("Failed to connect to key service")?;
+        let mut key_service =
+            KeyService::connect(&self.api_config.blockjoy_api_url, &self.api_config.token).await?;
 
-        let req = pb::KeyFilesGetRequest {
-            request_id: Some(Uuid::new_v4().to_string()),
-            node_id: id.to_string(),
-        };
-        let resp = client.get(with_auth(req, &api_token)).await?.into_inner();
-        let api_keys: HashMap<String, Vec<u8>> = resp
-            .key_files
+        let api_keys: HashMap<String, Vec<u8>> = key_service
+            .download_keys(id)
+            .await?
             .iter()
             .map(|k| (k.name.clone(), k.content.clone()))
             .collect();
         let api_keys_set: HashSet<&String> = HashSet::from_iter(api_keys.keys());
         debug!("Received API keys: {api_keys_set:?}");
 
-        // Get keys present on the Node
         let node_keys: HashMap<String, Vec<u8>> = node
             .download_keys()
             .await?
@@ -247,12 +239,7 @@ impl Nodes {
             })
             .collect();
         if !keys2.is_empty() {
-            let req = pb::KeyFilesSaveRequest {
-                request_id: Some(Uuid::new_v4().to_string()),
-                node_id: id.to_string(),
-                key_files: keys2,
-            };
-            client.save(with_auth(req, &api_token)).await?;
+            key_service.upload_keys(id, keys2).await?;
         }
 
         // Generate keys if we should (and can)
@@ -263,7 +250,6 @@ impl Nodes {
                 .await?
         {
             node.generate_keys().await?;
-            // Download generated keys
             let gen_keys: Vec<_> = node
                 .download_keys()
                 .await?
@@ -273,13 +259,7 @@ impl Nodes {
                     content: k.content.clone(),
                 })
                 .collect();
-            // Send generated keys to API
-            let req = pb::KeyFilesSaveRequest {
-                request_id: Some(Uuid::new_v4().to_string()),
-                node_id: id.to_string(),
-                key_files: gen_keys,
-            };
-            client.save(with_auth(req, &api_token)).await?;
+            key_service.upload_keys(id, gen_keys).await?;
         }
 
         Ok(())
