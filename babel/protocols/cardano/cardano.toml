@@ -8,6 +8,7 @@ babel_version = "0.0.1"
 node_version = "1.35.3"
 description = "cardano blockchain validator"
 api_host = "https://localhost:8090/"
+ports = [8090]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

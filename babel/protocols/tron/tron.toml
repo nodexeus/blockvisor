@@ -8,7 +8,7 @@ babel_version = "0.0.1"
 node_version = "0.5.0"
 description = "tron blockchain validator"
 api_host = "http://localhost:50545/"
-entry_point = "find"
+ports = [50545]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

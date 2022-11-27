@@ -9,7 +9,7 @@ node_version = "4.3.12"
 description = "harmony blockchain validator"
 api_host = "http://localhost:9599" # shard 1 = 9598
 # mainnet:  https://rpc.s0.t.hmny.io
-entry_point = "find"
+ports = [9599, 9598]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

@@ -8,6 +8,7 @@ babel_version = "0.0.1"
 node_version = "2.3.0" # beacon chain 
 description = "eth blockchain validator"
 api_host = "http://localhost:8000/"
+ports = [8000]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

@@ -8,6 +8,7 @@ babel_version = "0.0.1"
 node_version = "1.9.2"
 description = "avax blockchain validator"
 api_host = "http://localhost:9650/ext/bc/P/"
+ports = [9650]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]
