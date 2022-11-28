@@ -3,6 +3,7 @@
 use crate::grpc::pb;
 use crate::node;
 use std::collections::HashMap;
+use tracing::warn;
 
 /// The interval by which we collect metrics from each of the nodes.
 pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
@@ -54,11 +55,11 @@ where
     match tokio::time::timeout(TIMEOUT, fut).await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => {
-            tracing::error!("Collecting node metric failed! `{e}");
+            warn!("Collecting node metric failed! `{e}");
             Err(e)
         }
         Err(e) => {
-            tracing::error!("Collecting node metric timed out! `{e}`");
+            warn!("Collecting node metric timed out! `{e}`");
             Err(e.into())
         }
     }

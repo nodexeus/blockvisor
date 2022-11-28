@@ -130,7 +130,7 @@ async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc
         drop(lock);
         let metrics: pb::NodeMetricsRequest = metrics.into();
         if let Err(e) = client.node(metrics).await {
-            tracing::error!("Could not send node metrics! `{e}`");
+            error!("Could not send node metrics! `{e}`");
         }
     }
 }
