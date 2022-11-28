@@ -8,7 +8,8 @@ babel_version = "0.0.1"
 node_version = "0.16.1" # recc mainnet
 description = "kava blockchain validator"
 api_host = "http://localhost:26656/"
-# kava evm endopoint to connect to metamask: http://localhost:8545 
+# kava evm endopoint to connect to metamask: http://localhost:8545
+ports = [26656, 8545]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

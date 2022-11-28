@@ -10,6 +10,7 @@ babel_version = "0.0.1"
 node_version = "1.15.9"
 description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
+ports = [4467]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]

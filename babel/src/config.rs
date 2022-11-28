@@ -49,6 +49,9 @@ pub struct Config {
     /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
     /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
+    /// Ports used by blockchain software
+    /// Ports visibility will be controlled with some kind of firewall
+    pub ports: Vec<u16>,
     /// Path to mount data drive to
     pub data_directory_mount_point: String,
 }

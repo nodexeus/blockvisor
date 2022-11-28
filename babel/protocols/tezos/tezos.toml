@@ -8,6 +8,7 @@ babel_version = "0.0.1"
 node_version = "14.0" # tezos version
 description = "tezos blockchain validator"
 api_host = "http://localhost:8732/"
+ports = [8732]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [supervisor]
