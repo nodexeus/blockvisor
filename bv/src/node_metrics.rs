@@ -19,7 +19,7 @@ pub struct Metrics(HashMap<NodeId, Metric>);
 struct Metric {
     height: Option<u64>,
     block_age: Option<u64>,
-    staking_status: Option<()>,
+    staking_status: Option<i32>,
     consensus: Option<bool>,
 }
 
@@ -63,7 +63,7 @@ impl From<Metrics> for pb::NodeMetricsRequest {
                     pb::Metrics {
                         height: v.height,
                         block_age: v.block_age,
-                        staking_status: Some(0), // v.staking_status,
+                        staking_status: v.staking_status,
                         consensus: v.consensus,
                     },
                 )
