@@ -373,6 +373,7 @@ async fn test_bv_cmd_init_localhost() {
             sync_status: None,
             staking_status: None,
             ip_gateway: None,
+            self_update: Some(false),
         }),
     };
     let node: ui_pb::CreateNodeResponse = client
@@ -474,6 +475,7 @@ async fn test_bv_cmd_grpc_commands() {
                     r#type: json!({"id": 3, "properties": []}).to_string(),
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
+                    self_update: false,
                 })),
             })),
         },
@@ -492,6 +494,7 @@ async fn test_bv_cmd_grpc_commands() {
                     r#type: json!({"id": 3, "properties": []}).to_string(),
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
+                    self_update: false,
                 })),
             })),
         },
@@ -510,6 +513,7 @@ async fn test_bv_cmd_grpc_commands() {
                     r#type: json!({"id": 3, "properties": []}).to_string(),
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
+                    self_update: false,
                 })),
             })),
         },
@@ -621,7 +625,7 @@ async fn test_bv_cmd_grpc_commands() {
     let client_future = async {
         sleep(Duration::from_secs(5)).await;
         let channel = Endpoint::connect(&endpoint).await.unwrap();
-        let mut client = grpc::Client::with_auth(channel, token);
+        let mut client = grpc::CommandsClient::with_auth(channel, token);
         process_commands_stream(&mut client, nodes.clone(), updates_tx.clone())
             .await
             .unwrap();

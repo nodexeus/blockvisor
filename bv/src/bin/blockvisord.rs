@@ -1,3 +1,4 @@
+use crate::grpc::pb;
 use anyhow::Result;
 use blockvisord::{
     config::Config,
@@ -37,7 +38,7 @@ async fn main() -> Result<()> {
         let channel = wait_for_channel(&endpoint).await;
 
         info!("Creating gRPC client...");
-        let mut client = grpc::Client::with_auth(channel, token);
+        let mut client = grpc::CommandsClient::with_auth(channel, token.clone());
 
         loop {
             if let Err(e) =
@@ -79,10 +80,13 @@ async fn main() -> Result<()> {
         }
     };
 
+    let node_metrics_future = node_metrics(nodes.clone(), &endpoint, token.clone());
+
     tokio::select! {
         _ = internal_api_server_future => {},
         _ = external_api_client_future => {},
         _ = nodes_recovery_future => {},
+        _ = node_metrics_future => {},
     }
 
     info!("Stopping...");
@@ -107,6 +111,25 @@ async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
                 error!("Error connecting to endpoint: {:?}", e);
                 sleep(Duration::from_secs(5)).await;
             }
+        }
+    }
+}
+
+/// This task runs every minute to aggregate metrics from every node. It will call into the nodes
+/// query their metrics, then send them to blockvisor-api.
+async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc::AuthToken) {
+    let mut timer = tokio::time::interval(Duration::from_secs(60));
+    let channel = wait_for_channel(endpoint).await;
+    let mut client = grpc::MetricsClient::with_auth(channel, token);
+    loop {
+        timer.tick().await;
+        let mut lock = nodes.lock().await;
+        let metrics = blockvisord::node_metrics::collect_metrics(lock.nodes.values_mut()).await;
+        // Drop the lock as early as possible.
+        drop(lock);
+        let metrics: pb::NodeMetricsRequest = metrics.into();
+        if let Err(e) = client.node(metrics).await {
+            tracing::error!("Could not send node metrics! `{e}`");
         }
     }
 }
