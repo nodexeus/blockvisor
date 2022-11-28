@@ -158,12 +158,13 @@ impl<T: Timer> Backoff<T> {
 mod tests {
     use super::*;
     use crate::run_flag::RunFlag;
+    use assert_fs::TempDir;
     use async_trait::async_trait;
     use mockall::*;
     use serial_test::serial;
+    use std::fs;
     use std::ops::Add;
     use std::time::SystemTime;
-    use std::{env, fs};
     use tokio::time::Duration;
 
     mock! {
@@ -248,7 +249,8 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_multiple_entry_points() {
-        let file_path = env::temp_dir().join("test_multiple_entry_points");
+        let tmp_dir = TempDir::new().unwrap();
+        let file_path = tmp_dir.join("test_multiple_entry_points");
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
