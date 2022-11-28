@@ -18,4 +18,5 @@ service Blockvisor {
     rpc GetNodeIdForName(GetNodeIdForNameRequest) returns (GetNodeIdForNameResponse) {}
     rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
     rpc Blockchain(BlockchainRequest) returns (BlockchainResponse);
+    rpc GetNodeMetrics(GetNodeMetricsRequest) returns (GetNodeMetricsResponse);
 }

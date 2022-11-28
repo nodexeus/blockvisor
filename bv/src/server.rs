@@ -5,7 +5,7 @@ pub mod bv_pb {
 }
 
 use crate::server::bv_pb::{GetNodeLogsRequest, GetNodeLogsResponse};
-use crate::{node_data::NodeStatus, nodes::Nodes};
+use crate::{node_data::NodeStatus, node_metrics, nodes::Nodes};
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
@@ -289,6 +289,26 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .await
             .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::BlockchainResponse { value }))
+    }
+
+    async fn get_node_metrics(
+        &self,
+        request: Request<bv_pb::GetNodeMetricsRequest>,
+    ) -> Result<Response<bv_pb::GetNodeMetricsResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.node_id)?;
+        let mut node_lock = self.nodes.lock().await;
+        let node = node_lock
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?;
+        let (_, metrics) = node_metrics::collect_metric(node).await;
+        Ok(Response::new(bv_pb::GetNodeMetricsResponse {
+            height: metrics.height,
+            block_age: metrics.block_age,
+            staking_status: metrics.staking_status,
+            consensus: metrics.consensus,
+        }))
     }
 }
 

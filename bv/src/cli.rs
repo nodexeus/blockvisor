@@ -196,6 +196,12 @@ pub enum NodeCommand {
         #[clap(long)]
         payload: Option<String>,
     },
+
+    /// Collect metrics defining the current state of the node.
+    Metrics {
+        /// The id or name of the node whose metrics should be collected.
+        id_or_name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]

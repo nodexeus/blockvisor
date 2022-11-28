@@ -384,7 +384,7 @@ impl NodeClient {
                 let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
                 let keys = self
                     .client
-                    .get_node_keys(bv_pb::GetNodeKeysRequest { id: id.clone() })
+                    .get_node_keys(bv_pb::GetNodeKeysRequest { id })
                     .await?;
                 for name in keys.into_inner().names {
                     println!("{}", name);
@@ -418,7 +418,24 @@ impl NodeClient {
                     }
                 }
             }
+            NodeCommand::Metrics { id_or_name } => {
+                let node_id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let metrics = self
+                    .client
+                    .get_node_metrics(bv_pb::GetNodeMetricsRequest { node_id })
+                    .await?
+                    .into_inner();
+                println!("Block height:   {:>10}", fmt_opt(metrics.height));
+                println!("Block age:      {:>10}", fmt_opt(metrics.block_age));
+                println!("Staking Status: {:>10}", fmt_opt(metrics.staking_status));
+                println!("In consensus:   {:>10}", fmt_opt(metrics.consensus));
+            }
         }
         Ok(())
     }
+}
+
+fn fmt_opt<T: std::fmt::Display>(opt: Option<T>) -> String {
+    opt.map(|t| t.to_string())
+        .unwrap_or_else(|| "-".to_string())
 }

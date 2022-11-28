@@ -818,3 +818,12 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
     .await
     .unwrap();
 }
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
+fn test_metrics() {
+    println!("create a node");
+    let vm_id = &create_node("test");
+    bv_run(&["node", "metrics", vm_id], "In consensus:        false");
+}

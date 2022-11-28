@@ -18,11 +18,11 @@ pub struct Metrics(HashMap<NodeId, Metric>);
 
 /// The metrics for a single node.
 #[derive(serde::Serialize)]
-struct Metric {
-    height: Option<u64>,
-    block_age: Option<u64>,
-    staking_status: Option<i32>,
-    consensus: Option<bool>,
+pub struct Metric {
+    pub height: Option<u64>,
+    pub block_age: Option<u64>,
+    pub staking_status: Option<i32>,
+    pub consensus: Option<bool>,
 }
 
 /// Given a list of nodes, returns for each node their metric. It does this concurrently for each
@@ -37,7 +37,7 @@ pub async fn collect_metrics(nodes: impl Iterator<Item = &mut node::Node>) -> Me
 }
 
 /// Returns the metric for a single node.
-async fn collect_metric(node: &mut node::Node) -> (NodeId, Metric) {
+pub async fn collect_metric(node: &mut node::Node) -> (NodeId, Metric) {
     let metric = Metric {
         height: timeout(node.height()).await.ok(),
         block_age: timeout(node.block_age()).await.ok(),
@@ -51,7 +51,17 @@ async fn timeout<F, T>(fut: F) -> anyhow::Result<T>
 where
     F: std::future::Future<Output = anyhow::Result<T>>,
 {
-    tokio::time::timeout(TIMEOUT, fut).await?
+    match tokio::time::timeout(TIMEOUT, fut).await {
+        Ok(Ok(res)) => Ok(res),
+        Ok(Err(e)) => {
+            tracing::error!("Collecting node metric failed! `{e}");
+            Err(e)
+        }
+        Err(e) => {
+            tracing::error!("Collecting node metric timed out! `{e}`");
+            Err(e.into())
+        }
+    }
 }
 
 impl From<Metrics> for pb::NodeMetricsRequest {
@@ -60,15 +70,13 @@ impl From<Metrics> for pb::NodeMetricsRequest {
             .0
             .into_iter()
             .map(|(k, v)| {
-                (
-                    k.to_string(),
-                    pb::Metrics {
-                        height: v.height,
-                        block_age: v.block_age,
-                        staking_status: v.staking_status,
-                        consensus: v.consensus,
-                    },
-                )
+                let metrics = pb::Metrics {
+                    height: v.height,
+                    block_age: v.block_age,
+                    staking_status: v.staking_status,
+                    consensus: v.consensus,
+                };
+                (k.to_string(), metrics)
             })
             .collect();
         Self { metrics }
