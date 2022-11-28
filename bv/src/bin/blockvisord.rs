@@ -5,6 +5,7 @@ use blockvisord::{
     grpc,
     logging::setup_logging,
     node_data::NodeStatus,
+    node_metrics,
     nodes::Nodes,
     server::{bv_pb, BlockvisorServer, BLOCKVISOR_SERVICE_PORT},
 };
@@ -118,7 +119,7 @@ async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
 /// This task runs every minute to aggregate metrics from every node. It will call into the nodes
 /// query their metrics, then send them to blockvisor-api.
 async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc::AuthToken) {
-    let mut timer = tokio::time::interval(Duration::from_secs(60));
+    let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
     let channel = wait_for_channel(endpoint).await;
     let mut client = grpc::MetricsClient::with_auth(channel, token);
     loop {
