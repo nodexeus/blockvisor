@@ -159,6 +159,9 @@ fn test_bv_cmd_node_lifecycle() {
     println!("restart stopped node");
     bv_run(&["node", "start", vm_id], "Started node");
 
+    println!("query metrics");
+    bv_run(&["node", "metrics", vm_id], "In consensus:        false");
+
     println!("list running node before service restart");
     bv_run(&["node", "status", vm_id], "Running");
 
@@ -817,13 +820,4 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
     })
     .await
     .unwrap();
-}
-
-#[test]
-#[serial]
-#[cfg(target_os = "linux")]
-fn test_metrics() {
-    println!("create a node");
-    let vm_id = &create_node("test");
-    bv_run(&["node", "metrics", vm_id], "In consensus:        false");
 }
