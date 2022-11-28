@@ -341,6 +341,11 @@ impl Node {
         self.call_method("block_age").await
     }
 
+    /// TODO: Wait for Sean to tell us how to do this.
+    pub async fn stake_status(&mut self) -> Result<i32> {
+        Ok(0)
+    }
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per blockchain.
     /// ### Example

@@ -1,6 +1,7 @@
 use crate::nodes::Nodes;
 use anyhow::{anyhow, bail, Result};
 use pb::command_flow_client::CommandFlowClient;
+use pb::metrics_service_client::MetricsServiceClient;
 use pb::node_command::Command;
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::{broadcast::Sender, Mutex};
@@ -19,9 +20,14 @@ pub mod pb {
 
 const STATUS_OK: i32 = 0;
 const STATUS_ERROR: i32 = 1;
+
+#[derive(Clone)]
 pub struct AuthToken(pub String);
 
-pub type Client = CommandFlowClient<InterceptedService<tonic::transport::Channel, AuthToken>>;
+pub type CommandsClient =
+    CommandFlowClient<InterceptedService<tonic::transport::Channel, AuthToken>>;
+pub type MetricsClient =
+    MetricsServiceClient<InterceptedService<tonic::transport::Channel, AuthToken>>;
 
 impl Interceptor for AuthToken {
     fn call(&mut self, request: Request<()>) -> Result<Request<()>, Status> {
@@ -34,14 +40,20 @@ impl Interceptor for AuthToken {
     }
 }
 
-impl Client {
+impl CommandsClient {
     pub fn with_auth(channel: tonic::transport::Channel, token: AuthToken) -> Self {
         CommandFlowClient::with_interceptor(channel, token)
     }
 }
 
+impl MetricsClient {
+    pub fn with_auth(channel: tonic::transport::Channel, token: AuthToken) -> Self {
+        MetricsServiceClient::with_interceptor(channel, token)
+    }
+}
+
 pub async fn process_commands_stream(
-    client: &mut Client,
+    client: &mut CommandsClient,
     nodes: Arc<Mutex<Nodes>>,
     updates_tx: Sender<pb::InfoUpdate>,
 ) -> Result<()> {

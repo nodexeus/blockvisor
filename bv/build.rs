@@ -22,6 +22,7 @@ fn main() {
                 "user_service.proto",
                 // Internal API
                 "blockvisor_service.proto",
+                "metrics.proto",
             ],
             &[
                 "proto/blockjoy/api/v1",
