@@ -1,14 +1,12 @@
+use async_trait::async_trait;
+#[cfg(target_os = "linux")]
+use babel::vsock;
+use babel::{config, run_flag::RunFlag, supervisor};
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 use tokio::fs::DirBuilder;
+use tokio::sync::broadcast;
 use tracing_subscriber::util::SubscriberInitExt;
-
-// TODO: What are we going to use as backup when vsock is disabled?
-#[cfg(feature = "vsock")]
-mod client;
-mod config;
-mod error;
-#[cfg(feature = "vsock")]
-mod vsock;
 
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
 
@@ -37,15 +35,43 @@ async fn main() -> eyre::Result<()> {
         .await?;
     tracing::debug!("Mounted data directory: {output:?}");
 
-    serve(cfg).await
+    let run = RunFlag::run_until_ctrlc();
+    let supervisor_cfg = cfg.supervisor.clone();
+
+    let supervisor = supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg);
+    let logs_rx = supervisor.get_logs_rx();
+    let (supervisor, server) = tokio::join!(supervisor.run(), serve(run, cfg, logs_rx));
+    supervisor?;
+    server
 }
 
-#[cfg(feature = "vsock")]
-async fn serve(cfg: config::Babel) -> eyre::Result<()> {
-    vsock::serve(cfg).await
+struct SysTimer;
+
+#[async_trait]
+impl supervisor::Timer for SysTimer {
+    fn now() -> SystemTime {
+        SystemTime::now()
+    }
+
+    async fn sleep(duration: Duration) {
+        tokio::time::sleep(duration).await
+    }
 }
 
-#[cfg(not(feature = "vsock"))]
-async fn serve(_cfg: config::Babel) -> eyre::Result<()> {
+#[cfg(target_os = "linux")]
+async fn serve(
+    run: RunFlag,
+    cfg: config::Babel,
+    logs_rx: broadcast::Receiver<String>,
+) -> eyre::Result<()> {
+    vsock::serve(run, cfg, logs_rx).await
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn serve(
+    _run: RunFlag,
+    _cfg: config::Babel,
+    _logs_rx: broadcast::Receiver<String>,
+) -> eyre::Result<()> {
     unimplemented!()
 }

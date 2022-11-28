@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     info!("Starting...");
 
     let config = Config::load().await?;
-    let nodes = Nodes::load().await?;
+    let nodes = Nodes::load(config.clone()).await?;
     let updates_tx = nodes.get_updates_sender().await?.clone();
     let nodes = Arc::new(Mutex::new(nodes));
 

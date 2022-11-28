@@ -2,6 +2,7 @@ pub mod cli;
 pub mod config;
 pub mod grpc;
 pub mod hosts;
+pub mod key_service;
 pub mod logging;
 pub mod network_interface;
 pub mod node;

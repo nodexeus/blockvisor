@@ -8,11 +8,24 @@ babel_version = "0.0.1"
 node_version = "2.3.0" # beacon chain 
 description = "eth blockchain validator"
 api_host = "http://localhost:8000/"
-entry_point = "find"
+ports = [8000]
 data_directory_mount_point = "/blockjoy/miner/data"
 
-[monitor]
-pid_file = "/var/run/eth.pid"
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+
+    [[supervisor.entry_point]]
+    command = "/usr/bin/geth"
+    args = ["--syncmode snap", "--http", "--http.api", "eth,net,engine,admin", "--mainnet", "--datadir", "/blockjoy/.ethereum", "--ethash.dagdir", "/blockjoy/.ethash"]
+
+    [[supervisor.entry_point]]
+    command = "/usr/bin/lighthouse"
+    args = ["--datadir", "/blockjoy/lighthouse", "bn", "--checkpoint-sync-url", "https://mainnet-checkpoint-sync.stakely.io", "--execution-endpoint", "http://localhost:8551", "--execution-jwt", "/blockjoy/.ethereum/geth/jwtsecret"]
+
+[keys]
+"*" = "/opt/secrets"
 
 [[methods]]
 name = "height"

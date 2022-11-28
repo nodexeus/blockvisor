@@ -1,5 +1,7 @@
+use crate::supervisor;
+use eyre::bail;
 use serde::Deserialize;
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, collections::HashMap, path::Path};
 use tokio::fs;
 
 #[derive(Debug, Deserialize)]
@@ -7,7 +9,9 @@ pub struct Babel {
     pub export: Option<Vec<String>>,
     pub env: Option<Env>,
     pub config: Config,
-    pub monitor: Option<Monitor>,
+    /// Commands to start blockchain node
+    pub supervisor: supervisor::Config,
+    pub keys: Option<HashMap<String, String>>,
     #[serde(deserialize_with = "deserialize_methods")]
     pub methods: BTreeMap<String, Method>,
 }
@@ -45,15 +49,11 @@ pub struct Config {
     /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
     /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
-    /// Command to start blockchain node
-    pub entry_point: String,
+    /// Ports used by blockchain software
+    /// Ports visibility will be controlled with some kind of firewall
+    pub ports: Vec<u16>,
     /// Path to mount data drive to
     pub data_directory_mount_point: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Monitor {
-    pub pid_file: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,8 +126,13 @@ pub enum MethodResponseFormat {
 pub async fn load(path: &Path) -> eyre::Result<Babel> {
     let toml_str = fs::read_to_string(path).await?;
 
-    let cfg = toml::from_str(&toml_str)?;
-
+    let cfg: Babel = toml::from_str(&toml_str)?;
+    if cfg.supervisor.entry_point.is_empty() {
+        bail!("no entry point defined");
+    }
+    if cfg.supervisor.log_buffer_capacity_ln == 0 || cfg.supervisor.log_buffer_capacity_ln > 4096 {
+        bail!("invalid log_buffer_capacity_ln - must be in [1..4096]");
+    }
     Ok(cfg)
 }
 

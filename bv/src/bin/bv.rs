@@ -62,17 +62,16 @@ async fn main() -> Result<()> {
 
             let host = client.provision(create).await?.into_inner();
 
-            Config {
+            let api_config = Config {
                 id: host.host_id,
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
-            }
-            .save()
-            .await?;
+            };
+            api_config.save().await?;
 
             if !Nodes::exists() {
                 let nodes_data = CommonData { machine_index: 0 };
-                Nodes::new(nodes_data).save().await?;
+                Nodes::new(api_config, nodes_data).save().await?;
             }
         }
         Command::Reset(cmd_args) => {
@@ -357,7 +356,16 @@ impl NodeClient {
                 self.start_nodes(&ids).await?;
             }
             NodeCommand::Console { id_or_name: _ } => todo!(),
-            NodeCommand::Logs { id_or_name: _ } => todo!(),
+            NodeCommand::Logs { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let logs = self
+                    .client
+                    .get_node_logs(bv_pb::GetNodeLogsRequest { id: id.clone() })
+                    .await?;
+                for log in logs.into_inner().logs {
+                    print!("{}", log);
+                }
+            }
             NodeCommand::Status { id_or_names } => {
                 for id_or_name in id_or_names {
                     let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
@@ -370,6 +378,16 @@ impl NodeClient {
                         Some(status) => println!("{status}"),
                         None => eprintln!("Invalid status {status}"),
                     }
+                }
+            }
+            NodeCommand::Keys { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let keys = self
+                    .client
+                    .get_node_keys(bv_pb::GetNodeKeysRequest { id: id.clone() })
+                    .await?;
+                for name in keys.into_inner().names {
+                    println!("{}", name);
                 }
             }
             NodeCommand::Capabilities { id_or_name } => {
@@ -394,7 +412,7 @@ impl NodeClient {
                         if e.message().contains("not found") {
                             let msg = "Method not found. Options are:";
                             let caps = self.list_capabilities(node_id).await?;
-                            anyhow::bail!("{msg}\n{caps}");
+                            bail!("{msg}\n{caps}");
                         }
                         return Err(anyhow::Error::from(e));
                     }

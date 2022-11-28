@@ -7,12 +7,18 @@ node_type = "validator"
 babel_version = "0.0.1"
 node_version = "1.4.6"
 description = "casper blockchain validator"
-api_host = "http://localhost:3000/" 
-entry_point = "find"
+api_host = "http://localhost:3000/"
+ports = [3000]
 data_directory_mount_point = "/blockjoy/miner/data"
 
-[monitor]
-pid_file = "/var/run/casper.pid"
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+
+    [[supervisor.entry_point]]
+    command = "todo"
+    args = []
 
 [[methods]]
 name = "height"

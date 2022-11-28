@@ -8,11 +8,17 @@ babel_version = "0.0.1"
 node_version = "7.1.0" # cosmos hub
 description = "cosmos blockchain validator"
 api_host = "http://localhost:26657/"
-entry_point = "find"
+ports = [26657]
 data_directory_mount_point = "/blockjoy/miner/data"
 
-[monitor]
-pid_file = "/var/run/cosmos.pid"
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+
+    [[supervisor.entry_point]]
+    command = "todo"
+    args = []
 
 [[methods]]
 name = "height"

@@ -10,11 +10,22 @@ babel_version = "0.0.1"
 node_version = "1.15.9"
 description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
-entry_point = "/blockjoy/miner/bin/miner foreground"
+ports = [4467]
 data_directory_mount_point = "/blockjoy/miner/data"
 
-[monitor]
-pid_file = "/var/run/helium.pid" #this is likely not necessary
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 10000
+log_buffer_capacity_ln = 1000
+
+    [[supervisor.entry_point]]
+    command = "echo"
+    args = ["Helium entry_point not configured!"]
+
+[keys] # this is just an example
+first = "/opt/secrets/first.key"
+second = "/opt/secrets/second.key"
+"*" = "/tmp"
 
 # METHOD BLOCK-HEIGHT
 # example:
@@ -33,7 +44,6 @@ pid_file = "/var/run/helium.pid" #this is likely not necessary
 name = "height"
 transport = "jrpc"
 method = "info_height"
-params = []
 
     [methods.response]
     code = 200
@@ -55,7 +65,6 @@ params = []
 name = "address"
 transport = "jrpc"
 method = "peer_addr"
-params = []
 
     [methods.response]
     code = 200
@@ -77,7 +86,6 @@ params = []
 name = "name"
 transport = "jrpc"
 method = "info_name"
-params = []
 
     [methods.response]
     code = 200
@@ -99,7 +107,6 @@ params = []
 name = "consensus"
 transport = "jrpc"
 method = "info_in_consensus"
-params = []
 
     [methods.response]
     code = 200
@@ -122,7 +129,6 @@ params = []
 name = "block_age"
 transport = "jrpc"
 method = "info_block_age"
-params = []
 
     [methods.response]
     code = 200
@@ -175,7 +181,6 @@ params = []
 name = "info"
 transport = "jrpc"
 method = "info_summary"
-params = []
 
     [methods.response]
     code = 200
@@ -198,5 +203,14 @@ body = "miner versions | tail -n +2 | awk '{print $2}'"
 
     [methods.response]
     # something?
+    status = 0
+    format = "raw"
+
+[[methods]]
+name = "generate_keys"
+transport = "sh"
+body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
+
+    [methods.response]
     status = 0
     format = "raw"
