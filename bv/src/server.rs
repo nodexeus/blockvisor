@@ -211,6 +211,26 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))
     }
 
+    async fn get_node_keys(
+        &self,
+        request: Request<bv_pb::GetNodeKeysRequest>,
+    ) -> Result<Response<bv_pb::GetNodeKeysResponse>, Status> {
+        let request = request.into_inner();
+        let node_id = helpers::parse_uuid(request.id)?;
+        let keys = self
+            .nodes
+            .lock()
+            .await
+            .nodes
+            .get_mut(&node_id)
+            .ok_or_else(|| Status::invalid_argument("No such node"))?
+            .download_keys()
+            .await
+            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+        let names = keys.into_iter().map(|k| k.name).collect();
+        Ok(Response::new(bv_pb::GetNodeKeysResponse { names }))
+    }
+
     async fn get_node_id_for_name(
         &self,
         request: Request<bv_pb::GetNodeIdForNameRequest>,

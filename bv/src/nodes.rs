@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, read_dir};
@@ -12,7 +12,9 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::{
+    config::Config,
     grpc::{pb, pb::node_info::ContainerStatus},
+    key_service::KeyService,
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeStatus},
@@ -46,6 +48,7 @@ pub enum ServiceStatus {
 
 #[derive(Debug)]
 pub struct Nodes {
+    pub api_config: Config,
     pub nodes: HashMap<Uuid, Node>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
@@ -146,6 +149,10 @@ impl Nodes {
 
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
+        if let Err(e) = self.exchange_keys(&id).await {
+            warn!("Key exchange error: {e:?}")
+        }
+
         Ok(())
     }
 
@@ -185,11 +192,84 @@ impl Nodes {
 
         Ok(uuid)
     }
+
+    pub async fn exchange_keys(&mut self, id: &Uuid) -> Result<()> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(id))?;
+
+        let mut key_service =
+            KeyService::connect(&self.api_config.blockjoy_api_url, &self.api_config.token).await?;
+
+        let api_keys: HashMap<String, Vec<u8>> = key_service
+            .download_keys(id)
+            .await?
+            .iter()
+            .map(|k| (k.name.clone(), k.content.clone()))
+            .collect();
+        let api_keys_set: HashSet<&String> = HashSet::from_iter(api_keys.keys());
+        debug!("Received API keys: {api_keys_set:?}");
+
+        let node_keys: HashMap<String, Vec<u8>> = node
+            .download_keys()
+            .await?
+            .iter()
+            .map(|k| (k.name.clone(), k.content.clone()))
+            .collect();
+        let node_keys_set: HashSet<&String> = HashSet::from_iter(node_keys.keys());
+        debug!("Received Node keys: {node_keys_set:?}");
+
+        // Keys present in API, but not on Node, will be sent to Node
+        let keys1: Vec<_> = api_keys_set
+            .difference(&node_keys_set)
+            .into_iter()
+            .map(|n| babel_api::BlockchainKey {
+                name: n.to_string(),
+                content: api_keys.get(*n).unwrap().to_vec(), // checked
+            })
+            .collect();
+        if !keys1.is_empty() {
+            node.upload_keys(keys1).await?;
+        }
+
+        // Keys present on Node, but not in API, will be sent to API
+        let keys2: Vec<_> = node_keys_set
+            .difference(&api_keys_set)
+            .map(|n| pb::Keyfile {
+                name: n.to_string(),
+                content: node_keys.get(*n).unwrap().to_vec(), // checked
+            })
+            .collect();
+        if !keys2.is_empty() {
+            key_service.upload_keys(id, keys2).await?;
+        }
+
+        // Generate keys if we should (and can)
+        if api_keys_set.is_empty()
+            && node_keys_set.is_empty()
+            && node
+                .has_capability(&babel_api::BabelMethod::GenerateKeys.to_string())
+                .await?
+        {
+            node.generate_keys().await?;
+            let gen_keys: Vec<_> = node
+                .download_keys()
+                .await?
+                .iter()
+                .map(|k| pb::Keyfile {
+                    name: k.name.clone(),
+                    content: k.content.clone(),
+                })
+                .collect();
+            key_service.upload_keys(id, gen_keys).await?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Nodes {
-    pub fn new(nodes_data: CommonData) -> Self {
+    pub fn new(api_config: Config, nodes_data: CommonData) -> Self {
         Self {
+            api_config,
             data: nodes_data,
             nodes: HashMap::new(),
             node_ids: HashMap::new(),
@@ -197,7 +277,7 @@ impl Nodes {
         }
     }
 
-    pub async fn load() -> Result<Nodes> {
+    pub async fn load(api_config: Config) -> Result<Nodes> {
         // First load the common data file.
         info!(
             "Reading nodes common config file: {}",
@@ -210,7 +290,7 @@ impl Nodes {
             "Reading nodes config dir: {}",
             REGISTRY_CONFIG_DIR.display()
         );
-        let mut this = Nodes::new(nodes_data);
+        let mut this = Nodes::new(api_config, nodes_data);
         let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
         while let Some(entry) = dir.next_entry().await? {
             // blockvisord should not bail on problems with individual node files.

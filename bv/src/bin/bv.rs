@@ -62,17 +62,16 @@ async fn main() -> Result<()> {
 
             let host = client.provision(create).await?.into_inner();
 
-            Config {
+            let api_config = Config {
                 id: host.host_id,
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
-            }
-            .save()
-            .await?;
+            };
+            api_config.save().await?;
 
             if !Nodes::exists() {
                 let nodes_data = CommonData { machine_index: 0 };
-                Nodes::new(nodes_data).save().await?;
+                Nodes::new(api_config, nodes_data).save().await?;
             }
         }
         Command::Reset(cmd_args) => {
@@ -379,6 +378,16 @@ impl NodeClient {
                         Some(status) => println!("{status}"),
                         None => eprintln!("Invalid status {status}"),
                     }
+                }
+            }
+            NodeCommand::Keys { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let keys = self
+                    .client
+                    .get_node_keys(bv_pb::GetNodeKeysRequest { id: id.clone() })
+                    .await?;
+                for name in keys.into_inner().names {
+                    println!("{}", name);
                 }
             }
             NodeCommand::Capabilities { id_or_name } => {

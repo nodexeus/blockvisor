@@ -145,3 +145,14 @@ async fn process_node_command(
 
     Ok(())
 }
+
+pub fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
+    let mut request = Request::new(inner);
+    request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", base64::encode(auth_token))
+            .parse()
+            .unwrap(),
+    );
+    request
+}

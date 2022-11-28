@@ -209,7 +209,7 @@ body = "miner versions | tail -n +2 | awk '{print $2}'"
 [[methods]]
 name = "generate_keys"
 transport = "sh"
-body = "echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
+body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
 
     [methods.response]
     status = 0
