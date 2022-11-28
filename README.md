@@ -118,3 +118,121 @@ sequenceDiagram
     babel-->>bv: response
     bv-->>cli: response
 ```
+
+## Self update processes
+
+![](host_self_update.jpg)
+
+### Check for update
+
+```mermaid
+sequenceDiagram
+    participant repo as BlockJoy Repo
+    participant bv as BlockvisorD
+    participant installer as BlockvisorD.installer
+    
+    bv ->> repo: check for update on startup
+    activate repo
+    repo -->> bv: no updates
+    deactivate repo
+    bv ->> repo: subscribe update notifications
+    repo ->> bv: new release notification
+    bv ->> repo: download latest version
+    activate repo
+    repo -->> bv: latest bundle with installer
+    deactivate repo
+    bv ->> installer: launch installer
+```
+
+### BlockvisorD update
+
+```mermaid
+sequenceDiagram
+    participant api as API
+    participant bv as BlockvisorD
+    participant installer as BlockvisorD.installer
+    participant sysd as SystemD
+    
+    alt current version is not blacklisted
+        installer ->> installer: mark current version as rollback
+    end
+    installer ->> installer: change blockvisord and CLI symlinks  
+    alt BlockvisorD is running (may not in case of failed update)
+        installer ->> bv: request for graceful restart
+        activate bv
+        bv ->> api: change status to UPDATING
+        bv ->> bv: finish pending actions    
+        bv ->> bv: graceful shutdown    
+        deactivate bv
+    end
+    sysd ->> bv: restart BlockvisorD service
+    installer ->> bv: get update status
+    activate bv
+    alt update succeed
+        bv ->> bv: update Babel on running nodes
+        bv ->> api: change status to IDLE
+        bv -->> installer: done
+    else update failed
+        bv -->> installer: err
+        alt was it rollback
+            installer ->> api: send rollback error (broken host) notification
+        else
+            installer ->> installer: mark BlockvisorD version as blacklisted
+            installer ->> installer: laucnch installer from rollback version
+        end
+    end
+    deactivate bv
+```
+
+### Babel install
+
+```mermaid
+sequenceDiagram
+    participant bv as BlockvisorD
+    participant fc as Firecracker
+    participant babelvisor as BabelvisorD
+    participant babel as Babel
+    
+    bv ->> fc: start node  
+    activate babelvisor
+    bv ->> babelvisor: send Babel binary
+    babelvisor ->> babel: start
+    alt failed to start Babel
+        babelvisor ->> bv: Babel start error
+    end
+    deactivate babelvisor
+```
+
+### Babel update
+
+```mermaid
+sequenceDiagram
+    participant bv as BlockvisorD
+    participant babelvisor as BabelvisorD
+    participant babel as Babel
+   
+    bv ->> babelvisor: get Babel version
+    activate babelvisor
+    babelvisor -->> bv: Babel version
+    deactivate babelvisor
+    alt version doesn't match expected
+        bv ->> babelvisor: send Babel binary
+        activate babelvisor
+        babelvisor ->> babelvisor: replace Babel binary
+        activate babel
+        babelvisor -->> babel: request graceful shutdowan
+        babel ->> babel: finish pending actions
+        babel ->> babel: graceful shutdown
+        deactivate babel
+        babelvisor ->> babel: restart
+        activate babel
+        babelvisor ->> babel: health check
+        alt uodated version health check pass
+            babelvisor ->> bv: Babel update done
+        else
+            deactivate babel 
+            babelvisor ->> bv: Babel update error
+        end
+        deactivate babelvisor
+    end
+```
