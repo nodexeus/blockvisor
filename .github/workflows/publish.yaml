@@ -1,0 +1,56 @@
+name: Publish bundle
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-**'
+
+jobs:
+  create_release:
+    name: Create release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  linux:
+    name: Linux (musl)
+    needs: ['create_release']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Get Version
+        run: echo GIT_VERSION=$(git describe --tags) >> $GITHUB_ENV
+      - name: Install packages
+        run: sudo apt install -y musl-tools
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          profile: minimal
+          override: true
+      - name: Build bundle file
+        run: >
+          make bundle
+      - name: Upload bundle file
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: /tmp/bundle.tar.gz
+          asset_name: blockvisor-bundle-${{ env.GIT_VERSION }}.tar.gz
+          asset_content_type: application/octet-stream

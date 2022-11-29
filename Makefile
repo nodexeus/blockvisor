@@ -2,6 +2,33 @@ build:
 	cargo build -p blockvisord
 	cargo build -p babel --target x86_64-unknown-linux-musl
 
+build-release:
+	cargo build -p blockvisord --release
+	strip target/release/bv
+	strip target/release/blockvisord
+	cargo build -p babel --target x86_64-unknown-linux-musl --release
+	strip target/x86_64-unknown-linux-musl/release/babel
+
+bundle: build-release
+	rm -rf /tmp/bundle.tar.gz
+	rm -rf /tmp/bundle
+	mkdir -p /tmp/bundle/blockvisor/bin /tmp/bundle/blockvisor/services
+	cp target/release/bv /tmp/bundle/blockvisor/bin
+	cp target/release/blockvisord /tmp/bundle/blockvisor/bin
+	cp bv/data/tmux.service /tmp/bundle/blockvisor/services
+	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
+	mkdir -p /tmp/bundle/babel/bin /tmp/bundle/babel/services
+	cp target/x86_64-unknown-linux-musl/release/babel /tmp/bundle/babel/bin
+	cp babel/data/babel.service /tmp/bundle/babel/services
+	tar -C /tmp -czvf /tmp/bundle.tar.gz bundle
+
+tag: CARGO_VERSION = $(shell grep '^version' Cargo.toml | sed "s/ //g" | cut -d = -f 2 | sed "s/\"//g")
+tag: GIT_VERSION = $(shell git describe --tags)
+tag:
+	@if [ "${CARGO_VERSION}" == "${GIT_VERSION}" ]; then echo "Version ${CARGO_VERSION} already tagged!"; \
+	else git tag -a ${CARGO_VERSION} -m "Set version ${CARGO_VERSION}"; git push origin ${CARGO_VERSION}; \
+	fi
+
 install:
 	install -m u=rwx,g=rx,o=rx target/debug/blockvisord /usr/bin/
 	install -m u=rwx,g=rx,o=rx target/debug/bv /usr/bin/

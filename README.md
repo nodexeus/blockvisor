@@ -2,6 +2,12 @@
 
 The service that runs on the host systems and is responisble for provisioning and managing one or more blockchains on a single server.
 
+## How to release a new version
+
+1. Update version in workspace
+2. Run `make tag` to create a version tag
+3. CI `publish` workflow will then build a bundle and create a new GH release
+
 ## API proto files
 
 API proto files are stored in [separate repository](https://github.com/blockjoy/api-proto).
