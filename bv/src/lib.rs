@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod config;
+pub mod env;
 pub mod grpc;
 pub mod hosts;
 pub mod key_service;

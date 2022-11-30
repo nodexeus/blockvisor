@@ -3,7 +3,7 @@ use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
@@ -13,24 +13,13 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
+    env::{REGISTRY_CONFIG_DIR, REGISTRY_CONFIG_FILE},
     grpc::{pb, pb::node_info::ContainerStatus},
     key_service::KeyService,
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeStatus},
 };
-
-const NODES_CONFIG_FILENAME: &str = "nodes.toml";
-
-lazy_static::lazy_static! {
-    pub static ref REGISTRY_CONFIG_DIR: PathBuf = home::home_dir()
-        .map(|p| p.join(".cache"))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("blockvisor")
-        .join("nodes");
-
-    static ref REGISTRY_CONFIG_FILE: PathBuf = REGISTRY_CONFIG_DIR.join(NODES_CONFIG_FILENAME);
-}
 
 fn id_not_found(id: &Uuid) -> anyhow::Error {
     anyhow!("Node with id `{}` not found", id)

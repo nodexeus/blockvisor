@@ -76,7 +76,7 @@ fn test_bv_cmd_start_no_init() {
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.arg("start")
-        .env("HOME", tmp_dir.as_os_str())
+        .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
         .stderr("Error: Host is not registered, please run `init` first\n");
@@ -241,7 +241,7 @@ fn test_bv_cmd_init_unknown_otp() {
     cmd.args(&["init", otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
-        .env("HOME", tmp_dir.as_os_str())
+        .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
         .stderr(predicate::str::contains("Record not found"));
@@ -350,7 +350,7 @@ async fn test_bv_cmd_init_localhost() {
         .stdout(predicate::str::contains("Configuring blockvisor"));
 
     println!("read host id");
-    let config_path = "/root/.config/blockvisor.toml";
+    let config_path = "/etc/blockvisor.toml";
     let config = std::fs::read_to_string(config_path).unwrap();
     let config: Config = toml::from_str(&config).unwrap();
     let host_id = config.id;
@@ -792,7 +792,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
         let url = "http://localhost:8082";
         let otp = "AWESOME";
-        let config_path = format!("{}/.config/blockvisor.toml", tmp_dir.to_string_lossy());
+        let config_path = format!("{}/etc/blockvisor.toml", tmp_dir.to_string_lossy());
 
         println!("bv init");
         Command::cargo_bin("bv")
@@ -800,7 +800,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .args(&["init", otp])
             .args(&["--ifa", ifa])
             .args(&["--url", url])
-            .env("HOME", tmp_dir.as_os_str())
+            .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()
             .stdout(predicate::str::contains("Configuring blockvisor"));
@@ -811,7 +811,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         Command::cargo_bin("bv")
             .unwrap()
             .args(&["reset", "--yes"])
-            .env("HOME", tmp_dir.as_os_str())
+            .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()
             .stdout(predicate::str::contains("Deleting host"));

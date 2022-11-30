@@ -49,3 +49,6 @@ reinstall:
 	systemctl stop blockvisor.service
 	make install
 	systemctl start blockvisor.service
+
+net-clean:
+	for i in {1..5000}; do ip link delete bv$i type tuntap; done
