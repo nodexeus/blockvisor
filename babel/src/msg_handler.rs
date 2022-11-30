@@ -262,7 +262,7 @@ impl MsgHandler {
         match response_config.format {
             Json => {
                 let content: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                let res = babel_api::BlockchainResponse {
+                let res = BlockchainResponse {
                     value: serde_json::to_string(&content)?,
                 };
                 Ok(res)
