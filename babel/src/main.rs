@@ -61,7 +61,7 @@ impl supervisor::Timer for SysTimer {
 #[cfg(target_os = "linux")]
 async fn serve(
     run: RunFlag,
-    cfg: config::Babel,
+    cfg: babel_api::config::Babel,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     vsock::serve(run, cfg, logs_rx).await
@@ -70,7 +70,7 @@ async fn serve(
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
-    _cfg: config::Babel,
+    _cfg: babel_api::config::Babel,
     _logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     unimplemented!()

@@ -1,9 +1,9 @@
 use crate::log_buffer::LogBuffer;
 use crate::run_flag::RunFlag;
 use async_trait::async_trait;
+use babel_api::config::{Entrypoint, SupervisorConfig as Config};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use serde::Deserialize;
 use std::marker::PhantomData;
 use std::process::Stdio;
 use std::time::SystemTime;
@@ -17,34 +17,6 @@ use tracing::{info, warn};
 pub trait Timer {
     fn now() -> SystemTime;
     async fn sleep(duration: Duration);
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    ///  if entry_point stay alive given amount of time (in miliseconds) backof is reset
-    pub backoff_timeout_ms: u64,
-    /// base time (in miliseconds) for backof, multiplied by consecutive power of 2 each time
-    pub backoff_base_ms: u64,
-    /// capacity of log buffer (in lines)
-    pub log_buffer_capacity_ln: usize,
-    pub entry_point: Vec<Entrypoint>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct Entrypoint {
-    pub command: String,
-    pub args: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            backoff_timeout_ms: 60_000,
-            backoff_base_ms: 100,
-            log_buffer_capacity_ln: 1_000,
-            entry_point: vec![],
-        }
-    }
 }
 
 /// This module implements supervisor for node entry points. It spawn child processes as defined in
