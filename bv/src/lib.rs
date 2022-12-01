@@ -3,6 +3,7 @@ pub mod config;
 pub mod env;
 pub mod grpc;
 pub mod hosts;
+pub mod installer;
 pub mod key_service;
 pub mod logging;
 pub mod network_interface;

@@ -86,9 +86,8 @@ async fn main() -> Result<()> {
                 input.trim().to_lowercase() == "y"
             };
 
-            let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
-
             if confirm {
+                let mut service_client = BlockvisorClient::connect(BLOCKVISOR_SERVICE_URL).await?;
                 let nodes = service_client
                     .get_nodes(bv_pb::GetNodesRequest {})
                     .await?

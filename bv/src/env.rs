@@ -4,8 +4,8 @@ use std::path::PathBuf;
 const ENV_BV_ROOT_KEY: &str = "BV_ROOT";
 
 lazy_static::lazy_static! {
-    static ref ROOT_DIR: PathBuf = PathBuf::from(env::var(ENV_BV_ROOT_KEY).unwrap_or_else(|_| "/".to_string()));
-    static ref VARS_DIR: PathBuf = ROOT_DIR.join("var").join("lib").join("blockvisor");
+    pub static ref ROOT_DIR: PathBuf = PathBuf::from(env::var(ENV_BV_ROOT_KEY).unwrap_or_else(|_| "/".to_string()));
+    pub static ref VARS_DIR: PathBuf = ROOT_DIR.join("var").join("lib").join("blockvisor");
 
     pub static ref HOST_CONFIG_FILE: PathBuf = ROOT_DIR
         .join("etc")

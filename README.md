@@ -159,32 +159,33 @@ sequenceDiagram
     participant installer as BlockvisorD.installer
     participant sysd as SystemD
     
-    alt current version is not blacklisted
-        installer ->> installer: mark current version as rollback
+    alt running version is not blacklisted (this is not rollback)
+        installer ->> installer: backup running version
     end
-    installer ->> installer: change blockvisord and CLI symlinks  
-    alt BlockvisorD is running (may not in case of failed update)
-        installer ->> bv: request for graceful restart
+    alt BlockvisorD is running
+        installer ->> bv: notify about started update
         activate bv
         bv ->> api: change status to UPDATING
         bv ->> bv: finish pending actions    
-        bv ->> bv: graceful shutdown    
         deactivate bv
     end
+    installer ->> installer: switch current version (change symlinks)  
+    installer ->> sysd: restart BlockvisorD service     
     sysd ->> bv: restart BlockvisorD service
-    installer ->> bv: get update status
+    installer ->> bv: finalize update and get health check status
     activate bv
     alt update succeed
         bv ->> bv: update Babel on running nodes
         bv ->> api: change status to IDLE
-        bv -->> installer: done
+        bv -->> installer: ok
+        installer ->> installer: cleanup old version
     else update failed
         bv -->> installer: err
+        installer ->> installer: mark this version as blacklisted
         alt was it rollback
             installer ->> api: send rollback error (broken host) notification
         else
-            installer ->> installer: mark BlockvisorD version as blacklisted
-            installer ->> installer: laucnch installer from rollback version
+            installer ->> installer: launch installer from backup version
         end
     end
     deactivate bv
