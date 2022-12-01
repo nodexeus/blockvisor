@@ -1,11 +1,9 @@
-use std::{sync::Arc, time};
-
-use crate::msg_handler;
+use crate::msg_handler::MsgHandler;
 use crate::run_flag::RunFlag;
 use eyre::Context;
 use futures::StreamExt;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::broadcast;
 use tokio_vsock::VsockStream;
 
 const VSOCK_HOST_CID: u32 = 3;
@@ -15,14 +13,7 @@ const VSOCK_PORT: u32 = 42;
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or
 /// restarts.
-pub async fn serve(
-    mut run: RunFlag,
-    cfg: babel_api::config::Babel,
-    logs_rx: broadcast::Receiver<String>,
-) -> eyre::Result<()> {
-    let msg_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
-    let msg_handler = Arc::new(msg_handler);
-
+pub async fn serve(mut run: RunFlag, msg_handler: Arc<MsgHandler>) -> eyre::Result<()> {
     tracing::debug!("Binding to virtual socket...");
     let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
     tracing::debug!("Bound");
@@ -35,7 +26,7 @@ pub async fn serve(
                     match res {
                         Ok(stream) => {
                             tracing::debug!("Stream opened, delegating to handler.");
-                            tokio::spawn(serve_stream(stream, Arc::clone(&msg_handler)));
+                            tokio::spawn(serve_stream(stream, msg_handler.clone()));
                         }
                         Err(_) => {
                             tracing::debug!("Receiving streams failed. Aborting babel.");
@@ -50,7 +41,7 @@ pub async fn serve(
     Ok(())
 }
 
-async fn serve_stream(mut stream: VsockStream, msg_handler: Arc<msg_handler::MsgHandler>) {
+async fn serve_stream(mut stream: VsockStream, msg_handler: Arc<MsgHandler>) {
     loop {
         let mut buf = vec![0u8; 5000];
         let len = match stream.read(&mut buf).await {
@@ -81,7 +72,7 @@ async fn serve_stream(mut stream: VsockStream, msg_handler: Arc<msg_handler::Msg
 async fn handle_message(
     msg: &str,
     stream: &mut tokio_vsock::VsockStream,
-    msg_handler: &msg_handler::MsgHandler,
+    msg_handler: &MsgHandler,
 ) -> eyre::Result<()> {
     tracing::debug!("Received message: `{msg}`");
     let request: babel_api::BabelRequest =

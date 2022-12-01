@@ -64,7 +64,12 @@ async fn serve(
     cfg: babel_api::config::Babel,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
-    vsock::serve(run, cfg, logs_rx).await
+    use babel::msg_handler;
+    use std::sync::Arc;
+    use std::time;
+
+    let msg_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
+    vsock::serve(run, Arc::new(msg_handler)).await
 }
 
 #[cfg(not(target_os = "linux"))]
