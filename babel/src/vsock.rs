@@ -20,8 +20,8 @@ pub async fn serve(
     cfg: babel_api::config::Babel,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
-    let msf_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
-    let client = Arc::new(msf_handler);
+    let msg_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
+    let msg_handler = Arc::new(msg_handler);
 
     tracing::debug!("Binding to virtual socket...");
     let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
@@ -35,7 +35,7 @@ pub async fn serve(
                     match res {
                         Ok(stream) => {
                             tracing::debug!("Stream opened, delegating to handler.");
-                            tokio::spawn(serve_stream(stream, Arc::clone(&client)));
+                            tokio::spawn(serve_stream(stream, Arc::clone(&msg_handler)));
                         }
                         Err(_) => {
                             tracing::debug!("Receiving streams failed. Aborting babel.");
@@ -50,7 +50,7 @@ pub async fn serve(
     Ok(())
 }
 
-async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandler>) {
+async fn serve_stream(mut stream: VsockStream, msg_handler: Arc<msg_handler::MsgHandler>) {
     loop {
         let mut buf = vec![0u8; 5000];
         let len = match stream.read(&mut buf).await {
@@ -70,7 +70,7 @@ async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandl
                 continue;
             }
         };
-        if let Err(e) = handle_message(msg, &mut stream, &client).await {
+        if let Err(e) = handle_message(msg, &mut stream, &msg_handler).await {
             tracing::debug!("Failed to handle message: {e}");
             let resp = babel_api::BabelResponse::Error(e.to_string());
             let _ = write_json(&mut stream, resp).await;
