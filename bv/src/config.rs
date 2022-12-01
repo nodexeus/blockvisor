@@ -1,17 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::fs::{self, DirBuilder};
 use tracing::info;
 
-const HOST_CONFIG_FILENAME: &str = "blockvisor.toml";
-
-lazy_static::lazy_static! {
-    static ref HOST_CONFIG_FILE: PathBuf = home::home_dir()
-        .map(|p| p.join(".config"))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join(HOST_CONFIG_FILENAME);
-}
+use crate::env::HOST_CONFIG_FILE;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {

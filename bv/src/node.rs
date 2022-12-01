@@ -17,6 +17,7 @@ use tracing::{debug, error, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::{
+    env::*,
     node_data::{NodeData, NodeStatus},
     utils::{get_process_pid, run_cmd},
 };
@@ -53,12 +54,9 @@ impl Connection {
 
 // FIXME: Hardcoding everything for now.
 pub const FC_BIN_NAME: &str = "firecracker";
-const KERNEL_PATH: &str = "/var/lib/blockvisor/debian-vmlinux";
-const DATA_PATH: &str = "/var/lib/blockvisor/data.img";
-const ROOT_FS_FILE: &str = "os.img";
-const CHROOT_PATH: &str = "/var/lib/blockvisor";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
+const ROOT_FS_FILE: &str = "os.img";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PORT: u32 = 42;
@@ -66,14 +64,6 @@ const BABEL_VSOCK_PORT: u32 = 42;
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
-
-lazy_static::lazy_static! {
-    static ref IMAGE_CACHE_DIR: PathBuf = home::home_dir()
-        .map(|p| p.join(".cache"))
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("blockvisor")
-        .join("images");
-}
 
 impl Node {
     /// Creates a new node according to specs.
@@ -236,7 +226,7 @@ impl Node {
         // E.g. it makes little sense to upgrade helium validator into eth beacon
         let root_fs_path = Self::get_normalized_root_fs_path(image)?;
 
-        let data_dir = Path::new(CHROOT_PATH)
+        let data_dir = CHROOT_PATH
             .join(FC_BIN_NAME)
             .join(id.to_string())
             .join("root");
@@ -281,12 +271,16 @@ impl Node {
     async fn copy_data_image(id: &Uuid) -> Result<()> {
         // TODO: we need to create a new data image according to spec
         // At the time of writing we use the same 10 Gb empty image for every node
-        let data_dir = Path::new(CHROOT_PATH)
+        let data_dir = CHROOT_PATH
             .join(FC_BIN_NAME)
             .join(id.to_string())
             .join("root");
         DirBuilder::new().recursive(true).create(&data_dir).await?;
-        run_cmd("cp", &[DATA_PATH, &data_dir.to_string_lossy()]).await?;
+        run_cmd(
+            "cp",
+            &[&DATA_PATH.to_string_lossy(), &data_dir.to_string_lossy()],
+        )
+        .await?;
 
         Ok(())
     }
@@ -301,10 +295,10 @@ impl Node {
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
         let root_fs_path = Self::get_normalized_root_fs_path(&data.image)?;
 
-        let config = firec::config::Config::builder(Some(data.id), Path::new(KERNEL_PATH))
+        let config = firec::config::Config::builder(Some(data.id), &*KERNEL_PATH)
             // Jailer configuration.
             .jailer_cfg()
-            .chroot_base_dir(Path::new(CHROOT_PATH))
+            .chroot_base_dir(&*CHROOT_PATH)
             .exec_file(Path::new(FC_BIN_PATH))
             .mode(JailerMode::Tmux(Some(data.name.clone().into())))
             .build()
@@ -318,7 +312,7 @@ impl Node {
             .is_root_device(true)
             .build()
             // Add data drive.
-            .add_drive("data", Path::new(DATA_PATH))
+            .add_drive("data", &*DATA_PATH)
             .build()
             // Network configuration.
             .add_network_interface(iface)
@@ -515,7 +509,10 @@ impl Node {
 
         // We are going to connect to the central socket for this VM. Later we will specify which
         // port we want to talk to.
-        let socket = format!("{CHROOT_PATH}/firecracker/{node_id}/root{VSOCK_PATH}");
+        let socket = format!(
+            "{}/firecracker/{node_id}/root{VSOCK_PATH}",
+            CHROOT_PATH.to_string_lossy()
+        );
         debug!("Connecting to node at `{socket}`");
 
         // We need to implement retrying when reading from the socket, as it may take a little bit

@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::node::FC_BIN_NAME;
 use crate::utils::get_process_pid;
-use crate::{network_interface::NetworkInterface, nodes::REGISTRY_CONFIG_DIR};
+use crate::{env::REGISTRY_CONFIG_DIR, network_interface::NetworkInterface};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub enum NodeStatus {
