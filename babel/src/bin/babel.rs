@@ -9,6 +9,8 @@ use tokio::sync::broadcast;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
+const VSOCK_HOST_CID: u32 = 3;
+const VSOCK_PORT: u32 = 42;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -40,7 +42,10 @@ async fn main() -> eyre::Result<()> {
 
     let supervisor = supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg);
     let logs_rx = supervisor.get_logs_rx();
-    let (supervisor, server) = tokio::join!(supervisor.run(), serve(run, cfg, logs_rx));
+    let (supervisor, server) = tokio::join!(
+        supervisor.run(),
+        serve(run, cfg, VSOCK_HOST_CID, VSOCK_PORT, logs_rx)
+    );
     supervisor?;
     server
 }
@@ -62,6 +67,8 @@ impl supervisor::Timer for SysTimer {
 async fn serve(
     run: RunFlag,
     cfg: babel_api::config::Babel,
+    cid: u32,
+    port: u32,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     use babel::msg_handler;
@@ -69,13 +76,15 @@ async fn serve(
     use std::time;
 
     let msg_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
-    vsock::serve(run, Arc::new(msg_handler)).await
+    vsock::serve(run, cid, port, Arc::new(msg_handler)).await
 }
 
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
     _cfg: babel_api::config::Babel,
+    _cid: u32,
+    _port: u32,
     _logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     unimplemented!()

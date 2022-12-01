@@ -6,16 +6,18 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_vsock::VsockStream;
 
-const VSOCK_HOST_CID: u32 = 3;
-const VSOCK_PORT: u32 = 42;
-
 /// This function tries to read messages from the vsocket and keeps responding to those messages.
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
 /// listening for new messages. This means that we do not need to care if blockvisor shuts down or
 /// restarts.
-pub async fn serve(mut run: RunFlag, msg_handler: Arc<MsgHandler>) -> eyre::Result<()> {
+pub async fn serve(
+    mut run: RunFlag,
+    cid: u32,
+    port: u32,
+    msg_handler: Arc<MsgHandler>,
+) -> eyre::Result<()> {
     tracing::debug!("Binding to virtual socket...");
-    let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
+    let listener = tokio_vsock::VsockListener::bind(cid, port)?;
     tracing::debug!("Bound");
     let mut incoming = listener.incoming();
     tracing::debug!("Receiving incoming messages");
