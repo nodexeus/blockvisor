@@ -1,4 +1,8 @@
 use crate::error;
+#[cfg(target_os = "linux")]
+use crate::vsock::Handler;
+#[cfg(target_os = "linux")]
+use async_trait::async_trait;
 use babel_api::config;
 use babel_api::*;
 use serde_json::json;
@@ -21,6 +25,27 @@ impl std::ops::Deref for MsgHandler {
 
     fn deref(&self) -> &Self::Target {
         &self.inner
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[async_trait]
+impl Handler for MsgHandler {
+    async fn handle(&self, message: &str) -> eyre::Result<Vec<u8>> {
+        use eyre::Context;
+
+        let request: babel_api::BabelRequest = serde_json::from_str(message)
+            .wrap_err(format!("Could not parse request as json: '{message}'"))?;
+
+        let resp = match self.handle(request).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                tracing::debug!("Failed to handle message: {e}");
+                babel_api::BabelResponse::Error(e.to_string())
+            }
+        };
+
+        Ok(serde_json::to_vec(&resp)?)
     }
 }
 
