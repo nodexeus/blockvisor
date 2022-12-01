@@ -1,7 +1,7 @@
 use std::{sync::Arc, time};
 
+use crate::msg_handler;
 use crate::run_flag::RunFlag;
-use crate::{config, msg_handler};
 use eyre::Context;
 use futures::StreamExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -17,7 +17,7 @@ const VSOCK_PORT: u32 = 42;
 /// restarts.
 pub async fn serve(
     mut run: RunFlag,
-    cfg: config::Babel,
+    cfg: babel_api::config::Babel,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     let msf_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;

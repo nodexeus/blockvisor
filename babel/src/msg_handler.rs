@@ -1,5 +1,5 @@
-use crate::config;
 use crate::error;
+use babel_api::config;
 use babel_api::*;
 use serde_json::json;
 use std::path::Path;
@@ -262,7 +262,7 @@ impl MsgHandler {
         match response_config.format {
             Json => {
                 let content: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-                let res = babel_api::BlockchainResponse {
+                let res = BlockchainResponse {
                     value: serde_json::to_string(&content)?,
                 };
                 Ok(res)
@@ -278,11 +278,11 @@ impl MsgHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{
-        Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
-    };
-    use crate::supervisor;
     use assert_fs::TempDir;
+    use babel_api::config::{
+        Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
+        SupervisorConfig,
+    };
     use httpmock::prelude::*;
     use std::collections::{BTreeMap, HashMap};
 
@@ -317,7 +317,7 @@ mod tests {
                 ports: vec![],
                 data_directory_mount_point: "".to_string(),
             },
-            supervisor: supervisor::Config {
+            supervisor: SupervisorConfig {
                 backoff_timeout_ms: 10,
                 backoff_base_ms: 1,
                 log_buffer_capacity_ln: 4,
@@ -358,7 +358,7 @@ mod tests {
                 api_host: None,
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([
                 (
@@ -440,7 +440,7 @@ mod tests {
                 api_host: None,
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([
                 ("first".to_string(), format!("{tmp_dir_str}/first/key")),
                 ("second".to_string(), format!("{tmp_dir_str}/second/key")),
@@ -541,7 +541,7 @@ mod tests {
                 api_host: None,
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([(
                 WILDCARD_KEY_NAME.to_string(),
                 format!("{tmp_dir_str}/star/"),
@@ -597,7 +597,7 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
@@ -648,7 +648,7 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
                 "json items".to_string(),
@@ -710,7 +710,7 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
             },
-            supervisor: supervisor::Config::default(),
+            supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
                 "get height".to_string(),
