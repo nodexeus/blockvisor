@@ -71,7 +71,7 @@ impl From<Metrics> for pb::NodeMetricsRequest {
             .0
             .into_iter()
             .map(|(k, v)| {
-                let metrics = pb::Metrics {
+                let metrics = pb::NodeMetrics {
                     height: v.height,
                     block_age: v.block_age,
                     staking_status: v.staking_status,

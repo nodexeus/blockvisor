@@ -2,7 +2,7 @@ use crate::grpc::pb;
 use anyhow::Result;
 use blockvisord::{
     config::Config,
-    grpc,
+    grpc, hosts,
     logging::setup_logging,
     node_data::NodeStatus,
     node_metrics,
@@ -82,12 +82,14 @@ async fn main() -> Result<()> {
     };
 
     let node_metrics_future = node_metrics(nodes.clone(), &endpoint, token.clone());
+    let host_metrics_future = host_metrics(config.id.clone(), &endpoint, token.clone());
 
     tokio::select! {
         _ = internal_api_server_future => {},
         _ = external_api_client_future => {},
         _ = nodes_recovery_future => {},
         _ = node_metrics_future => {},
+        _ = host_metrics_future => {},
     }
 
     info!("Stopping...");
@@ -131,6 +133,20 @@ async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc
         let metrics: pb::NodeMetricsRequest = metrics.into();
         if let Err(e) = client.node(metrics).await {
             error!("Could not send node metrics! `{e}`");
+        }
+    }
+}
+
+async fn host_metrics(host_id: String, endpoint: &Endpoint, token: grpc::AuthToken) {
+    let mut timer = tokio::time::interval(hosts::COLLECT_INTERVAL);
+    let channel = wait_for_channel(endpoint).await;
+    let mut client = grpc::MetricsClient::with_auth(channel, token);
+    loop {
+        timer.tick().await;
+        let metrics = blockvisord::hosts::get_host_metrics();
+        let metrics = pb::HostMetricsRequest::new(host_id.clone(), metrics);
+        if let Err(e) = client.host(metrics).await {
+            error!("Could not send host metrics! `{e}`");
         }
     }
 }
