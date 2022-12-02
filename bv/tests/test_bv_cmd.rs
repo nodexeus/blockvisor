@@ -95,6 +95,12 @@ fn test_bv_cmd_restart() {
 
 #[test]
 #[serial]
+fn test_bv_host_metrics() {
+    bv_run(&["host", "metrics"], "Used cpu:                 ");
+}
+
+#[test]
+#[serial]
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_start_and_stop_all() {
     const NODES_COUNT: usize = 2;
@@ -503,7 +509,10 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "test".to_string(),
+                        protocol: "helium".to_string(),
+                        node_type: "validator".to_string(),
+                        node_version: "0.0.2".to_string(),
+                        status: 1, // Development
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -522,7 +531,10 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: "some-new-name".to_string(),
                     image: Some(pb::ContainerImage {
-                        url: "test".to_string(),
+                        protocol: "helium".to_string(),
+                        node_type: "validator".to_string(),
+                        node_version: "0.0.2".to_string(),
+                        status: 1, // Development
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -541,7 +553,10 @@ async fn test_bv_cmd_grpc_commands() {
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
-                        url: "test".to_string(),
+                        protocol: "helium".to_string(),
+                        node_type: "validator".to_string(),
+                        node_version: "0.0.2".to_string(),
+                        status: 1, // Development
                     }),
                     blockchain: "helium".to_string(),
                     r#type: json!({"id": 3, "properties": []}).to_string(),
@@ -613,7 +628,10 @@ async fn test_bv_cmd_grpc_commands() {
                 created_at: None,
                 command: Some(pb::node_command::Command::Upgrade(pb::NodeUpgrade {
                     image: Some(pb::ContainerImage {
-                        url: "helium/validator/0.0.2/os.img".to_string(),
+                        protocol: "helium".to_string(),
+                        node_type: "validator".to_string(),
+                        node_version: "0.0.2".to_string(),
+                        status: 1, // Development
                     }),
                 })),
             })),

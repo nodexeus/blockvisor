@@ -421,7 +421,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "sysinfo",
+ "sysinfo 0.26.8",
  "tokio",
  "tokio-stream",
  "toml",
@@ -912,7 +912,7 @@ dependencies = [
  "hyperlocal",
  "serde",
  "serde_json",
- "sysinfo",
+ "sysinfo 0.23.13",
  "thiserror",
  "tokio",
  "tracing",
@@ -1703,6 +1703,15 @@ name = "ntapi"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
+name = "ntapi"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc51db7b362b205941f71232e56c625156eb9a929f8cf74a428fd5bc094a4afc"
 dependencies = [
  "winapi",
 ]
@@ -2567,7 +2576,22 @@ dependencies = [
  "cfg-if",
  "core-foundation-sys",
  "libc",
- "ntapi",
+ "ntapi 0.3.7",
+ "once_cell",
+ "rayon",
+ "winapi",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.26.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29ddf41e393a9133c81d5f0974195366bd57082deac6e0eb02ed39b8341c2bb6"
+dependencies = [
+ "cfg-if",
+ "core-foundation-sys",
+ "libc",
+ "ntapi 0.4.0",
  "once_cell",
  "rayon",
  "winapi",

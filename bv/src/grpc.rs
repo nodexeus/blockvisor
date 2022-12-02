@@ -124,7 +124,7 @@ async fn process_node_command(
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {
-                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url;
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url();
                 nodes
                     .lock()
                     .await
@@ -145,7 +145,7 @@ async fn process_node_command(
                 nodes.lock().await.start(node_id).await?;
             }
             Command::Upgrade(args) => {
-                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url;
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?.url();
                 nodes.lock().await.upgrade(node_id, image).await?;
             }
             Command::Update(_) => unimplemented!(),
@@ -167,4 +167,10 @@ pub fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
             .unwrap(),
     );
     request
+}
+
+impl pb::ContainerImage {
+    pub fn url(&self) -> String {
+        format!("{}/{}/{}/os.img", self.protocol, self.node_type, self.node_version)
+    }
 }

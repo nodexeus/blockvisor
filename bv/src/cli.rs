@@ -209,6 +209,10 @@ pub enum HostCommand {
     /// Collect host system information
     #[clap(alias = "i")]
     Info,
+
+    /// Collect metrics about the current host
+    #[clap(alias = "m")]
+    Metrics,
 }
 
 #[derive(Debug, Subcommand)]

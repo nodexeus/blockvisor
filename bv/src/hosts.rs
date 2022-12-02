@@ -1,4 +1,6 @@
-use sysinfo::{DiskExt, System, SystemExt};
+use std::collections::HashMap;
+use sysinfo::{DiskExt, System, SystemExt, NetworksExt, CpuExt, NetworkExt};
+use crate::grpc::pb;
 
 #[derive(Debug)]
 pub struct HostInfo {
@@ -11,7 +13,8 @@ pub struct HostInfo {
 }
 
 pub fn get_host_info() -> HostInfo {
-    let sys = System::new_all();
+    let mut sys = System::new_all();
+    sys.refresh_all();
 
     let disk_size = sys
         .disks()
@@ -32,4 +35,57 @@ pub fn get_ip_address(ifa_name: &str) -> String {
     let ifas = local_ip_address::list_afinet_netifas().unwrap();
     let (_, ip) = local_ip_address::find_ifa(ifas, ifa_name).unwrap();
     ip.to_string()
+}
+
+#[derive(Debug)]
+pub struct HostMetrics {
+    pub used_cpu: u32,
+    pub used_memory: u64,
+    pub used_disk_space: u64,
+    pub load_one: f64,
+    pub load_five: f64,
+    pub load_fifteen: f64,
+    pub network_received: u64,
+    pub network_sent: u64,
+    pub uptime: u64,
+}
+
+pub fn get_host_metrics() -> HostMetrics {
+    let mut sys = System::new_all();
+    // We need to refresh twice:
+    // https://docs.rs/sysinfo/latest/sysinfo/trait.CpuExt.html#tymethod.cpu_usage
+    sys.refresh_all();
+    sys.refresh_all();
+
+    let load = sys.load_average();
+    HostMetrics {
+        used_cpu: sys.global_cpu_info().cpu_usage() as u32,
+        used_memory: sys.free_memory(),
+        used_disk_space: sys.disks().iter().map(|d| d.available_space()).sum(),
+        load_one: load.one,
+        load_five: load.five,
+        load_fifteen: load.fifteen,
+        network_received: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
+        network_sent: sys.networks().iter().map(|(_, n)| n.total_transmitted()).sum(),
+        uptime: sys.uptime(),
+    }
+}
+
+impl pb::HostMetricsRequest {
+    pub fn new(host_id: String, metrics: HostMetrics) -> Self {
+        let metrics = pb::HostMetrics {
+            used_cpu: Some(metrics.used_cpu),
+            used_memory: Some(metrics.used_memory),
+            used_disk_space: Some(metrics.used_disk_space),
+            load_one: Some(metrics.load_one),
+            load_five: Some(metrics.load_five),
+            load_fifteen: Some(metrics.load_fifteen),
+            network_received: Some(metrics.network_received),
+            network_sent: Some(metrics.network_sent),
+            uptime: Some(metrics.uptime),
+        };
+        Self {
+            metrics: HashMap::from([(host_id, metrics)])
+        }
+    }
 }

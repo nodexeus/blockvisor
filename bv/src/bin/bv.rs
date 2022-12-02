@@ -3,7 +3,7 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
     grpc::pb,
-    hosts::{get_host_info, get_ip_address},
+    hosts::{get_host_info, get_host_metrics, get_ip_address},
     nodes::{CommonData, Nodes},
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
@@ -165,6 +165,18 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
         HostCommand::Info => {
             let info = get_host_info();
             println!("{:?}", info);
+        }
+        HostCommand::Metrics => {
+            let metrics = get_host_metrics();
+            println!("Used cpu:       {:>13} of 100", metrics.used_cpu);
+            println!("Used mem:       {:>13} bytes", metrics.used_memory);
+            println!("Used disk:      {:>13} bytes", metrics.used_disk_space);
+            println!("Load (1 min):   {:>13}%", metrics.load_one);
+            println!("Load (5 mins):  {:>13}%", metrics.load_five);
+            println!("Load (15 mins): {:>13}%", metrics.load_fifteen);
+            println!("Network in:     {:>13} bytes", metrics.network_received);
+            println!("Network out:    {:>13} bytes", metrics.network_sent);
+            println!("Uptime:         {:>13} seconds", metrics.uptime);
         }
     }
 
