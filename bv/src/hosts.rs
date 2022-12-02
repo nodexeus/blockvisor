@@ -63,10 +63,14 @@ pub fn get_host_metrics() -> HostMetrics {
     let load = sys.load_average();
     HostMetrics {
         used_cpu: sys.global_cpu_info().cpu_usage() as u32,
+        // TODO: This produces the wrong result, investigate why.
         used_memory: sys.used_memory(),
         used_disk_space: sys
             .disks()
             .iter()
+            // TODO: this includes all drives, we need to figure out which drives we should count
+            // here and which ones we need to skip. Loopback devices should probably be skipped for
+            // example.
             .map(|d| d.total_space() - d.available_space())
             .sum(),
         load_one: load.one,
