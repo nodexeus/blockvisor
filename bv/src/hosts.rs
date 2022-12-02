@@ -63,8 +63,12 @@ pub fn get_host_metrics() -> HostMetrics {
     let load = sys.load_average();
     HostMetrics {
         used_cpu: sys.global_cpu_info().cpu_usage() as u32,
-        used_memory: sys.free_memory(),
-        used_disk_space: sys.disks().iter().map(|d| d.available_space()).sum(),
+        used_memory: sys.used_memory(),
+        used_disk_space: sys
+            .disks()
+            .iter()
+            .map(|d| d.total_space() - d.available_space())
+            .sum(),
         load_one: load.one,
         load_five: load.five,
         load_fifteen: load.fifteen,
