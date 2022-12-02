@@ -2,7 +2,7 @@ use crate::grpc::pb;
 use anyhow::Result;
 use blockvisord::{
     config::Config,
-    grpc,
+    grpc, hosts,
     logging::setup_logging,
     node_data::NodeStatus,
     node_metrics,
@@ -138,7 +138,7 @@ async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc
 }
 
 async fn host_metrics(host_id: String, endpoint: &Endpoint, token: grpc::AuthToken) {
-    let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
+    let mut timer = tokio::time::interval(hosts::COLLECT_INTERVAL);
     let channel = wait_for_channel(endpoint).await;
     let mut client = grpc::MetricsClient::with_auth(channel, token);
     loop {

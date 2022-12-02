@@ -168,14 +168,15 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
         }
         HostCommand::Metrics => {
             let metrics = get_host_metrics();
-            println!("Used cpu:       {:>13} of 100", metrics.used_cpu);
-            println!("Used mem:       {:>13} bytes", metrics.used_memory);
-            println!("Used disk:      {:>13} bytes", metrics.used_disk_space);
-            println!("Load (1 min):   {:>13} %", metrics.load_one);
-            println!("Load (5 mins):  {:>13} %", metrics.load_five);
-            println!("Load (15 mins): {:>13} %", metrics.load_fifteen);
-            println!("Network in:     {:>13} bytes", metrics.network_received);
-            println!("Network out:    {:>13} bytes", metrics.network_sent);
+            let to_gb = |n| format!("{:.3} GB", n as f64 / 1_000_000_000.0);
+            println!("Used cpu:       {:>13} %", metrics.used_cpu);
+            println!("Used mem:       {:>13}", to_gb(metrics.used_memory));
+            println!("Used disk:      {:>13}", to_gb(metrics.used_disk_space));
+            println!("Load (1 min):   {:>13}", metrics.load_one);
+            println!("Load (5 mins):  {:>13}", metrics.load_five);
+            println!("Load (15 mins): {:>13}", metrics.load_fifteen);
+            println!("Network in:     {:>13}", to_gb(metrics.network_received));
+            println!("Network out:    {:>13}", to_gb(metrics.network_sent));
             println!("Uptime:         {:>13} seconds", metrics.uptime);
         }
     }

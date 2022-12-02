@@ -1,6 +1,9 @@
-use std::collections::HashMap;
-use sysinfo::{DiskExt, System, SystemExt, NetworksExt, CpuExt, NetworkExt};
 use crate::grpc::pb;
+use std::collections::HashMap;
+use sysinfo::{CpuExt, DiskExt, NetworkExt, NetworksExt, System, SystemExt};
+
+/// The interval by which we collect metrics from this host.
+pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 
 #[derive(Debug)]
 pub struct HostInfo {
@@ -55,7 +58,7 @@ pub fn get_host_metrics() -> HostMetrics {
     // We need to refresh twice:
     // https://docs.rs/sysinfo/latest/sysinfo/trait.CpuExt.html#tymethod.cpu_usage
     sys.refresh_all();
-    sys.refresh_all();
+    sys.refresh_cpu_specifics(sysinfo::CpuRefreshKind::new().with_cpu_usage());
 
     let load = sys.load_average();
     HostMetrics {
@@ -66,7 +69,11 @@ pub fn get_host_metrics() -> HostMetrics {
         load_five: load.five,
         load_fifteen: load.fifteen,
         network_received: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
-        network_sent: sys.networks().iter().map(|(_, n)| n.total_transmitted()).sum(),
+        network_sent: sys
+            .networks()
+            .iter()
+            .map(|(_, n)| n.total_transmitted())
+            .sum(),
         uptime: sys.uptime(),
     }
 }
@@ -85,7 +92,7 @@ impl pb::HostMetricsRequest {
             uptime: Some(metrics.uptime),
         };
         Self {
-            metrics: HashMap::from([(host_id, metrics)])
+            metrics: HashMap::from([(host_id, metrics)]),
         }
     }
 }
