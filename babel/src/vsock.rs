@@ -53,13 +53,23 @@ pub async fn serve(
 async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandler>) {
     loop {
         let mut buf = vec![0u8; 5000];
-        let len = stream.read(&mut buf).await.unwrap();
+        let len = match stream.read(&mut buf).await {
+            Ok(len) => len,
+            // If we cannot await new data from the stream anymore we end the task.
+            Err(_) => break,
+        };
         if len == 0 {
             tracing::info!("Vsock stream closed. Shutting down connection handler.");
             break;
         }
         buf.resize(len, 0);
-        let msg = std::str::from_utf8(&buf).unwrap();
+        let msg = match std::str::from_utf8(&buf) {
+            Ok(msg) => msg,
+            Err(e) => {
+                tracing::warn!("Ingoring non-utf8 message: {e}");
+                continue;
+            }
+        };
         if let Err(e) = handle_message(msg, &mut stream, &client).await {
             tracing::debug!("Failed to handle message: {e}");
             let resp = babel_api::BabelResponse::Error(e.to_string());
