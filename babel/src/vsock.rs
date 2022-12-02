@@ -1,15 +1,14 @@
-use std::{sync::Arc, time};
-
-use crate::msg_handler;
 use crate::run_flag::RunFlag;
-use eyre::Context;
+use async_trait::async_trait;
 use futures::StreamExt;
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::broadcast;
 use tokio_vsock::VsockStream;
 
-const VSOCK_HOST_CID: u32 = 3;
-const VSOCK_PORT: u32 = 42;
+#[async_trait]
+pub trait Handler {
+    async fn handle(&self, message: &str) -> eyre::Result<Vec<u8>>;
+}
 
 /// This function tries to read messages from the vsocket and keeps responding to those messages.
 /// Each opened connection gets handled separately by a tokio task and then the listener starts
@@ -17,14 +16,12 @@ const VSOCK_PORT: u32 = 42;
 /// restarts.
 pub async fn serve(
     mut run: RunFlag,
-    cfg: babel_api::config::Babel,
-    logs_rx: broadcast::Receiver<String>,
+    cid: u32,
+    port: u32,
+    handler: Arc<impl Handler + Send + Sync + 'static>,
 ) -> eyre::Result<()> {
-    let msf_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
-    let client = Arc::new(msf_handler);
-
     tracing::debug!("Binding to virtual socket...");
-    let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_PORT)?;
+    let listener = tokio_vsock::VsockListener::bind(cid, port)?;
     tracing::debug!("Bound");
     let mut incoming = listener.incoming();
     tracing::debug!("Receiving incoming messages");
@@ -35,10 +32,10 @@ pub async fn serve(
                     match res {
                         Ok(stream) => {
                             tracing::debug!("Stream opened, delegating to handler.");
-                            tokio::spawn(serve_stream(stream, Arc::clone(&client)));
+                            tokio::spawn(serve_stream(stream, handler.clone()));
                         }
                         Err(_) => {
-                            tracing::debug!("Receiving streams failed. Aborting babel.");
+                            tracing::debug!("Receiving streams failed. Aborting server.");
                             run.stop();
                         }
                     }
@@ -50,7 +47,7 @@ pub async fn serve(
     Ok(())
 }
 
-async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandler>) {
+async fn serve_stream(mut stream: VsockStream, handler: Arc<impl Handler>) {
     loop {
         let mut buf = vec![0u8; 5000];
         let len = match stream.read(&mut buf).await {
@@ -70,33 +67,20 @@ async fn serve_stream(mut stream: VsockStream, client: Arc<msg_handler::MsgHandl
                 continue;
             }
         };
-        if let Err(e) = handle_message(msg, &mut stream, &client).await {
-            tracing::debug!("Failed to handle message: {e}");
-            let resp = babel_api::BabelResponse::Error(e.to_string());
-            let _ = write_json(&mut stream, resp).await;
+        if let Err(e) = handle_message(msg, &mut stream, &handler).await {
+            tracing::warn!("Failed to handle message: {e}");
         }
     }
 }
 
 async fn handle_message(
-    msg: &str,
+    message: &str,
     stream: &mut tokio_vsock::VsockStream,
-    msg_handler: &msg_handler::MsgHandler,
+    handler: &Arc<impl Handler>,
 ) -> eyre::Result<()> {
-    tracing::debug!("Received message: `{msg}`");
-    let request: babel_api::BabelRequest =
-        serde_json::from_str(msg).wrap_err(format!("Could not parse request as json '{msg}'"))?;
-    let response = msg_handler.handle(request).await?;
+    tracing::debug!("Received message: `{message}`");
+    let response = handler.handle(message).await?;
     tracing::debug!("Sending response: {response:?}");
-    write_json(stream, response).await?;
-    Ok(())
-}
-
-async fn write_json<W: tokio::io::AsyncWrite + Unpin>(
-    writer: &mut W,
-    message: impl serde::Serialize,
-) -> eyre::Result<()> {
-    let msg = serde_json::to_vec(&message)?;
-    writer.write_all(&msg).await?;
+    stream.write_all(&response).await?;
     Ok(())
 }
