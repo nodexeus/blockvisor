@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     env::*,
-    node_data::{NodeData, NodeStatus},
+    node_data::{NodeData, NodeImage, NodeStatus},
     utils::{get_process_pid, run_cmd},
 };
 
@@ -56,7 +56,7 @@ impl Connection {
 pub const FC_BIN_NAME: &str = "firecracker";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
-const ROOT_FS_FILE: &str = "os.img";
+pub const ROOT_FS_FILE: &str = "os.img";
 const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_VSOCK_PORT: u32 = 42;
@@ -113,13 +113,19 @@ impl Node {
 
     /// Updates OS image for VM.
     #[instrument(skip(self))]
-    pub async fn upgrade(&mut self, image: &str) -> Result<()> {
+    pub async fn upgrade(&mut self, image: &NodeImage) -> Result<()> {
         if self.status() != NodeStatus::Stopped {
             bail!("Node should be stopped before running upgrade");
         }
+        if image.protocol != self.data.image.protocol {
+            bail!("Cannot upgrade protocol to `{}`", image.protocol);
+        }
+        if image.node_type != self.data.image.node_type {
+            bail!("Cannot upgrade node type to `{}`", image.node_type);
+        }
 
         Node::copy_os_image(&self.data.id, image).await?;
-        self.data.image = image.to_string();
+        self.data.image = image.clone();
         self.data.save().await
     }
 
@@ -221,9 +227,7 @@ impl Node {
     }
 
     /// Copy OS drive into chroot location.
-    async fn copy_os_image(id: &Uuid, image: &str) -> Result<()> {
-        // TODO: we need to check blockchain and node type as well
-        // E.g. it makes little sense to upgrade helium validator into eth beacon
+    async fn copy_os_image(id: &Uuid, image: &NodeImage) -> Result<()> {
         let root_fs_path = Self::get_normalized_root_fs_path(image)?;
 
         let data_dir = CHROOT_PATH
@@ -244,8 +248,8 @@ impl Node {
     /// Check root if fs source path is correct and exists
     ///
     /// Also resolve symlinks into canonical path
-    fn get_normalized_root_fs_path(image: &str) -> Result<PathBuf> {
-        let root_fs_path = IMAGE_CACHE_DIR.join(image).canonicalize()?;
+    fn get_normalized_root_fs_path(image: &NodeImage) -> Result<PathBuf> {
+        let root_fs_path = IMAGE_CACHE_DIR.join(image.url()).canonicalize()?;
         if root_fs_path.file_name() != Some(OsStr::new(ROOT_FS_FILE)) {
             bail!(
                 "Bad root image file name: `{:?}` in `{}`",

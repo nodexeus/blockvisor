@@ -9,10 +9,16 @@ enum NodeStatus {
     Failed = 3;
 }
 
+message NodeImage {
+    string protocol = 1;
+    string node_type = 2;
+    string node_version = 3;
+}
+
 message Node {
     string id = 1;
     string name = 2;
-    string image = 3;
+    NodeImage image = 3;
     string ip = 4;
     string gateway = 5;
     NodeStatus status = 6;
@@ -32,7 +38,7 @@ message HealthResponse {
 message CreateNodeRequest {
     string id = 1;
     string name = 2;
-    string image = 3;
+    NodeImage image = 3;
     string ip = 4;
     string gateway = 5;
 }
@@ -41,7 +47,7 @@ message CreateNodeResponse {}
 
 message UpgradeNodeRequest {
     string id = 1;
-    string image = 2;
+    NodeImage image = 2;
 }
 
 message UpgradeNodeResponse {}

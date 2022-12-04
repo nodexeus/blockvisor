@@ -18,7 +18,7 @@ use crate::{
     key_service::KeyService,
     network_interface::NetworkInterface,
     node::Node,
-    node_data::{NodeData, NodeStatus},
+    node_data::{NodeData, NodeImage, NodeStatus},
 };
 
 fn id_not_found(id: &Uuid) -> anyhow::Error {
@@ -55,7 +55,7 @@ impl Nodes {
         &mut self,
         id: Uuid,
         name: String,
-        image: String,
+        image: NodeImage,
         ip: String,
         gateway: String,
     ) -> Result<()> {
@@ -94,7 +94,7 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    pub async fn upgrade(&mut self, id: Uuid, image: String) -> Result<()> {
+    pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
         let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;

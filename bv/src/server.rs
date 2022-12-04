@@ -4,8 +4,7 @@ pub mod bv_pb {
     tonic::include_proto!("blockjoy.blockvisor.v1");
 }
 
-use crate::server::bv_pb::{GetNodeLogsRequest, GetNodeLogsResponse};
-use crate::{node_data::NodeStatus, node_metrics, nodes::Nodes};
+use crate::{node_data, node_data::NodeStatus, node_metrics, nodes::Nodes};
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
@@ -48,11 +47,19 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
     ) -> Result<Response<bv_pb::CreateNodeResponse>, Status> {
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
+        let image = request
+            .image
+            .ok_or_else(|| Status::invalid_argument("Image not provided"))?;
+        let image = node_data::NodeImage {
+            protocol: image.protocol,
+            node_type: image.node_type,
+            node_version: image.node_version,
+        };
 
         self.nodes
             .lock()
             .await
-            .create(id, request.name, request.image, request.ip, request.gateway)
+            .create(id, request.name, image, request.ip, request.gateway)
             .await
             .map_err(|e| Status::unknown(e.to_string()))?;
 
@@ -67,11 +74,19 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
     ) -> Result<Response<bv_pb::UpgradeNodeResponse>, Status> {
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
+        let image = request
+            .image
+            .ok_or_else(|| Status::invalid_argument("Image not provided"))?;
+        let image = node_data::NodeImage {
+            protocol: image.protocol,
+            node_type: image.node_type,
+            node_version: image.node_version,
+        };
 
         self.nodes
             .lock()
             .await
-            .upgrade(id, request.image)
+            .upgrade(id, image)
             .await
             .map_err(|e| Status::unknown(e.to_string()))?;
 
@@ -149,10 +164,15 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
                 NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
                 NodeStatus::Failed => bv_pb::NodeStatus::Failed,
             };
+            let image = bv_pb::NodeImage {
+                protocol: node.image.protocol,
+                node_type: node.image.node_type,
+                node_version: node.image.node_version,
+            };
             let n = bv_pb::Node {
                 id: node.id.to_string(),
                 name: node.name,
-                image: node.image,
+                image: Some(image),
                 status: status.into(),
                 ip: node.network_interface.ip.to_string(),
                 gateway: node.network_interface.gateway.to_string(),
@@ -194,8 +214,8 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 
     async fn get_node_logs(
         &self,
-        request: Request<GetNodeLogsRequest>,
-    ) -> Result<Response<GetNodeLogsResponse>, Status> {
+        request: Request<bv_pb::GetNodeLogsRequest>,
+    ) -> Result<Response<bv_pb::GetNodeLogsResponse>, Status> {
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.id)?;
         let logs = self
@@ -315,6 +335,16 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 impl fmt::Display for bv_pb::NodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+impl fmt::Display for bv_pb::NodeImage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}",
+            self.protocol, self.node_type, self.node_version
+        )
     }
 }
 

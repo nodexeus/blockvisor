@@ -1,3 +1,4 @@
+use crate::node_data::NodeImage;
 use crate::nodes::Nodes;
 use anyhow::{anyhow, bail, Result};
 use pb::command_flow_client::CommandFlowClient;
@@ -124,10 +125,12 @@ async fn process_node_command(
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {
-                let image = args
-                    .image
-                    .ok_or_else(|| anyhow!("Image not provided"))?
-                    .url();
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?;
+                let image = NodeImage {
+                    protocol: image.protocol,
+                    node_type: image.node_type,
+                    node_version: image.node_version,
+                };
                 nodes
                     .lock()
                     .await
@@ -148,10 +151,12 @@ async fn process_node_command(
                 nodes.lock().await.start(node_id).await?;
             }
             Command::Upgrade(args) => {
-                let image = args
-                    .image
-                    .ok_or_else(|| anyhow!("Image not provided"))?
-                    .url();
+                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?;
+                let image = NodeImage {
+                    protocol: image.protocol,
+                    node_type: image.node_type,
+                    node_version: image.node_version,
+                };
                 nodes.lock().await.upgrade(node_id, image).await?;
             }
             Command::Update(_) => unimplemented!(),
@@ -173,13 +178,4 @@ pub fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
             .unwrap(),
     );
     request
-}
-
-impl pb::ContainerImage {
-    pub fn url(&self) -> String {
-        format!(
-            "{}/{}/{}/os.img",
-            self.protocol, self.node_type, self.node_version
-        )
-    }
 }

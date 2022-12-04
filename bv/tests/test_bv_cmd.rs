@@ -48,20 +48,18 @@ fn bv_run(commands: &[&str], stdout_pattern: &str) {
 }
 
 #[cfg(target_os = "linux")]
-fn create_node(chain_id: &str) -> String {
+fn create_node(image: &str) -> String {
     use std::str;
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", chain_id]);
+    let cmd = cmd.args(&["node", "create", image]);
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
     let stderr = str::from_utf8(&output.stderr).unwrap();
     println!("create stdout: {stdout}");
     println!("create stderr: {stderr}");
     stdout
-        .trim_start_matches(&format!(
-            "Created new node from `{chain_id}` image with ID "
-        ))
+        .trim_start_matches(&format!("Created new node from `{image}` image with ID "))
         .split('`')
         .nth(1)
         .unwrap()
@@ -107,7 +105,7 @@ fn test_bv_cmd_node_start_and_stop_all() {
     println!("create {NODES_COUNT} nodes");
     let mut nodes: Vec<String> = Default::default();
     for _ in 0..NODES_COUNT {
-        nodes.push(create_node("test"));
+        nodes.push(create_node("helium/validator/0.0.1"));
     }
 
     println!("start all created nodes");
@@ -129,7 +127,7 @@ fn test_bv_cmd_node_start_and_stop_all() {
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_logs() {
     println!("create a node");
-    let vm_id = &create_node("test");
+    let vm_id = &create_node("helium/validator/0.0.1");
     println!("create vm_id: {vm_id}");
 
     println!("start node");
@@ -150,7 +148,7 @@ fn test_bv_cmd_logs() {
 #[cfg(target_os = "linux")]
 fn test_bv_cmd_node_lifecycle() {
     println!("create a node");
-    let vm_id = &create_node("test");
+    let vm_id = &create_node("helium/validator/0.0.1");
     println!("create vm_id: {vm_id}");
 
     println!("stop stopped node");
@@ -182,7 +180,7 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("upgrade running node");
     bv_run(
-        &["node", "upgrade", vm_id, "helium/validator/0.0.2/os.img"],
+        &["node", "upgrade", vm_id, "helium/validator/0.0.2"],
         "Upgraded node",
     );
 
@@ -206,7 +204,7 @@ async fn test_bv_cmd_node_recovery() {
     use blockvisord::{node::FC_BIN_NAME, utils};
 
     println!("create a node");
-    let vm_id = &create_node("test");
+    let vm_id = &create_node("helium/validator/0.0.1");
     println!("create vm_id: {vm_id}");
 
     println!("start stopped node");
@@ -396,7 +394,7 @@ async fn test_bv_cmd_init_localhost() {
             blockchain_id: Some(blockchain_id.to_string()),
             name: None,
             groups: vec![],
-            version: None,
+            version: None, // will be translated into "latest"
             ip: None,
             r#type: Some(json!({"id": 3, "properties": []}).to_string()),
             address: None,

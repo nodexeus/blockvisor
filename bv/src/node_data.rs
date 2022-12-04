@@ -6,7 +6,7 @@ use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::node::FC_BIN_NAME;
+use crate::node::{FC_BIN_NAME, ROOT_FS_FILE};
 use crate::utils::get_process_pid;
 use crate::{env::REGISTRY_CONFIG_DIR, network_interface::NetworkInterface};
 
@@ -24,15 +24,33 @@ impl fmt::Display for NodeStatus {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NodeImage {
+    pub protocol: String,
+    pub node_type: String,
+    pub node_version: String,
+}
+
+impl NodeImage {
+    pub fn url(&self) -> String {
+        format!(
+            "{}/{}/{}/{ROOT_FS_FILE}",
+            self.protocol.to_lowercase(),
+            self.node_type,
+            self.node_version
+        )
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NodeData {
     pub id: Uuid,
     pub name: String,
-    pub image: String,
     pub expected_status: NodeStatus,
     /// Whether or not this node should check for updates and then update itself. The default is
     /// `false`.
     #[serde(default)]
     pub self_update: bool,
+    pub image: NodeImage,
     pub network_interface: NetworkInterface,
 }
 
