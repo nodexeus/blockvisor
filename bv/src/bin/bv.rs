@@ -291,17 +291,11 @@ impl NodeClient {
 
     async fn process_node_command(mut self, command: NodeCommand) -> Result<()> {
         match command {
-            NodeCommand::List { running, image } => {
+            NodeCommand::List { running } => {
                 let nodes = self.fetch_nodes().await?;
                 let mut nodes = nodes
                     .iter()
-                    .filter(|n| {
-                        image
-                            .as_ref()
-                            .map(|image| n.image.contains(image))
-                            .unwrap_or(true)
-                            && (!running || (n.status == bv_pb::NodeStatus::Running as i32))
-                    })
+                    .filter(|n| (!running || (n.status == bv_pb::NodeStatus::Running as i32)))
                     .peekable();
                 if nodes.peek().is_some() {
                     let mut table = vec![];
