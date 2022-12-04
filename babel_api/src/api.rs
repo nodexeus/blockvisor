@@ -1,6 +1,19 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SupervisorRequest {
+    Logs,
+    Ping,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SupervisorResponse {
+    Pong,
+    Logs(Vec<String>),
+    Error(String),
+}
+
 /// Each request that comes over the VSock to babel must be a piece of JSON that can be
 /// deserialized into this struct.
 #[derive(Debug, Serialize, Deserialize)]

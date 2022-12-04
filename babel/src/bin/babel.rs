@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use babel::vsock;
 use babel::{config, logging, run_flag::RunFlag, supervisor};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::fs::DirBuilder;
 use tokio::sync::broadcast;
@@ -10,7 +11,8 @@ use tokio::sync::broadcast;
 const CONFIG_PATH: &str = "/etc/babel.conf";
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
 const VSOCK_HOST_CID: u32 = 3;
-const VSOCK_PORT: u32 = 42;
+const VSOCK_SUPERVISOR_PORT: u32 = 41;
+const VSOCK_BABEL_PORT: u32 = 42;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -34,17 +36,33 @@ async fn main() -> eyre::Result<()> {
         .await?;
     tracing::debug!("Mounted data directory: {output:?}");
 
+    let cfg = Arc::new(cfg);
     let run = RunFlag::run_until_ctrlc();
     let supervisor_cfg = cfg.supervisor.clone();
 
     let supervisor = supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg);
-    let logs_rx = supervisor.get_logs_rx();
-    let (supervisor, server) = tokio::join!(
+    let rx1 = supervisor.get_logs_rx();
+    let rx2 = supervisor.get_logs_rx();
+    let (supervisor, sup_server, msg_server) = tokio::join!(
         supervisor.run(),
-        serve(run, cfg, VSOCK_HOST_CID, VSOCK_PORT, logs_rx)
+        serve(
+            run.clone(),
+            cfg.clone(),
+            VSOCK_HOST_CID,
+            VSOCK_SUPERVISOR_PORT,
+            rx1,
+        ),
+        serve(
+            run.clone(),
+            cfg.clone(),
+            VSOCK_HOST_CID,
+            VSOCK_BABEL_PORT,
+            rx2,
+        )
     );
     supervisor?;
-    server
+    msg_server?;
+    sup_server
 }
 
 struct SysTimer;
@@ -63,13 +81,12 @@ impl supervisor::Timer for SysTimer {
 #[cfg(target_os = "linux")]
 async fn serve(
     run: RunFlag,
-    cfg: babel_api::config::Babel,
+    cfg: Arc<babel_api::config::Babel>,
     cid: u32,
     port: u32,
     logs_rx: broadcast::Receiver<String>,
 ) -> eyre::Result<()> {
     use babel::msg_handler;
-    use std::sync::Arc;
     use std::time;
 
     let msg_handler = msg_handler::MsgHandler::new(cfg, time::Duration::from_secs(10), logs_rx)?;
@@ -79,7 +96,7 @@ async fn serve(
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
-    _cfg: babel_api::config::Babel,
+    _cfg: Arc<babel_api::config::Babel>,
     _cid: u32,
     _port: u32,
     _logs_rx: broadcast::Receiver<String>,
