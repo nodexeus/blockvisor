@@ -1,25 +1,22 @@
 use async_trait::async_trait;
 #[cfg(target_os = "linux")]
 use babel::vsock;
-use babel::{config, run_flag::RunFlag, supervisor};
+use babel::{config, logging, run_flag::RunFlag, supervisor};
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 use tokio::fs::DirBuilder;
 use tokio::sync::broadcast;
-use tracing_subscriber::util::SubscriberInitExt;
 
+const CONFIG_PATH: &str = "/etc/babel.conf";
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
 const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_PORT: u32 = 42;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .finish()
-        .init();
+    logging::setup_logging()?;
 
-    let cfg_path = Path::new("/etc/babel.conf");
+    let cfg_path = Path::new(CONFIG_PATH);
     tracing::info!("Loading babel configuration at {}", cfg_path.display());
     let cfg = config::load(cfg_path).await?;
     tracing::debug!("Loaded babel configuration: {:?}", &cfg);
