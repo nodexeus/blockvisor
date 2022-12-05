@@ -52,13 +52,7 @@ async fn main() -> eyre::Result<()> {
             VSOCK_SUPERVISOR_PORT,
             rx1,
         ),
-        serve(
-            run.clone(),
-            cfg.clone(),
-            VSOCK_HOST_CID,
-            VSOCK_BABEL_PORT,
-            rx2,
-        )
+        serve(run, cfg, VSOCK_HOST_CID, VSOCK_BABEL_PORT, rx2)
     );
     supervisor?;
     msg_server?;

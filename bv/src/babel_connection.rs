@@ -13,19 +13,25 @@ const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
 const BABEL_START_RETRY_DELAY: Duration = Duration::from_secs(10);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
-const BABEL_VSOCK_PORT: u32 = 42;
 
 #[derive(Debug)]
 pub enum BabelConnection {
     Closed,
-    Open { babel_conn: UnixStream },
+    Open {
+        babel_conn: UnixStream,
+        guest_port: u32,
+    },
 }
 
 impl BabelConnection {
     /// Establishes a new connection to the VM. Note that this fails if the VM hasn't started yet.
     /// It also initializes that connection by sending the opening message. Therefore, if this
     /// function succeeds the connection is guaranteed to be writeable at the moment of returning.
-    pub async fn connect(node_id: &uuid::Uuid, max_delay: Duration) -> Result<UnixStream> {
+    pub async fn connect(
+        node_id: &uuid::Uuid,
+        guest_port: u32,
+        max_delay: Duration,
+    ) -> Result<UnixStream> {
         use std::io::ErrorKind::WouldBlock;
 
         // We are going to connect to the central socket for this VM. Later we will specify which
@@ -58,7 +64,7 @@ impl BabelConnection {
         // We check this by asserting that the first message received starts with `OK`. Popping
         // this message here prevents us from having to check for the opening message elsewhere
         // were we expect the response to be valid json.
-        let open_message = format!("CONNECT {BABEL_VSOCK_PORT}\n");
+        let open_message = format!("CONNECT {guest_port}\n");
         debug!("Sending open message : `{open_message:?}`.");
         timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
         debug!("Sent open message.");
@@ -87,13 +93,13 @@ impl BabelConnection {
         timeout(SOCKET_TIMEOUT, resp).await?
     }
 
-    pub async fn wait_for_connect(node_id: &uuid::Uuid) -> Result<UnixStream> {
-        match Self::connect(node_id, BABEL_START_TIMEOUT).await {
+    pub async fn wait_for_connect(node_id: &uuid::Uuid, guest_port: u32) -> Result<UnixStream> {
+        match Self::connect(node_id, guest_port, BABEL_START_TIMEOUT).await {
             Ok(conn) => Ok(conn),
             Err(_) => {
                 // Extremely scientific retrying mechanism
                 sleep(BABEL_START_RETRY_DELAY).await;
-                Self::connect(node_id, BABEL_START_TIMEOUT).await
+                Self::connect(node_id, guest_port, BABEL_START_TIMEOUT).await
             }
         }
     }
@@ -103,7 +109,10 @@ impl BabelConnection {
         use BabelConnection::*;
         match self {
             Closed => None,
-            Open { babel_conn } => Some(babel_conn),
+            Open {
+                babel_conn,
+                guest_port: _,
+            } => Some(babel_conn),
         }
     }
 
@@ -111,6 +120,18 @@ impl BabelConnection {
     pub fn try_conn_mut(&mut self) -> Result<&mut UnixStream> {
         self.conn_mut()
             .ok_or_else(|| anyhow!("Tried to get babel connection while there isn't one"))
+    }
+
+    /// Returns babel connection guest port, if there is active connection.
+    pub fn port(&self) -> Option<u32> {
+        use BabelConnection::*;
+        match self {
+            Closed => None,
+            Open {
+                babel_conn: _,
+                guest_port,
+            } => Some(*guest_port),
+        }
     }
 
     /// Waits for the socket to become readable, then writes the data as json to the socket. The max

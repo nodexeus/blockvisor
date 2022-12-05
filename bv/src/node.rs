@@ -7,8 +7,9 @@ use std::{
     str::FromStr,
     time::Duration,
 };
+use tokio::io::AsyncWriteExt;
 use tokio::{fs::DirBuilder, time::sleep};
-use tracing::{debug, instrument, trace, warn};
+use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -32,6 +33,8 @@ const FC_SOCKET_PATH: &str = "/firecracker.socket";
 pub const ROOT_FS_FILE: &str = "os.img";
 pub const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
+const BABEL_SUP_VSOCK_PORT: u32 = 41;
+const BABEL_VSOCK_PORT: u32 = 42;
 
 impl Node {
     /// Creates a new node according to specs.
@@ -60,11 +63,16 @@ impl Node {
                 // Since this is the startup phase it doesn't make sense to wait a long time
                 // for the nodes to come online. For that reason we restrict the allowed delay
                 // further down to one second.
-                let babel_conn = BabelConnection::connect(&data.id, Duration::from_secs(1)).await?;
+                let guest_port = BABEL_VSOCK_PORT;
+                let babel_conn =
+                    BabelConnection::connect(&data.id, guest_port, Duration::from_secs(1)).await?;
                 debug!("Established babel connection");
                 (
                     firec::MachineState::RUNNING { pid },
-                    BabelConnection::Open { babel_conn },
+                    BabelConnection::Open {
+                        babel_conn,
+                        guest_port,
+                    },
                 )
             }
             Err(_) => (firec::MachineState::SHUTOFF, BabelConnection::Closed),
@@ -113,10 +121,16 @@ impl Node {
 
         self.machine.start().await?;
         let node_id = self.id();
-        let babel_conn = BabelConnection::wait_for_connect(&node_id).await?;
-        self.babel_conn = BabelConnection::Open { babel_conn };
-        let resp = self.send(babel_api::BabelRequest::Ping).await;
-        if !matches!(resp, Ok(babel_api::BabelResponse::Pong)) {
+        let guest_port = BABEL_SUP_VSOCK_PORT;
+        let babel_conn = BabelConnection::wait_for_connect(&node_id, guest_port).await?;
+        self.babel_conn = BabelConnection::Open {
+            babel_conn,
+            guest_port,
+        };
+        let resp = self
+            .send(babel_api::SupervisorRequest::Ping, BABEL_SUP_VSOCK_PORT)
+            .await;
+        if !matches!(resp, Ok(babel_api::SupervisorResponse::Pong)) {
             warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
         }
 
@@ -321,7 +335,7 @@ impl Node {
             name: method.to_string(),
         });
         debug!("Calling method: {method}");
-        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let resp: babel_api::BabelResponse = self.send(request, BABEL_VSOCK_PORT).await?;
         let inner = match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
                 value,
@@ -335,7 +349,7 @@ impl Node {
     /// blockchain that is not listed here will result in an error being returned.
     pub async fn capabilities(&mut self) -> Result<Vec<String>> {
         let request = babel_api::BabelRequest::ListCapabilities;
-        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let resp: babel_api::BabelResponse = self.send(request, BABEL_VSOCK_PORT).await?;
         let capabilities = match resp {
             babel_api::BabelResponse::ListCapabilities(caps) => caps,
             e => bail!("Unexpected BabelResponse for `capabilities`: `{e:?}`"),
@@ -351,10 +365,10 @@ impl Node {
 
     /// Returns the list of logs from blockchain entry_points.
     pub async fn logs(&mut self) -> Result<Vec<String>> {
-        let request = babel_api::BabelRequest::Logs;
-        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let request = babel_api::SupervisorRequest::Logs;
+        let resp: babel_api::SupervisorResponse = self.send(request, BABEL_SUP_VSOCK_PORT).await?;
         let logs = match resp {
-            babel_api::BabelResponse::Logs(logs) => logs,
+            babel_api::SupervisorResponse::Logs(logs) => logs,
             e => bail!("Unexpected BabelResponse for `logs`: `{e:?}`"),
         };
         Ok(logs)
@@ -363,7 +377,7 @@ impl Node {
     /// Returns blockchain node keys.
     pub async fn download_keys(&mut self) -> Result<Vec<babel_api::BlockchainKey>> {
         let request = babel_api::BabelRequest::DownloadKeys;
-        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let resp: babel_api::BabelResponse = self.send(request, BABEL_VSOCK_PORT).await?;
         let keys = match resp {
             babel_api::BabelResponse::Keys(keys) => keys,
             e => bail!("Unexpected BabelResponse for `download_keys`: `{e:?}`"),
@@ -374,7 +388,7 @@ impl Node {
     /// Sets blockchain node keys.
     pub async fn upload_keys(&mut self, keys: Vec<babel_api::BlockchainKey>) -> Result<()> {
         let request = babel_api::BabelRequest::UploadKeys(keys);
-        let resp: babel_api::BabelResponse = self.send(request).await?;
+        let resp: babel_api::BabelResponse = self.send(request, BABEL_VSOCK_PORT).await?;
         match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
                 value,
@@ -392,11 +406,32 @@ impl Node {
 
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to
     /// send some request and then obtain a response back.
-    async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(
+    pub async fn send<S: serde::ser::Serialize, D: serde::de::DeserializeOwned>(
         &mut self,
         data: S,
+        port: u32,
     ) -> Result<D> {
-        self.babel_conn.write_data(data).await?;
-        self.babel_conn.read_data().await
+        match &mut self.babel_conn {
+            BabelConnection::Closed => bail!("Cannot send data: babel connection is closed"),
+            BabelConnection::Open {
+                babel_conn,
+                guest_port,
+            } => {
+                if *guest_port != port {
+                    info!("Reconnecting babel to port: {port}");
+                    babel_conn.shutdown().await?;
+                    let babel_conn =
+                        BabelConnection::connect(&self.data.id, port, Duration::from_secs(1))
+                            .await?;
+                    self.babel_conn = BabelConnection::Open {
+                        babel_conn,
+                        guest_port: port,
+                    };
+                };
+
+                self.babel_conn.write_data(data).await?;
+                self.babel_conn.read_data().await
+            }
+        }
     }
 }
