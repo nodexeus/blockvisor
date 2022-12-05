@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{
@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
     time::Duration,
 };
-use tokio::{fs::DirBuilder, net::UnixStream, time::sleep};
+use tokio::{fs::DirBuilder, time::sleep};
 use tracing::{debug, instrument, trace, warn};
 use uuid::Uuid;
 
@@ -52,15 +52,19 @@ impl Node {
 
     /// Returns node previously created on this host.
     #[instrument]
-    pub async fn connect(data: NodeData, babel_conn: Option<UnixStream>) -> Result<Self> {
+    pub async fn connect(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
         let (state, babel_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => {
-                let c = babel_conn.ok_or_else(|| anyhow!("Node running, need babel_conn"))?;
+                // Since this is the startup phase it doesn't make sense to wait a long time
+                // for the nodes to come online. For that reason we restrict the allowed delay
+                // further down to one second.
+                let babel_conn = BabelConnection::connect(&data.id, Duration::from_secs(1)).await?;
+                debug!("Established babel connection");
                 (
                     firec::MachineState::RUNNING { pid },
-                    BabelConnection::Open { babel_conn: c },
+                    BabelConnection::Open { babel_conn },
                 )
             }
             Err(_) => (firec::MachineState::SHUTOFF, BabelConnection::Closed),
@@ -109,14 +113,7 @@ impl Node {
 
         self.machine.start().await?;
         let node_id = self.id();
-        let babel_conn = match BabelConnection::connect(&node_id).await {
-            Ok(conn) => Ok(conn),
-            Err(_) => {
-                // Extremely scientific retrying mechanism
-                sleep(Duration::from_secs(10)).await;
-                BabelConnection::connect(&node_id).await
-            }
-        }?;
+        let babel_conn = BabelConnection::wait_for_connect(&node_id).await?;
         self.babel_conn = BabelConnection::Open { babel_conn };
         let resp = self.send(babel_api::BabelRequest::Ping).await;
         if !matches!(resp, Ok(babel_api::BabelResponse::Pong)) {

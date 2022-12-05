@@ -7,11 +7,9 @@ use std::path::Path;
 use tokio::fs::{self, read_dir};
 use tokio::sync::broadcast::{self, Sender};
 use tokio::sync::OnceCell;
-use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
-use crate::babel_connection::BabelConnection;
 use crate::{
     config::Config,
     env::{REGISTRY_CONFIG_DIR, REGISTRY_CONFIG_FILE},
@@ -291,18 +289,7 @@ impl Nodes {
                 continue;
             }
             match NodeData::load(&path)
-                .and_then(|data| async {
-                    // Since this is the startup phase it doesn't make sense to wait a long time
-                    // for the nodes to come online. For that reason we restrict the allowed delay
-                    // further down to one second.
-                    let max_delay = std::time::Duration::from_secs(1);
-                    let babel_conn = timeout(max_delay, BabelConnection::connect(&data.id))
-                        .await
-                        .ok()
-                        .and_then(Result::ok);
-                    debug!("Established babel connection");
-                    Node::connect(data, babel_conn).await
-                })
+                .and_then(|data| async { Node::connect(data).await })
                 .await
             {
                 Ok(node) => {

@@ -10,6 +10,7 @@ use tracing::{debug, error, warn};
 use crate::{env::*, node::VSOCK_PATH};
 
 const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
+const BABEL_START_RETRY_DELAY: Duration = Duration::from_secs(10);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 const BABEL_VSOCK_PORT: u32 = 42;
@@ -24,7 +25,7 @@ impl BabelConnection {
     /// Establishes a new connection to the VM. Note that this fails if the VM hasn't started yet.
     /// It also initializes that connection by sending the opening message. Therefore, if this
     /// function succeeds the connection is guaranteed to be writeable at the moment of returning.
-    pub async fn connect(node_id: &uuid::Uuid) -> Result<UnixStream> {
+    pub async fn connect(node_id: &uuid::Uuid, max_delay: Duration) -> Result<UnixStream> {
         use std::io::ErrorKind::WouldBlock;
 
         // We are going to connect to the central socket for this VM. Later we will specify which
@@ -44,7 +45,7 @@ impl BabelConnection {
             let maybe_conn = UnixStream::connect(&socket).await;
             match maybe_conn {
                 Ok(conn) => break Ok(conn),
-                Err(e) if elapsed() < BABEL_START_TIMEOUT => {
+                Err(e) if elapsed() < max_delay => {
                     debug!("No socket file yet, retrying in 5 seconds: {e}");
                     sleep(std::time::Duration::from_secs(5)).await;
                 }
@@ -84,6 +85,17 @@ impl BabelConnection {
             Ok(conn)
         };
         timeout(SOCKET_TIMEOUT, resp).await?
+    }
+
+    pub async fn wait_for_connect(node_id: &uuid::Uuid) -> Result<UnixStream> {
+        match Self::connect(node_id, BABEL_START_TIMEOUT).await {
+            Ok(conn) => Ok(conn),
+            Err(_) => {
+                // Extremely scientific retrying mechanism
+                sleep(BABEL_START_RETRY_DELAY).await;
+                Self::connect(node_id, BABEL_START_TIMEOUT).await
+            }
+        }
     }
 
     /// Returns the open babel connection, if there is one.
