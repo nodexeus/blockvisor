@@ -11,6 +11,7 @@ use tokio::time::timeout;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
+use crate::babel_connection::BabelConnection;
 use crate::{
     config::Config,
     env::{REGISTRY_CONFIG_DIR, REGISTRY_CONFIG_FILE},
@@ -295,7 +296,7 @@ impl Nodes {
                     // for the nodes to come online. For that reason we restrict the allowed delay
                     // further down to one second.
                     let max_delay = std::time::Duration::from_secs(1);
-                    let babel_conn = timeout(max_delay, Node::conn(data.id))
+                    let babel_conn = timeout(max_delay, BabelConnection::connect(&data.id))
                         .await
                         .ok()
                         .and_then(Result::ok);

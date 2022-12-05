@@ -1,3 +1,4 @@
+pub mod babel_connection;
 pub mod cli;
 pub mod config;
 pub mod env;
