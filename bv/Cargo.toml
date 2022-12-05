@@ -48,6 +48,7 @@ tracing = "0.1.34"
 tracing-subscriber = {version = "0.3.11", features = ["env-filter", "fmt", "std"], default-features = false}
 uuid = {version = "1.0.0", features = ["serde", "v4"]}
 fs_extra = "1.2.0"
+tower = "0.4.13"
 
 [build-dependencies]
 tonic-build = {version = "0.7", features = ["prost"]}
@@ -55,6 +56,8 @@ tonic-build = {version = "0.7", features = ["prost"]}
 [dev-dependencies]
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
+mockall = "0.11.3"
 jsonwebtoken = "7.2.0"
 predicates = "2.1.1"
 serial_test = "0.9.0"
+tokio-stream = {version = "0.1.9", features = ["net"]}

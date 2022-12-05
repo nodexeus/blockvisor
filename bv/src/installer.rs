@@ -1,8 +1,15 @@
+use crate::server::bv_pb::blockvisor_client::BlockvisorClient;
+use crate::server::bv_pb::{HealthRequest, StartUpdateRequest};
+use crate::server::{bv_pb, BLOCKVISOR_SERVICE_URL};
+use crate::utils::get_process_pid;
 use anyhow::{bail, ensure, Context, Error, Result};
 use std::io::Write;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 use std::{env, fs};
+use tonic::transport::Channel;
 
 const SYSTEM_SERVICES: &str = "etc/systemd/system";
 const SYSTEM_BIN: &str = "usr/bin";
@@ -15,6 +22,11 @@ const FC_BIN: &str = "firecracker/bin";
 const BLOCKVISOR_BIN: &str = "blockvisor/bin";
 const BLOCKVISOR_SERVICES: &str = "blockvisor/services";
 const THIS_VERSION: &str = env!("CARGO_PKG_VERSION");
+const BV_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
+const BV_REQ_TIMEOUT: Duration = Duration::from_secs(1);
+const BV_CHECK_INTERVAL: Duration = Duration::from_millis(100);
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(60);
+const PREPARE_FOR_UPDATE_TIMEOUT: Duration = Duration::from_secs(180);
 
 struct InstallerPaths {
     system_services: PathBuf,
@@ -26,10 +38,22 @@ struct InstallerPaths {
     blacklist: PathBuf,
 }
 
-impl Default for Installer {
+impl<T: Timer> Default for Installer<T> {
     fn default() -> Self {
-        Self::new(crate::env::ROOT_DIR.clone())
+        Self::new(
+            crate::env::ROOT_DIR.clone(),
+            Channel::from_static(BLOCKVISOR_SERVICE_URL)
+                .timeout(BV_REQ_TIMEOUT)
+                .connect_timeout(BV_CONNECT_TIMEOUT)
+                .connect_lazy(),
+        )
     }
+}
+
+/// Time abstraction for better testing.
+pub trait Timer {
+    fn now() -> SystemTime;
+    fn sleep(duration: Duration);
 }
 
 #[derive(Debug, PartialEq)]
@@ -39,31 +63,22 @@ enum BackupStatus {
     ThisIsRollback,
 }
 
-pub struct Installer {
+pub struct Installer<T: Timer> {
     paths: InstallerPaths,
+    bv_client: BlockvisorClient<Channel>,
+    phantom: PhantomData<T>,
 }
 
-impl Installer {
-    pub fn run(self) -> Result<()> {
+impl<T: Timer> Installer<T> {
+    pub async fn run(mut self) -> Result<()> {
         if self.is_blacklisted(THIS_VERSION)? {
             bail!("BV {THIS_VERSION} is on a blacklist - can't install")
         }
         println!("installing BV {THIS_VERSION} ...");
-        let pre_install_status = || {
-            self.move_bundle_to_install_path(
-                env::current_exe().with_context(|| "failed to get current binary path")?,
-            )?;
-            self.backup_running_version()
-        };
-        match pre_install_status() {
+
+        match self.preinstall() {
             Ok(backup_status) => {
-                let install_status = || {
-                    // TODO let running version know about update: ask to stop pending actions
-                    self.install_this_version()?;
-                    Self::restart_blockvisor()?;
-                    self.health_check()
-                };
-                match install_status() {
+                match self.install().await {
                     Ok(_) => {
                         // try cleanup after install, but cleanup result should not affect exit code
                         let _ = self
@@ -75,13 +90,13 @@ impl Installer {
                 }
             }
             Err(err) => {
-                // TODO: try to send install failed status to API
+                // TODO: try to send install failed status to the backend
                 Err(err)
             }
         }
     }
 
-    fn new(root: PathBuf) -> Self {
+    fn new(root: PathBuf, bv_channel: Channel) -> Self {
         let install_path = root.join(INSTALL_PATH);
         let current = install_path.join(CURRENT_LINK);
         let this_version = install_path.join(THIS_VERSION);
@@ -98,6 +113,8 @@ impl Installer {
                 backup,
                 blacklist,
             },
+            bv_client: BlockvisorClient::new(bv_channel),
+            phantom: Default::default(),
         }
     }
 
@@ -131,16 +148,16 @@ impl Installer {
 
         match backup_status {
             BackupStatus::Done => {
-                // TODO: try to send install failed status to API
+                // TODO: try to send install failed status to the backend
                 self.rollback()?;
                 bail!("installation failed with: {err}, but rolled back to previous version")
             }
             BackupStatus::ThisIsRollback => {
-                // TODO: try to send rollback failed status to API
+                // TODO: try to send rollback failed status to the backend
                 bail!("rollback failed - host needs manual fix: {err}")
             }
             BackupStatus::NothingToBackup => {
-                // TODO: try to send install failed status to API
+                // TODO: try to send install failed status to the backend
                 bail!("installation failed: {err}");
             }
         }
@@ -187,6 +204,62 @@ impl Installer {
         } else {
             Ok(None)
         }
+    }
+
+    fn preinstall(&self) -> Result<BackupStatus> {
+        self.move_bundle_to_install_path(
+            env::current_exe().with_context(|| "failed to get current binary path")?,
+        )?;
+        self.backup_running_version()
+    }
+
+    async fn install(&mut self) -> Result<()> {
+        self.prepare_running().await?;
+        self.install_this_version()?;
+        Self::restart_blockvisor()?;
+        self.health_check().await
+    }
+
+    async fn prepare_running(&mut self) -> Result<()> {
+        if !self.paths.current.exists()
+            || get_process_pid(
+                INSTALLER_BIN,
+                &self.paths.current.join(INSTALLER_BIN).to_string_lossy(),
+            )
+            .is_err()
+        {
+            return Ok(());
+        }
+        println!("prepare running BV for update");
+        let timestamp = T::now();
+        let expired = || {
+            let now = T::now();
+            let duration = now.duration_since(timestamp).unwrap_or_default();
+            duration > PREPARE_FOR_UPDATE_TIMEOUT
+        };
+        loop {
+            match self
+                .bv_client
+                .start_update(StartUpdateRequest::default())
+                .await
+            {
+                Ok(resp) => {
+                    let status = resp.into_inner().status;
+                    if status == bv_pb::ServiceStatus::Updating as i32 {
+                        break;
+                    } else if expired() {
+                        bail!("prepare running BV for update failed, BV start_update respond with {status}");
+                    }
+                }
+                Err(err) => {
+                    if expired() {
+                        bail!("prepare running BV for update failed, BV start_update respond with {err}");
+                    }
+                }
+            }
+            T::sleep(BV_CHECK_INTERVAL);
+        }
+        Ok(())
     }
 
     fn install_this_version(&self) -> Result<()> {
@@ -238,9 +311,32 @@ impl Installer {
         Ok(())
     }
 
-    fn health_check(&self) -> Result<()> {
+    async fn health_check(&mut self) -> Result<()> {
         println!("verify newly installed BV");
-        // TODO: wait for new blockvisor start and respond with health check status
+        let timestamp = T::now();
+        let expired = || {
+            let now = T::now();
+            let duration = now.duration_since(timestamp).unwrap_or_default();
+            duration > HEALTH_CHECK_TIMEOUT
+        };
+        loop {
+            match self.bv_client.health(HealthRequest::default()).await {
+                Ok(resp) => {
+                    let status = resp.into_inner().status;
+                    if status == bv_pb::ServiceStatus::Ok as i32 {
+                        break;
+                    } else if expired() {
+                        bail!("installed BV health check failed, BV health respond with {status}");
+                    }
+                }
+                Err(err) => {
+                    if expired() {
+                        bail!("installed BV health check failed, BV health respond with {err}");
+                    }
+                }
+            }
+            T::sleep(BV_CHECK_INTERVAL);
+        }
         Ok(())
     }
 
@@ -309,18 +405,291 @@ impl Installer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::server::bv_pb;
     use anyhow::anyhow;
     use assert_fs::TempDir;
+    use mockall::*;
+    use serial_test::serial;
+    use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
+    use tokio::net::UnixStream;
+    use tokio_stream::wrappers::UnixListenerStream;
+    use tonic::transport::{Endpoint, Server, Uri};
+    use tonic::Response;
+
+    mock! {
+        pub TestBV {}
+
+        #[tonic::async_trait]
+        impl bv_pb::blockvisor_server::Blockvisor for TestBV {
+            async fn health(
+                &self,
+                request: tonic::Request<bv_pb::HealthRequest>,
+            ) -> Result<tonic::Response<bv_pb::HealthResponse>, tonic::Status>;
+            async fn start_update(
+                &self,
+                request: tonic::Request<bv_pb::StartUpdateRequest>,
+            ) -> Result<tonic::Response<bv_pb::StartUpdateResponse>, tonic::Status>;
+            async fn create_node(
+                &self,
+                request: tonic::Request<bv_pb::CreateNodeRequest>,
+            ) -> Result<tonic::Response<bv_pb::CreateNodeResponse>, tonic::Status>;
+            async fn upgrade_node(
+                &self,
+                request: tonic::Request<bv_pb::UpgradeNodeRequest>,
+            ) -> Result<tonic::Response<bv_pb::UpgradeNodeResponse>, tonic::Status>;
+            async fn delete_node(
+                &self,
+                request: tonic::Request<bv_pb::DeleteNodeRequest>,
+            ) -> Result<tonic::Response<bv_pb::DeleteNodeResponse>, tonic::Status>;
+            async fn start_node(
+                &self,
+                request: tonic::Request<bv_pb::StartNodeRequest>,
+            ) -> Result<tonic::Response<bv_pb::StartNodeResponse>, tonic::Status>;
+            async fn stop_node(
+                &self,
+                request: tonic::Request<bv_pb::StopNodeRequest>,
+            ) -> Result<tonic::Response<bv_pb::StopNodeResponse>, tonic::Status>;
+            async fn get_nodes(
+                &self,
+                request: tonic::Request<bv_pb::GetNodesRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodesResponse>, tonic::Status>;
+            async fn get_node_status(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeStatusRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeStatusResponse>, tonic::Status>;
+            async fn get_node_logs(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeLogsRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeLogsResponse>, tonic::Status>;
+            async fn get_node_keys(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeKeysRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeKeysResponse>, tonic::Status>;
+            async fn get_node_id_for_name(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeIdForNameRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeIdForNameResponse>, tonic::Status>;
+            async fn list_capabilities(
+                &self,
+                request: tonic::Request<bv_pb::ListCapabilitiesRequest>,
+            ) -> Result<tonic::Response<bv_pb::ListCapabilitiesResponse>, tonic::Status>;
+            async fn blockchain(
+                &self,
+                request: tonic::Request<bv_pb::BlockchainRequest>,
+            ) -> Result<tonic::Response<bv_pb::BlockchainResponse>, tonic::Status>;
+            async fn get_node_metrics(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeMetricsRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeMetricsResponse>, tonic::Status>;
+        }
+    }
+
+    mock! {
+        pub TestTimer {}
+
+        impl Timer for TestTimer {
+            fn now() -> SystemTime;
+            fn sleep(duration: Duration);
+        }
+    }
 
     fn touch_file(path: &PathBuf) -> std::io::Result<fs::File> {
         fs::OpenOptions::new().create(true).write(true).open(path)
     }
 
-    #[test]
-    fn test_backup_running_version() -> Result<()> {
+    async fn test_server(tmp_root: &PathBuf, bv_mock: MockTestBV) -> Result<()> {
+        let socket_path = tmp_root.join("test_socket");
+        let uds_stream =
+            UnixListenerStream::new(tokio::net::UnixListener::bind(socket_path.clone())?);
+        Server::builder()
+            .max_concurrent_streams(1)
+            .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(bv_mock))
+            .serve_with_incoming(uds_stream)
+            .await?;
+        Ok(())
+    }
+
+    fn test_channel(tmp_root: &PathBuf) -> Channel {
+        let socket_path = tmp_root.join("test_socket");
+        Endpoint::try_from("http://[::]:50052")
+            .unwrap()
+            .timeout(Duration::from_secs(1))
+            .connect_timeout(Duration::from_secs(1))
+            .connect_with_connector_lazy(tower::service_fn(move |_: Uri| {
+                UnixStream::connect(socket_path.clone())
+            }))
+    }
+
+    fn create_dummy_installer(path: &PathBuf) -> Result<()> {
+        // create dummy installer that will sleep
+        let _ = fs::create_dir_all(path);
+        let mut installer = fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .mode(0o770)
+            .open(path.join(INSTALLER_BIN))?;
+        writeln!(installer, "#!/bin/sh")?;
+        writeln!(installer, "sleep infinity")?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_prepare_running_none() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
-        let installer = Installer::new(tmp_root);
+        let _ = fs::create_dir_all(&tmp_root);
+        let channel = test_channel(&tmp_root);
+
+        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        installer.prepare_running().await?;
+        let _ = fs::create_dir_all(&installer.paths.current);
+        installer.prepare_running().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_prepare_running_ok() -> Result<()> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let _ = fs::create_dir_all(&tmp_root);
+        let channel = test_channel(&tmp_root);
+
+        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        create_dummy_installer(&installer.paths.current)?;
+        let mut dummy_installer =
+            tokio::process::Command::new(&installer.paths.current.join(INSTALLER_BIN)).spawn()?;
+        let mut bv_mock = MockTestBV::new();
+        bv_mock.expect_start_update().once().returning(|_| {
+            let reply = bv_pb::StartUpdateResponse {
+                status: bv_pb::ServiceStatus::Updating.into(),
+            };
+            Ok(Response::new(reply))
+        });
+        let now_ctx = MockTestTimer::now_context();
+        let now = SystemTime::now();
+        now_ctx.expect().once().returning(move || now);
+
+        let resp = tokio::select! {
+            resp = installer.prepare_running() => resp,
+            _ = test_server(&tmp_root, bv_mock) => Ok(()),
+            _ = dummy_installer.wait() => Ok(()),
+        };
+        resp?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_prepare_running_timeout() -> Result<()> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let _ = fs::create_dir_all(&tmp_root);
+        let channel = test_channel(&tmp_root);
+
+        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        create_dummy_installer(&installer.paths.current)?;
+        let mut dummy_installer =
+            tokio::process::Command::new(&installer.paths.current.join(INSTALLER_BIN)).spawn()?;
+        let mut bv_mock = MockTestBV::new();
+        bv_mock.expect_start_update().once().returning(|_| {
+            let reply = bv_pb::StartUpdateResponse {
+                status: bv_pb::ServiceStatus::Ok.into(),
+            };
+            Ok(Response::new(reply))
+        });
+        let now_ctx = MockTestTimer::now_context();
+        let sleep_ctx = MockTestTimer::sleep_context();
+        let now = SystemTime::now();
+        now_ctx.expect().once().returning(move || now);
+        sleep_ctx
+            .expect()
+            .with(predicate::eq(BV_CHECK_INTERVAL))
+            .returning(|_| ());
+        now_ctx.expect().once().returning(move || {
+            now.add(PREPARE_FOR_UPDATE_TIMEOUT)
+                .add(Duration::from_secs(1))
+        });
+
+        let resp = tokio::select! {
+            resp = installer.prepare_running() => resp,
+            _ = test_server(&tmp_root, bv_mock) => Ok(()),
+            _ = dummy_installer.wait() => Ok(()),
+        };
+        assert!(resp.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_health_check_ok() -> Result<()> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let _ = fs::create_dir_all(&tmp_root);
+        let channel = test_channel(&tmp_root);
+
+        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        let mut bv_mock = MockTestBV::new();
+        bv_mock.expect_health().once().returning(|_| {
+            let reply = bv_pb::HealthResponse {
+                status: bv_pb::ServiceStatus::Ok.into(),
+            };
+            Ok(Response::new(reply))
+        });
+        let now_ctx = MockTestTimer::now_context();
+        now_ctx
+            .expect()
+            .times(1)
+            .returning(move || SystemTime::now());
+
+        let resp = tokio::select! {
+            resp = installer.health_check() => resp,
+            resp = test_server(&tmp_root, bv_mock) => resp,
+        };
+        resp?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_health_check_timeout() -> Result<()> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let _ = fs::create_dir_all(&tmp_root);
+        let channel = test_channel(&tmp_root);
+
+        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        let mut bv_mock = MockTestBV::new();
+        bv_mock.expect_health().returning(|_| {
+            let reply = bv_pb::HealthResponse {
+                status: bv_pb::ServiceStatus::Updating.into(),
+            };
+            Ok(Response::new(reply))
+        });
+        let now_ctx = MockTestTimer::now_context();
+        let sleep_ctx = MockTestTimer::sleep_context();
+        let now = SystemTime::now();
+        now_ctx.expect().once().returning(move || now);
+        sleep_ctx
+            .expect()
+            .with(predicate::eq(BV_CHECK_INTERVAL))
+            .returning(|_| ());
+        now_ctx
+            .expect()
+            .once()
+            .returning(move || now.add(HEALTH_CHECK_TIMEOUT).add(Duration::from_secs(1)));
+
+        let resp = tokio::select! {
+            resp = installer.health_check() => resp,
+            resp = test_server(&tmp_root, bv_mock) => resp,
+        };
+        assert!(resp.is_err());
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_backup_running_version() -> Result<()> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let channel = test_channel(&tmp_root);
+        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
 
         fs::create_dir_all(&installer.paths.install_path)?;
         assert_eq!(
@@ -345,11 +714,13 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_move_bundle_to_install_path() -> Result<()> {
+    #[tokio::test]
+    #[serial]
+    async fn test_move_bundle_to_install_path() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
         let bundle_path = tmp_root.join("bundle");
-        let installer = Installer::new(tmp_root);
+        let channel = test_channel(&tmp_root);
+        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
 
         assert!(installer
             .move_bundle_to_install_path(bundle_path.join("installer"))
@@ -379,10 +750,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_install_this_version() -> Result<()> {
+    #[tokio::test]
+    #[serial]
+    async fn test_install_this_version() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
-        let installer = Installer::new(tmp_root);
+        let channel = test_channel(&tmp_root);
+        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
 
         assert!(installer.install_this_version().is_err());
 
@@ -415,10 +788,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_broken_installation() -> Result<()> {
+    #[tokio::test]
+    #[serial]
+    async fn test_broken_installation() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
-        let installer = Installer::new(tmp_root.clone());
+        let channel = test_channel(&tmp_root);
+        let installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
 
         assert!(installer
             .handle_broken_installation(BackupStatus::ThisIsRollback, anyhow!("error"))
@@ -456,10 +831,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_cleanup() -> Result<()> {
+    #[tokio::test]
+    #[serial]
+    async fn test_cleanup() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
-        let installer = Installer::new(tmp_root);
+        let channel = test_channel(&tmp_root);
+        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
 
         // cant cleanup non existing dir nothing
         assert!(installer.cleanup().is_err());

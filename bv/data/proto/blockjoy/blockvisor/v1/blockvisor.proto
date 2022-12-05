@@ -27,11 +27,19 @@ message Node {
 enum ServiceStatus {
     UndefinedServiceStatus = 0;
     Ok = 1;
+    Updating = 2;
+    Broken = 3;
 }
 
 message HealthRequest {}
 
 message HealthResponse {
+    ServiceStatus status = 1;
+}
+
+message StartUpdateRequest {}
+
+message StartUpdateResponse {
     ServiceStatus status = 1;
 }
 
