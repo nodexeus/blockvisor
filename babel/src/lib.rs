@@ -2,6 +2,7 @@
 pub mod config;
 pub mod error;
 pub mod log_buffer;
+pub mod logging;
 pub mod msg_handler;
 pub mod run_flag;
 pub mod supervisor;
