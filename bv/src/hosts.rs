@@ -27,7 +27,7 @@ pub fn get_host_info() -> HostInfo {
     HostInfo {
         name: sys.host_name(),
         cpu_count: sys.physical_core_count().map(|x| x as i64),
-        mem_size: Some(sys.total_memory() as i64 * 1024),
+        mem_size: Some(sys.total_memory() as i64),
         disk_size: Some(disk_size as i64),
         os: sys.name(),
         os_version: sys.os_version(),

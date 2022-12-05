@@ -95,8 +95,9 @@ fn test_bv_cmd_restart() {
 
 #[test]
 #[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_host_metrics() {
-    bv_run(&["host", "metrics"], "Used cpu:                 ");
+    bv_run(&["host", "metrics"], "Used cpu:");
 }
 
 #[test]
