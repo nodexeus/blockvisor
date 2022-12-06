@@ -41,6 +41,15 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         Ok(Response::new(reply))
     }
 
+    async fn start_update(
+        &self,
+        _request: Request<bv_pb::StartUpdateRequest>,
+    ) -> Result<Response<bv_pb::StartUpdateResponse>, Status> {
+        Ok(Response::new(bv_pb::StartUpdateResponse {
+            status: bv_pb::ServiceStatus::Ok.into(),
+        }))
+    }
+
     async fn create_node(
         &self,
         request: Request<bv_pb::CreateNodeRequest>,
