@@ -4,6 +4,7 @@ use assert_cmd::Command;
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
 use blockvisord::grpc::{self, pb};
+use blockvisord::server::bv_pb;
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
 #[cfg(target_os = "linux")]
@@ -666,7 +667,7 @@ async fn test_bv_cmd_grpc_commands() {
             .await
             .unwrap()
     };
-
+    *blockvisord::BV_STATUS.write().await = bv_pb::ServiceStatus::Ok;
     let config = Config {
         id: Uuid::new_v4().to_string(),
         token: "any token".to_string(),

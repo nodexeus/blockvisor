@@ -1,5 +1,4 @@
 use crate::server::bv_pb::blockvisor_client::BlockvisorClient;
-use crate::server::bv_pb::{HealthRequest, StartUpdateRequest};
 use crate::server::{bv_pb, BLOCKVISOR_SERVICE_URL};
 use crate::utils::get_process_pid;
 use anyhow::{bail, ensure, Context, Error, Result};
@@ -7,7 +6,7 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant};
 use std::{env, fs};
 use tonic::transport::Channel;
 
@@ -52,7 +51,7 @@ impl<T: Timer> Default for Installer<T> {
 
 /// Time abstraction for better testing.
 pub trait Timer {
-    fn now() -> SystemTime;
+    fn now() -> Instant;
     fn sleep(duration: Duration);
 }
 
@@ -234,13 +233,13 @@ impl<T: Timer> Installer<T> {
         let timestamp = T::now();
         let expired = || {
             let now = T::now();
-            let duration = now.duration_since(timestamp).unwrap_or_default();
+            let duration = now.duration_since(timestamp);
             duration > PREPARE_FOR_UPDATE_TIMEOUT
         };
         loop {
             match self
                 .bv_client
-                .start_update(StartUpdateRequest::default())
+                .start_update(bv_pb::StartUpdateRequest::default())
                 .await
             {
                 Ok(resp) => {
@@ -316,11 +315,11 @@ impl<T: Timer> Installer<T> {
         let timestamp = T::now();
         let expired = || {
             let now = T::now();
-            let duration = now.duration_since(timestamp).unwrap_or_default();
+            let duration = now.duration_since(timestamp);
             duration > HEALTH_CHECK_TIMEOUT
         };
         loop {
-            match self.bv_client.health(HealthRequest::default()).await {
+            match self.bv_client.health(bv_pb::HealthRequest::default()).await {
                 Ok(resp) => {
                     let status = resp.into_inner().status;
                     if status == bv_pb::ServiceStatus::Ok as i32 {
@@ -489,7 +488,7 @@ mod tests {
         pub TestTimer {}
 
         impl Timer for TestTimer {
-            fn now() -> SystemTime;
+            fn now() -> Instant;
             fn sleep(duration: Duration);
         }
     }
@@ -567,7 +566,7 @@ mod tests {
             Ok(Response::new(reply))
         });
         let now_ctx = MockTestTimer::now_context();
-        let now = SystemTime::now();
+        let now = Instant::now();
         now_ctx.expect().once().returning(move || now);
 
         let resp = tokio::select! {
@@ -599,7 +598,7 @@ mod tests {
         });
         let now_ctx = MockTestTimer::now_context();
         let sleep_ctx = MockTestTimer::sleep_context();
-        let now = SystemTime::now();
+        let now = Instant::now();
         now_ctx.expect().once().returning(move || now);
         sleep_ctx
             .expect()
@@ -635,10 +634,7 @@ mod tests {
             Ok(Response::new(reply))
         });
         let now_ctx = MockTestTimer::now_context();
-        now_ctx
-            .expect()
-            .times(1)
-            .returning(move || SystemTime::now());
+        now_ctx.expect().times(1).returning(move || Instant::now());
 
         let resp = tokio::select! {
             resp = installer.health_check() => resp,
@@ -665,7 +661,7 @@ mod tests {
         });
         let now_ctx = MockTestTimer::now_context();
         let sleep_ctx = MockTestTimer::sleep_context();
-        let now = SystemTime::now();
+        let now = Instant::now();
         now_ctx.expect().once().returning(move || now);
         sleep_ctx
             .expect()

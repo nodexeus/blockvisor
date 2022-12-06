@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use babel::vsock;
 use babel::{config, logging, run_flag::RunFlag, supervisor};
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant};
 use tokio::fs::DirBuilder;
 use tokio::sync::broadcast;
 
@@ -51,8 +51,8 @@ struct SysTimer;
 
 #[async_trait]
 impl supervisor::Timer for SysTimer {
-    fn now() -> SystemTime {
-        SystemTime::now()
+    fn now() -> Instant {
+        Instant::now()
     }
 
     async fn sleep(duration: Duration) {
