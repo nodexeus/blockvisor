@@ -31,7 +31,7 @@ impl BabelConnection {
         node_id: &uuid::Uuid,
         guest_port: u32,
         max_delay: Duration,
-    ) -> Result<UnixStream> {
+    ) -> Result<Self> {
         use std::io::ErrorKind::WouldBlock;
 
         // We are going to connect to the central socket for this VM. Later we will specify which
@@ -88,12 +88,15 @@ impl BabelConnection {
                     Err(e) => bail!("Establishing socket failed with `{e}`"),
                 }
             }
-            Ok(conn)
+            Ok(Self::Open {
+                babel_conn: conn,
+                guest_port,
+            })
         };
         timeout(SOCKET_TIMEOUT, resp).await?
     }
 
-    pub async fn wait_for_connect(node_id: &uuid::Uuid, guest_port: u32) -> Result<UnixStream> {
+    pub async fn wait_for_connect(node_id: &uuid::Uuid, guest_port: u32) -> Result<Self> {
         match Self::connect(node_id, guest_port, BABEL_START_TIMEOUT).await {
             Ok(conn) => Ok(conn),
             Err(_) => {
@@ -104,8 +107,8 @@ impl BabelConnection {
         }
     }
 
-    /// Returns the open babel connection, if there is one.
-    pub fn conn_mut(&mut self) -> Option<&mut UnixStream> {
+    /// Returns the open babel unix stream, if there is one.
+    pub fn stream_mut(&mut self) -> Option<&mut UnixStream> {
         use BabelConnection::*;
         match self {
             Closed => None,
@@ -116,22 +119,10 @@ impl BabelConnection {
         }
     }
 
-    /// Tries to return the babel connection, and if there isn't one, returns an error message.
-    pub fn try_conn_mut(&mut self) -> Result<&mut UnixStream> {
-        self.conn_mut()
+    /// Tries to return the babel unix stream, and if there isn't one, returns an error message.
+    pub fn try_stream_mut(&mut self) -> Result<&mut UnixStream> {
+        self.stream_mut()
             .ok_or_else(|| anyhow!("Tried to get babel connection while there isn't one"))
-    }
-
-    /// Returns babel connection guest port, if there is active connection.
-    pub fn port(&self) -> Option<u32> {
-        use BabelConnection::*;
-        match self {
-            Closed => None,
-            Open {
-                babel_conn: _,
-                guest_port,
-            } => Some(*guest_port),
-        }
     }
 
     /// Waits for the socket to become readable, then writes the data as json to the socket. The max
@@ -140,7 +131,7 @@ impl BabelConnection {
         use std::io::ErrorKind::WouldBlock;
 
         let data = serde_json::to_string(&data)?;
-        let unix_stream = self.try_conn_mut()?;
+        let unix_stream = self.try_stream_mut()?;
         let write_data = async {
             loop {
                 // Wait for the socket to become ready to write to.
@@ -164,7 +155,7 @@ impl BabelConnection {
     pub async fn read_data<D: serde::de::DeserializeOwned>(&mut self) -> Result<D> {
         use std::io::ErrorKind::WouldBlock;
 
-        let unix_stream = self.try_conn_mut()?;
+        let unix_stream = self.try_stream_mut()?;
         let read_data = async {
             loop {
                 // Wait for the socket to become ready to read from.
@@ -187,7 +178,7 @@ impl BabelConnection {
     }
 
     pub async fn wait_for_disconnect(&mut self, node_id: &uuid::Uuid) {
-        if let Some(babel_conn) = self.conn_mut() {
+        if let Some(babel_conn) = self.stream_mut() {
             // We can verify successful shutdown success by checking whether we can read
             // into a buffer of nonzero length. If the stream is closed, the number of
             // bytes read should be zero.

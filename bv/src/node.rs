@@ -67,13 +67,7 @@ impl Node {
                 let babel_conn =
                     BabelConnection::connect(&data.id, guest_port, Duration::from_secs(1)).await?;
                 debug!("Established babel connection");
-                (
-                    firec::MachineState::RUNNING { pid },
-                    BabelConnection::Open {
-                        babel_conn,
-                        guest_port,
-                    },
-                )
+                (firec::MachineState::RUNNING { pid }, babel_conn)
             }
             Err(_) => (firec::MachineState::SHUTOFF, BabelConnection::Closed),
         };
@@ -120,13 +114,8 @@ impl Node {
         }
 
         self.machine.start().await?;
-        let node_id = self.id();
-        let guest_port = BABEL_SUP_VSOCK_PORT;
-        let babel_conn = BabelConnection::wait_for_connect(&node_id, guest_port).await?;
-        self.babel_conn = BabelConnection::Open {
-            babel_conn,
-            guest_port,
-        };
+        self.babel_conn =
+            BabelConnection::wait_for_connect(&self.id(), BABEL_SUP_VSOCK_PORT).await?;
         let resp = self
             .send(babel_api::SupervisorRequest::Ping, BABEL_SUP_VSOCK_PORT)
             .await;
@@ -420,13 +409,9 @@ impl Node {
                 if *guest_port != port {
                     info!("Reconnecting babel to port: {port}");
                     babel_conn.shutdown().await?;
-                    let babel_conn =
+                    self.babel_conn =
                         BabelConnection::connect(&self.data.id, port, Duration::from_secs(1))
                             .await?;
-                    self.babel_conn = BabelConnection::Open {
-                        babel_conn,
-                        guest_port: port,
-                    };
                 };
 
                 self.babel_conn.write_data(data).await?;
