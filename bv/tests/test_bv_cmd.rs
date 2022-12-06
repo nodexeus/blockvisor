@@ -145,10 +145,10 @@ fn test_bv_cmd_logs() {
     bv_run(&["node", "stop", vm_id], "Stopped node");
 }
 
-#[test]
+#[tokio::test]
 #[serial]
 #[cfg(target_os = "linux")]
-fn test_bv_cmd_node_lifecycle() {
+async fn test_bv_cmd_node_lifecycle() {
     println!("create a node");
     let vm_id = &create_node("helium/validator/0.0.1");
     println!("create vm_id: {vm_id}");
@@ -164,6 +164,9 @@ fn test_bv_cmd_node_lifecycle() {
 
     println!("restart stopped node");
     bv_run(&["node", "start", vm_id], "Started node");
+
+    // TODO: think about better way to make the following metrics test stable
+    sleep(Duration::from_secs(10)).await;
 
     println!("query metrics");
     bv_run(&["node", "metrics", vm_id], "In consensus:        false");

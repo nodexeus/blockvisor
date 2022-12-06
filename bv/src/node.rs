@@ -13,7 +13,7 @@ use tracing::{debug, info, instrument, trace, warn};
 use uuid::Uuid;
 
 use crate::{
-    babel_connection::BabelConnection,
+    babel_connection::{BabelConnection, BABEL_START_TIMEOUT},
     env::*,
     node_data::{NodeData, NodeImage, NodeStatus},
     utils::{get_process_pid, run_cmd},
@@ -63,9 +63,9 @@ impl Node {
                 // Since this is the startup phase it doesn't make sense to wait a long time
                 // for the nodes to come online. For that reason we restrict the allowed delay
                 // further down to one second.
-                let guest_port = BABEL_VSOCK_PORT;
                 let babel_conn =
-                    BabelConnection::connect(&data.id, guest_port, Duration::from_secs(1)).await?;
+                    BabelConnection::connect(&data.id, BABEL_VSOCK_PORT, Duration::from_secs(1))
+                        .await?;
                 debug!("Established babel connection");
                 (firec::MachineState::RUNNING { pid }, babel_conn)
             }
@@ -115,7 +115,7 @@ impl Node {
 
         self.machine.start().await?;
         self.babel_conn =
-            BabelConnection::wait_for_connect(&self.id(), BABEL_SUP_VSOCK_PORT).await?;
+            BabelConnection::connect(&self.id(), BABEL_SUP_VSOCK_PORT, BABEL_START_TIMEOUT).await?;
         let resp = self
             .send(babel_api::SupervisorRequest::Ping, BABEL_SUP_VSOCK_PORT)
             .await;

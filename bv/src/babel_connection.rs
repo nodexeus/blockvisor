@@ -9,8 +9,7 @@ use tracing::{debug, error, warn};
 
 use crate::{env::*, node::VSOCK_PATH};
 
-const BABEL_START_TIMEOUT: Duration = Duration::from_secs(30);
-const BABEL_START_RETRY_DELAY: Duration = Duration::from_secs(10);
+pub const BABEL_START_TIMEOUT: Duration = Duration::from_secs(60);
 const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -32,8 +31,6 @@ impl BabelConnection {
         guest_port: u32,
         max_delay: Duration,
     ) -> Result<Self> {
-        use std::io::ErrorKind::WouldBlock;
-
         // We are going to connect to the central socket for this VM. Later we will specify which
         // port we want to talk to.
         let socket = format!(
@@ -47,10 +44,18 @@ impl BabelConnection {
         // by Firecracker.
         let start = std::time::Instant::now();
         let elapsed = || std::time::Instant::now() - start;
-        let mut conn = loop {
+        let conn = loop {
             let maybe_conn = UnixStream::connect(&socket).await;
             match maybe_conn {
-                Ok(conn) => break Ok(conn),
+                // Also it's possible that we will not manage to
+                // initiate connection from the first attempt
+                Ok(conn) => match Self::handshake(conn, guest_port).await {
+                    Ok(conn) => break Ok(conn),
+                    Err(e) => {
+                        debug!("Handshake error, retrying in 5 seconds: {e}");
+                        sleep(std::time::Duration::from_secs(5)).await;
+                    }
+                },
                 Err(e) if elapsed() < max_delay => {
                     debug!("No socket file yet, retrying in 5 seconds: {e}");
                     sleep(std::time::Duration::from_secs(5)).await;
@@ -59,52 +64,47 @@ impl BabelConnection {
             };
         }
         .context("Failed to connect to babel bus")?;
-        // For host initiated connections we have to send a message to the guess socket that
-        // contains the port number. As a response we expect a message of the format `Ok <num>\n`.
-        // We check this by asserting that the first message received starts with `OK`. Popping
-        // this message here prevents us from having to check for the opening message elsewhere
-        // were we expect the response to be valid json.
+
+        Ok(conn)
+    }
+
+    /// Execute connection handshake procedure
+    ///
+    /// For host initiated connections we have to send a message to the guess socket that
+    /// contains the port number. As a response we expect a message of the format `Ok <num>\n`.
+    /// We check this by asserting that the first message received starts with `OK`. Popping
+    /// this message here prevents us from having to check for the opening message elsewhere
+    /// were we expect the response to be valid json.
+    async fn handshake(mut conn: UnixStream, guest_port: u32) -> Result<Self> {
+        use std::io::ErrorKind::WouldBlock;
+
         let open_message = format!("CONNECT {guest_port}\n");
         debug!("Sending open message : `{open_message:?}`.");
         timeout(SOCKET_TIMEOUT, conn.write(open_message.as_bytes())).await??;
         debug!("Sent open message.");
         let mut sock_opened_buf = [0; 20];
-        let resp = async {
-            loop {
-                conn.readable().await?;
-                match conn.try_read(&mut sock_opened_buf) {
-                    Ok(0) => {
-                        error!("Socket responded to open message with empty message :(");
-                        bail!("Socket responded to open message with empty message :(");
-                    }
-                    Ok(n) => {
-                        let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
-                        let msg_valid = sock_opened_msg.starts_with("OK ");
-                        ensure!(msg_valid, "Invalid opening message for new socket");
-                        break;
-                    }
-                    // Ignore false-positive readable events
-                    Err(e) if e.kind() == WouldBlock => continue,
-                    Err(e) => bail!("Establishing socket failed with `{e}`"),
+        loop {
+            conn.readable().await?;
+            match conn.try_read(&mut sock_opened_buf) {
+                Ok(0) => {
+                    error!("Socket responded to open message with empty message :(");
+                    bail!("Socket responded to open message with empty message :(");
                 }
-            }
-            Ok(Self::Open {
-                babel_conn: conn,
-                guest_port,
-            })
-        };
-        timeout(SOCKET_TIMEOUT, resp).await?
-    }
-
-    pub async fn wait_for_connect(node_id: &uuid::Uuid, guest_port: u32) -> Result<Self> {
-        match Self::connect(node_id, guest_port, BABEL_START_TIMEOUT).await {
-            Ok(conn) => Ok(conn),
-            Err(_) => {
-                // Extremely scientific retrying mechanism
-                sleep(BABEL_START_RETRY_DELAY).await;
-                Self::connect(node_id, guest_port, BABEL_START_TIMEOUT).await
+                Ok(n) => {
+                    let sock_opened_msg = std::str::from_utf8(&sock_opened_buf[..n]).unwrap();
+                    let msg_valid = sock_opened_msg.starts_with("OK ");
+                    ensure!(msg_valid, "Invalid opening message for new socket");
+                    break;
+                }
+                // Ignore false-positive readable events
+                Err(e) if e.kind() == WouldBlock => continue,
+                Err(e) => bail!("Establishing socket failed with `{e}`"),
             }
         }
+        Ok(Self::Open {
+            babel_conn: conn,
+            guest_port,
+        })
     }
 
     /// Returns the open babel unix stream, if there is one.
@@ -125,7 +125,7 @@ impl BabelConnection {
             .ok_or_else(|| anyhow!("Tried to get babel connection while there isn't one"))
     }
 
-    /// Waits for the socket to become readable, then writes the data as json to the socket. The max
+    /// Waits for the socket to become writable, then writes the data as json to the socket. The max
     /// time that is allowed to elapse  is `SOCKET_TIMEOUT`.
     pub async fn write_data(&mut self, data: impl serde::Serialize) -> Result<()> {
         use std::io::ErrorKind::WouldBlock;
