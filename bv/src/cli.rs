@@ -88,10 +88,6 @@ pub enum NodeCommand {
         /// Display only running nodes
         #[clap(long, short)]
         running: bool,
-
-        /// Display nodes of particular image (as a substring)
-        #[clap(long, short)]
-        image: Option<String>,
     },
 
     /// Create node

@@ -291,17 +291,11 @@ impl NodeClient {
 
     async fn process_node_command(mut self, command: NodeCommand) -> Result<()> {
         match command {
-            NodeCommand::List { running, image } => {
+            NodeCommand::List { running } => {
                 let nodes = self.fetch_nodes().await?;
                 let mut nodes = nodes
                     .iter()
-                    .filter(|n| {
-                        image
-                            .as_ref()
-                            .map(|image| n.image.contains(image))
-                            .unwrap_or(true)
-                            && (!running || (n.status == bv_pb::NodeStatus::Running as i32))
-                    })
+                    .filter(|n| (!running || (n.status == bv_pb::NodeStatus::Running as i32)))
                     .peekable();
                 if nodes.peek().is_some() {
                     let mut table = vec![];
@@ -309,7 +303,7 @@ impl NodeClient {
                         table.push(PrettyTableRow {
                             id: node.id,
                             name: node.name,
-                            image: node.image,
+                            image: fmt_opt(node.image),
                             status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
                             ip: node.ip,
                         })
@@ -322,6 +316,7 @@ impl NodeClient {
             NodeCommand::Create { image, ip, gateway } => {
                 let id = Uuid::new_v4();
                 let name = Petnames::default().generate_one(3, "_");
+                let node_image = parse_image(&image)?;
                 // TODO: this configurations is useful for testing on CI machine
                 let gateway = gateway.unwrap_or_else(|| "216.18.214.193".to_string());
                 let ip = ip.unwrap_or_else(|| "216.18.214.195".to_string());
@@ -329,7 +324,7 @@ impl NodeClient {
                     .create_node(bv_pb::CreateNodeRequest {
                         id: id.to_string(),
                         name: name.clone(),
-                        image: image.to_string(),
+                        image: Some(node_image),
                         ip,
                         gateway,
                     })
@@ -340,12 +335,13 @@ impl NodeClient {
                 );
             }
             NodeCommand::Upgrade { id_or_names, image } => {
+                let node_image = parse_image(&image)?;
                 for id_or_name in id_or_names {
                     let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
                     self.client
                         .upgrade_node(bv_pb::UpgradeNodeRequest {
                             id: id.clone(),
-                            image: image.to_string(),
+                            image: Some(node_image.clone()),
                         })
                         .await?;
                     println!("Upgraded node `{}` to `{}` image", id, image);
@@ -456,4 +452,16 @@ impl NodeClient {
 fn fmt_opt<T: std::fmt::Display>(opt: Option<T>) -> String {
     opt.map(|t| t.to_string())
         .unwrap_or_else(|| "-".to_string())
+}
+
+fn parse_image(image: &str) -> Result<bv_pb::NodeImage> {
+    let image_vec: Vec<&str> = image.split('/').collect();
+    if image_vec.len() != 3 {
+        bail!("Wrong number of components in image: {image:?}");
+    }
+    Ok(bv_pb::NodeImage {
+        protocol: image_vec[0].to_string(),
+        node_type: image_vec[1].to_string(),
+        node_version: image_vec[2].to_string(),
+    })
 }
