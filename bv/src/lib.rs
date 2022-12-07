@@ -1,6 +1,7 @@
 pub mod babel_connection;
 pub mod cli;
 pub mod config;
+pub mod cookbook_service;
 pub mod env;
 pub mod grpc;
 pub mod hosts;

@@ -8,6 +8,8 @@ fn main() {
                 "command_flow.proto",
                 "host_service.proto",
                 "key_file_service.proto",
+                // Cookbook API
+                "cookbook.proto",
                 // UI API (used in the tests)
                 "authentication_service.proto",
                 "billing_service.proto",
@@ -28,6 +30,7 @@ fn main() {
                 "proto/blockjoy/api/v1",
                 "proto/blockjoy/api/ui_v1",
                 "data/proto/blockjoy/blockvisor/v1",
+                "data/proto/blockjoy/api/v1/babel",
             ],
         )
     {
