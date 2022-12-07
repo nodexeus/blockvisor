@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use babel_api::config;
 use babel_api::*;
 use serde_json::json;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -208,17 +209,18 @@ impl MsgHandler {
         match &method {
             Jrpc {
                 method, response, ..
-            } => self.handle_jrpc(method, response).await,
+            } => self.handle_jrpc(method, cmd.params, response).await,
             Rest {
                 method, response, ..
-            } => self.handle_rest(method, response).await,
-            Sh { body, response, .. } => Self::handle_sh(body, response).await,
+            } => self.handle_rest(method, cmd.params, response).await,
+            Sh { body, response, .. } => Self::handle_sh(body, cmd.params, response).await,
         }
     }
 
     async fn handle_jrpc(
         &self,
         method: &str,
+        params: HashMap<String, String>,
         resp_config: &config::JrpcResponse,
     ) -> Result<BlockchainResponse, error::Error> {
         let url = self
@@ -227,6 +229,10 @@ impl MsgHandler {
             .api_host
             .as_deref()
             .ok_or_else(|| error::Error::no_host(method))?;
+        let method = &mut method.to_string();
+        params
+            .iter()
+            .for_each(|(k, v)| *method = method.replace(k, v));
         let text: String = self
             .post(url)
             .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": method }))
@@ -247,6 +253,7 @@ impl MsgHandler {
     async fn handle_rest(
         &self,
         method: &str,
+        params: HashMap<String, String>,
         resp_config: &config::RestResponse,
     ) -> Result<BlockchainResponse, error::Error> {
         let host = self
@@ -255,13 +262,13 @@ impl MsgHandler {
             .api_host
             .as_ref()
             .ok_or_else(|| error::Error::no_host(method))?;
-        let url = format!(
+        let url = &mut format!(
             "{}/{}",
             host.trim_end_matches('/'),
             method.trim_start_matches('/')
         );
-
-        let text = self.post(&url).send().await?.text().await?;
+        params.iter().for_each(|(k, v)| *url = url.replace(k, v));
+        let text = self.post(url.as_str()).send().await?.text().await?;
         let value = match &resp_config.field {
             Some(field) => gjson::get(&text, field).to_string(),
             None => text,
@@ -271,9 +278,15 @@ impl MsgHandler {
 
     async fn handle_sh(
         command: &str,
+        params: HashMap<String, String>,
         response_config: &config::ShResponse,
     ) -> Result<BlockchainResponse, error::Error> {
         use config::MethodResponseFormat::*;
+
+        let command = &mut command.to_string();
+        params
+            .iter()
+            .for_each(|(k, v)| *command = command.replace(k, v));
 
         let args = vec!["-c", command];
         let output = tokio::process::Command::new("sh")
@@ -428,18 +441,21 @@ mod tests {
 
         let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "raw".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(raw_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "make a toast\n");
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(json_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "\"make a toast\"");
 
         let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "unknown".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(unknown_cmd).await;
         assert_eq!(
@@ -641,6 +657,7 @@ mod tests {
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
@@ -692,6 +709,7 @@ mod tests {
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
@@ -753,6 +771,7 @@ mod tests {
 
         let height_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "get height".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
