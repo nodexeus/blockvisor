@@ -330,6 +330,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         }))
     }
 
+    /// Calls an arbitrary method on a the blockchain node running inside the VM.
     async fn blockchain(
         &self,
         request: Request<bv_pb::BlockchainRequest>,
@@ -344,7 +345,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .nodes
             .get_mut(&node_id)
             .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .call_method(&request.method)
+            .call_method(&request.method, request.params)
             .await
             .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::BlockchainResponse { value }))

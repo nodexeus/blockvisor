@@ -26,6 +26,11 @@ pub enum Error {
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// We return this type when the parameters required for a blockchain method call contain
+    /// injection-unsafe characters.
+    #[error("Unsafe subsitution")]
+    UnsafeSubsitution,
 }
 
 impl Error {
@@ -52,5 +57,10 @@ impl Error {
         Self::Keys {
             output: format!("{out}"),
         }
+    }
+
+    /// Convenience method to construct the UnsafeSubsitution variant.
+    pub fn unsafe_sub() -> Self {
+        Self::UnsafeSubsitution
     }
 }

@@ -190,7 +190,7 @@ pub enum NodeCommand {
         method: String,
         /// The payload that should be passed to the endpoint. This should be a json encoded blob.
         #[clap(long)]
-        payload: Option<String>,
+        params: Option<String>,
     },
 
     /// Collect metrics defining the current state of the node.

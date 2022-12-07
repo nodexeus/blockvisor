@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections;
 use strum_macros::Display;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,6 +38,7 @@ pub enum BabelRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlockchainCommand {
     pub name: String,
+    pub params: collections::HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -1,11 +1,12 @@
-use crate::error;
 #[cfg(target_os = "linux")]
 use crate::vsock::Handler;
+use crate::{error, Result};
 #[cfg(target_os = "linux")]
 use async_trait::async_trait;
 use babel_api::config;
 use babel_api::*;
 use serde_json::json;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -55,7 +56,7 @@ impl MsgHandler {
         cfg: Arc<config::Babel>,
         timeout: Duration,
         logs_rx: broadcast::Receiver<String>,
-    ) -> Result<Self, error::Error> {
+    ) -> Result<Self> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
         Ok(Self {
             inner: client,
@@ -64,7 +65,7 @@ impl MsgHandler {
         })
     }
 
-    pub async fn handle(&self, req: BabelRequest) -> Result<BabelResponse, error::Error> {
+    pub async fn handle(&self, req: BabelRequest) -> Result<BabelResponse> {
         use BabelResponse::*;
 
         match req {
@@ -109,7 +110,7 @@ impl MsgHandler {
         logs
     }
 
-    async fn handle_download_keys(&self) -> Result<Vec<BlockchainKey>, error::Error> {
+    async fn handle_download_keys(&self) -> Result<Vec<BlockchainKey>> {
         let config = self
             .cfg
             .keys
@@ -134,10 +135,7 @@ impl MsgHandler {
         Ok(results)
     }
 
-    async fn handle_upload_keys(
-        &self,
-        keys: Vec<BlockchainKey>,
-    ) -> Result<BlockchainResponse, error::Error> {
+    async fn handle_upload_keys(&self, keys: Vec<BlockchainKey>) -> Result<BlockchainResponse> {
         if keys.is_empty() {
             return Err(error::Error::keys("No keys provided"));
         }
@@ -195,7 +193,7 @@ impl MsgHandler {
         Ok(resp)
     }
 
-    async fn handle_cmd(&self, cmd: BlockchainCommand) -> Result<BlockchainResponse, error::Error> {
+    async fn handle_cmd(&self, cmd: BlockchainCommand) -> Result<BlockchainResponse> {
         use config::Method::*;
 
         let method = self
@@ -208,25 +206,27 @@ impl MsgHandler {
         match &method {
             Jrpc {
                 method, response, ..
-            } => self.handle_jrpc(method, response).await,
+            } => self.handle_jrpc(method, cmd.params, response).await,
             Rest {
                 method, response, ..
-            } => self.handle_rest(method, response).await,
-            Sh { body, response, .. } => Self::handle_sh(body, response).await,
+            } => self.handle_rest(method, cmd.params, response).await,
+            Sh { body, response, .. } => Self::handle_sh(body, cmd.params, response).await,
         }
     }
 
     async fn handle_jrpc(
         &self,
         method: &str,
+        params: HashMap<String, String>,
         resp_config: &config::JrpcResponse,
-    ) -> Result<BlockchainResponse, error::Error> {
+    ) -> Result<BlockchainResponse> {
         let url = self
             .cfg
             .config
             .api_host
             .as_deref()
             .ok_or_else(|| error::Error::no_host(method))?;
+        let method = Self::render(method, &params)?;
         let text: String = self
             .post(url)
             .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": method }))
@@ -247,8 +247,9 @@ impl MsgHandler {
     async fn handle_rest(
         &self,
         method: &str,
+        params: HashMap<String, String>,
         resp_config: &config::RestResponse,
-    ) -> Result<BlockchainResponse, error::Error> {
+    ) -> Result<BlockchainResponse> {
         let host = self
             .cfg
             .config
@@ -260,8 +261,8 @@ impl MsgHandler {
             host.trim_end_matches('/'),
             method.trim_start_matches('/')
         );
-
-        let text = self.post(&url).send().await?.text().await?;
+        let url = Self::render(&url, &params)?;
+        let text = self.post(url.as_str()).send().await?.text().await?;
         let value = match &resp_config.field {
             Some(field) => gjson::get(&text, field).to_string(),
             None => text,
@@ -271,11 +272,15 @@ impl MsgHandler {
 
     async fn handle_sh(
         command: &str,
+        params: HashMap<String, String>,
         response_config: &config::ShResponse,
-    ) -> Result<BlockchainResponse, error::Error> {
+    ) -> Result<BlockchainResponse> {
         use config::MethodResponseFormat::*;
 
-        let args = vec!["-c", command];
+        let command = &mut command.to_string();
+        let command = Self::render(command, &params)?;
+
+        let args = vec!["-c", &command];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()
@@ -298,6 +303,32 @@ impl MsgHandler {
                 Ok(content.into())
             }
         }
+    }
+
+    /// Renders a template by filling in uppercased, `{{ }}`-delimited template strings with the
+    /// values in the `params` dictionary.
+    fn render(template: &str, params: &HashMap<String, String>) -> Result<String> {
+        let mut res = template.to_string();
+        // This formats a parameter like `url` as `{{URL}}`
+        let fmt_key = |k: &String| format!("{{{{{}}}}}", k.to_uppercase());
+        for (k, v) in params {
+            res = res.replace(&fmt_key(k), &Self::sanitize_param(v)?);
+        }
+        Ok(res)
+    }
+
+    /// Allowing people to subsitute arbitrary data into sh-commands is unsafe. We therefore run
+    /// this function over each value before we substitute it. This function is deliberatly more
+    /// restrictive than needed; it just filters out each character that is not a number or a
+    /// string or absolutely needed to form a url.
+    fn sanitize_param(param: &str) -> Result<String> {
+        const ALLOWLIST: [char; 2] = ['/', ':'];
+        let is_safe = |c: char| c.is_alphanumeric() || ALLOWLIST.contains(&c);
+        param
+            .chars()
+            .all(is_safe)
+            .then(|| param.to_string())
+            .ok_or_else(error::Error::unsafe_sub)
     }
 }
 
@@ -428,18 +459,21 @@ mod tests {
 
         let raw_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "raw".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(raw_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "make a toast\n");
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(json_cmd).await.unwrap();
         assert_eq!(unwrap_blockchain(output).value, "\"make a toast\"");
 
         let unknown_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "unknown".to_string(),
+            params: HashMap::new(),
         });
         let output = msg_handler.handle(unknown_cmd).await;
         assert_eq!(
@@ -641,6 +675,7 @@ mod tests {
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
@@ -692,6 +727,7 @@ mod tests {
 
         let json_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "json items".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
@@ -753,6 +789,7 @@ mod tests {
 
         let height_cmd = BabelRequest::BlockchainCommand(BlockchainCommand {
             name: "get height".to_string(),
+            params: HashMap::new(),
         });
         let (_, logs_rx) = broadcast::channel(1);
         let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
@@ -760,5 +797,21 @@ mod tests {
 
         mock.assert();
         assert_eq!(unwrap_blockchain(output).value, "123");
+    }
+
+    #[test]
+    fn test_render() {
+        let params = [("par1", "val1"), ("pAr2", "val2"), ("PAR3", "val3")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        let render = |tmplt| MsgHandler::render(tmplt, &params).unwrap();
+
+        assert_eq!(render("{{PAR1}} bla"), "val1 bla");
+        assert_eq!(render("{{PAR2}} waa"), "val2 waa");
+        assert_eq!(render("{{PAR3}} kra"), "val3 kra");
+        assert_eq!(render("{{par1}} woo"), "{{par1}} woo");
+        assert_eq!(render("{{pAr2}} koo"), "{{pAr2}} koo");
+        assert_eq!(render("{{PAR3}} doo"), "val3 doo");
     }
 }

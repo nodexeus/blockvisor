@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use std::{
+    collections::HashMap,
     ffi::OsStr,
     path::{Path, PathBuf},
     str::FromStr,
@@ -281,12 +282,12 @@ impl Node {
 
     /// Returns the height of the blockchain (in blocks).
     pub async fn height(&mut self) -> Result<u64> {
-        self.call_method("height").await
+        self.call_method("height", HashMap::new()).await
     }
 
     /// Returns the block age of the blockchain (in seconds).
     pub async fn block_age(&mut self) -> Result<u64> {
-        self.call_method("block_age").await
+        self.call_method("block_age", HashMap::new()).await
     }
 
     /// TODO: Wait for Sean to tell us how to do this.
@@ -299,29 +300,34 @@ impl Node {
     /// ### Example
     /// `chilly-peach-kangaroo`
     pub async fn name(&mut self) -> Result<String> {
-        self.call_method("name").await
+        self.call_method("name", HashMap::new()).await
     }
 
     /// The address of the node. The meaning of this varies from blockchain to blockchain.
     /// ### Example
     /// `/p2p/11Uxv9YpMpXvLf8ZyvGWBdbgq3BXv8z1pra1LBqkRS5wmTEHNW3`
     pub async fn address(&mut self) -> Result<String> {
-        self.call_method("address").await
+        self.call_method("address", HashMap::new()).await
     }
 
     /// Returns whether this node is in consensus or not.
     pub async fn consensus(&mut self) -> Result<bool> {
-        self.call_method("consensus").await
+        self.call_method("consensus", HashMap::new()).await
     }
 
     /// This function calls babel by sending a blockchain command using the specified method name.
-    pub async fn call_method<T>(&mut self, method: &str) -> Result<T>
+    pub async fn call_method<T>(
+        &mut self,
+        method: &str,
+        params: HashMap<String, String>,
+    ) -> Result<T>
     where
         T: FromStr,
         <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
     {
         let request = babel_api::BabelRequest::BlockchainCommand(babel_api::BlockchainCommand {
             name: method.to_string(),
+            params,
         });
         debug!("Calling method: {method}");
         let resp: babel_api::BabelResponse = self.send(request, BABEL_VSOCK_PORT).await?;
@@ -389,8 +395,11 @@ impl Node {
 
     /// Generates keys on node
     pub async fn generate_keys(&mut self) -> Result<String> {
-        self.call_method(&babel_api::BabelMethod::GenerateKeys.to_string())
-            .await
+        self.call_method(
+            &babel_api::BabelMethod::GenerateKeys.to_string(),
+            HashMap::new(),
+        )
+        .await
     }
 
     /// This function combines the capabilities from `write_data` and `read_data` to allow you to

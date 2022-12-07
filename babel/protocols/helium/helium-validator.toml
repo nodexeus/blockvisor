@@ -189,7 +189,7 @@ method = "info_summary"
 [[methods]]
 name = "genesis"
 transport = "sh"
-body = "/usr/bin/curl -s https://snapshots.helium.wtf/genesis.mainnet -o /h && /usr/local/bin/miner genesis load /h"
+body = "/usr/bin/curl -s {{GENESIS_BLOCK_URL}} -o /h && /usr/local/bin/miner genesis load /h"
 
     [methods.response]
     # something?

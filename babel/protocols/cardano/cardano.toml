@@ -32,7 +32,7 @@ method = "v2/blocks/latest/header"
 [[methods]]
 name = "address"
 transport = "jrpc"
-method = "v2/wallets/{walletId}/keys" 
+method = "v2/wallets/{{WALLET_ID}}/keys" 
 
     [methods.response]
     code = 200

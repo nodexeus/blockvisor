@@ -129,8 +129,8 @@ message BlockchainRequest {
     string method = 1;
     /// The id of the node that this message should be sent to.
     string node_id = 2;
-    /// This string should be a json-encoded request
-    optional string payload = 3;
+    /// These should be the parameters that are needed to perform the method call.
+    map<string, string> params = 3;
 }
 
 message BlockchainResponse {

@@ -412,13 +412,18 @@ impl NodeClient {
             NodeCommand::Run {
                 id_or_name,
                 method,
-                payload,
+                params,
             } => {
                 let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                let params = params
+                    .as_deref()
+                    .map(serde_json::from_str)
+                    .transpose()?
+                    .unwrap_or_default();
                 let req = bv_pb::BlockchainRequest {
                     method,
                     node_id: node_id.to_string(),
-                    payload,
+                    params,
                 };
                 match self.client.blockchain(req).await {
                     Ok(result) => println!("{}", result.into_inner().value),
