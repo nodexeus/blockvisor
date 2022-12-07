@@ -311,11 +311,10 @@ impl MsgHandler {
         let mut res = template.to_string();
         // This formats a parameter like `url` as `{{URL}}`
         let fmt_key = |k: &String| format!("{{{{{}}}}}", k.to_uppercase());
-        params
-            .iter()
-            .map(|(k, v)| (fmt_key(k), Self::sanitize_param(v)))
-            .try_for_each(|(k, v)| Ok(res = res.replace(&k, &v?)))
-            .map(|_| res)
+        for (k, v) in params {
+            res = res.replace(&fmt_key(k), &Self::sanitize_param(v)?);
+        }
+        Ok(res)
     }
 
     /// Allowing people to subsitute arbitrary data into sh-commands is unsafe. We therefore run
