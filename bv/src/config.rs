@@ -11,6 +11,7 @@ pub struct Config {
     pub id: String,
     pub token: String,
     pub blockjoy_api_url: String,
+    pub blockjoy_registry_url: String,
 }
 
 impl Config {
