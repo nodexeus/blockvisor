@@ -787,4 +787,16 @@ mod tests {
         mock.assert();
         assert_eq!(unwrap_blockchain(output).value, "123");
     }
+
+    #[test]
+    fn test_render() {
+        let params = [("par1", "val1"), ("pAr2", "val2"), ("PAR3", "val3")].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+
+        assert_eq!(MsgHandler::render("{{PAR1}} bla", &params), "val1 bla");
+        assert_eq!(MsgHandler::render("{{PAR2}} waa", &params), "val2 waa");
+        assert_eq!(MsgHandler::render("{{PAR3}} kra", &params), "val3 kra");
+        assert_eq!(MsgHandler::render("{{par1}} woo", &params), "{{par1}} woo");
+        assert_eq!(MsgHandler::render("{{pAr2}} koo", &params), "{{pAr2}} koo");
+        assert_eq!(MsgHandler::render("{{PAR3}} doo", &params), "val3 doo");
+    }
 }
