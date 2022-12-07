@@ -229,10 +229,7 @@ impl MsgHandler {
             .api_host
             .as_deref()
             .ok_or_else(|| error::Error::no_host(method))?;
-        let method = &mut method.to_string();
-        params
-            .iter()
-            .for_each(|(k, v)| *method = method.replace(k, v));
+        let method = Self::render(method, &params);
         let text: String = self
             .post(url)
             .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": method }))
@@ -262,12 +259,12 @@ impl MsgHandler {
             .api_host
             .as_ref()
             .ok_or_else(|| error::Error::no_host(method))?;
-        let url = &mut format!(
+        let url = format!(
             "{}/{}",
             host.trim_end_matches('/'),
             method.trim_start_matches('/')
         );
-        params.iter().for_each(|(k, v)| *url = url.replace(k, v));
+        let url = Self::render(&url, &params);
         let text = self.post(url.as_str()).send().await?.text().await?;
         let value = match &resp_config.field {
             Some(field) => gjson::get(&text, field).to_string(),
@@ -284,11 +281,9 @@ impl MsgHandler {
         use config::MethodResponseFormat::*;
 
         let command = &mut command.to_string();
-        params
-            .iter()
-            .for_each(|(k, v)| *command = command.replace(k, v));
+        let command = Self::render(command, &params);
 
-        let args = vec!["-c", command];
+        let args = vec!["-c", &command];
         let output = tokio::process::Command::new("sh")
             .args(args)
             .output()
@@ -311,6 +306,18 @@ impl MsgHandler {
                 Ok(content.into())
             }
         }
+    }
+
+    /// Renders a template by filling in uppercased, `{{ }}`-delimited template strings with the
+    /// values in the `params` dictionary.
+    fn render(template: &str, params: &HashMap<String, String>) -> String {
+        let mut res = template.to_string();
+        // This formats a parameter like `url` as `{{URL}}`
+        let fmt_key = |k: &String| format!("{{{{{}}}}}", k.to_uppercase());
+        params
+            .iter()
+            .for_each(|(k, v)| res = res.replace(&fmt_key(k), v));
+        res
     }
 }
 
