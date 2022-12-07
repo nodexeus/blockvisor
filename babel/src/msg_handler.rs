@@ -316,8 +316,19 @@ impl MsgHandler {
         let fmt_key = |k: &String| format!("{{{{{}}}}}", k.to_uppercase());
         params
             .iter()
-            .for_each(|(k, v)| res = res.replace(&fmt_key(k), v));
+            .map(|(k, v)| (fmt_key(k), Self::sanitize_param(v)))
+            .for_each(|(k, v)| res = res.replace(&k, &v));
         res
+    }
+
+    /// Allowing people to subsitute arbitrary data into sh-commands is unsafe. We therefore run
+    /// this function over each value before we substitute it. This function is deliberatly more
+    /// restrictive than needed; it just filters out each character that is not a number or a
+    /// string or absolutely needed to form a url.
+    fn sanitize_param(param: &str) -> String {
+        const ALLOWLIST: [char; 2] = ['/', ':'];
+        let is_safe = |c: &char| c.is_alphanumeric() || ALLOWLIST.contains(c);
+        param.chars().filter(is_safe).collect()
     }
 }
 
