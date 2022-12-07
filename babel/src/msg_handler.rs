@@ -790,7 +790,10 @@ mod tests {
 
     #[test]
     fn test_render() {
-        let params = [("par1", "val1"), ("pAr2", "val2"), ("PAR3", "val3")].iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+        let params = [("par1", "val1"), ("pAr2", "val2"), ("PAR3", "val3")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
 
         assert_eq!(MsgHandler::render("{{PAR1}} bla", &params), "val1 bla");
         assert_eq!(MsgHandler::render("{{PAR2}} waa", &params), "val2 waa");
