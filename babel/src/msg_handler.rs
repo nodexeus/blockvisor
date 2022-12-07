@@ -7,6 +7,7 @@ use babel_api::config;
 use babel_api::*;
 use serde_json::json;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::{self, DirBuilder, File};
 use tokio::io::AsyncWriteExt;
@@ -16,7 +17,7 @@ const WILDCARD_KEY_NAME: &str = "*";
 
 pub struct MsgHandler {
     inner: reqwest::Client,
-    cfg: config::Babel,
+    cfg: Arc<config::Babel>,
     logs_rx: Mutex<broadcast::Receiver<String>>,
 }
 
@@ -51,7 +52,7 @@ impl Handler for MsgHandler {
 
 impl MsgHandler {
     pub fn new(
-        cfg: config::Babel,
+        cfg: Arc<config::Babel>,
         timeout: Duration,
         logs_rx: broadcast::Receiver<String>,
     ) -> Result<Self, error::Error> {
@@ -204,7 +205,7 @@ impl MsgHandler {
             .ok_or_else(|| crate::error::Error::unknown_method(cmd.name))?;
         tracing::debug!("Chosen method is {method:?}");
 
-        match method {
+        match &method {
             Jrpc {
                 method, response, ..
             } => self.handle_jrpc(method, response).await,
@@ -352,7 +353,7 @@ mod tests {
             methods: Default::default(),
         };
         let (tx, logs_rx) = broadcast::channel(16);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
         tx.send("log1".to_string()).expect("failed to send log");
         tx.send("log2".to_string()).expect("failed to send log");
         tx.send("log3".to_string()).expect("failed to send log");
@@ -411,7 +412,7 @@ mod tests {
             ]),
         };
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
 
         let caps = msg_handler
             .handle(BabelRequest::ListCapabilities)
@@ -474,7 +475,7 @@ mod tests {
             methods: BTreeMap::new(),
         };
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
 
         println!("no files uploaded yet");
         let output = msg_handler
@@ -574,7 +575,7 @@ mod tests {
             methods: BTreeMap::new(),
         };
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
 
         println!("upload unknown keys");
         let output = msg_handler
@@ -642,7 +643,7 @@ mod tests {
             name: "json items".to_string(),
         });
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
         let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
@@ -693,7 +694,7 @@ mod tests {
             name: "json items".to_string(),
         });
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
         let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
@@ -754,7 +755,7 @@ mod tests {
             name: "get height".to_string(),
         });
         let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
         let output = msg_handler.handle(height_cmd).await.unwrap();
 
         mock.assert();
