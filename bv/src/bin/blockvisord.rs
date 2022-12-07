@@ -24,6 +24,10 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await?;
     let nodes = Nodes::load(config.clone()).await?;
+    {
+        // TODO check babel version on running nodes and update it before set status OK
+        *blockvisord::BV_STATUS.write().await = bv_pb::ServiceStatus::Ok;
+    }
     let updates_tx = nodes.get_updates_sender().await?.clone();
     let nodes = Arc::new(Mutex::new(nodes));
 

@@ -14,3 +14,9 @@ pub mod nodes;
 pub mod pretty_table;
 pub mod server;
 pub mod utils;
+
+use tokio::sync::RwLock;
+
+lazy_static::lazy_static! {
+    pub static ref BV_STATUS: RwLock<server::bv_pb::ServiceStatus> = RwLock::new(server::bv_pb::ServiceStatus::UndefinedServiceStatus);
+}

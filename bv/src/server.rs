@@ -5,6 +5,7 @@ pub mod bv_pb {
 }
 
 use crate::{node_data, node_data::NodeStatus, node_metrics, nodes::Nodes};
+use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
@@ -15,6 +16,21 @@ pub const BLOCKVISOR_SERVICE_URL: &str = "http://localhost:9001";
 
 lazy_static::lazy_static! {
     pub static ref BLOCKVISOR_SERVICE_ENDPOINT: Endpoint = Endpoint::from_str(BLOCKVISOR_SERVICE_URL).expect("valid url");
+}
+
+async fn status_check() -> Result<(), Status> {
+    match *crate::BV_STATUS.read().await.deref() {
+        bv_pb::ServiceStatus::UndefinedServiceStatus => Err(tonic::Status::unavailable(
+            "service not ready, try again later",
+        )),
+        bv_pb::ServiceStatus::Updating => Err(tonic::Status::unavailable(
+            "pending update, try again later",
+        )),
+        bv_pb::ServiceStatus::Broken => {
+            Err(tonic::Status::internal("service is broken, call support"))
+        }
+        bv_pb::ServiceStatus::Ok => Ok(()),
+    }
 }
 
 pub struct BlockvisorServer {
@@ -35,8 +51,9 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::HealthRequest>,
     ) -> Result<Response<bv_pb::HealthResponse>, Status> {
+        let status = crate::BV_STATUS.read().await;
         let reply = bv_pb::HealthResponse {
-            status: bv_pb::ServiceStatus::Ok.into(),
+            status: *status.deref() as i32,
         };
         Ok(Response::new(reply))
     }
@@ -45,8 +62,10 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::StartUpdateRequest>,
     ) -> Result<Response<bv_pb::StartUpdateResponse>, Status> {
+        let mut status = crate::BV_STATUS.write().await;
+        *status = bv_pb::ServiceStatus::Updating;
         Ok(Response::new(bv_pb::StartUpdateResponse {
-            status: bv_pb::ServiceStatus::Ok.into(),
+            status: bv_pb::ServiceStatus::Updating.into(),
         }))
     }
 
@@ -54,6 +73,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::CreateNodeRequest>,
     ) -> Result<Response<bv_pb::CreateNodeResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
         let image = request
@@ -81,6 +101,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::UpgradeNodeRequest>,
     ) -> Result<Response<bv_pb::UpgradeNodeResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
         let image = request
@@ -108,6 +129,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::DeleteNodeRequest>,
     ) -> Result<Response<bv_pb::DeleteNodeResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
 
@@ -119,7 +141,6 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .map_err(|e| Status::unknown(e.to_string()))?;
 
         let reply = bv_pb::DeleteNodeResponse {};
-
         Ok(Response::new(reply))
     }
 
@@ -127,6 +148,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::StartNodeRequest>,
     ) -> Result<Response<bv_pb::StartNodeResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
 
@@ -146,6 +168,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::StopNodeRequest>,
     ) -> Result<Response<bv_pb::StopNodeResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
 
@@ -165,6 +188,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::GetNodesRequest>,
     ) -> Result<Response<bv_pb::GetNodesResponse>, Status> {
+        status_check().await?;
         let list = self.nodes.lock().await.list().await;
         let mut nodes = vec![];
         for node in list {
@@ -198,6 +222,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::GetNodeStatusRequest>,
     ) -> Result<Response<bv_pb::GetNodeStatusResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
 
@@ -225,6 +250,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::GetNodeLogsRequest>,
     ) -> Result<Response<bv_pb::GetNodeLogsResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.id)?;
         let logs = self
@@ -244,6 +270,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::GetNodeKeysRequest>,
     ) -> Result<Response<bv_pb::GetNodeKeysResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.id)?;
         let keys = self
@@ -264,6 +291,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::GetNodeIdForNameRequest>,
     ) -> Result<Response<bv_pb::GetNodeIdForNameResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let name = request.name;
 
@@ -284,6 +312,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::ListCapabilitiesRequest>,
     ) -> Result<Response<bv_pb::ListCapabilitiesResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.node_id)?;
         let capabilities = self
@@ -305,6 +334,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::BlockchainRequest>,
     ) -> Result<Response<bv_pb::BlockchainResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.node_id)?;
         let value = self
@@ -324,6 +354,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         request: Request<bv_pb::GetNodeMetricsRequest>,
     ) -> Result<Response<bv_pb::GetNodeMetricsResponse>, Status> {
+        status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.node_id)?;
         let mut node_lock = self.nodes.lock().await;

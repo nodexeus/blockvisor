@@ -6,7 +6,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::marker::PhantomData;
 use std::process::Stdio;
-use std::time::SystemTime;
+use std::time::Instant;
 use tokio::process::Command;
 use tokio::sync::broadcast;
 use tokio::time::Duration;
@@ -15,7 +15,7 @@ use tracing::{info, warn};
 /// Time abstraction for better testing.
 #[async_trait]
 pub trait Timer {
-    fn now() -> SystemTime;
+    fn now() -> Instant;
     async fn sleep(duration: Duration);
 }
 
@@ -90,7 +90,7 @@ impl<T: Timer> Supervisor<T> {
 
 struct Backoff<T: Timer> {
     counter: u32,
-    timestamp: SystemTime,
+    timestamp: Instant,
     backoff_base_ms: u64,
     reset_timeout: Duration,
     phantom: PhantomData<T>,
@@ -100,7 +100,7 @@ impl<T: Timer> Backoff<T> {
     fn new(config: &Config) -> Self {
         Self {
             counter: 0,
-            timestamp: SystemTime::now(),
+            timestamp: Instant::now(),
             backoff_base_ms: config.backoff_base_ms,
             reset_timeout: Duration::from_millis(config.backoff_timeout_ms),
             phantom: Default::default(),
@@ -113,7 +113,7 @@ impl<T: Timer> Backoff<T> {
 
     async fn wait(&mut self) {
         let now = T::now();
-        let duration = now.duration_since(self.timestamp).unwrap_or_default();
+        let duration = now.duration_since(self.timestamp);
         if duration > self.reset_timeout {
             self.counter = 0;
         } else {
@@ -136,7 +136,7 @@ mod tests {
     use serial_test::serial;
     use std::fs;
     use std::ops::Add;
-    use std::time::SystemTime;
+    use std::time::Instant;
     use tokio::time::Duration;
 
     mock! {
@@ -144,7 +144,7 @@ mod tests {
 
         #[async_trait]
         impl Timer for TestTimer {
-            fn now() -> SystemTime;
+            fn now() -> Instant;
             async fn sleep(duration: Duration);
         }
     }
@@ -164,7 +164,7 @@ mod tests {
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
 
-        let now = SystemTime::now();
+        let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().once().returning(move || now);
@@ -193,7 +193,7 @@ mod tests {
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
 
-        let now = SystemTime::now();
+        let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
         let sleep_ctx = MockTestTimer::sleep_context();
@@ -245,7 +245,7 @@ mod tests {
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
 
-        let now = SystemTime::now();
+        let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().returning(move || now);
@@ -297,7 +297,7 @@ mod tests {
         let run: RunFlag = Default::default();
         let mut test_run = run.clone();
 
-        let now = SystemTime::now();
+        let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().returning(move || now);

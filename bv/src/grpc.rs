@@ -1,9 +1,11 @@
 use crate::node_data::NodeImage;
 use crate::nodes::Nodes;
+use crate::server::bv_pb;
 use anyhow::{anyhow, bail, Result};
 use pb::command_flow_client::CommandFlowClient;
 use pb::metrics_service_client::MetricsServiceClient;
 use pb::node_command::Command;
+use std::ops::Deref;
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::{broadcast::Sender, Mutex};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
@@ -53,6 +55,30 @@ impl MetricsClient {
     }
 }
 
+fn service_status_update(
+    status: &bv_pb::ServiceStatus,
+    command_id: String,
+) -> Option<pb::InfoUpdate> {
+    match status {
+        bv_pb::ServiceStatus::UndefinedServiceStatus => create_info_update(
+            command_id,
+            STATUS_ERROR,
+            Some("service not ready, try again later".to_string()),
+        ),
+        bv_pb::ServiceStatus::Updating => create_info_update(
+            command_id,
+            STATUS_ERROR,
+            Some("pending update, try again later".to_string()),
+        ),
+        bv_pb::ServiceStatus::Broken => create_info_update(
+            command_id,
+            STATUS_ERROR,
+            Some("service is broken, call support".to_string()),
+        ),
+        bv_pb::ServiceStatus::Ok => None,
+    }
+}
+
 pub async fn process_commands_stream(
     client: &mut CommandsClient,
     nodes: Arc<Mutex<Nodes>>,
@@ -68,18 +94,24 @@ pub async fn process_commands_stream(
 
     info!("Getting pending commands from stream...");
     while let Some(received) = commands_stream.next().await {
+        let status = crate::BV_STATUS.read().await;
         info!("received: {received:?}");
         let received = received?;
 
         let update = match received.r#type {
             Some(pb::command::Type::Node(node_command)) => {
                 let command_id = node_command.api_command_id.clone();
-                match process_node_command(nodes.clone(), node_command).await {
-                    Err(error) => {
-                        error!("Error processing command: {error}");
-                        create_info_update(command_id, STATUS_ERROR, Some(error.to_string()))
+                let update = service_status_update(status.deref(), command_id.clone());
+                if update.is_none() {
+                    match process_node_command(nodes.clone(), node_command).await {
+                        Err(error) => {
+                            error!("Error processing command: {error}");
+                            create_info_update(command_id, STATUS_ERROR, Some(error.to_string()))
+                        }
+                        Ok(()) => create_info_update(command_id, STATUS_OK, None),
                     }
-                    Ok(()) => create_info_update(command_id, STATUS_OK, None),
+                } else {
+                    update
                 }
             }
             Some(pb::command::Type::Host(host_command)) => {
