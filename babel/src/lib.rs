@@ -8,3 +8,5 @@ pub mod run_flag;
 pub mod supervisor;
 #[cfg(target_os = "linux")]
 pub mod vsock;
+
+type Result<T, E = error::Error> = std::result::Result<T, E>;

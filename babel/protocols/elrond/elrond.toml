@@ -33,7 +33,8 @@ method = "blocks/count"
 [[methods]]
 name = "address"
 transport = "rest"
-method = "usernames/{username}"
+# TODO: can we make this `USERNAME` parameter into something that works cross-blockchain?
+method = "usernames/{{USERNAME}}"
 
     [methods.response]
     status = 200
