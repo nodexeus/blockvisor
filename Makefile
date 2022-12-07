@@ -8,6 +8,7 @@ build-release:
 	strip target/release/blockvisord
 	cargo build -p babel --target x86_64-unknown-linux-musl --release
 	strip target/x86_64-unknown-linux-musl/release/babel
+	strip target/x86_64-unknown-linux-musl/release/babelsup
 
 get-firecraker: FC_VERSION=v1.1.3
 get-firecraker:
@@ -27,7 +28,8 @@ bundle: get-firecraker build-release
 	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
 	mkdir -p /tmp/bundle/babel/bin /tmp/bundle/babel/services
 	cp target/x86_64-unknown-linux-musl/release/babel /tmp/bundle/babel/bin
-	cp babel/data/babel.service /tmp/bundle/babel/services
+	cp target/x86_64-unknown-linux-musl/release/babelsup /tmp/bundle/babel/bin
+	cp babel/data/babelsup.service /tmp/bundle/babel/services
 	mkdir -p /tmp/bundle/firecracker/bin
 	cp /tmp/fc/firecracker /tmp/bundle/firecracker/bin
 	cp /tmp/fc/jailer /tmp/bundle/firecracker/bin
@@ -50,9 +52,10 @@ install:
 	for image in $$(find /var/lib/blockvisor/images/ -name *.img); do \
 		mount $$image /mnt/fc; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babel /mnt/fc/usr/bin/; \
-		install -m u=rw,g=r,o=r babel/data/babel.service /mnt/fc/etc/systemd/system/; \
+		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babelsup /mnt/fc/usr/bin/; \
+		install -m u=rw,g=r,o=r babel/data/babelsup.service /mnt/fc/etc/systemd/system/; \
 		install -m u=rw,g=r,o=r babel/protocols/helium/helium-validator.toml /mnt/fc/etc/babel.conf; \
-		ln -s /mnt/fc/etc/systemd/system/babel.service /mnt/fc/etc/systemd/system/multi-user.target.wants/babel.service; \
+		ln -s /mnt/fc/etc/systemd/system/babelsup.service /mnt/fc/etc/systemd/system/multi-user.target.wants/babelsup.service; \
 		umount /mnt/fc; \
 	done
 

@@ -8,18 +8,15 @@ use babel_api::*;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::{self, DirBuilder, File};
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{broadcast, Mutex};
 
 const WILDCARD_KEY_NAME: &str = "*";
 
 pub struct MsgHandler {
     inner: reqwest::Client,
-    cfg: Arc<config::Babel>,
-    logs_rx: Mutex<broadcast::Receiver<String>>,
+    cfg: config::Babel,
 }
 
 impl std::ops::Deref for MsgHandler {
@@ -52,17 +49,9 @@ impl Handler for MsgHandler {
 }
 
 impl MsgHandler {
-    pub fn new(
-        cfg: Arc<config::Babel>,
-        timeout: Duration,
-        logs_rx: broadcast::Receiver<String>,
-    ) -> Result<Self> {
+    pub fn new(cfg: config::Babel, timeout: Duration) -> Result<Self> {
         let client = reqwest::Client::builder().timeout(timeout).build()?;
-        Ok(Self {
-            inner: client,
-            cfg,
-            logs_rx: Mutex::new(logs_rx),
-        })
+        Ok(Self { inner: client, cfg })
     }
 
     pub async fn handle(&self, req: BabelRequest) -> Result<BabelResponse> {
@@ -71,7 +60,6 @@ impl MsgHandler {
         match req {
             BabelRequest::ListCapabilities => Ok(ListCapabilities(self.handle_list_caps())),
             BabelRequest::Ping => Ok(Pong),
-            BabelRequest::Logs => Ok(Logs(self.handle_logs().await)),
             BabelRequest::BlockchainCommand(cmd) => {
                 tracing::debug!("Handling BlockchainCommand: `{cmd:?}`");
                 self.handle_cmd(cmd).await.map(BlockchainResponse)
@@ -94,20 +82,6 @@ impl MsgHandler {
             .keys()
             .map(|method| method.to_string())
             .collect()
-    }
-
-    /// List logs from blockchain entry_points.
-    async fn handle_logs(&self) -> Vec<String> {
-        let mut logs = Vec::default();
-        let mut rx = self.logs_rx.lock().await;
-        loop {
-            match rx.try_recv() {
-                Ok(log) => logs.push(log),
-                Err(broadcast::error::TryRecvError::Lagged(_)) => {}
-                Err(_) => break,
-            }
-        }
-        logs
     }
 
     async fn handle_download_keys(&self) -> Result<Vec<BlockchainKey>> {
@@ -360,47 +334,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_logs() {
-        let cfg = Babel {
-            export: None,
-            env: None,
-            config: Config {
-                babel_version: "".to_string(),
-                node_version: "".to_string(),
-                protocol: "".to_string(),
-                node_type: "".to_string(),
-                description: None,
-                api_host: None,
-                ports: vec![],
-                data_directory_mount_point: "".to_string(),
-            },
-            supervisor: SupervisorConfig {
-                backoff_timeout_ms: 10,
-                backoff_base_ms: 1,
-                log_buffer_capacity_ln: 4,
-                entry_point: vec![],
-            },
-            keys: None,
-            methods: Default::default(),
-        };
-        let (tx, logs_rx) = broadcast::channel(16);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
-        tx.send("log1".to_string()).expect("failed to send log");
-        tx.send("log2".to_string()).expect("failed to send log");
-        tx.send("log3".to_string()).expect("failed to send log");
-
-        if let BabelResponse::Logs(logs) = msg_handler
-            .handle(BabelRequest::Logs)
-            .await
-            .expect("failed to handle logs request")
-        {
-            assert_eq!(vec!["log1", "log2", "log3"], logs)
-        } else {
-            panic!("invalid logs response")
-        }
-    }
-
-    #[tokio::test]
     async fn test_sh() {
         let cfg = Babel {
             export: None,
@@ -442,8 +375,7 @@ mod tests {
                 ),
             ]),
         };
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10)).unwrap();
 
         let caps = msg_handler
             .handle(BabelRequest::ListCapabilities)
@@ -508,8 +440,7 @@ mod tests {
             ])),
             methods: BTreeMap::new(),
         };
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10)).unwrap();
 
         println!("no files uploaded yet");
         let output = msg_handler
@@ -608,8 +539,7 @@ mod tests {
             )])),
             methods: BTreeMap::new(),
         };
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(10), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(10)).unwrap();
 
         println!("upload unknown keys");
         let output = msg_handler
@@ -677,8 +607,7 @@ mod tests {
             name: "json items".to_string(),
             params: HashMap::new(),
         });
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
         let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
@@ -729,8 +658,7 @@ mod tests {
             name: "json items".to_string(),
             params: HashMap::new(),
         });
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
         let output = msg_handler.handle(json_cmd).await.unwrap();
 
         mock.assert();
@@ -791,8 +719,7 @@ mod tests {
             name: "get height".to_string(),
             params: HashMap::new(),
         });
-        let (_, logs_rx) = broadcast::channel(1);
-        let msg_handler = MsgHandler::new(Arc::new(cfg), Duration::from_secs(1), logs_rx).unwrap();
+        let msg_handler = MsgHandler::new(cfg, Duration::from_secs(1)).unwrap();
         let output = msg_handler.handle(height_cmd).await.unwrap();
 
         mock.assert();

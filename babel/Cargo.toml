@@ -14,6 +14,10 @@ path = "src/lib.rs"
 name = "babel"
 path = "src/bin/babel.rs"
 
+[[bin]]
+name = "babelsup"
+path = "src/bin/babelsup.rs"
+
 [dependencies]
 babel_api = {version = "*", path = "../babel_api"}
 eyre = "0.6.8"

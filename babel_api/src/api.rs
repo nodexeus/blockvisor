@@ -4,8 +4,10 @@ use strum_macros::Display;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SupervisorRequest {
-    Logs,
+    /// Returns `Pong`. Useful to check for the liveness of the node.
     Ping,
+    /// List of logs from blockchain entry_points.
+    Logs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,13 +21,11 @@ pub enum SupervisorResponse {
 /// deserialized into this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BabelRequest {
+    /// Returns `Pong`. Useful to check for the liveness of the node.
+    Ping,
     /// List the endpoints that are available for the current blockchain. These are extracted from
     /// the config, and just sent back as strings for now.
     ListCapabilities,
-    /// List of logs from blockchain entry_points.
-    Logs,
-    /// Returns `Pong`. Useful to check for the liveness of the node.
-    Ping,
     /// Send a request to the current blockchain. We can identify the way to do this from the
     /// config and forward the provided parameters.
     BlockchainCommand(BlockchainCommand),
@@ -43,9 +43,8 @@ pub struct BlockchainCommand {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum BabelResponse {
-    ListCapabilities(Vec<String>),
     Pong,
-    Logs(Vec<String>),
+    ListCapabilities(Vec<String>),
     BlockchainResponse(BlockchainResponse),
     Keys(Vec<BlockchainKey>),
     Error(String),
