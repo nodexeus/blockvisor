@@ -50,11 +50,11 @@ jobs:
           AWS_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }} AWS_REGION=us-east-1 \
             aws --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com/ s3 cp \
             /tmp/bundle.tar.gz \
-            s3://bundles/${{ env.GIT_VERSION }}/bvd-bundle.tgz
+            s3://cookbook-dev/bundles/${{ env.GIT_VERSION }}/bvd-bundle.tgz
           AWS_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }} AWS_REGION=us-east-1 \
             aws --endpoint-url https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com/ s3api put-object-tagging \
-            --bucket bundles \
-            --key ${{ env.GIT_VERSION }}/ \
+            --bucket cookbook-dev \
+            --key bundles/${{ env.GIT_VERSION }}/ \
             --tagging '{"TagSet": [{ "Key": "dev", "Value": "true" }]}'
       - name: Upload to GH releases
         uses: actions/upload-release-asset@v1.0.1
