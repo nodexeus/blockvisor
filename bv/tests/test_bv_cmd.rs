@@ -4,7 +4,6 @@ use assert_cmd::Command;
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
 use blockvisord::grpc::{self, pb};
-use blockvisord::server::bv_pb;
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
 #[cfg(target_os = "linux")]
@@ -97,6 +96,13 @@ fn test_bv_cmd_restart() {
 #[cfg(target_os = "linux")]
 fn test_bv_host_metrics() {
     bv_run(&["host", "metrics"], "Used cpu:");
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
+fn test_bv_chain_list() {
+    bv_run(&["chain", "list", "helium", "validator"], "");
 }
 
 #[test]
@@ -490,6 +496,7 @@ async fn test_bv_cmd_grpc_commands() {
     use blockvisord::config::Config;
     use blockvisord::grpc::process_commands_stream;
     use blockvisord::nodes::Nodes;
+    use blockvisord::server::bv_pb;
     use serde_json::json;
     use std::str::FromStr;
     use stub_server::StubServer;

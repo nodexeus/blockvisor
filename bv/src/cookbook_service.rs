@@ -42,7 +42,8 @@ impl CookbookService {
             .into_iter()
             .map(|id| id.node_version)
             .collect();
-        versions.sort();
+        // sort desc
+        versions.sort_by(|a, b| b.cmp(a));
 
         Ok(versions)
     }
