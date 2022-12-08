@@ -3,9 +3,6 @@ use eyre::bail;
 use std::path::Path;
 use tokio::fs;
 
-pub const BABEL_BIN_PATH: &str = "/usr/bin/babel";
-pub const CONFIG_PATH: &str = "/etc/babel.conf";
-
 pub async fn load(path: &Path) -> eyre::Result<Babel> {
     tracing::info!("Loading babel configuration at {}", path.display());
     let toml_str = fs::read_to_string(path).await?;

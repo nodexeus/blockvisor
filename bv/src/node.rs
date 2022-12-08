@@ -4,10 +4,11 @@ use firec::Machine;
 use std::{collections::HashMap, path::Path, str::FromStr, time::Duration};
 use tokio::io::AsyncWriteExt;
 use tokio::{fs::DirBuilder, time::sleep};
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace};
 use uuid::Uuid;
 
 use crate::{
+    babel_binary,
     babel_connection::{BabelConnection, BABEL_START_TIMEOUT},
     cookbook_service::CookbookService,
     env::*,
@@ -61,21 +62,38 @@ impl Node {
                 // Since this is the startup phase it doesn't make sense to wait a long time
                 // for the nodes to come online. For that reason we restrict the allowed delay
                 // further down to one second.
-                let babel_conn =
-                    BabelConnection::connect(&data.id, BABEL_VSOCK_PORT, Duration::from_secs(1))
-                        .await?;
+                let babel_conn = BabelConnection::connect(
+                    &data.id,
+                    BABEL_SUP_VSOCK_PORT,
+                    Duration::from_secs(1),
+                )
+                .await?;
                 debug!("Established babel connection");
                 (firec::MachineState::RUNNING { pid }, babel_conn)
             }
             Err(_) => (firec::MachineState::SHUTOFF, BabelConnection::Closed),
         };
         let machine = firec::Machine::connect(config, state).await;
-
-        Ok(Self {
+        let mut node = Self {
             data,
             machine,
             babel_conn,
-        })
+        };
+        if let firec::MachineState::RUNNING { .. } = state {
+            let (babel_bin, checksum) = babel_binary::load()?;
+            let resp = node
+                .send(
+                    babel_api::SupervisorRequest::CheckBabelChecksum(checksum),
+                    BABEL_SUP_VSOCK_PORT,
+                )
+                .await;
+            if !matches!(resp, Ok(babel_api::SupervisorResponse::Ok)) {
+                info!("Invalid Babel service, install new one");
+                node.start_new_babel(babel_bin, checksum).await;
+            }
+        }
+
+        Ok(node)
     }
 
     /// Returns the node's `id`.
@@ -109,15 +127,23 @@ impl Node {
         self.machine.start().await?;
         self.babel_conn =
             BabelConnection::connect(&self.id(), BABEL_SUP_VSOCK_PORT, BABEL_START_TIMEOUT).await?;
-        let resp = self
-            .send(babel_api::SupervisorRequest::Ping, BABEL_SUP_VSOCK_PORT)
-            .await;
-        if !matches!(resp, Ok(babel_api::SupervisorResponse::Pong)) {
-            warn!("Ping request did not respond with `Pong`, but `{resp:?}`");
-        }
+        let (babel_bin, checksum) = babel_binary::load()?;
+        self.start_new_babel(babel_bin, checksum).await;
 
         self.data.expected_status = NodeStatus::Running;
         self.data.save().await
+    }
+
+    async fn start_new_babel(&mut self, babel_bin: Vec<u8>, checksum: u32) {
+        let resp = self
+            .send(
+                babel_api::SupervisorRequest::StartBabel(babel_bin, checksum),
+                BABEL_SUP_VSOCK_PORT,
+            )
+            .await;
+        if !matches!(resp, Ok(babel_api::SupervisorResponse::Ok)) {
+            error!("StartBabel request failed with {resp:?}");
+        }
     }
 
     /// Returns the actual status of the node.

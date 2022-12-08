@@ -1,7 +1,6 @@
 #[cfg(target_os = "linux")]
 use babel::vsock;
 use babel::{config, logging, run_flag::RunFlag};
-use std::path::Path;
 use tokio::fs::DirBuilder;
 
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
@@ -12,8 +11,7 @@ const VSOCK_BABEL_PORT: u32 = 42;
 async fn main() -> eyre::Result<()> {
     logging::setup_logging()?;
 
-    let cfg_path = Path::new(config::CONFIG_PATH);
-    let cfg = config::load(cfg_path).await?;
+    let cfg = config::load(&babel::env::BABEL_CONFIG_PATH).await?;
 
     let data_dir = &cfg.config.data_directory_mount_point;
     tracing::info!("Recursively creating data directory at {data_dir}");
@@ -41,11 +39,10 @@ async fn serve(
     cid: u32,
     port: u32,
 ) -> eyre::Result<()> {
-    use std::sync::Arc;
     use std::time::Duration;
 
     let msg_handler = babel::msg_handler::MsgHandler::new(cfg, Duration::from_secs(10))?;
-    vsock::serve(run, cid, port, Arc::new(msg_handler)).await
+    vsock::serve(run, cid, port, msg_handler).await
 }
 
 #[cfg(not(target_os = "linux"))]

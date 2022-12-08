@@ -1,5 +1,7 @@
 // TODO: What are we going to use as backup when vsock is disabled?
+mod babel_binary;
 pub mod config;
+pub mod env;
 pub mod error;
 pub mod log_buffer;
 pub mod logging;

@@ -304,7 +304,7 @@ impl<T: Timer> Installer<T> {
             .code()
             .with_context(|| "failed to get systemctl exit status code")?;
         ensure!(
-            status_code != 0,
+            status_code == 0,
             "blockvisor service restart failed with exit code {status_code}"
         );
         Ok(())
@@ -348,7 +348,7 @@ impl<T: Timer> Installer<T> {
             .code()
             .with_context(|| "failed to get backup installer exit status code")?;
         ensure!(
-            status_code != 0,
+            status_code == 0,
             "backup installer failed with exit code {status_code}"
         );
         Ok(())

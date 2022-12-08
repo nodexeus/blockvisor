@@ -160,7 +160,8 @@ impl BabelConnection {
             loop {
                 // Wait for the socket to become ready to read from.
                 unix_stream.readable().await?;
-                let mut data = vec![0; 4194304];
+                let mut data = vec![0; 4194304]; // 4Mb to be able to receive full logs
+
                 // Try to read data, this may still fail with `WouldBlock`
                 // if the readiness event is a false positive.
                 match unix_stream.try_read(&mut data) {

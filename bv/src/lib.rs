@@ -1,3 +1,4 @@
+mod babel_binary;
 pub mod babel_connection;
 pub mod cli;
 pub mod config;

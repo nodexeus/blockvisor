@@ -4,16 +4,17 @@ use strum_macros::Display;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SupervisorRequest {
-    /// Returns `Pong`. Useful to check for the liveness of the node.
-    Ping,
-    /// List of logs from blockchain entry_points.
+    CheckBabelChecksum(u32),
+    StartBabel(Vec<u8>, u32),
+    /// Get logs from blockchain entry_points.
     Logs,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SupervisorResponse {
-    Pong,
+    /// List of logs from blockchain entry_points.
     Logs(Vec<String>),
+    Ok,
     Error(String),
 }
 

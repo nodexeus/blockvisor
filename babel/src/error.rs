@@ -2,6 +2,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Internal Error
+    #[error("Babel Internal Error")]
+    InternalError { description: String },
+    /// Invalid Babel
+    #[error("Babel service is invalid")]
+    InvalidBabel,
     /// Unknown method
     #[error("Method `{method}` not found")]
     UnknownMethod { method: String },
