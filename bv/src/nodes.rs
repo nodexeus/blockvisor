@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     config::Config,
+    cookbook_service::CookbookService,
     env::{REGISTRY_CONFIG_DIR, REGISTRY_CONFIG_FILE},
     grpc::{pb, pb::node_info::ContainerStatus},
     key_service::KeyService,
@@ -66,6 +67,8 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
+        self.fetch_image_data(&image).await?;
+
         let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
         self.data.machine_index += 1;
@@ -94,9 +97,10 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
-        let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
+        self.fetch_image_data(&image).await?;
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
+        let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
         self.stop(id).await?;
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
@@ -108,6 +112,39 @@ impl Nodes {
         }
 
         let _ = self.send_container_status(&id, ContainerStatus::Upgraded);
+
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn fetch_image_data(&mut self, image: &NodeImage) -> Result<()> {
+        if CookbookService::is_image_cache_valid(image)
+            .await
+            .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
+        {
+            info!(
+                "Image cache present: `{}`, skipping download..",
+                CookbookService::get_image_download_folder_path(image).display()
+            );
+            return Ok(());
+        }
+
+        let mut cookbook_service = CookbookService::connect(
+            &self.api_config.blockjoy_registry_url,
+            &self.api_config.token,
+        )
+        .await?;
+
+        cookbook_service
+            .download_kernel(image)
+            .await
+            .with_context(|| format!("Failed to download image: `{image:?}`"))?;
+        cookbook_service
+            .download_image(image)
+            .await
+            .with_context(|| format!("Failed to download kernel: `{image:?}`"))?;
+        // TODO: fetch babel config
+        // cookbook_service.get_babel_config(image).await?;
 
         Ok(())
     }
