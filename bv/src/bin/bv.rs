@@ -66,6 +66,7 @@ async fn main() -> Result<()> {
                 id: host.host_id,
                 token: host.token,
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
+                blockjoy_registry_url: cmd_args.blockjoy_registry_url,
             };
             api_config.save().await?;
 

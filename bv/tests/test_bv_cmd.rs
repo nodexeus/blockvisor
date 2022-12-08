@@ -250,6 +250,7 @@ fn test_bv_cmd_init_unknown_otp() {
     cmd.args(&["init", otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
+        .args(&["--registry", url])
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
@@ -348,12 +349,14 @@ async fn test_bv_cmd_init_localhost() {
     println!("bv init");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
+    let registry = "http://localhost:50051";
 
     Command::cargo_bin("bv")
         .unwrap()
         .args(&["init", &otp])
         .args(&["--ifa", ifa])
         .args(&["--url", url])
+        .args(&["--registry", registry])
         .assert()
         .success()
         .stdout(predicate::str::contains("Configuring blockvisor"));
@@ -675,6 +678,7 @@ async fn test_bv_cmd_grpc_commands() {
         id: Uuid::new_v4().to_string(),
         token: "any token".to_string(),
         blockjoy_api_url: "http://localhost:8081".to_string(),
+        blockjoy_registry_url: "http://localhost:50051".to_string(),
     };
     let nodes = Nodes::load(config.clone()).await.unwrap();
     let updates_tx = nodes.get_updates_sender().await.unwrap().clone();
@@ -821,6 +825,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .args(&["init", otp])
             .args(&["--ifa", ifa])
             .args(&["--url", url])
+            .args(&["--registry", url])
             .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()

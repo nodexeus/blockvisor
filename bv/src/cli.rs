@@ -19,6 +19,10 @@ pub struct InitArgs {
     #[clap(long = "url", default_value = "https://api.blockvisor.dev")]
     pub blockjoy_api_url: String,
 
+    /// BlockJoy registry url
+    #[clap(long = "registry", default_value = "https://api.blockvisor.dev")]
+    pub blockjoy_registry_url: String,
+
     /// Network interface name
     #[clap(long = "ifa", default_value = "bvbr0")]
     pub ifa: String,
