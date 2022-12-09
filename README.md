@@ -14,6 +14,9 @@ The service that runs on the host systems and is responisble for provisioning an
 apt install tmux pigz util-linux e2fsprogs
 ```
 
+## Local testing
+See [run_bv_local.md](./run_bv_local.md) 
+
 ## API proto files
 
 API proto files are stored in [separate repository](https://github.com/blockjoy/api-proto).

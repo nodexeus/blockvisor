@@ -330,16 +330,24 @@ impl Nodes {
             "Reading nodes common config file: {}",
             REGISTRY_CONFIG_FILE.display()
         );
-        let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE).await?;
-        let nodes_data = toml::from_str(&config)?;
+        let config = fs::read_to_string(&*REGISTRY_CONFIG_FILE)
+            .await
+            .context("failed to read nodes registry")?;
+        let nodes_data = toml::from_str(&config).context("failed to parse nodes registry")?;
         // Now the individual node data files.
         info!(
             "Reading nodes config dir: {}",
             REGISTRY_CONFIG_DIR.display()
         );
         let mut this = Nodes::new(api_config, nodes_data);
-        let mut dir = read_dir(&*REGISTRY_CONFIG_DIR).await?;
-        while let Some(entry) = dir.next_entry().await? {
+        let mut dir = read_dir(&*REGISTRY_CONFIG_DIR)
+            .await
+            .context("failed to read nodes registry dir")?;
+        while let Some(entry) = dir
+            .next_entry()
+            .await
+            .context("failed to read nodes registry entry")?
+        {
             // blockvisord should not bail on problems with individual node files.
             // It should log warnings though.
             let path = entry.path();
@@ -416,8 +424,12 @@ impl Nodes {
     ) -> Result<NetworkInterface> {
         self.data.machine_index += 1;
 
-        let iface =
-            NetworkInterface::create(format!("bv{}", self.data.machine_index), ip, gateway).await?;
+        let iface = NetworkInterface::create(format!("bv{}", self.data.machine_index), ip, gateway)
+            .await
+            .context(format!(
+                "failed to create VM bridge bv{}",
+                self.data.machine_index
+            ))?;
 
         Ok(iface)
     }

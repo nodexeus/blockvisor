@@ -1,5 +1,5 @@
 use crate::grpc::pb;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use blockvisord::{
     config::Config,
     grpc, hosts,
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     setup_logging()?;
     info!("Starting...");
 
-    let config = Config::load().await?;
+    let config = Config::load().await.context("failed to load host config")?;
     let nodes = Nodes::load(config.clone()).await?;
     {
         // TODO check babel version on running nodes and update it before set status OK
