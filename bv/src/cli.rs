@@ -219,7 +219,17 @@ pub enum HostCommand {
 pub enum ChainCommand {
     /// Show chains list
     #[clap(alias = "ls")]
-    List,
+    List {
+        /// Blockchain protocol name (e.g. helium, eth)
+        protocol: String,
+
+        /// Blockchain node type (e.g. validator)
+        r#type: String,
+
+        /// Display the first N items
+        #[clap(long, short, default_value = "10")]
+        number: usize,
+    },
 
     /// Display chain status
     Status {

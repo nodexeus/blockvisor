@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
+    cookbook_service::CookbookService,
     grpc::pb,
     hosts::{get_host_info, get_host_metrics, get_ip_address},
     nodes::{CommonData, Nodes},
@@ -192,8 +193,24 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
 
 #[allow(unreachable_code)]
 async fn process_chain_command(command: ChainCommand) -> Result<()> {
+    let config = Config::load().await?;
+
     match command {
-        ChainCommand::List => todo!(),
+        ChainCommand::List {
+            protocol,
+            r#type,
+            number,
+        } => {
+            let mut cookbook_service =
+                CookbookService::connect(&config.blockjoy_registry_url, &config.token).await?;
+            let mut versions = cookbook_service.list_versions(&protocol, &r#type).await?;
+
+            versions.truncate(number);
+
+            for version in versions {
+                println!("{version}");
+            }
+        }
         ChainCommand::Status { id: _ } => todo!(),
         ChainCommand::Sync { id: _ } => todo!(),
     }

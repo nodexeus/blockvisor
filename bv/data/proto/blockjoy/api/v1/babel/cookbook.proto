@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package blockjoy.api.v1.babel;
+
+import "google/protobuf/empty.proto";
+
+/* Define staging status */
+enum StatusName {
+  UndefinedStatusName = 0;
+  Development = 1;
+  Unstable = 2;
+  Stable = 3;
+}
+
+/* Message type used for identifying a specific configuration */
+message ConfigIdentifier {
+  /* snake_cased name of the blockchain */
+  string protocol = 1;
+  /* snake_cased name of the node type */
+  string node_type = 2;
+  /* semantic version string of the node type version */
+  string node_version = 3;
+  /* Does defined tuple have the requested tag assigned */
+  StatusName status = 4;
+}
+
+message BundleIdentifier {
+  /* semantic version string of the bundle version */
+  string version = 1;
+  /* Does defined tuple have the requested tag assigned */
+  StatusName status = 2;
+}
+
+message Configuration {
+  ConfigIdentifier identifier = 1;
+  /* Configuration file contents */
+  bytes toml_content = 2;
+}
+
+message ArchiveLocation {
+  string url = 1;
+}
+
+message BabelVersionsRequest {
+  string protocol = 1;
+  string node_type = 2;
+  StatusName status = 3;
+}
+
+message BabelVersionsResponse {
+  repeated ConfigIdentifier identifiers = 1;
+}
+
+message BundleVersionsRequest {
+  StatusName status = 1;
+}
+
+message BundleVersionsResponse {
+  repeated BundleIdentifier identifiers = 1;
+}
+
+/* Babel cookbook service */
+service CookBookService {
+  /* Retrieve configuration for specific version and state */
+  rpc RetrieveConfiguration(ConfigIdentifier) returns (Configuration) {}
+  /* Retrieve image for specific version and state */
+  rpc RetrieveImage(ConfigIdentifier) returns (ArchiveLocation) {}
+  /* Retrieve kernel file for specific version and state */
+  rpc RetrieveKernel(ConfigIdentifier) returns (ArchiveLocation) {}
+  /* List all available babel versions */
+  rpc ListBabelVersions(BabelVersionsRequest) returns (BabelVersionsResponse) {}
+  /* Promote/Demote configuration/image to the desired state */
+  rpc AddStage(ConfigIdentifier) returns (google.protobuf.Empty) {}
+  /* Disable configuration in the desired state */
+  rpc RemoveStage(ConfigIdentifier) returns (google.protobuf.Empty) {}
+  /* Delete configuration/image from storage */
+  rpc Delete(ConfigIdentifier) returns (google.protobuf.Empty) {}
+}
+
+/* Retrieve manage BVD bundles */
+service BundleService {
+  /* Retrieve image for specific version and state */
+  rpc Retrieve(BundleIdentifier) returns (ArchiveLocation) {}
+  /* List all available bundle versions */
+  rpc ListBundleVersions(BundleVersionsRequest) returns (BundleVersionsResponse) {}
+  /* Promote/Demote bundle to the desired state */
+  rpc AddStage(BundleIdentifier) returns (google.protobuf.Empty) {}
+  /* Disable configuration in the desired state */
+  rpc RemoveStage(BundleIdentifier) returns (google.protobuf.Empty) {}
+  /* Delete bundle from storage */
+  rpc Delete(BundleIdentifier) returns (google.protobuf.Empty) {}
+}

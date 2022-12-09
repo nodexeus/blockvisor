@@ -44,3 +44,22 @@ services:
       DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
     depends_on:
       - api
+
+  cookbook:
+    image: 'registry.digitalocean.com/stakejoy/babel-cookbook:latest'
+    ports:
+      - 50051:50051
+    environment:
+      SERVER_URL: 0.0.0.0:50051
+      JWT_SECRET: 1245456
+      CASBIN_MODEL: /etc/cookbook/conf/model.conf
+      CASBIN_POLICIES: /etc/cookbook/conf/policies.csv
+      AWS_ACCESS_KEY_ID: 0ad80055714f2804ae72b2c89011e882
+      AWS_SECRET_ACCESS_KEY: 6ee068ea418987668f5ccee147551966af5764e732a7b0ceb9de63d1b20d2bdc
+      AWS_REGION: us-east-1
+      R2_URL: https://19afdffb308beea3e9c1ef3a95085d3b.r2.cloudflarestorage.com
+      R2_ROOT: cookbook-dev
+      DIR_CHAINS_PREFIX: chains
+      DIR_BUNDLES_PREFIX: bundles
+      PRESIGNED_URL_EXPIRATION_SECS: 60
+      RUST_LOG: debug
