@@ -6,8 +6,7 @@ After=syslog.target network.target network-online.target
 Requires=tmux.service
 
 [Service]
-# Debug logging for now
-Environment="RUST_LOG=debug,firec=trace"
+Environment="RUST_LOG=info,firec=trace"
 # TODO: We need to run things as a special system user.
 # User=blockvisor
 ExecStart=/usr/bin/blockvisord
