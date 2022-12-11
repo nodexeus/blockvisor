@@ -2,6 +2,7 @@
 
 use crate::grpc::pb;
 use crate::node;
+use crate::node_data::NodeStatus;
 use std::collections::HashMap;
 use tracing::warn;
 
@@ -27,12 +28,15 @@ pub struct Metric {
 }
 
 /// Given a list of nodes, returns for each node their metric. It does this concurrently for each
-/// node, but queries the different metrics sequentially for a given node. Normally this would not
+/// running node, but queries the different metrics sequentially for a given node. Normally this would not
 /// be efficient, but since we are dealing with a virtual socket the latency is very low, in the
 /// hundres of nanoseconds. Furthermore, we require unique access to the node to query a metric, so
 /// sequentially is easier to program.
 pub async fn collect_metrics(nodes: impl Iterator<Item = &mut node::Node>) -> Metrics {
-    let metrics_fut: Vec<_> = nodes.map(collect_metric).collect();
+    let metrics_fut: Vec<_> = nodes
+        .filter(|n| n.status() == NodeStatus::Running)
+        .map(collect_metric)
+        .collect();
     let metrics: Vec<_> = futures_util::future::join_all(metrics_fut).await;
     Metrics(metrics.into_iter().collect())
 }
@@ -55,7 +59,7 @@ where
     match tokio::time::timeout(TIMEOUT, fut).await {
         Ok(Ok(res)) => Ok(res),
         Ok(Err(e)) => {
-            warn!("Collecting node metric failed! `{e}");
+            warn!("Collecting node metric failed! `{e}`");
             Err(e)
         }
         Err(e) => {
