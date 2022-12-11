@@ -408,9 +408,9 @@ async fn test_bv_cmd_init_localhost() {
             blockchain_id: Some(blockchain_id.to_string()),
             name: None,
             groups: vec![],
-            version: None, // will be translated into "latest"
+            version: Some("0.0.1".to_string()),
             ip: None,
-            r#type: Some(json!({"id": 3, "properties": []}).to_string()),
+            r#type: Some(json!({"id": 3, "properties": []}).to_string()), // validator
             address: None,
             wallet_address: None,
             block_height: None,
