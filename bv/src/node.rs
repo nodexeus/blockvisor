@@ -152,15 +152,15 @@ impl Node {
                     }
                 }
                 self.babel_conn.wait_for_disconnect(&self.id()).await;
+
+                // FIXME: for some reason firecracker socket is not created by
+                // consequent start command if we do not wait a bit here
+                sleep(Duration::from_secs(10)).await;
             }
         }
         self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
         self.babel_conn = BabelConnection::Closed;
-
-        // FIXME: for some reason firecracker socket is not created by
-        // consequent start command if we do not wait a bit here
-        sleep(Duration::from_secs(10)).await;
 
         Ok(())
     }
