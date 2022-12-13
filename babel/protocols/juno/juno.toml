@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "juno"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "9.0.0"
+min_babel_version = "0.0.1"
 description = "juno blockchain validator"
 api_host = "http://localhost:26657/"
 ports = [26657]

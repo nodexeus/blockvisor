@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "kusama"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "0.9.29"
+min_babel_version = "0.0.1"
 description = "kusama blockchain validator"
 api_host = "http://localhost:9933/"
 ports = [9933]

@@ -6,8 +6,8 @@ disk = 200
 [config]
 protocol = "helium"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "1.15.9"
+min_babel_version = "0.0.1"
 description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
 ports = [4467]

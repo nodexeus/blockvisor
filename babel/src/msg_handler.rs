@@ -339,7 +339,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
@@ -423,7 +423,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
@@ -523,7 +523,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
@@ -578,7 +578,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
@@ -629,7 +629,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),
@@ -691,7 +691,7 @@ mod tests {
             export: None,
             env: None,
             config: Config {
-                babel_version: "0.1.0".to_string(),
+                min_babel_version: "0.1.0".to_string(),
                 node_version: "1.51.3".to_string(),
                 protocol: "helium".to_string(),
                 node_type: "".to_string(),

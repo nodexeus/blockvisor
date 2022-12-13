@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "bsc"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "1.1.17"
+min_babel_version = "0.0.1"
 description = "bsc blockchain validator"
 api_host = "http://localhost:8545/"
 ports = [8545]
