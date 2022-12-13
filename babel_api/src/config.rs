@@ -6,6 +6,7 @@ pub struct Babel {
     pub export: Option<Vec<String>>,
     pub env: Option<Env>,
     pub config: Config,
+    pub requirements: Requirements,
     /// Commands to start blockchain node
     pub supervisor: SupervisorConfig,
     pub keys: Option<HashMap<String, String>>,
@@ -79,6 +80,16 @@ pub struct Config {
     pub ports: Vec<u16>,
     /// Path to mount data drive to
     pub data_directory_mount_point: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Requirements {
+    // Virtual cores to share with VM
+    pub vcpu_count: usize,
+    // RAM allocated to VM
+    pub mem_size_mb: usize,
+    // Size of data drive for storing blockchain data (not to be confused with OS drive)
+    pub disk_size_gb: usize,
 }
 
 #[derive(Debug, Deserialize)]
