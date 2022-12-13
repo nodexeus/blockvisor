@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
+use babel_api::config::Babel;
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -67,7 +68,8 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
-        self.fetch_image_data(&image).await?;
+        // TODO: use babel config
+        let _babel = self.fetch_image_data(&image).await?;
 
         let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
@@ -97,7 +99,8 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
-        self.fetch_image_data(&image).await?;
+        // TODO: use babel config
+        let _babel = self.fetch_image_data(&image).await?;
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
@@ -117,36 +120,33 @@ impl Nodes {
     }
 
     #[instrument(skip(self))]
-    async fn fetch_image_data(&mut self, image: &NodeImage) -> Result<()> {
-        if CookbookService::is_image_cache_valid(image)
+    async fn fetch_image_data(&mut self, image: &NodeImage) -> Result<Babel> {
+        if !CookbookService::is_image_cache_valid(image)
             .await
             .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
         {
-            info!(
-                "Image cache present: `{}`, skipping download..",
-                CookbookService::get_image_download_folder_path(image).display()
-            );
-            return Ok(());
+            let mut cookbook_service = CookbookService::connect(
+                &self.api_config.blockjoy_registry_url,
+                &self.api_config.token,
+            )
+            .await?;
+
+            cookbook_service
+                .download_babel_config(image)
+                .await
+                .with_context(|| format!("Failed to download babel config: `{image:?}`"))?;
+            cookbook_service
+                .download_image(image)
+                .await
+                .with_context(|| format!("Failed to download kernel: `{image:?}`"))?;
+            cookbook_service
+                .download_kernel(image)
+                .await
+                .with_context(|| format!("Failed to download OS image: `{image:?}`"))?;
         }
 
-        let mut cookbook_service = CookbookService::connect(
-            &self.api_config.blockjoy_registry_url,
-            &self.api_config.token,
-        )
-        .await?;
-
-        cookbook_service
-            .download_kernel(image)
-            .await
-            .with_context(|| format!("Failed to download image: `{image:?}`"))?;
-        cookbook_service
-            .download_image(image)
-            .await
-            .with_context(|| format!("Failed to download kernel: `{image:?}`"))?;
-        // TODO: fetch babel config
-        // cookbook_service.get_babel_config(image).await?;
-
-        Ok(())
+        let babel = CookbookService::get_babel_config(image).await?;
+        Ok(babel)
     }
 
     #[instrument(skip(self))]
