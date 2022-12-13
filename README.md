@@ -8,6 +8,12 @@ The service that runs on the host systems and is responisble for provisioning an
 2. Run `make tag` to create a version tag
 3. CI `publish` workflow will then build a bundle and create a new GH release
 
+## Prerequisites
+
+```sh
+apt install tmux pigz
+```
+
 ## API proto files
 
 API proto files are stored in [separate repository](https://github.com/blockjoy/api-proto).

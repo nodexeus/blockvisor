@@ -34,9 +34,7 @@ impl NodeImage {
     pub fn url(&self) -> String {
         format!(
             "{}/{}/{}/{ROOT_FS_FILE}",
-            self.protocol.to_lowercase(),
-            self.node_type,
-            self.node_version
+            self.protocol, self.node_type, self.node_version
         )
     }
 }

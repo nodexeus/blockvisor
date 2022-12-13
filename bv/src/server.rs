@@ -4,7 +4,11 @@ pub mod bv_pb {
     tonic::include_proto!("blockjoy.blockvisor.v1");
 }
 
-use crate::{node_data, node_data::NodeStatus, node_metrics, nodes::Nodes};
+use crate::{
+    node_data::{NodeImage, NodeStatus},
+    node_metrics,
+    nodes::Nodes,
+};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
@@ -76,14 +80,10 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
-        let image = request
+        let image: NodeImage = request
             .image
-            .ok_or_else(|| Status::invalid_argument("Image not provided"))?;
-        let image = node_data::NodeImage {
-            protocol: image.protocol,
-            node_type: image.node_type,
-            node_version: image.node_version,
-        };
+            .ok_or_else(|| Status::invalid_argument("Image not provided"))?
+            .into();
 
         self.nodes
             .lock()
@@ -104,14 +104,10 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         status_check().await?;
         let request = request.into_inner();
         let id = helpers::parse_uuid(request.id)?;
-        let image = request
+        let image: NodeImage = request
             .image
-            .ok_or_else(|| Status::invalid_argument("Image not provided"))?;
-        let image = node_data::NodeImage {
-            protocol: image.protocol,
-            node_type: image.node_type,
-            node_version: image.node_version,
-        };
+            .ok_or_else(|| Status::invalid_argument("Image not provided"))?
+            .into();
 
         self.nodes
             .lock()
@@ -197,11 +193,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
                 NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
                 NodeStatus::Failed => bv_pb::NodeStatus::Failed,
             };
-            let image = bv_pb::NodeImage {
-                protocol: node.image.protocol,
-                node_type: node.image.node_type,
-                node_version: node.image.node_version,
-            };
+            let image: bv_pb::NodeImage = node.image.into();
             let n = bv_pb::Node {
                 id: node.id.to_string(),
                 name: node.name,
@@ -386,6 +378,26 @@ impl fmt::Display for bv_pb::NodeImage {
             "{}/{}/{}",
             self.protocol, self.node_type, self.node_version
         )
+    }
+}
+
+impl From<bv_pb::NodeImage> for NodeImage {
+    fn from(image: bv_pb::NodeImage) -> Self {
+        Self {
+            protocol: image.protocol,
+            node_type: image.node_type,
+            node_version: image.node_version,
+        }
+    }
+}
+
+impl From<NodeImage> for bv_pb::NodeImage {
+    fn from(image: NodeImage) -> Self {
+        Self {
+            protocol: image.protocol,
+            node_type: image.node_type,
+            node_version: image.node_version,
+        }
     }
 }
 

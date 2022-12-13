@@ -31,7 +31,6 @@ clap = {version = "3.1.15", features = ["derive", "cargo"]}
 cli-table = "0.4"
 firec = {git = "https://github.com/blockjoy/firec.git", rev = "88c3dec"}
 futures-util = "0.3"
-home = "0.5.3"
 lazy_static = "1.4.0"
 local-ip-address = "0.4.4"
 petname = {version = "1.1.2", features = ["default_dictionary", "std_rng"], default-features = false}
@@ -49,6 +48,7 @@ tracing-subscriber = {version = "0.3.11", features = ["env-filter", "fmt", "std"
 uuid = {version = "1.0.0", features = ["serde", "v4"]}
 fs_extra = "1.2.0"
 tower = "0.4.13"
+reqwest = {version = "0.11.11", features = ["rustls"]}
 
 [build-dependencies]
 tonic-build = {version = "0.7", features = ["prost"]}

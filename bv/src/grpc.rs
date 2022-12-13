@@ -157,12 +157,10 @@ async fn process_node_command(
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {
-                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?;
-                let image = NodeImage {
-                    protocol: image.protocol,
-                    node_type: image.node_type,
-                    node_version: image.node_version,
-                };
+                let image: NodeImage = args
+                    .image
+                    .ok_or_else(|| anyhow!("Image not provided"))?
+                    .into();
                 nodes
                     .lock()
                     .await
@@ -183,12 +181,10 @@ async fn process_node_command(
                 nodes.lock().await.start(node_id).await?;
             }
             Command::Upgrade(args) => {
-                let image = args.image.ok_or_else(|| anyhow!("Image not provided"))?;
-                let image = NodeImage {
-                    protocol: image.protocol,
-                    node_type: image.node_type,
-                    node_version: image.node_version,
-                };
+                let image: NodeImage = args
+                    .image
+                    .ok_or_else(|| anyhow!("Image not provided"))?
+                    .into();
                 nodes.lock().await.upgrade(node_id, image).await?;
             }
             Command::Update(_) => unimplemented!(),
@@ -210,4 +206,14 @@ pub fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
             .unwrap(),
     );
     request
+}
+
+impl From<pb::ContainerImage> for NodeImage {
+    fn from(image: pb::ContainerImage) -> Self {
+        Self {
+            protocol: image.protocol.to_lowercase(),
+            node_type: image.node_type.to_lowercase(),
+            node_version: image.node_version.to_lowercase(),
+        }
+    }
 }
