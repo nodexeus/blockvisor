@@ -334,7 +334,9 @@ impl Node {
         let inner = match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
                 value,
-            }) => value.parse().context(format!("Could not parse {method}"))?,
+            }) => value
+                .parse()
+                .context(format!("Could not parse {method}: {value}"))?,
             e => bail!("Unexpected BabelResponse for `{method}`: `{e:?}`"),
         };
         Ok(inner)
