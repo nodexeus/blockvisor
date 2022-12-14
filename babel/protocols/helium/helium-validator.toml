@@ -1,7 +1,5 @@
-[requirements]
-vcpu = 8
-ram = 16
-disk = 200
+[env]
+path_append = "/blockjoy/bin/"
 
 [config]
 protocol = "helium"
@@ -12,6 +10,11 @@ description = "helium blockchain validator"
 api_host = "http://localhost:4467/"
 ports = [4467]
 data_directory_mount_point = "/blockjoy/miner/data"
+
+[requirements]
+vcpu_count = 1
+mem_size_mb = 8192
+disk_size_gb = 10
 
 [supervisor]
 backoff_timeout_ms = 60000

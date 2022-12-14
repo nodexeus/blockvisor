@@ -311,8 +311,8 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use babel_api::config::{
-        Babel, Config, JrpcResponse, Method, MethodResponseFormat, RestResponse, ShResponse,
-        SupervisorConfig,
+        Babel, Config, JrpcResponse, Method, MethodResponseFormat, Requirements, RestResponse,
+        ShResponse, SupervisorConfig,
     };
     use httpmock::prelude::*;
     use std::collections::{BTreeMap, HashMap};
@@ -347,6 +347,11 @@ mod tests {
                 description: None,
                 api_host: None,
                 ports: vec![],
+            },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
             },
             supervisor: SupervisorConfig::default(),
             keys: None,
@@ -431,6 +436,11 @@ mod tests {
                 description: None,
                 api_host: None,
                 ports: vec![],
+            },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
             },
             supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([
@@ -532,6 +542,11 @@ mod tests {
                 api_host: None,
                 ports: vec![],
             },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
+            },
             supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([(
                 WILDCARD_KEY_NAME.to_string(),
@@ -587,6 +602,11 @@ mod tests {
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
             },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
+            },
             supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
@@ -637,6 +657,11 @@ mod tests {
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
+            },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
             },
             supervisor: SupervisorConfig::default(),
             keys: None,
@@ -699,6 +724,11 @@ mod tests {
                 description: None,
                 api_host: Some(format!("http://{}", server.address())),
                 ports: vec![],
+            },
+            requirements: Requirements {
+                vcpu_count: 1,
+                mem_size_mb: 1,
+                disk_size_gb: 1,
             },
             supervisor: SupervisorConfig::default(),
             keys: None,
