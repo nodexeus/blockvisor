@@ -50,7 +50,7 @@ pub async fn serve(
 
 async fn serve_stream(mut stream: VsockStream, handler: Arc<impl Handler>) {
     loop {
-        let mut buf = vec![0u8; 16777216]; // 16Mb to be able to receive Babel binary
+        let mut buf = vec![0u8; 16384];
         let len = match stream.read(&mut buf).await {
             Ok(len) => len,
             // If we cannot await new data from the stream anymore we end the task.

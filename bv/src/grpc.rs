@@ -1,3 +1,4 @@
+use crate::get_bv_status;
 use crate::node_data::NodeImage;
 use crate::nodes::Nodes;
 use crate::server::bv_pb;
@@ -5,7 +6,6 @@ use anyhow::{anyhow, bail, Result};
 use pb::command_flow_client::CommandFlowClient;
 use pb::metrics_service_client::MetricsServiceClient;
 use pb::node_command::Command;
-use std::ops::Deref;
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::{broadcast::Sender, Mutex};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
@@ -56,7 +56,7 @@ impl MetricsClient {
 }
 
 fn service_status_update(
-    status: &bv_pb::ServiceStatus,
+    status: bv_pb::ServiceStatus,
     command_id: String,
 ) -> Option<pb::InfoUpdate> {
     match status {
@@ -94,14 +94,13 @@ pub async fn process_commands_stream(
 
     info!("Getting pending commands from stream...");
     while let Some(received) = commands_stream.next().await {
-        let status = crate::BV_STATUS.read().await;
         info!("received: {received:?}");
         let received = received?;
 
         let update = match received.r#type {
             Some(pb::command::Type::Node(node_command)) => {
                 let command_id = node_command.api_command_id.clone();
-                let update = service_status_update(status.deref(), command_id.clone());
+                let update = service_status_update(get_bv_status().await, command_id.clone());
                 if update.is_none() {
                     match process_node_command(nodes.clone(), node_command).await {
                         Err(error) => {

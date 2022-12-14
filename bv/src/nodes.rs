@@ -363,12 +363,14 @@ impl Nodes {
                     this.node_ids.insert(node.data.name.clone(), node.id());
                     this.nodes.insert(node.data.id, node);
                 }
-                Err(e) => warn!(
-                    "Failed to connect to node from file `{}`: {}",
-                    path.display(),
-                    e
-                ),
-            }
+                Err(e) => {
+                    warn!(
+                        "Failed to connect to node from file `{}`: {}",
+                        path.display(),
+                        e
+                    );
+                }
+            };
         }
 
         Ok(this)

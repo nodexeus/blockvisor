@@ -2,22 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections;
 use strum_macros::Display;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SupervisorRequest {
-    CheckBabelChecksum(u32),
-    StartBabel(Vec<u8>, u32),
-    /// Get logs from blockchain entry_points.
-    Logs,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SupervisorResponse {
-    /// List of logs from blockchain entry_points.
-    Logs(Vec<String>),
-    Ok,
-    Error(String),
-}
-
 /// Each request that comes over the VSock to babel must be a piece of JSON that can be
 /// deserialized into this struct.
 #[derive(Debug, Serialize, Deserialize)]

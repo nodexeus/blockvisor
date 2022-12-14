@@ -8,6 +8,7 @@ use blockvisord::{
     node_metrics,
     nodes::Nodes,
     server::{bv_pb, BlockvisorServer, BLOCKVISOR_SERVICE_PORT},
+    try_set_bv_status,
 };
 use std::{net::ToSocketAddrs, str::FromStr, sync::Arc};
 use tokio::{
@@ -24,10 +25,7 @@ async fn main() -> Result<()> {
 
     let config = Config::load().await.context("failed to load host config")?;
     let nodes = Nodes::load(config.clone()).await?;
-    {
-        // TODO check babel version on running nodes and update it before set status OK
-        *blockvisord::BV_STATUS.write().await = bv_pb::ServiceStatus::Ok;
-    }
+    try_set_bv_status(bv_pb::ServiceStatus::Ok).await;
     let updates_tx = nodes.get_updates_sender().await?.clone();
     let nodes = Arc::new(Mutex::new(nodes));
 

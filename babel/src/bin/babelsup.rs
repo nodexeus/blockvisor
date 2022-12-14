@@ -1,9 +1,11 @@
 use async_trait::async_trait;
+use babel::{babelsup_service, utils};
 #[cfg(target_os = "linux")]
-use babel::vsock;
 use babel::{config, logging, run_flag::RunFlag, supervisor};
+use eyre::Context;
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, watch};
+use tonic::transport::Server;
 
 const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_SUPERVISOR_PORT: u32 = 41;
@@ -16,17 +18,18 @@ async fn main() -> eyre::Result<()> {
 
     let run = RunFlag::run_until_ctrlc();
 
+    let (babel_change_tx, babel_change_rx) =
+        watch::channel(utils::file_checksum(&babel::env::BABEL_BIN_PATH).await.ok());
+
     let supervisor = supervisor::Supervisor::<SysTimer>::new(
         run.clone(),
         cfg.supervisor,
         babel::env::BABEL_BIN_PATH.clone(),
+        babel_change_rx,
     );
-    let rx = supervisor.get_logs_rx();
-    let tx = supervisor.get_babel_restart_tx();
-    let (supervisor, sup_server) = tokio::join!(
-        supervisor.run(),
-        serve(run, VSOCK_HOST_CID, VSOCK_SUPERVISOR_PORT, rx, tx),
-    );
+    let logs_rx = supervisor.get_logs_rx();
+    let (supervisor, sup_server) =
+        tokio::join!(supervisor.run(), serve(run, logs_rx, babel_change_tx),);
     supervisor?;
     sup_server
 }
@@ -46,27 +49,33 @@ impl supervisor::Timer for SysTimer {
 
 #[cfg(target_os = "linux")]
 async fn serve(
-    run: RunFlag,
-    cid: u32,
-    port: u32,
+    mut run: RunFlag,
     logs_rx: broadcast::Receiver<String>,
-    babel_restart_tx: mpsc::Sender<()>,
+    babel_change_tx: watch::Sender<Option<u32>>,
 ) -> eyre::Result<()> {
-    let sup_handler = babel::sup_handler::SupHandler::new(
+    let babelsup_service = babel::babelsup_service::BabelSupService::new(
         logs_rx,
-        babel_restart_tx,
+        babel_change_tx,
         babel::env::BABEL_BIN_PATH.clone(),
-    )?;
-    vsock::serve(run, cid, port, sup_handler).await
+    );
+    let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_SUPERVISOR_PORT)
+        .with_context(|| "failed to bind to vsock")?;
+
+    Server::builder()
+        .max_concurrent_streams(2)
+        .add_service(babelsup_service::pb::babel_sup_server::BabelSupServer::new(
+            babelsup_service,
+        ))
+        .serve_with_incoming_shutdown(listener.incoming(), run.wait())
+        .await?;
+    Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
-    _cid: u32,
-    _port: u32,
     _logs_rx: broadcast::Receiver<String>,
-    _babel_restart_tx: mpsc::Sender<()>,
+    _babel_change_tx: watch::Sender<Option<u32>>,
 ) -> eyre::Result<()> {
     unimplemented!()
 }

@@ -4,12 +4,13 @@ use async_trait::async_trait;
 use babel_api::config::{Entrypoint, SupervisorConfig as Config};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use std::env;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Instant;
 use tokio::process::Command;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, watch};
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
@@ -28,22 +29,24 @@ pub struct Supervisor<T: Timer> {
     config: Config,
     babel_path: PathBuf,
     log_buffer: LogBuffer,
-    babel_restart_tx: mpsc::Sender<()>,
-    babel_restart_rx: Option<mpsc::Receiver<()>>,
+    babel_change_rx: watch::Receiver<Option<u32>>,
     phantom: PhantomData<T>,
 }
 
 impl<T: Timer> Supervisor<T> {
-    pub fn new(run: RunFlag, config: Config, babel_path: PathBuf) -> Self {
+    pub fn new(
+        run: RunFlag,
+        config: Config,
+        babel_path: PathBuf,
+        babel_change_rx: watch::Receiver<Option<u32>>,
+    ) -> Self {
         let log_buffer = LogBuffer::new(config.log_buffer_capacity_ln);
-        let (babel_restart_tx, babel_restart_rx) = mpsc::channel(8);
         Self {
             run,
             config,
             babel_path,
             log_buffer,
-            babel_restart_tx,
-            babel_restart_rx: Some(babel_restart_rx),
+            babel_change_rx,
             phantom: Default::default(),
         }
     }
@@ -52,55 +55,45 @@ impl<T: Timer> Supervisor<T> {
         self.log_buffer.subscribe()
     }
 
-    pub fn get_babel_restart_tx(&self) -> mpsc::Sender<()> {
-        self.babel_restart_tx.clone()
-    }
-
-    pub async fn run(mut self) -> eyre::Result<()> {
-        // we can safely expect babel_rx since it is initialized by new() and run() can be called only once
-        let babel_rx = self
-            .babel_restart_rx
-            .take()
-            .expect("supervisor not initialized");
+    pub async fn run(self) -> eyre::Result<()> {
+        let mut babel_change_rx = self.babel_change_rx.clone();
+        let mut run = self.run.clone();
+        if babel_change_rx.borrow_and_update().is_none() {
+            tokio::select!(
+                res = babel_change_rx.changed() => {res},
+                _ = run.wait() => {Ok(())},
+            )?;
+        }
         let mut futures = FuturesUnordered::new();
         for entry_point in &self.config.entry_point {
             futures.push(self.run_entrypoint(entry_point));
         }
         let entry_futures = async { while (futures.next().await).is_some() {} };
-        tokio::join!(entry_futures, self.run_babel(babel_rx));
+        tokio::join!(entry_futures, self.run_babel(babel_change_rx));
         Ok(())
     }
 
-    async fn run_babel(&self, mut babel_rx: mpsc::Receiver<()>) {
+    async fn run_babel(&self, mut babel_change_rx: watch::Receiver<Option<u32>>) {
         let mut cmd = Command::new(&self.babel_path);
+        cmd.envs(env::vars())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         let mut backoff = Backoff::<T>::new(&self.config);
         let mut run = self.run.clone();
-        loop {
-            tokio::select!(
-                start_signal = babel_rx.recv() => {
-                    if let Some(()) = start_signal {
-                        break
-                    }
-                },
-                _ = run.wait() => {
-                    break
-                },
-            );
-        }
         while run.load() {
             backoff.start();
             if let Ok(mut child) = cmd.spawn() {
                 info!("Spawned Babel");
+                self.log_buffer
+                    .attach("babel", child.stdout.take(), child.stderr.take());
                 tokio::select!(
                     _ = child.wait() => {
                         error!("Babel stopped unexpected");
                         backoff.wait().await;
                     },
-                    restart_signal = babel_rx.recv() => {
-                        if let Some(()) = restart_signal {
-                            info!("Babel restart requested");
-                            let _ = child.kill().await;
-                        }
+                    _ = babel_change_rx.changed() => {
+                        info!("Babel changed - restart service");
+                        let _ = child.kill().await;
                     },
                     _ = run.wait() => {
                         info!("Supervisor stopped, killing babel");
@@ -109,7 +102,10 @@ impl<T: Timer> Supervisor<T> {
                 );
             } else {
                 error!("Failed to spawn babel");
-                backoff.wait().await;
+                tokio::select!(
+                    _ = backoff.wait() => {},
+                    _ = run.wait() => {},
+                );
             }
         }
     }
@@ -126,24 +122,24 @@ impl<T: Timer> Supervisor<T> {
             backoff.start();
             if let Ok(mut child) = cmd.spawn() {
                 info!("Spawned entrypoint '{entry_name}'");
-                let logs =
-                    self.log_buffer
-                        .attach(&entry_name, child.stdout.take(), child.stderr.take());
+                self.log_buffer
+                    .attach(&entry_name, child.stdout.take(), child.stderr.take());
                 tokio::select!(
                     _ = child.wait() => {
                         warn!("Entrypoint stopped unexpected '{entry_name}'");
-                        logs.await;
                         backoff.wait().await;
                     },
                     _ = run.wait() => {
                         info!("Supervisor stopped, killing entrypoint '{entry_name}'");
                         let _ = child.kill().await;
-                        logs.await;
                     },
                 );
             } else {
                 warn!("Failed to spawn entrypoint '{entry_name}'");
-                backoff.wait().await;
+                tokio::select!(
+                    _ = backoff.wait() => {},
+                    _ = run.wait() => {},
+                );
             }
         }
     }
@@ -194,7 +190,6 @@ mod tests {
     use assert_fs::TempDir;
     use async_trait::async_trait;
     use eyre::Result;
-    use futures::FutureExt;
     use mockall::*;
     use serial_test::serial;
     use std::fs;
@@ -202,6 +197,7 @@ mod tests {
     use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::time::Instant;
     use tokio::time::Duration;
 
@@ -215,18 +211,42 @@ mod tests {
         }
     }
 
-    fn create_dummy_babel(path: &PathBuf, ctrl_file: &str) -> Result<()> {
+    struct TestEnv {
+        tmp_root: PathBuf,
+        ctrl_file: PathBuf,
+        babel_path: PathBuf,
+        run: RunFlag,
+        babel_change_tx: watch::Sender<Option<u32>>,
+        babel_change_rx: watch::Receiver<Option<u32>>,
+    }
+
+    fn setup_test_env() -> Result<TestEnv> {
+        let tmp_root = TempDir::new()?.to_path_buf();
+        let ctrl_file = tmp_root.join("babel_started");
+        let babel_path = tmp_root.join("babel");
+        let run = Default::default();
+
         // create dummy babel that will touch control file and sleep
-        let _ = fs::create_dir_all(path.parent().unwrap());
+        let _ = fs::create_dir_all(babel_path.parent().unwrap());
+        let _ = fs::remove_file(&babel_path);
         let mut babel = fs::OpenOptions::new()
             .create(true)
             .write(true)
             .mode(0o770)
-            .open(path)?;
+            .open(&babel_path)?;
         writeln!(babel, "#!/bin/sh")?;
-        writeln!(babel, "touch {ctrl_file}")?;
+        writeln!(babel, "echo \"babel log\"")?;
+        writeln!(babel, "touch {}", ctrl_file.to_string_lossy())?;
         writeln!(babel, "sleep infinity")?;
-        Ok(())
+        let (babel_change_tx, babel_change_rx) = watch::channel(Some(0));
+        Ok(TestEnv {
+            tmp_root,
+            ctrl_file,
+            babel_path,
+            run,
+            babel_change_tx,
+            babel_change_rx,
+        })
     }
 
     fn minimal_cfg() -> Config {
@@ -243,37 +263,41 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_backoff_timeout_ms() {
+    async fn test_backoff_timeout_ms() -> Result<()> {
+        let test_env = setup_test_env()?;
         let cfg = minimal_cfg();
-        let run: RunFlag = Default::default();
-        let mut test_run = run.clone();
-
         let now = Instant::now();
 
+        let mut test_run = test_env.run.clone();
         let now_ctx = MockTestTimer::now_context();
+        now_ctx.expect().once().returning(move || now);
         now_ctx.expect().once().returning(move || now);
         now_ctx.expect().once().returning(move || {
             test_run.stop();
             now.add(Duration::from_millis(cfg.backoff_timeout_ms + 1))
         });
-        assert!(
-            Supervisor::<MockTestTimer>::new(run, cfg, crate::env::BABEL_BIN_PATH.clone())
-                .run()
-                .await
-                .is_ok()
-        );
+        Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg,
+            test_env.babel_path,
+            test_env.babel_change_rx,
+        )
+        .run()
+        .await?;
+        Ok(())
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_exponential_backoff() {
+    async fn test_exponential_backoff() -> Result<()> {
+        let test_env = setup_test_env()?;
         let cfg = minimal_cfg();
-        let run: RunFlag = Default::default();
-        let mut test_run = run.clone();
+        let mut test_run = test_env.run.clone();
 
         let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
+        now_ctx.expect().once().returning(move || now);
         let sleep_ctx = MockTestTimer::sleep_context();
         const RANGE: u32 = 8;
         for n in 0..RANGE {
@@ -290,19 +314,22 @@ mod tests {
             .returning(move |_| {
                 test_run.stop();
             });
-        assert!(
-            Supervisor::<MockTestTimer>::new(run, cfg, crate::env::BABEL_BIN_PATH.clone())
-                .run()
-                .await
-                .is_ok()
-        );
+        Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg,
+            test_env.babel_path,
+            test_env.babel_change_rx,
+        )
+        .run()
+        .await?;
+        Ok(())
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_multiple_entry_points() {
-        let tmp_dir = TempDir::new().unwrap();
-        let file_path = tmp_dir.join("test_multiple_entry_points");
+    async fn test_multiple_entry_points() -> Result<()> {
+        let test_env = setup_test_env()?;
+        let file_path = test_env.tmp_root.join("test_multiple_entry_points");
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
@@ -322,8 +349,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let run: RunFlag = Default::default();
-        let mut test_run = run.clone();
+        let mut test_run = test_env.run.clone();
 
         let now = Instant::now();
 
@@ -342,23 +368,22 @@ mod tests {
             test_run.stop();
         });
         let _ = fs::remove_file(&file_path);
-        assert!(
-            Supervisor::<MockTestTimer>::new(run, cfg, crate::env::BABEL_BIN_PATH.clone())
-                .run()
-                .await
-                .is_ok()
-        );
+        Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg,
+            test_env.babel_path,
+            test_env.babel_change_rx,
+        )
+        .run()
+        .await?;
         assert!(!file_path.exists());
+        Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_babel_restart() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let ctrl_file = tmp_root.join("babel_started");
-        let babel_path = tmp_root.join("babel");
-        create_dummy_babel(&babel_path, &ctrl_file.to_string_lossy())?;
-        let _ = fs::remove_file(&ctrl_file);
+        let test_env = setup_test_env()?;
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
@@ -368,30 +393,25 @@ mod tests {
             }],
             ..Default::default()
         };
-        let run: RunFlag = Default::default();
-        let mut test_run = run.clone();
+        let mut test_run = test_env.run.clone();
 
-        let supervisor = Supervisor::<MockTestTimer>::new(run, cfg.clone(), babel_path);
-        let tx = supervisor.get_babel_restart_tx();
+        let babel_change_tx = Arc::new(test_env.babel_change_tx);
+        let supervisor = Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg.clone(),
+            test_env.babel_path.clone(),
+            test_env.babel_change_rx,
+        );
 
         let now = Instant::now();
         let now_ctx = MockTestTimer::now_context();
-        let reset_tx = tx.clone();
-        // expect now from run_entry_point
-        now_ctx.expect().once().returning(move || {
-            let reset_tx = reset_tx.clone();
-            async move {
-                let _ = reset_tx.send(()).await;
-                now
-            }
-            .now_or_never()
-            .unwrap()
-        });
-        let reset_tx = tx.clone();
-        let control_file = ctrl_file.clone();
+        let change_tx = babel_change_tx.clone();
         // expect now from run_babel
+        now_ctx.expect().once().returning(move || now);
+        // expect now from run_entry_point
+        let control_file = test_env.ctrl_file.clone();
         now_ctx.expect().once().returning(move || {
-            let reset_tx = reset_tx.clone();
+            let change_tx = change_tx.clone();
             assert!(!control_file.exists());
             let control_file = control_file.clone();
             tokio::spawn(async move {
@@ -403,25 +423,27 @@ mod tests {
                 })
                 .await;
                 // and send restart signal
-                let _ = reset_tx.send(()).await;
+                change_tx.send_modify(|value| {
+                    let _ = value.insert(1);
+                });
             });
-            now.add(Duration::from_millis(cfg.backoff_timeout_ms + 1))
+            now
         });
-        let control_file = ctrl_file.clone();
         // expect now after babel restart
         now_ctx.expect().once().returning(move || {
-            assert!(control_file.exists());
             test_run.stop();
             now.add(Duration::from_millis(cfg.backoff_timeout_ms + 1))
         });
-        assert!(supervisor.run().await.is_ok());
-        assert!(ctrl_file.exists());
+
+        supervisor.run().await?;
+        assert!(test_env.ctrl_file.exists());
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
-    async fn test_logs() {
+    async fn test_logs() -> Result<()> {
+        let test_env = setup_test_env()?;
         let cfg = Config {
             backoff_timeout_ms: 600,
             backoff_base_ms: 10,
@@ -431,27 +453,95 @@ mod tests {
                 args: vec!["test".to_owned()],
             }],
         };
-        let run: RunFlag = Default::default();
-        let mut test_run = run.clone();
+        let test_run = test_env.run.clone();
 
         let now = Instant::now();
 
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().returning(move || now);
+        now_ctx.expect().returning(move || now);
         let sleep_ctx = MockTestTimer::sleep_context();
         sleep_ctx.expect().times(3).returning(|_| ());
+        let control_file = test_env.ctrl_file.clone();
         sleep_ctx.expect().returning(move |_| {
-            test_run.stop();
+            let control_file = control_file.clone();
+            let mut test_run = test_run.clone();
+            tokio::spawn(async move {
+                // asynchronously wait for dummy babel to start
+                let _ = tokio::time::timeout(Duration::from_millis(500), async {
+                    while !control_file.exists() {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                })
+                .await;
+                // and send restart signal
+                test_run.stop();
+            });
         });
-        let supervisor =
-            Supervisor::<MockTestTimer>::new(run, cfg, crate::env::BABEL_BIN_PATH.clone());
+        let supervisor = Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg,
+            test_env.babel_path,
+            test_env.babel_change_rx,
+        );
         let mut rx = supervisor.get_logs_rx();
-        assert!(supervisor.run().await.is_ok());
+        supervisor.run().await?;
 
         let mut lines = Vec::default();
         while let Ok(line) = rx.try_recv() {
             lines.push(line);
         }
-        assert_eq!(vec!["test\n", "test\n", "test\n", "test\n"], lines);
+        lines.sort();
+        assert_eq!(
+            vec!["babel log\n", "test\n", "test\n", "test\n", "test\n"],
+            lines
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_babel_only() -> Result<()> {
+        let test_env = setup_test_env()?;
+        let cfg = Config {
+            backoff_timeout_ms: 600,
+            backoff_base_ms: 10,
+            ..Default::default()
+        };
+        let test_run = test_env.run.clone();
+
+        let now = Instant::now();
+
+        let supervisor = Supervisor::<MockTestTimer>::new(
+            test_env.run,
+            cfg,
+            test_env.babel_path,
+            test_env.babel_change_rx,
+        );
+
+        let now_ctx = MockTestTimer::now_context();
+        now_ctx.expect().once().returning(move || now);
+        let control_file = test_env.ctrl_file.clone();
+        let mut test_run = test_run.clone();
+        tokio::spawn(async move {
+            // asynchronously wait for dummy babel to start
+            let _ = tokio::time::timeout(Duration::from_millis(500), async {
+                while !control_file.exists() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await;
+            // and send restart signal
+            test_run.stop();
+        });
+        let mut rx = supervisor.get_logs_rx();
+        supervisor.run().await?;
+
+        let mut lines = Vec::default();
+        while let Ok(line) = rx.try_recv() {
+            lines.push(line);
+        }
+        assert_eq!(vec!["babel log\n"], lines);
+        Ok(())
     }
 }

@@ -4,12 +4,14 @@ use assert_cmd::Command;
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
 use blockvisord::grpc::{self, pb};
+use blockvisord::set_bv_status;
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
 #[cfg(target_os = "linux")]
 use predicates::prelude::*;
 #[cfg(target_os = "linux")]
 use serial_test::serial;
+use std::{env, fs};
 #[cfg(target_os = "linux")]
 use std::{net::ToSocketAddrs, sync::Arc};
 #[cfg(target_os = "linux")]
@@ -500,7 +502,7 @@ async fn test_bv_cmd_cookbook_download() {
         .join("helium")
         .join("validator")
         .join("0.0.3");
-    tokio::fs::remove_dir_all(&folder).await.unwrap();
+    let _ = tokio::fs::remove_dir_all(&folder).await;
 
     println!("create a node");
     let vm_id = &create_node("helium/validator/0.0.3");
@@ -532,6 +534,17 @@ async fn test_bv_cmd_grpc_commands() {
     let id = node_id.clone();
     let command_id = Uuid::new_v4().to_string();
 
+    let babel_dir = fs::canonicalize(env::current_exe().unwrap())
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("../../babel/bin");
+    fs::create_dir_all(&babel_dir).unwrap();
+    fs::copy(
+        "/opt/blockvisor/current/babel/bin/babel",
+        babel_dir.join("babel"),
+    )
+    .unwrap();
     println!("delete existing node, if any");
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["node", "delete", &node_name]).assert();
@@ -705,7 +718,7 @@ async fn test_bv_cmd_grpc_commands() {
             .await
             .unwrap()
     };
-    *blockvisord::BV_STATUS.write().await = bv_pb::ServiceStatus::Ok;
+    set_bv_status(bv_pb::ServiceStatus::Ok).await;
     let config = Config {
         id: Uuid::new_v4().to_string(),
         token: "any token".to_string(),
