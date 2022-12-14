@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "band"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "2.4.1"
+min_babel_version = "0.0.1"
 description = "band blockchain validator"
 api_host = "http://localhost:26657/"
 ports = [26657]

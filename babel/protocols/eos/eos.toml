@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "eos"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "2.0.13"
+min_babel_version = "0.0.1"
 description = "eos blockchain validator"
 api_host = "http://localhost:8080" # default
 ports = [8080]

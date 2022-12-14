@@ -4,8 +4,8 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "avax"
 node_type = "validator"
-babel_version = "0.0.1"
 node_version = "1.9.2"
+min_babel_version = "0.0.1"
 description = "avax blockchain validator"
 api_host = "http://localhost:9650/ext/bc/P/"
 ports = [9650]

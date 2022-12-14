@@ -62,18 +62,19 @@ pub struct Env {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// A semver version of the babel program, indicating the versions of the babel program that a
-    /// config file is compatible with.
-    pub babel_version: String,
-    /// A semver version of the blockchain node program. This is used to indicate the minimal
-    /// version that this config file requires, or the maximal version up to which this config is
-    /// compatible with the node.
+    /// A semver version of the babel program, indicating the minimum version of the babel
+    /// program that a config file is compatible with.
+    pub min_babel_version: String,
+    /// A semver version of the blockchain node program.
     pub node_version: String,
+    /// Name of the blockchain protocol
     pub protocol: String,
+    /// Type of the node (validator, beacon, etc)
     pub node_type: String,
+    /// Some description of the node
     pub description: Option<String>,
-    /// The url where the miner exposes its endpoints. Since the blockchain node is running on the
-    /// same OS as babel, this will be a local url. Example: `http://localhost:4467/`.
+    /// The url where the node exposes its endpoints. Since the blockchain node is running on the
+    /// same OS as babel, this will be a local url (usually). Example: `http://localhost:4467/`.
     pub api_host: Option<String>,
     /// Ports used by blockchain software
     /// Ports visibility will be controlled with some kind of firewall
