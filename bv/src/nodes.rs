@@ -68,8 +68,8 @@ impl Nodes {
             bail!(format!("Node with name `{}` exists", &name));
         }
 
-        // TODO: use babel config
-        let _babel = self.fetch_image_data(&image).await?;
+        let babel = self.fetch_image_data(&image).await?;
+        check_babel_version(&babel.config.min_babel_version)?;
 
         let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
@@ -99,8 +99,8 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
-        // TODO: use babel config
-        let _babel = self.fetch_image_data(&image).await?;
+        let babel = self.fetch_image_data(&image).await?;
+        check_babel_version(&babel.config.min_babel_version)?;
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
@@ -409,4 +409,15 @@ impl Nodes {
             })
             .await
     }
+}
+
+pub fn check_babel_version(min_babel_version: &str) -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+    if version < min_babel_version {
+        bail!(format!(
+            "Required minimum babel version is `{}`, running is `{}`",
+            min_babel_version, version
+        ));
+    }
+    Ok(())
 }
