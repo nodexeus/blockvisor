@@ -19,7 +19,7 @@ use crate::{
     key_service::KeyService,
     network_interface::NetworkInterface,
     node::Node,
-    node_data::{NodeData, NodeImage, NodeStatus},
+    node_data::{NodeData, NodeImage, NodeRequirements, NodeStatus},
 };
 
 fn id_not_found(id: &Uuid) -> anyhow::Error {
@@ -77,12 +77,20 @@ impl Nodes {
         let ip = ip.parse()?;
         let gateway = gateway.parse()?;
         let network_interface = self.create_network_interface(ip, gateway).await?;
+
+        let requirements = NodeRequirements {
+            vcpu_count: babel.requirements.vcpu_count,
+            mem_size_mb: babel.requirements.mem_size_mb,
+            disk_size_gb: babel.requirements.disk_size_gb,
+        };
+
         let node = NodeData {
             id,
             name: name.clone(),
             image,
             expected_status: NodeStatus::Stopped,
             network_interface,
+            requirements,
             self_update: false,
         };
         self.save().await?;
@@ -102,11 +110,25 @@ impl Nodes {
         let babel = self.fetch_image_data(&image).await?;
         check_babel_version(&babel.config.min_babel_version)?;
 
-        let need_to_restart = self.status(id).await? == NodeStatus::Running;
         let _ = self.send_container_status(&id, ContainerStatus::Upgrading);
-        self.stop(id).await?;
 
+        let need_to_restart = self.status(id).await? == NodeStatus::Running;
+        self.stop(id).await?;
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
+
+        if image.protocol != node.data.image.protocol {
+            bail!("Cannot upgrade protocol to `{}`", image.protocol);
+        }
+        if image.node_type != node.data.image.node_type {
+            bail!("Cannot upgrade node type to `{}`", image.node_type);
+        }
+        if node.data.requirements.vcpu_count != babel.requirements.vcpu_count
+            || node.data.requirements.mem_size_mb != babel.requirements.mem_size_mb
+            || node.data.requirements.disk_size_gb != babel.requirements.disk_size_gb
+        {
+            bail!("Cannot upgrade node requirements");
+        }
+
         node.upgrade(&image).await?;
         debug!("Node upgraded");
 
