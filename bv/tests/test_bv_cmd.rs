@@ -493,16 +493,14 @@ fn with_auth<T>(inner: T, auth_token: &str, refresh_token: &str) -> Request<T> {
 #[serial]
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_cookbook_download() {
-    use blockvisord::{
-        cookbook_service::CookbookService, env::IMAGE_CACHE_DIR, node_data::NodeImage,
-    };
+    use blockvisord::env::IMAGE_CACHE_DIR;
     use std::path::Path;
 
     let folder = IMAGE_CACHE_DIR
         .join("helium")
         .join("validator")
         .join("0.0.3");
-    tokio::fs::remove_dir_all(&folder);
+    tokio::fs::remove_dir_all(&folder).await.unwrap();
 
     println!("create a node");
     let vm_id = &create_node("helium/validator/0.0.3");
@@ -513,6 +511,7 @@ async fn test_bv_cmd_cookbook_download() {
 
     assert!(Path::new(&folder.join("kernel")).exists());
     assert!(Path::new(&folder.join("os.img")).exists());
+    assert!(Path::new(&folder.join("babel.yml")).exists());
 }
 
 #[tokio::test]
