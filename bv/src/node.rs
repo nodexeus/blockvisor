@@ -32,6 +32,7 @@ pub const FC_BIN_NAME: &str = "firecracker";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 pub const ROOT_FS_FILE: &str = "os.img";
+const DATA_FILE: &str = "data.img";
 pub const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
 const BABEL_SUP_VSOCK_PORT: u32 = 41;
@@ -42,7 +43,7 @@ impl Node {
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
-        Node::copy_data_image(&data.id).await?;
+        Node::create_data_image(&data.id, data.requirements.disk_size_gb).await?;
         let machine = firec::Machine::create(config).await?;
 
         data.save().await?;
@@ -92,14 +93,9 @@ impl Node {
         if self.status() != NodeStatus::Stopped {
             bail!("Node should be stopped before running upgrade");
         }
-        if image.protocol != self.data.image.protocol {
-            bail!("Cannot upgrade protocol to `{}`", image.protocol);
-        }
-        if image.node_type != self.data.image.node_type {
-            bail!("Cannot upgrade node type to `{}`", image.node_type);
-        }
 
         Node::copy_os_image(&self.data.id, image).await?;
+
         self.data.image = image.clone();
         self.data.save().await
     }
@@ -216,26 +212,18 @@ impl Node {
         Ok(root_fs_path)
     }
 
-    /// Copy data drive into chroot location.
-    ///
-    /// NOTE: this is a workaround using system `cp` instead of `std::fs::copy`
-    /// to be able to preserve sparsity of the file. Firec will not overwrite
-    /// the file in chroot if it's already present.
-    ///
-    /// See discussion here for more details: https://github.com/rust-lang/rust/issues/58635
-    async fn copy_data_image(id: &Uuid) -> Result<()> {
-        // TODO: we need to create a new data image according to spec
-        // At the time of writing we use the same 10 Gb empty image for every node
+    /// Create new data drive in chroot location.
+    async fn create_data_image(id: &Uuid, disk_size_gb: usize) -> Result<()> {
         let data_dir = CHROOT_PATH
             .join(FC_BIN_NAME)
             .join(id.to_string())
             .join("root");
         DirBuilder::new().recursive(true).create(&data_dir).await?;
-        run_cmd(
-            "cp",
-            &[&DATA_PATH.to_string_lossy(), &data_dir.to_string_lossy()],
-        )
-        .await?;
+        let path = data_dir.join(DATA_FILE).to_string_lossy().into_owned();
+
+        let gb = format!("{disk_size_gb}G");
+        run_cmd("fallocate", &["-l", &gb, &path]).await?;
+        run_cmd("mkfs.ext4", &[&path]).await?;
 
         Ok(())
     }
@@ -259,8 +247,8 @@ impl Node {
             .build()
             // Machine configuration.
             .machine_cfg()
-            .vcpu_count(1)
-            .mem_size_mib(8192)
+            .vcpu_count(data.requirements.vcpu_count)
+            .mem_size_mib(data.requirements.mem_size_mb as i64)
             .build()
             // Add root drive.
             .add_drive("root", root_fs_path)

@@ -11,7 +11,7 @@ The service that runs on the host systems and is responisble for provisioning an
 ## Prerequisites
 
 ```sh
-apt install tmux pigz
+apt install tmux pigz util-linux e2fsprogs
 ```
 
 ## API proto files

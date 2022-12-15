@@ -40,6 +40,13 @@ impl NodeImage {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NodeRequirements {
+    pub vcpu_count: usize,
+    pub mem_size_mb: usize,
+    pub disk_size_gb: usize,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NodeData {
     pub id: Uuid,
     pub name: String,
@@ -50,6 +57,7 @@ pub struct NodeData {
     pub self_update: bool,
     pub image: NodeImage,
     pub network_interface: NetworkInterface,
+    pub requirements: NodeRequirements,
 }
 
 impl NodeData {
