@@ -7,8 +7,8 @@ node_type = "validator"
 node_version = "3.12.2"
 min_babel_version = "0.0.1"
 description = "algo blockchain validator"
-api_host = "https://localhost:8443/"
-ports = [8443]
+api_host = "https://localhost:4001/"
+ports = [4001]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
