@@ -12,9 +12,9 @@ ports = [8899]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
-vcpu_count = 1
-mem_size_mb = 8192
-disk_size_gb = 10
+vcpu_count = 32
+mem_size_mb = 131072
+disk_size_gb = 1500
 
 [supervisor]
 backoff_timeout_ms = 60000
