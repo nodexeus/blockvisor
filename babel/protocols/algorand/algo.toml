@@ -4,7 +4,7 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "algo"
 node_type = "validator"
-node_version = "3.9.4"
+node_version = "3.12.2"
 min_babel_version = "0.0.1"
 description = "algo blockchain validator"
 api_host = "https://localhost:8443/"
