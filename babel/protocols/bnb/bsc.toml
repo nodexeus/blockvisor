@@ -2,7 +2,7 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "bsc"
+protocol = "bsc" # binance smart chain
 node_type = "validator"
 node_version = "1.1.17"
 min_babel_version = "0.0.1"
