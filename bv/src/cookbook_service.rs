@@ -1,4 +1,9 @@
-use crate::{grpc::with_auth, node::ROOT_FS_FILE, node_data::NodeImage, utils};
+use crate::{
+    grpc::with_auth,
+    node::{KERNEL_FILE, ROOT_FS_FILE},
+    node_data::NodeImage,
+    utils,
+};
 use anyhow::{Context, Result};
 use babel_api::config::Babel;
 use std::path::PathBuf;
@@ -16,7 +21,6 @@ pub mod cb_pb {
 const BABEL_ARCHIVE_IMAGE_NAME: &str = "blockjoy.gz";
 const BABEL_IMAGE_NAME: &str = "blockjoy";
 const KERNEL_ARCHIVE_NAME: &str = "kernel.gz";
-const KERNEL_NAME: &str = "kernel";
 const BABEL_CONFIG_NAME: &str = "babel.yml";
 
 pub struct CookbookService {
@@ -146,7 +150,7 @@ impl CookbookService {
         let folder = CookbookService::get_image_download_folder_path(image);
 
         let root = folder.join(ROOT_FS_FILE);
-        let kernel = folder.join(KERNEL_NAME);
+        let kernel = folder.join(KERNEL_FILE);
         let config = folder.join(BABEL_CONFIG_NAME);
         if !root.exists() || !kernel.exists() || !config.exists() {
             return Ok(false);

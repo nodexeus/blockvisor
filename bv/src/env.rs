@@ -16,7 +16,6 @@ lazy_static::lazy_static! {
 
     pub static ref IMAGE_CACHE_DIR: PathBuf = VARS_DIR.join("images");
 
-    pub static ref KERNEL_PATH: PathBuf = VARS_DIR.join("debian-vmlinux");
     pub static ref DATA_PATH: PathBuf = VARS_DIR.join("data.img");
     pub static ref CHROOT_PATH: PathBuf = VARS_DIR.clone();
 }

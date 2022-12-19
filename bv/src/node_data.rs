@@ -6,7 +6,7 @@ use tokio::fs;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::node::{FC_BIN_NAME, ROOT_FS_FILE};
+use crate::node::FC_BIN_NAME;
 use crate::utils::get_process_pid;
 use crate::{env::REGISTRY_CONFIG_DIR, network_interface::NetworkInterface};
 
@@ -28,15 +28,6 @@ pub struct NodeImage {
     pub protocol: String,
     pub node_type: String,
     pub node_version: String,
-}
-
-impl NodeImage {
-    pub fn url(&self) -> String {
-        format!(
-            "{}/{}/{}/{ROOT_FS_FILE}",
-            self.protocol, self.node_type, self.node_version
-        )
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
