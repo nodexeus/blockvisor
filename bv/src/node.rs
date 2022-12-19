@@ -1,13 +1,7 @@
 use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    str::FromStr,
-    time::Duration,
-};
+use std::{collections::HashMap, path::Path, str::FromStr, time::Duration};
 use tokio::io::AsyncWriteExt;
 use tokio::{fs::DirBuilder, time::sleep};
 use tracing::{debug, info, instrument, trace, warn};
@@ -15,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     babel_connection::{BabelConnection, BABEL_START_TIMEOUT},
+    cookbook_service::CookbookService,
     env::*,
     node_data::{NodeData, NodeImage, NodeStatus},
     utils::{get_process_pid, run_cmd},
@@ -32,6 +27,7 @@ pub const FC_BIN_NAME: &str = "firecracker";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 pub const ROOT_FS_FILE: &str = "os.img";
+pub const KERNEL_FILE: &str = "kernel";
 const DATA_FILE: &str = "data.img";
 pub const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
@@ -175,7 +171,8 @@ impl Node {
 
     /// Copy OS drive into chroot location.
     async fn copy_os_image(id: &Uuid, image: &NodeImage) -> Result<()> {
-        let root_fs_path = Self::get_normalized_root_fs_path(image)?;
+        let root_fs_path =
+            CookbookService::get_image_download_folder_path(image).join(ROOT_FS_FILE);
 
         let data_dir = CHROOT_PATH
             .join(FC_BIN_NAME)
@@ -190,26 +187,6 @@ impl Node {
         .await?;
 
         Ok(())
-    }
-
-    /// Check root if fs source path is correct and exists
-    ///
-    /// Also resolve symlinks into canonical path
-    fn get_normalized_root_fs_path(image: &NodeImage) -> Result<PathBuf> {
-        let root_fs_path = IMAGE_CACHE_DIR.join(image.url()).canonicalize()?;
-        if root_fs_path.file_name() != Some(OsStr::new(ROOT_FS_FILE)) {
-            bail!(
-                "Bad root image file name: `{:?}` in `{}`",
-                root_fs_path.file_name(),
-                root_fs_path.display()
-            )
-        }
-        if !root_fs_path.try_exists()? {
-            // TODO: download from remote images repository into cache dir
-            // return error if not present in remote
-            bail!("Root image file not found: `{}`", root_fs_path.display())
-        }
-        Ok(root_fs_path)
     }
 
     /// Create new data drive in chroot location.
@@ -236,9 +213,12 @@ impl Node {
         );
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
-        let root_fs_path = Self::get_normalized_root_fs_path(&data.image)?;
+        let root_fs_path =
+            CookbookService::get_image_download_folder_path(&data.image).join(ROOT_FS_FILE);
+        let kernel_path =
+            CookbookService::get_image_download_folder_path(&data.image).join(KERNEL_FILE);
 
-        let config = firec::config::Config::builder(Some(data.id), &*KERNEL_PATH)
+        let config = firec::config::Config::builder(Some(data.id), kernel_path)
             // Jailer configuration.
             .jailer_cfg()
             .chroot_base_dir(&*CHROOT_PATH)

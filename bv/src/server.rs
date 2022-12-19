@@ -254,7 +254,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .ok_or_else(|| Status::invalid_argument("No such node"))?
             .logs()
             .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+            .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))
     }
 
@@ -274,7 +274,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .ok_or_else(|| Status::invalid_argument("No such node"))?
             .download_keys()
             .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+            .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
         let names = keys.into_iter().map(|k| k.name).collect();
         Ok(Response::new(bv_pb::GetNodeKeysResponse { names }))
     }
@@ -316,7 +316,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .ok_or_else(|| Status::invalid_argument("No such node"))?
             .capabilities()
             .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+            .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::ListCapabilitiesResponse {
             capabilities,
         }))
@@ -339,7 +339,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .ok_or_else(|| Status::invalid_argument("No such node"))?
             .call_method(&request.method, request.params)
             .await
-            .map_err(|e| Status::internal(&format!("Call to babel failed: `{e}`")))?;
+            .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::BlockchainResponse { value }))
     }
 
