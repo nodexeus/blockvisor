@@ -395,7 +395,7 @@ async fn test_bv_cmd_init_localhost() {
     println!("got blockchain: {:?}", &blockchain);
     let blockchain_id = blockchain.id.as_ref().unwrap();
 
-    let mut client = ui_pb::node_service_client::NodeServiceClient::connect(url)
+    let mut node_client = ui_pb::node_service_client::NodeServiceClient::connect(url)
         .await
         .unwrap();
 
@@ -424,7 +424,7 @@ async fn test_bv_cmd_init_localhost() {
             self_update: Some(false),
         }),
     };
-    let node: ui_pb::CreateNodeResponse = client
+    let node: ui_pb::CreateNodeResponse = node_client
         .create(with_auth(node_create, &auth_token, &refresh_token))
         .await
         .unwrap()
@@ -463,6 +463,25 @@ async fn test_bv_cmd_init_localhost() {
 
     println!("check node keys");
     bv_run(&["node", "keys", &node_id], "first");
+
+    let node_delete = ui_pb::DeleteNodeRequest {
+        meta: Some(ui_pb::RequestMeta::default()),
+        id: node_id.clone(),
+    };
+    node_client
+        .delete(with_auth(node_delete, &auth_token, &refresh_token))
+        .await
+        .unwrap()
+        .into_inner();
+
+    sleep(Duration::from_secs(10)).await;
+
+    println!("check node is deleted");
+    let mut cmd = Command::cargo_bin("bv").unwrap();
+    cmd.args(&["node", "status", &node_id])
+        .env("NO_COLOR", "1")
+        .assert()
+        .failure();
 }
 
 #[cfg(target_os = "linux")]
