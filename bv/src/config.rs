@@ -8,9 +8,15 @@ use crate::env::HOST_CONFIG_FILE;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
+    /// Host uuid
     pub id: String,
+    /// Host auth token
     pub token: String,
+    /// API endpoint url
     pub blockjoy_api_url: String,
+    /// Url of key service for getting secrets
+    pub blockjoy_keys_url: String,
+    /// Url of cookbook service for getting fs images, babel configs, kernel files, etc
     pub blockjoy_registry_url: String,
 }
 
