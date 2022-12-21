@@ -2,21 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections;
 use strum_macros::Display;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SupervisorRequest {
-    /// Returns `Pong`. Useful to check for the liveness of the node.
-    Ping,
-    /// List of logs from blockchain entry_points.
-    Logs,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum SupervisorResponse {
-    Pong,
-    Logs(Vec<String>),
-    Error(String),
-}
-
 /// Each request that comes over the VSock to babel must be a piece of JSON that can be
 /// deserialized into this struct.
 #[derive(Debug, Serialize, Deserialize)]

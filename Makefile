@@ -24,6 +24,7 @@ bundle: get-firecraker build-release
 	mkdir -p /tmp/bundle/blockvisor/bin /tmp/bundle/blockvisor/services
 	cp target/release/bv /tmp/bundle/blockvisor/bin
 	cp target/release/blockvisord /tmp/bundle/blockvisor/bin
+	cp target/release/installer /tmp/bundle
 	cp bv/data/tmux.service /tmp/bundle/blockvisor/services
 	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
 	mkdir -p /tmp/bundle/babel/bin /tmp/bundle/babel/services
@@ -42,16 +43,14 @@ tag:
 	else git tag -a ${CARGO_VERSION} -m "Set version ${CARGO_VERSION}"; git push origin ${CARGO_VERSION}; \
 	fi
 
-install:
-	install -m u=rwx,g=rx,o=rx target/debug/blockvisord /usr/bin/
-	install -m u=rwx,g=rx,o=rx target/debug/bv /usr/bin/
-	install -m u=rw,g=r,o=r bv/data/tmux.service /etc/systemd/system/
-	install -m u=rw,g=r,o=r bv/data/blockvisor.service /etc/systemd/system/
+install: bundle
+	rm -rf /opt/blockvisor
+	/tmp/bundle/installer
+
 	systemctl daemon-reload
 	systemctl enable blockvisor.service
 	for image in $$(find /var/lib/blockvisor/images/ -name *.img); do \
 		mount $$image /mnt/fc; \
-		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babel /mnt/fc/usr/bin/; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/debug/babelsup /mnt/fc/usr/bin/; \
 		install -m u=rw,g=r,o=r babel/data/babelsup.service /mnt/fc/etc/systemd/system/; \
 		install -m u=rw,g=r,o=r babel/protocols/helium/helium-validator.toml /mnt/fc/etc/babel.conf; \

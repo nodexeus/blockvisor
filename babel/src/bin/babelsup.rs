@@ -1,11 +1,11 @@
 use async_trait::async_trait;
+use babel::{babelsup_service, utils};
 #[cfg(target_os = "linux")]
-use babel::vsock;
 use babel::{config, logging, run_flag::RunFlag, supervisor};
-use babel_api::config::Entrypoint;
-use std::path::Path;
+use eyre::Context;
 use std::time::{Duration, Instant};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, watch};
+use tonic::transport::Server;
 
 const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_SUPERVISOR_PORT: u32 = 41;
@@ -14,25 +14,22 @@ const VSOCK_SUPERVISOR_PORT: u32 = 41;
 async fn main() -> eyre::Result<()> {
     logging::setup_logging()?;
 
-    let cfg_path = Path::new(config::CONFIG_PATH);
-    let cfg = config::load(cfg_path).await?;
+    let cfg = config::load(&babel::env::BABEL_CONFIG_PATH).await?;
 
     let run = RunFlag::run_until_ctrlc();
-    let mut supervisor_cfg = cfg.supervisor.clone();
-    supervisor_cfg.entry_point.insert(
-        0,
-        Entrypoint {
-            command: config::BABEL_BIN_PATH.to_string(),
-            args: vec![],
-        },
-    );
 
-    let supervisor = supervisor::Supervisor::<SysTimer>::new(run.clone(), supervisor_cfg);
-    let rx = supervisor.get_logs_rx();
-    let (supervisor, sup_server) = tokio::join!(
-        supervisor.run(),
-        serve(run, VSOCK_HOST_CID, VSOCK_SUPERVISOR_PORT, rx,),
+    let (babel_change_tx, babel_change_rx) =
+        watch::channel(utils::file_checksum(&babel::env::BABEL_BIN_PATH).await.ok());
+
+    let supervisor = supervisor::Supervisor::<SysTimer>::new(
+        run.clone(),
+        cfg.supervisor,
+        babel::env::BABEL_BIN_PATH.clone(),
+        babel_change_rx,
     );
+    let logs_rx = supervisor.get_logs_rx();
+    let (supervisor, sup_server) =
+        tokio::join!(supervisor.run(), serve(run, logs_rx, babel_change_tx),);
     supervisor?;
     sup_server
 }
@@ -52,23 +49,33 @@ impl supervisor::Timer for SysTimer {
 
 #[cfg(target_os = "linux")]
 async fn serve(
-    run: RunFlag,
-    cid: u32,
-    port: u32,
+    mut run: RunFlag,
     logs_rx: broadcast::Receiver<String>,
+    babel_change_tx: watch::Sender<Option<u32>>,
 ) -> eyre::Result<()> {
-    use std::sync::Arc;
+    let babelsup_service = babel::babelsup_service::BabelSupService::new(
+        logs_rx,
+        babel_change_tx,
+        babel::env::BABEL_BIN_PATH.clone(),
+    );
+    let listener = tokio_vsock::VsockListener::bind(VSOCK_HOST_CID, VSOCK_SUPERVISOR_PORT)
+        .with_context(|| "failed to bind to vsock")?;
 
-    let sup_handler = babel::sup_handler::SupHandler::new(logs_rx)?;
-    vsock::serve(run, cid, port, Arc::new(sup_handler)).await
+    Server::builder()
+        .max_concurrent_streams(2)
+        .add_service(babelsup_service::pb::babel_sup_server::BabelSupServer::new(
+            babelsup_service,
+        ))
+        .serve_with_incoming_shutdown(listener.incoming(), run.wait())
+        .await?;
+    Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
-    _cid: u32,
-    _port: u32,
     _logs_rx: broadcast::Receiver<String>,
+    _babel_change_tx: watch::Sender<Option<u32>>,
 ) -> eyre::Result<()> {
     unimplemented!()
 }

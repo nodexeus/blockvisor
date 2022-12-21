@@ -259,9 +259,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
-version = "0.5.16"
+version = "0.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9e3356844c4d6a6d6467b8da2cffb4a2820be256f50a3a386c9d152bab31043"
+checksum = "acee9fd5073ab6b045a275b3e709c163dd36c90685219cb21804a147b58dba43"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -288,9 +288,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f0c0a60006f2a293d82d571f635042a72edf927539b7685bd62d361963839b"
+checksum = "37e5939e02c56fecd5c017c37df4238c0a839fa76b7f97acdd7efb804fd181cc"
 dependencies = [
  "async-trait",
  "bytes 1.2.1",
@@ -309,12 +309,16 @@ dependencies = [
  "assert_fs",
  "async-trait",
  "babel_api",
+ "crc",
  "ctrlc",
  "eyre",
  "futures",
  "gjson",
  "httpmock",
+ "lazy_static",
  "mockall",
+ "prost",
+ "prost-types",
  "reqwest",
  "serde",
  "serde_json",
@@ -325,6 +329,9 @@ dependencies = [
  "tokio-util",
  "tokio-vsock",
  "toml",
+ "tonic",
+ "tonic-build",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "walkdir",
@@ -408,6 +415,7 @@ dependencies = [
  "base64 0.13.0",
  "clap",
  "cli-table",
+ "crc",
  "firec",
  "fs_extra",
  "futures-util",
@@ -578,9 +586,9 @@ dependencies = [
 
 [[package]]
 name = "cmake"
-version = "0.1.48"
+version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ad8cef104ac57b68b89df3208164d228503abbdce70f6880ffa3d970e7443a"
+checksum = "db34956e100b30725f2eb215f90d4871051239535632f84fea3bc92722c66b7c"
 dependencies = [
  "cc",
 ]
@@ -619,6 +627,21 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "crc"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53757d12b596c16c78b83458d732a5d1a17ab3f53f2f7412f6fb57cc8a140ab3"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d0165d2900ae6778e36e80bbc4da3b5eefccee9ba939761f9c2882a5d9af3ff"
 
 [[package]]
 name = "crossbeam-channel"
@@ -2873,13 +2896,13 @@ dependencies = [
 [[package]]
 name = "tokio-vsock"
 version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d2ad075b54bbb450ae2e3770211d7954362a488fcd386085c9fbb6d787ade8b"
+source = "git+https://github.com/blockjoy/tokio-vsock.git#c1b2868395ebfdec1670d4bc7ba013ee89d031a7"
 dependencies = [
  "bytes 0.4.12",
  "futures",
  "libc",
  "tokio",
+ "tonic",
  "vsock",
 ]
 
@@ -2962,9 +2985,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c530c8675c1dbf98facee631536fa116b5fb6382d7dd6dc1b118d970eafe3ba"
+checksum = "f873044bf02dd1e8239e9c1293ea39dad76dc594ec16185d0a1bf31d8dc8d858"
 dependencies = [
  "bitflags",
  "bytes 1.2.1",

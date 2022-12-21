@@ -18,8 +18,9 @@ pub async fn serve(
     mut run: RunFlag,
     cid: u32,
     port: u32,
-    handler: Arc<impl Handler + Send + Sync + 'static>,
+    handler: impl Handler + Send + Sync + 'static,
 ) -> eyre::Result<()> {
+    let handler = Arc::new(handler);
     tracing::debug!("Binding to virtual socket...");
     let listener = tokio_vsock::VsockListener::bind(cid, port)?;
     tracing::debug!("Bound");
@@ -49,7 +50,7 @@ pub async fn serve(
 
 async fn serve_stream(mut stream: VsockStream, handler: Arc<impl Handler>) {
     loop {
-        let mut buf = vec![0u8; 5000];
+        let mut buf = vec![0u8; 16384];
         let len = match stream.read(&mut buf).await {
             Ok(len) => len,
             // If we cannot await new data from the stream anymore we end the task.

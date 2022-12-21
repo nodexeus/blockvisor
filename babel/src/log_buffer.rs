@@ -1,4 +1,3 @@
-use std::future::Future;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -10,7 +9,6 @@ use tracing::warn;
 /// See tokio::broadcast for more details.
 pub struct LogBuffer {
     tx: broadcast::Sender<String>,
-    #[allow(dead_code)] // TODO use it in client code to stream logs to blockvisord
     rx: broadcast::Receiver<String>,
 }
 
@@ -22,7 +20,6 @@ impl LogBuffer {
         Self { tx, rx }
     }
 
-    #[allow(dead_code)] // TODO use it in client code to stream logs to blockvisord
     pub fn subscribe(&self) -> broadcast::Receiver<String> {
         self.rx.resubscribe()
     }
@@ -32,7 +29,7 @@ impl LogBuffer {
         entry_name: &str,
         stdout: Option<T>,
         stderr: Option<U>,
-    ) -> impl Future<Output = ()>
+    ) -> JoinHandle<()>
     where
         T: AsyncRead + Send + Unpin + 'static,
         U: AsyncRead + Send + Unpin + 'static,
@@ -40,7 +37,7 @@ impl LogBuffer {
         let stdout_task = self.attach_stream(stdout);
         let stderr_task = self.attach_stream(stderr);
         let entry_name = entry_name.to_string();
-        async move {
+        tokio::spawn(async move {
             match (stdout_task, stderr_task) {
                 (None, Some(err)) => {
                     warn!("Missing stdout for '{entry_name}'");
@@ -57,7 +54,7 @@ impl LogBuffer {
                     warn!("Missing stdout and stderr for '{entry_name}'");
                 }
             }
-        }
+        })
     }
 
     fn attach_stream<T: AsyncRead + Send + Unpin + 'static>(
@@ -99,7 +96,8 @@ mod tests {
         let mut rx = log_buffer.subscribe();
         log_buffer
             .attach::<tokio::io::Empty, tokio::io::Empty>("name1", None, None)
-            .await;
+            .await
+            .unwrap();
         assert!(rx.try_recv().is_err());
     }
 
@@ -120,7 +118,10 @@ mod tests {
         ]);
         let stderr = StreamReader::new(stderr_stream);
         let mut rx = log_buffer.subscribe();
-        log_buffer.attach("name1", Some(stdout), Some(stderr)).await;
+        log_buffer
+            .attach("name1", Some(stdout), Some(stderr))
+            .await
+            .unwrap();
         let mut lines = Vec::default();
         while let Ok(line) = rx.try_recv() {
             lines.push(line);
@@ -146,7 +147,8 @@ mod tests {
         let mut rx = log_buffer.subscribe();
         log_buffer
             .attach::<_, tokio::io::Empty>("name1", Some(stdout), None)
-            .await;
+            .await
+            .unwrap();
         let mut lines = Vec::default();
         loop {
             match rx.try_recv() {

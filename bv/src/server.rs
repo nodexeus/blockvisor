@@ -5,11 +5,12 @@ pub mod bv_pb {
 }
 
 use crate::{
+    get_bv_status,
     node_data::{NodeImage, NodeStatus},
     node_metrics,
     nodes::Nodes,
+    set_bv_status,
 };
-use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
 use tokio::sync::Mutex;
@@ -23,7 +24,7 @@ lazy_static::lazy_static! {
 }
 
 async fn status_check() -> Result<(), Status> {
-    match *crate::BV_STATUS.read().await.deref() {
+    match get_bv_status().await {
         bv_pb::ServiceStatus::UndefinedServiceStatus => Err(tonic::Status::unavailable(
             "service not ready, try again later",
         )),
@@ -55,9 +56,8 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::HealthRequest>,
     ) -> Result<Response<bv_pb::HealthResponse>, Status> {
-        let status = crate::BV_STATUS.read().await;
         let reply = bv_pb::HealthResponse {
-            status: *status.deref() as i32,
+            status: get_bv_status().await as i32,
         };
         Ok(Response::new(reply))
     }
@@ -66,8 +66,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         &self,
         _request: Request<bv_pb::StartUpdateRequest>,
     ) -> Result<Response<bv_pb::StartUpdateResponse>, Status> {
-        let mut status = crate::BV_STATUS.write().await;
-        *status = bv_pb::ServiceStatus::Updating;
+        set_bv_status(bv_pb::ServiceStatus::Updating).await;
         Ok(Response::new(bv_pb::StartUpdateResponse {
             status: bv_pb::ServiceStatus::Updating.into(),
         }))
@@ -252,7 +251,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .nodes
             .get_mut(&node_id)
             .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .logs()
+            .get_logs()
             .await
             .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
         Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))

@@ -304,7 +304,7 @@ impl<T: Timer> Installer<T> {
             .code()
             .with_context(|| "failed to get systemctl exit status code")?;
         ensure!(
-            status_code != 0,
+            status_code == 0,
             "blockvisor service restart failed with exit code {status_code}"
         );
         Ok(())
@@ -348,7 +348,7 @@ impl<T: Timer> Installer<T> {
             .code()
             .with_context(|| "failed to get backup installer exit status code")?;
         ensure!(
-            status_code != 0,
+            status_code == 0,
             "backup installer failed with exit code {status_code}"
         );
         Ok(())
@@ -569,11 +569,11 @@ mod tests {
         let now = Instant::now();
         now_ctx.expect().once().returning(move || now);
 
-        let resp = tokio::select! {
+        let resp = tokio::select!(
             resp = installer.prepare_running() => resp,
             _ = test_server(&tmp_root, bv_mock) => Ok(()),
             _ = dummy_installer.wait() => Ok(()),
-        };
+        );
         resp?;
         Ok(())
     }
@@ -609,11 +609,11 @@ mod tests {
                 .add(Duration::from_secs(1))
         });
 
-        let resp = tokio::select! {
+        let resp = tokio::select!(
             resp = installer.prepare_running() => resp,
             _ = test_server(&tmp_root, bv_mock) => Ok(()),
             _ = dummy_installer.wait() => Ok(()),
-        };
+        );
         assert!(resp.is_err());
         Ok(())
     }
@@ -636,10 +636,10 @@ mod tests {
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().times(1).returning(move || Instant::now());
 
-        let resp = tokio::select! {
+        let resp = tokio::select!(
             resp = installer.health_check() => resp,
             resp = test_server(&tmp_root, bv_mock) => resp,
-        };
+        );
         resp?;
         Ok(())
     }
@@ -672,10 +672,10 @@ mod tests {
             .once()
             .returning(move || now.add(HEALTH_CHECK_TIMEOUT).add(Duration::from_secs(1)));
 
-        let resp = tokio::select! {
+        let resp = tokio::select!(
             resp = installer.health_check() => resp,
             resp = test_server(&tmp_root, bv_mock) => resp,
-        };
+        );
         assert!(resp.is_err());
         Ok(())
     }
