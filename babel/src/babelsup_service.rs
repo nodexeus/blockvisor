@@ -80,7 +80,10 @@ impl pb::babel_sup_server::BabelSup for BabelSupService {
             });
             Ok(Response::new(pb::StartNewBabelResponse {}))
         } else {
-            Err(Status::internal(format!("received babel binary checksum ({checksum}) doesn't match expected ({expected_checksum})")))
+            Err(Status::internal(format!(
+                "received babel binary checksum ({checksum})\
+                 doesn't match expected ({expected_checksum})"
+            )))
         }
     }
 }
@@ -180,12 +183,38 @@ mod tests {
         Ok(BabelSupClient::new(channel))
     }
 
-    #[tokio::test]
-    async fn test_start_new_babel() -> Result<()> {
+    struct TestEnv {
+        babel_path: PathBuf,
+        logs_tx: broadcast::Sender<String>,
+        babel_change_rx: watch::Receiver<Option<u32>>,
+        client: BabelSupClient<Channel>,
+    }
+
+    fn setup_test_env() -> Result<TestEnv> {
         let tmp_root = TempDir::new()?.to_path_buf();
         fs::create_dir_all(&tmp_root)?;
-        let babel_bin_path = tmp_root.join("babel");
-        let mut client = test_client(&tmp_root)?;
+        let babel_path = tmp_root.join("babel");
+        let client = test_client(&tmp_root)?;
+        let uds_stream = UnixListenerStream::new(tokio::net::UnixListener::bind(
+            tmp_root.join("test_socket"),
+        )?);
+        let (babel_change_tx, babel_change_rx) = watch::channel(None);
+        let (logs_tx, logs_rx) = broadcast::channel(16);
+        tokio::spawn(
+            async move { sup_server(&tmp_root, logs_rx, babel_change_tx, uds_stream).await },
+        );
+
+        Ok(TestEnv {
+            babel_path,
+            logs_tx,
+            babel_change_rx,
+            client,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_start_new_babel() -> Result<()> {
+        let mut test_env = setup_test_env()?;
 
         let incomplete_babel_bin = vec![
             pb::StartNewBabelRequest {
@@ -205,53 +234,52 @@ mod tests {
             },
         ];
 
-        let uds_stream = UnixListenerStream::new(tokio::net::UnixListener::bind(
-            tmp_root.join("test_socket"),
-        )?);
-        let (babel_change_tx, babel_change_rx) = watch::channel(None);
-        let (_, logs_rx) = broadcast::channel(16);
-        tokio::spawn(
-            async move { sup_server(&tmp_root, logs_rx, babel_change_tx, uds_stream).await },
-        );
-        assert!(client
+        assert!(test_env
+            .client
             .start_new_babel(tokio_stream::iter(incomplete_babel_bin.clone()))
             .await
             .is_err());
-        assert!(!babel_change_rx.has_changed()?);
+        assert!(!test_env.babel_change_rx.has_changed()?);
 
         let mut invalid_babel_bin = incomplete_babel_bin.clone();
         invalid_babel_bin.push(pb::StartNewBabelRequest {
             babel_bin: Some(pb::start_new_babel_request::BabelBin::Checksum(123)),
         });
-        assert!(client
+        assert!(test_env
+            .client
             .start_new_babel(tokio_stream::iter(invalid_babel_bin))
             .await
             .is_err());
-        assert!(!babel_change_rx.has_changed()?);
+        assert!(!test_env.babel_change_rx.has_changed()?);
 
         let mut babel_bin = incomplete_babel_bin.clone();
         babel_bin.push(pb::StartNewBabelRequest {
             babel_bin: Some(pb::start_new_babel_request::BabelBin::Checksum(4135829304)),
         });
-        client
+        test_env
+            .client
             .start_new_babel(tokio_stream::iter(babel_bin))
             .await?;
-        assert!(babel_change_rx.has_changed()?);
-        assert_eq!(4135829304, babel_change_rx.borrow().unwrap());
+        assert!(test_env.babel_change_rx.has_changed()?);
+        assert_eq!(4135829304, test_env.babel_change_rx.borrow().unwrap());
         assert_eq!(
             4135829304,
-            utils::file_checksum(&babel_bin_path).await.unwrap()
+            utils::file_checksum(&test_env.babel_path).await.unwrap()
         );
         Ok(())
     }
 
     #[tokio::test]
     async fn test_check_babel() -> Result<()> {
-        let tmp_dir = TempDir::new().unwrap();
-        let babel_bin_path = tmp_dir.join("babel");
+        let babel_bin_path = TempDir::new().unwrap().join("babel");
         let (_, logs_rx) = broadcast::channel(16);
-        let (babel_change_tx, _babel_change_rx) = watch::channel(None);
-        let sup_service = BabelSupService::new(logs_rx, babel_change_tx, babel_bin_path.clone());
+
+        let (babel_change_tx, _) = watch::channel(None);
+        let sup_service = BabelSupService::new(
+            logs_rx.resubscribe(),
+            babel_change_tx,
+            babel_bin_path.clone(),
+        );
 
         assert_eq!(
             pb::check_babel_response::BabelStatus::Missing as i32,
@@ -262,9 +290,12 @@ mod tests {
                 .babel_status
         );
 
-        let (_, logs_rx) = broadcast::channel(16);
-        let (babel_change_tx, _babel_change_rx) = watch::channel(Some(321));
-        let sup_service = BabelSupService::new(logs_rx, babel_change_tx, babel_bin_path.clone());
+        let (babel_change_tx, _) = watch::channel(Some(321));
+        let sup_service = BabelSupService::new(
+            logs_rx.resubscribe(),
+            babel_change_tx,
+            babel_bin_path.clone(),
+        );
 
         assert_eq!(
             pb::check_babel_response::BabelStatus::ChecksumMismatch as i32,
@@ -287,24 +318,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_logs() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        fs::create_dir_all(&tmp_root)?;
-        let mut client = test_client(&tmp_root)?;
+        let mut test_env = setup_test_env()?;
 
-        let uds_stream = UnixListenerStream::new(tokio::net::UnixListener::bind(
-            tmp_root.join("test_socket"),
-        )?);
-        let (babel_change_tx, _babel_change_rx) = watch::channel(None);
-        let (tx, logs_rx) = broadcast::channel(16);
-        tokio::spawn(
-            async move { sup_server(&tmp_root, logs_rx, babel_change_tx, uds_stream).await },
-        );
+        test_env
+            .logs_tx
+            .send("log1".to_string())
+            .expect("failed to send log");
+        test_env
+            .logs_tx
+            .send("log2".to_string())
+            .expect("failed to send log");
+        test_env
+            .logs_tx
+            .send("log3".to_string())
+            .expect("failed to send log");
 
-        tx.send("log1".to_string()).expect("failed to send log");
-        tx.send("log2".to_string()).expect("failed to send log");
-        tx.send("log3".to_string()).expect("failed to send log");
-
-        let mut stream = client.get_logs(pb::GetLogsRequest {}).await?.into_inner();
+        let mut stream = test_env
+            .client
+            .get_logs(pb::GetLogsRequest {})
+            .await?
+            .into_inner();
 
         let mut logs = Vec::<String>::default();
         while let Some(Ok(log)) = stream.next().await {

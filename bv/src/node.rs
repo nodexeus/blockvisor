@@ -7,12 +7,12 @@ use tokio::{fs::DirBuilder, time::sleep};
 use tracing::{debug, instrument, trace};
 use uuid::Uuid;
 
-use crate::babel_connection::BABEL_RECONNECT_TIMEOUT;
+use crate::node_connection::NODE_RECONNECT_TIMEOUT;
 use crate::{
-    babel_connection,
-    babel_connection::{BabelConnection, BABEL_START_TIMEOUT},
     cookbook_service::CookbookService,
     env::*,
+    node_connection,
+    node_connection::{NodeConnection, NODE_START_TIMEOUT},
     node_data::{NodeData, NodeImage, NodeStatus},
     utils::{get_process_pid, run_cmd},
 };
@@ -21,7 +21,7 @@ use crate::{
 pub struct Node {
     pub data: NodeData,
     machine: Machine<'static>,
-    babel_conn: BabelConnection,
+    node_conn: NodeConnection,
 }
 
 // FIXME: Hardcoding everything for now.
@@ -48,7 +48,7 @@ impl Node {
         Ok(Self {
             data,
             machine,
-            babel_conn: BabelConnection::closed(node_id),
+            node_conn: NodeConnection::closed(node_id),
         })
     }
 
@@ -57,26 +57,25 @@ impl Node {
     pub async fn connect(data: NodeData) -> Result<Self> {
         let config = Node::create_config(&data)?;
         let cmd = data.id.to_string();
-        let (state, babel_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
+        let (state, node_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => {
                 // Since this is the startup phase it doesn't make sense to wait a long time
                 // for the nodes to come online. For that reason we restrict the allowed delay
                 // further down.
-                let babel_conn =
-                    BabelConnection::try_open(data.id, BABEL_RECONNECT_TIMEOUT).await?;
+                let node_conn = NodeConnection::try_open(data.id, NODE_RECONNECT_TIMEOUT).await?;
                 debug!("Established babel connection");
-                (firec::MachineState::RUNNING { pid }, babel_conn)
+                (firec::MachineState::RUNNING { pid }, node_conn)
             }
             Err(_) => (
                 firec::MachineState::SHUTOFF,
-                BabelConnection::closed(data.id),
+                NodeConnection::closed(data.id),
             ),
         };
         let machine = firec::Machine::connect(config, state).await;
         Ok(Self {
             data,
             machine,
-            babel_conn,
+            node_conn,
         })
     }
 
@@ -109,7 +108,7 @@ impl Node {
         }
 
         self.machine.start().await?;
-        self.babel_conn = BabelConnection::try_open(self.id(), BABEL_START_TIMEOUT).await?;
+        self.node_conn = NodeConnection::try_open(self.id(), NODE_START_TIMEOUT).await?;
 
         self.data.expected_status = NodeStatus::Running;
         self.data.save().await
@@ -138,7 +137,7 @@ impl Node {
                         bail!("Forced shutdown failed: {err}");
                     }
                 }
-                self.babel_conn.wait_for_disconnect(&self.id()).await;
+                self.node_conn.wait_for_disconnect(&self.id()).await;
 
                 // FIXME: for some reason firecracker socket is not created by
                 // consequent start command if we do not wait a bit here
@@ -147,7 +146,7 @@ impl Node {
         }
         self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
-        self.babel_conn = BabelConnection::closed(self.id());
+        self.node_conn = NodeConnection::closed(self.id());
 
         Ok(())
     }
@@ -293,7 +292,7 @@ impl Node {
             params,
         });
         debug!("Calling method: {method}");
-        let resp: babel_api::BabelResponse = self.babel_conn.babel_rpc(request).await?;
+        let resp: babel_api::BabelResponse = self.node_conn.babel_rpc(request).await?;
         let inner = match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
                 value,
@@ -309,7 +308,7 @@ impl Node {
     /// blockchain that is not listed here will result in an error being returned.
     pub async fn capabilities(&mut self) -> Result<Vec<String>> {
         let request = babel_api::BabelRequest::ListCapabilities;
-        let resp: babel_api::BabelResponse = self.babel_conn.babel_rpc(request).await?;
+        let resp: babel_api::BabelResponse = self.node_conn.babel_rpc(request).await?;
         let capabilities = match resp {
             babel_api::BabelResponse::ListCapabilities(caps) => caps,
             e => bail!("Unexpected BabelResponse for `capabilities`: `{e:?}`"),
@@ -325,9 +324,9 @@ impl Node {
 
     /// Returns the list of logs from blockchain entry_points.
     pub async fn get_logs(&mut self) -> Result<Vec<String>> {
-        let client = self.babel_conn.babelsup_client().await?;
+        let client = self.node_conn.babelsup_client().await?;
         let mut resp = client
-            .get_logs(babel_connection::babelsup_pb::GetLogsRequest {})
+            .get_logs(node_connection::babelsup_pb::GetLogsRequest {})
             .await?
             .into_inner();
         let mut logs = Vec::<String>::default();
@@ -340,7 +339,7 @@ impl Node {
     /// Returns blockchain node keys.
     pub async fn download_keys(&mut self) -> Result<Vec<babel_api::BlockchainKey>> {
         let request = babel_api::BabelRequest::DownloadKeys;
-        let resp: babel_api::BabelResponse = self.babel_conn.babel_rpc(request).await?;
+        let resp: babel_api::BabelResponse = self.node_conn.babel_rpc(request).await?;
         let keys = match resp {
             babel_api::BabelResponse::Keys(keys) => keys,
             e => bail!("Unexpected BabelResponse for `download_keys`: `{e:?}`"),
@@ -351,7 +350,7 @@ impl Node {
     /// Sets blockchain node keys.
     pub async fn upload_keys(&mut self, keys: Vec<babel_api::BlockchainKey>) -> Result<()> {
         let request = babel_api::BabelRequest::UploadKeys(keys);
-        let resp: babel_api::BabelResponse = self.babel_conn.babel_rpc(request).await?;
+        let resp: babel_api::BabelResponse = self.node_conn.babel_rpc(request).await?;
         match resp {
             babel_api::BabelResponse::BlockchainResponse(babel_api::BlockchainResponse {
                 value,

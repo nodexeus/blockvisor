@@ -220,8 +220,8 @@ impl<T: Timer> Installer<T> {
     }
 
     async fn prepare_running(&mut self) -> Result<()> {
-        if !self.paths.current.exists()
-            || get_process_pid(
+        if !self.paths.current.exists() //fresh installation
+            || get_process_pid( // rollback - launched by another installer from self.paths.current
                 INSTALLER_BIN,
                 &self.paths.current.join(INSTALLER_BIN).to_string_lossy(),
             )
