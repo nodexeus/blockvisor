@@ -13,7 +13,7 @@ use crate::{
 };
 use std::sync::Arc;
 use std::{fmt, str::FromStr};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tonic::{transport::Endpoint, Request, Response, Status};
 
 pub const BLOCKVISOR_SERVICE_PORT: usize = 9001;
@@ -39,7 +39,7 @@ async fn status_check() -> Result<(), Status> {
 }
 
 pub struct BlockvisorServer {
-    pub nodes: Arc<Mutex<Nodes>>,
+    pub nodes: Arc<RwLock<Nodes>>,
 }
 
 impl BlockvisorServer {
@@ -85,7 +85,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .into();
 
         self.nodes
-            .lock()
+            .write()
             .await
             .create(id, request.name, image, request.ip, request.gateway)
             .await
@@ -109,7 +109,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .into();
 
         self.nodes
-            .lock()
+            .write()
             .await
             .upgrade(id, image)
             .await
@@ -129,7 +129,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
-            .lock()
+            .write()
             .await
             .delete(id)
             .await
@@ -148,7 +148,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
-            .lock()
+            .write()
             .await
             .start(id)
             .await
@@ -168,7 +168,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let id = helpers::parse_uuid(request.id)?;
 
         self.nodes
-            .lock()
+            .write()
             .await
             .stop(id)
             .await
@@ -184,7 +184,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         _request: Request<bv_pb::GetNodesRequest>,
     ) -> Result<Response<bv_pb::GetNodesResponse>, Status> {
         status_check().await?;
-        let list = self.nodes.lock().await.list().await;
+        let list = self.nodes.read().await.list().await;
         let mut nodes = vec![];
         for node in list {
             let status = match node.status() {
@@ -219,7 +219,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 
         let status = self
             .nodes
-            .lock()
+            .read()
             .await
             .status(id)
             .await
@@ -246,7 +246,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let node_id = helpers::parse_uuid(request.id)?;
         let logs = self
             .nodes
-            .lock()
+            .write()
             .await
             .nodes
             .get_mut(&node_id)
@@ -266,7 +266,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let node_id = helpers::parse_uuid(request.id)?;
         let keys = self
             .nodes
-            .lock()
+            .write()
             .await
             .nodes
             .get_mut(&node_id)
@@ -288,7 +288,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 
         let id = self
             .nodes
-            .lock()
+            .read()
             .await
             .node_id_for_name(&name)
             .await
@@ -308,7 +308,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         let node_id = helpers::parse_uuid(request.node_id)?;
         let capabilities = self
             .nodes
-            .lock()
+            .write()
             .await
             .nodes
             .get_mut(&node_id)
@@ -336,7 +336,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .collect();
         let value = self
             .nodes
-            .lock()
+            .write()
             .await
             .nodes
             .get_mut(&node_id)
@@ -354,7 +354,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
         status_check().await?;
         let request = request.into_inner();
         let node_id = helpers::parse_uuid(request.node_id)?;
-        let mut node_lock = self.nodes.lock().await;
+        let mut node_lock = self.nodes.write().await;
         let node = node_lock
             .nodes
             .get_mut(&node_id)

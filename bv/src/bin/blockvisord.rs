@@ -12,7 +12,7 @@ use blockvisord::{
 };
 use std::{net::ToSocketAddrs, str::FromStr, sync::Arc};
 use tokio::{
-    sync::Mutex,
+    sync::RwLock,
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     let nodes = Nodes::load(config.clone()).await?;
     try_set_bv_status(bv_pb::ServiceStatus::Ok).await;
     let updates_tx = nodes.get_updates_sender().await?.clone();
-    let nodes = Arc::new(Mutex::new(nodes));
+    let nodes = Arc::new(RwLock::new(nodes));
 
     let url = format!("0.0.0.0:{BLOCKVISOR_SERVICE_PORT}");
     let server = BlockvisorServer {
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
 
     let nodes_recovery_future = async {
         loop {
-            let list = nodes.lock().await.list().await;
+            let list = nodes.read().await.list().await;
 
             for node in list {
                 let id = &node.id;
@@ -63,13 +63,13 @@ async fn main() -> Result<()> {
                     match node.expected_status {
                         NodeStatus::Running => {
                             info!("Recovery: starting node with ID `{id}`");
-                            if let Err(e) = nodes.lock().await.start(node.id).await {
+                            if let Err(e) = nodes.write().await.start(node.id).await {
                                 error!("Recovery: starting node with ID `{id}` failed: {e}");
                             }
                         }
                         NodeStatus::Stopped => {
                             info!("Recovery: stopping node with ID `{id}`");
-                            if let Err(e) = nodes.lock().await.stop(node.id).await {
+                            if let Err(e) = nodes.write().await.stop(node.id).await {
                                 error!("Recovery: stopping node with ID `{id}` failed: {e}",);
                             }
                         }
@@ -122,13 +122,13 @@ async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
 
 /// This task runs every minute to aggregate metrics from every node. It will call into the nodes
 /// query their metrics, then send them to blockvisor-api.
-async fn node_metrics(nodes: Arc<Mutex<Nodes>>, endpoint: &Endpoint, token: grpc::AuthToken) {
+async fn node_metrics(nodes: Arc<RwLock<Nodes>>, endpoint: &Endpoint, token: grpc::AuthToken) {
     let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
     let channel = wait_for_channel(endpoint).await;
     let mut client = grpc::MetricsClient::with_auth(channel, token);
     loop {
         timer.tick().await;
-        let mut lock = nodes.lock().await;
+        let mut lock = nodes.write().await;
         let metrics = blockvisord::node_metrics::collect_metrics(lock.nodes.values_mut()).await;
         // Drop the lock as early as possible.
         drop(lock);
