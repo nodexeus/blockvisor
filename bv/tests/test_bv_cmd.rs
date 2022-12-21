@@ -255,7 +255,8 @@ fn test_bv_cmd_init_unknown_otp() {
     let mut cmd = Command::cargo_bin("bv").unwrap();
     cmd.args(&["init", otp])
         .args(&["--ifa", ifa])
-        .args(&["--url", url])
+        .args(&["--api", url])
+        .args(&["--keys", url])
         .args(&["--registry", url])
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
@@ -361,7 +362,8 @@ async fn test_bv_cmd_init_localhost() {
         .unwrap()
         .args(&["init", &otp])
         .args(&["--ifa", ifa])
-        .args(&["--url", url])
+        .args(&["--api", url])
+        .args(&["--keys", url])
         .args(&["--registry", registry])
         .assert()
         .success()
@@ -729,6 +731,7 @@ async fn test_bv_cmd_grpc_commands() {
         id: Uuid::new_v4().to_string(),
         token: "any token".to_string(),
         blockjoy_api_url: "http://localhost:8081".to_string(),
+        blockjoy_keys_url: "http://localhost:8081".to_string(),
         blockjoy_registry_url: "http://localhost:50051".to_string(),
     };
     let nodes = Nodes::load(config.clone()).await.unwrap();
@@ -875,7 +878,8 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .unwrap()
             .args(&["init", otp])
             .args(&["--ifa", ifa])
-            .args(&["--url", url])
+            .args(&["--api", url])
+            .args(&["--keys", url])
             .args(&["--registry", url])
             .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()

@@ -244,7 +244,7 @@ impl Nodes {
         let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(id))?;
 
         let mut key_service =
-            KeyService::connect(&self.api_config.blockjoy_api_url, &self.api_config.token).await?;
+            KeyService::connect(&self.api_config.blockjoy_keys_url, &self.api_config.token).await?;
 
         let api_keys: HashMap<String, Vec<u8>> = key_service
             .download_keys(id)

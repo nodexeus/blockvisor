@@ -16,11 +16,15 @@ pub struct InitArgs {
     pub otp: String,
 
     /// BlockJoy API url
-    #[clap(long = "url", default_value = "https://api.blockvisor.dev")]
+    #[clap(long = "api", default_value = "https://api.dev.blockjoy.com")]
     pub blockjoy_api_url: String,
 
+    /// BlockJoy keys service url
+    #[clap(long = "keys", default_value = "https://api.dev.blockjoy.com")]
+    pub blockjoy_keys_url: String,
+
     /// BlockJoy registry url
-    #[clap(long = "registry", default_value = "https://api.blockvisor.dev")]
+    #[clap(long = "registry", default_value = "https://api.dev.blockjoy.com")]
     pub blockjoy_registry_url: String,
 
     /// Network interface name
