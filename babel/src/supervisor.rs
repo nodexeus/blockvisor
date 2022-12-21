@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use babel_api::config::{Entrypoint, SupervisorConfig as Config};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use std::env;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -75,11 +74,9 @@ impl<T: Timer> Supervisor<T> {
 
     async fn run_babel(&self, mut babel_change_rx: watch::Receiver<Option<u32>>) {
         let mut cmd = Command::new(&self.babel_path);
-        cmd.envs(env::vars())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut backoff = Backoff::<T>::new(&self.config);
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut run = self.run.clone();
+        let mut backoff = Backoff::<T>::new(run.clone(), &self.config);
         while run.load() {
             backoff.start();
             if let Ok(mut child) = cmd.spawn() {
@@ -102,10 +99,7 @@ impl<T: Timer> Supervisor<T> {
                 );
             } else {
                 error!("Failed to spawn babel");
-                tokio::select!(
-                    _ = backoff.wait() => {},
-                    _ = run.wait() => {},
-                );
+                backoff.wait().await;
             }
         }
     }
@@ -116,8 +110,8 @@ impl<T: Timer> Supervisor<T> {
         cmd.args(&entrypoint.args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        let mut backoff = Backoff::<T>::new(&self.config);
         let mut run = self.run.clone();
+        let mut backoff = Backoff::<T>::new(run.clone(), &self.config);
         while run.load() {
             backoff.start();
             if let Ok(mut child) = cmd.spawn() {
@@ -136,10 +130,7 @@ impl<T: Timer> Supervisor<T> {
                 );
             } else {
                 warn!("Failed to spawn entrypoint '{entry_name}'");
-                tokio::select!(
-                    _ = backoff.wait() => {},
-                    _ = run.wait() => {},
-                );
+                backoff.wait().await;
             }
         }
     }
@@ -150,16 +141,18 @@ struct Backoff<T: Timer> {
     timestamp: Instant,
     backoff_base_ms: u64,
     reset_timeout: Duration,
+    run: RunFlag,
     phantom: PhantomData<T>,
 }
 
 impl<T: Timer> Backoff<T> {
-    fn new(config: &Config) -> Self {
+    fn new(run: RunFlag, config: &Config) -> Self {
         Self {
             counter: 0,
             timestamp: Instant::now(),
             backoff_base_ms: config.backoff_base_ms,
             reset_timeout: Duration::from_millis(config.backoff_timeout_ms),
+            run,
             phantom: Default::default(),
         }
     }
@@ -174,10 +167,10 @@ impl<T: Timer> Backoff<T> {
         if duration > self.reset_timeout {
             self.counter = 0;
         } else {
-            T::sleep(Duration::from_millis(
-                self.backoff_base_ms * 2u64.pow(self.counter),
-            ))
-            .await;
+            tokio::select!(
+                _ = T::sleep(Duration::from_millis(self.backoff_base_ms * 2u64.pow(self.counter))) => {},
+                _ = self.run.wait() => {},
+            );
             self.counter += 1;
         }
     }
@@ -247,6 +240,20 @@ mod tests {
             babel_change_tx,
             babel_change_rx,
         })
+    }
+
+    fn wait_for_babel(mut test_run: RunFlag, control_file: PathBuf) {
+        tokio::spawn(async move {
+            // asynchronously wait for dummy babel to start
+            let _ = tokio::time::timeout(Duration::from_millis(500), async {
+                while !control_file.exists() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await;
+            // and send restart signal
+            test_run.stop();
+        });
     }
 
     fn minimal_cfg() -> Config {
@@ -464,19 +471,7 @@ mod tests {
         sleep_ctx.expect().times(3).returning(|_| ());
         let control_file = test_env.ctrl_file.clone();
         sleep_ctx.expect().returning(move |_| {
-            let control_file = control_file.clone();
-            let mut test_run = test_run.clone();
-            tokio::spawn(async move {
-                // asynchronously wait for dummy babel to start
-                let _ = tokio::time::timeout(Duration::from_millis(500), async {
-                    while !control_file.exists() {
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                    }
-                })
-                .await;
-                // and send restart signal
-                test_run.stop();
-            });
+            wait_for_babel(test_run.clone(), control_file.clone());
         });
         let supervisor = Supervisor::<MockTestTimer>::new(
             test_env.run,
@@ -521,19 +516,7 @@ mod tests {
 
         let now_ctx = MockTestTimer::now_context();
         now_ctx.expect().once().returning(move || now);
-        let control_file = test_env.ctrl_file.clone();
-        let mut test_run = test_run.clone();
-        tokio::spawn(async move {
-            // asynchronously wait for dummy babel to start
-            let _ = tokio::time::timeout(Duration::from_millis(500), async {
-                while !control_file.exists() {
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            })
-            .await;
-            // and send restart signal
-            test_run.stop();
-        });
+        wait_for_babel(test_run.clone(), test_env.ctrl_file.clone());
         let mut rx = supervisor.get_logs_rx();
         supervisor.run().await?;
 
