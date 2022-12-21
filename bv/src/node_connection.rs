@@ -14,7 +14,7 @@ use tokio_stream;
 use tonic::transport::{Channel, Endpoint, Uri};
 use tracing::{debug, error, info, warn};
 
-use crate::babel_connection::babelsup_pb::babel_sup_client::BabelSupClient;
+use crate::node_connection::babelsup_pb::babel_sup_client::BabelSupClient;
 use crate::{env::*, node::VSOCK_PATH};
 
 pub mod babelsup_pb {
@@ -25,9 +25,9 @@ pub mod babelsup_pb {
 
 pub const BABEL_SUP_VSOCK_PORT: u32 = 41;
 pub const BABEL_VSOCK_PORT: u32 = 42;
-pub const BABEL_START_TIMEOUT: Duration = Duration::from_secs(60);
-pub const BABEL_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const BABEL_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+pub const NODE_START_TIMEOUT: Duration = Duration::from_secs(60);
+pub const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(15);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 const GRPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const GRPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
@@ -35,23 +35,23 @@ const CONNECTION_SWITCH_TIMEOUT: Duration = Duration::from_secs(1);
 const RETRY_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
-pub enum BabelConnectionState {
+pub enum NodeConnectionState {
     Closed,
     Babel { stream: UnixStream },
     BabelSup { client: BabelSupClient<Channel> },
 }
 
 #[derive(Debug)]
-pub struct BabelConnection {
+pub struct NodeConnection {
     node_id: uuid::Uuid,
-    state: BabelConnectionState,
+    state: NodeConnectionState,
 }
 
-impl BabelConnection {
+impl NodeConnection {
     pub fn closed(node_id: uuid::Uuid) -> Self {
         Self {
             node_id,
-            state: BabelConnectionState::Closed,
+            state: NodeConnectionState::Closed,
         }
     }
 
@@ -74,7 +74,7 @@ impl BabelConnection {
         }
         let mut connection = Self {
             node_id,
-            state: BabelConnectionState::BabelSup { client },
+            state: NodeConnectionState::BabelSup { client },
         };
         let resp = connection.babel_rpc(BabelRequest::Ping).await;
         if matches!(resp, Ok(BabelResponse::Pong)) {
@@ -92,11 +92,11 @@ impl BabelConnection {
         request: S,
     ) -> Result<D> {
         match &mut self.state {
-            BabelConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
-            BabelConnectionState::Babel { .. } => {}
-            BabelConnectionState::BabelSup { .. } => {
+            NodeConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
+            NodeConnectionState::Babel { .. } => {}
+            NodeConnectionState::BabelSup { .. } => {
                 info!("Reconnecting to babel");
-                self.state = BabelConnectionState::Babel {
+                self.state = NodeConnectionState::Babel {
                     stream: open_stream(self.node_id, BABEL_VSOCK_PORT, CONNECTION_SWITCH_TIMEOUT)
                         .await?,
                 }
@@ -110,26 +110,26 @@ impl BabelConnection {
     /// This function gets gRPC client connected to babelsup. It reconnect to babelsup if necessary.
     pub async fn babelsup_client(&mut self) -> Result<&mut BabelSupClient<Channel>> {
         match &mut self.state {
-            BabelConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
-            BabelConnectionState::Babel { stream } => {
+            NodeConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
+            NodeConnectionState::Babel { stream } => {
                 stream.shutdown().await?;
                 info!("Reconnecting to babelsup");
-                self.state = BabelConnectionState::BabelSup {
+                self.state = NodeConnectionState::BabelSup {
                     client: connect_babelsup(self.node_id, CONNECTION_SWITCH_TIMEOUT).await?,
                 };
             }
-            BabelConnectionState::BabelSup { .. } => {}
+            NodeConnectionState::BabelSup { .. } => {}
         };
         self.try_babelsup_client_mut()
     }
 
     // TODO remove it after graceful node shutdown implemented
     pub async fn wait_for_disconnect(&mut self, node_id: &uuid::Uuid) {
-        if let Ok(babel_conn) = self.try_babel_stream_mut() {
+        if let Ok(node_conn) = self.try_babel_stream_mut() {
             // We can verify successful shutdown success by checking whether we can read
             // into a buffer of nonzero length. If the stream is closed, the number of
             // bytes read should be zero.
-            let read = timeout(BABEL_STOP_TIMEOUT, babel_conn.read(&mut [0])).await;
+            let read = timeout(NODE_STOP_TIMEOUT, node_conn.read(&mut [0])).await;
             match read {
                 // Successful shutdown in this case
                 Ok(Ok(0)) => debug!("Node {} gracefully shut down", node_id),
@@ -149,7 +149,7 @@ impl BabelConnection {
     /// Tries to return the babel unix stream, and if there isn't one, returns an error message.
     fn try_babel_stream_mut(&mut self) -> Result<&mut UnixStream> {
         match &mut self.state {
-            BabelConnectionState::Babel { stream } => Ok(stream),
+            NodeConnectionState::Babel { stream } => Ok(stream),
             _ => Err(anyhow!(
                 "Tried to get babel connection stream while there isn't one"
             )),
@@ -159,7 +159,7 @@ impl BabelConnection {
     /// Tries to return the babelsup client, and if there isn't one, returns an error message.
     fn try_babelsup_client_mut(&mut self) -> Result<&mut BabelSupClient<Channel>> {
         match &mut self.state {
-            BabelConnectionState::BabelSup { client } => Ok(client),
+            NodeConnectionState::BabelSup { client } => Ok(client),
             _ => Err(anyhow!(
                 "Tried to get babelsup client while there isn't one"
             )),
@@ -187,19 +187,20 @@ async fn open_stream(node_id: uuid::Uuid, port: u32, max_delay: Duration) -> Res
             // initiate connection from the first attempt
             Ok(mut stream) => match handshake(&mut stream, port).await {
                 Ok(_) => break Ok(stream),
-                Err(e) => {
+                Err(e) if elapsed() < max_delay => {
                     debug!("Handshake error, retrying in 5 seconds: {e}");
                     sleep(RETRY_INTERVAL).await;
                 }
+                Err(e) => break Err(anyhow!("handshake error {e}")),
             },
             Err(e) if elapsed() < max_delay => {
                 debug!("No socket file yet, retrying in 5 seconds: {e}");
                 sleep(RETRY_INTERVAL).await;
             }
-            Err(e) => break Err(e),
+            Err(e) => break Err(anyhow!("uds connect error {e}")),
         };
     }
-    .context("Failed to connect to babel bus")?;
+    .context("Failed to connect to node bus")?;
 
     Ok(stream)
 }

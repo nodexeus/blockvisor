@@ -1,4 +1,3 @@
-pub mod babel_connection;
 pub mod cli;
 pub mod config;
 pub mod cookbook_service;
@@ -10,6 +9,7 @@ pub mod key_service;
 pub mod logging;
 pub mod network_interface;
 pub mod node;
+pub mod node_connection;
 pub mod node_data;
 pub mod node_metrics;
 pub mod nodes;
