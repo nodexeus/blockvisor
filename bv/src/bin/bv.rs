@@ -71,6 +71,7 @@ async fn main() -> Result<()> {
                 blockjoy_api_url: cmd_args.blockjoy_api_url,
                 blockjoy_keys_url: cmd_args.blockjoy_keys_url,
                 blockjoy_registry_url: cmd_args.blockjoy_registry_url,
+                update_check_interval_secs: None,
             };
             api_config.save().await?;
 

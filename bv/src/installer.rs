@@ -12,11 +12,11 @@ use tonic::transport::Channel;
 
 const SYSTEM_SERVICES: &str = "etc/systemd/system";
 const SYSTEM_BIN: &str = "usr/bin";
-const INSTALL_PATH: &str = "opt/blockvisor";
-const BLACKLIST: &str = "blacklist";
+pub const INSTALL_PATH: &str = "opt/blockvisor";
+pub const BLACKLIST: &str = "blacklist";
 const CURRENT_LINK: &str = "current";
 const BACKUP_LINK: &str = "backup";
-const INSTALLER_BIN: &str = "installer";
+pub const INSTALLER_BIN: &str = "installer";
 const FC_BIN: &str = "firecracker/bin";
 const BLOCKVISOR_BIN: &str = "blockvisor/bin";
 const BLOCKVISOR_SERVICES: &str = "blockvisor/services";
@@ -405,15 +405,15 @@ impl<T: Timer> Installer<T> {
 mod tests {
     use super::*;
     use crate::server::bv_pb;
+    use crate::utils::tests::test_channel;
     use anyhow::anyhow;
     use assert_fs::TempDir;
     use mockall::*;
     use serial_test::serial;
     use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
-    use tokio::net::UnixStream;
     use tokio_stream::wrappers::UnixListenerStream;
-    use tonic::transport::{Endpoint, Server, Uri};
+    use tonic::transport::Server;
     use tonic::Response;
 
     mock! {
@@ -509,17 +509,6 @@ mod tests {
         Ok(())
     }
 
-    fn test_channel(tmp_root: &PathBuf) -> Channel {
-        let socket_path = tmp_root.join("test_socket");
-        Endpoint::try_from("http://[::]:50052")
-            .unwrap()
-            .timeout(Duration::from_secs(1))
-            .connect_timeout(Duration::from_secs(1))
-            .connect_with_connector_lazy(tower::service_fn(move |_: Uri| {
-                UnixStream::connect(socket_path.clone())
-            }))
-    }
-
     fn create_dummy_installer(path: &PathBuf) -> Result<()> {
         // create dummy installer that will sleep
         let _ = fs::create_dir_all(path);
@@ -571,7 +560,7 @@ mod tests {
 
         let resp = tokio::select!(
             resp = installer.prepare_running() => resp,
-            _ = test_server(&tmp_root, bv_mock) => Ok(()),
+            _ = test_server(&tmp_root, bv_mock) => panic!(),
             _ = dummy_installer.wait() => Ok(()),
         );
         resp?;
@@ -611,8 +600,8 @@ mod tests {
 
         let resp = tokio::select!(
             resp = installer.prepare_running() => resp,
-            _ = test_server(&tmp_root, bv_mock) => Ok(()),
-            _ = dummy_installer.wait() => Ok(()),
+            _ = test_server(&tmp_root, bv_mock) => panic!(),
+            _ = dummy_installer.wait() => panic!(),
         );
         assert!(resp.is_err());
         Ok(())
@@ -638,7 +627,7 @@ mod tests {
 
         let resp = tokio::select!(
             resp = installer.health_check() => resp,
-            resp = test_server(&tmp_root, bv_mock) => resp,
+            _ = test_server(&tmp_root, bv_mock) => panic!(),
         );
         resp?;
         Ok(())
@@ -674,7 +663,7 @@ mod tests {
 
         let resp = tokio::select!(
             resp = installer.health_check() => resp,
-            resp = test_server(&tmp_root, bv_mock) => resp,
+            _ = test_server(&tmp_root, bv_mock) => panic!(),
         );
         assert!(resp.is_err());
         Ok(())
