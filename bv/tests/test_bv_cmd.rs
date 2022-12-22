@@ -15,7 +15,7 @@ use std::{env, fs};
 #[cfg(target_os = "linux")]
 use std::{net::ToSocketAddrs, sync::Arc};
 #[cfg(target_os = "linux")]
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, RwLock};
 #[cfg(target_os = "linux")]
 use tokio::time::{sleep, Duration};
 #[cfg(target_os = "linux")]
@@ -749,7 +749,7 @@ async fn test_bv_cmd_grpc_commands() {
     };
     let nodes = Nodes::load(config.clone()).await.unwrap();
     let updates_tx = nodes.get_updates_sender().await.unwrap().clone();
-    let nodes = Arc::new(Mutex::new(nodes));
+    let nodes = Arc::new(RwLock::new(nodes));
 
     let token = grpc::AuthToken(config.token);
     let endpoint = Endpoint::from_str(&config.blockjoy_api_url).unwrap();

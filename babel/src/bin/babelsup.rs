@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use babel::{babelsup_service, utils};
-#[cfg(target_os = "linux")]
 use babel::{config, logging, run_flag::RunFlag, supervisor};
 use eyre::Context;
 use std::time::{Duration, Instant};

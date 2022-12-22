@@ -7,7 +7,7 @@ use pb::command_flow_client::CommandFlowClient;
 use pb::metrics_service_client::MetricsServiceClient;
 use pb::node_command::Command;
 use std::{str::FromStr, sync::Arc};
-use tokio::sync::{broadcast::Sender, Mutex};
+use tokio::sync::{broadcast::Sender, RwLock};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tonic::codegen::InterceptedService;
 use tonic::service::Interceptor;
@@ -81,7 +81,7 @@ fn service_status_update(
 
 pub async fn process_commands_stream(
     client: &mut CommandsClient,
-    nodes: Arc<Mutex<Nodes>>,
+    nodes: Arc<RwLock<Nodes>>,
     updates_tx: Sender<pb::InfoUpdate>,
 ) -> Result<()> {
     info!("Processing pending commands");
@@ -149,7 +149,7 @@ fn create_info_update(
 }
 
 async fn process_node_command(
-    nodes: Arc<Mutex<Nodes>>,
+    nodes: Arc<RwLock<Nodes>>,
     node_command: pb::NodeCommand,
 ) -> Result<()> {
     let node_id = Uuid::from_str(&node_command.id)?;
@@ -161,30 +161,30 @@ async fn process_node_command(
                     .ok_or_else(|| anyhow!("Image not provided"))?
                     .into();
                 nodes
-                    .lock()
+                    .write()
                     .await
                     .create(node_id, args.name, image, args.ip, args.gateway)
                     .await?;
             }
             Command::Delete(_) => {
-                nodes.lock().await.delete(node_id).await?;
+                nodes.write().await.delete(node_id).await?;
             }
             Command::Start(_) => {
-                nodes.lock().await.start(node_id).await?;
+                nodes.write().await.start(node_id).await?;
             }
             Command::Stop(_) => {
-                nodes.lock().await.stop(node_id).await?;
+                nodes.write().await.stop(node_id).await?;
             }
             Command::Restart(_) => {
-                nodes.lock().await.stop(node_id).await?;
-                nodes.lock().await.start(node_id).await?;
+                nodes.write().await.stop(node_id).await?;
+                nodes.write().await.start(node_id).await?;
             }
             Command::Upgrade(args) => {
                 let image: NodeImage = args
                     .image
                     .ok_or_else(|| anyhow!("Image not provided"))?
                     .into();
-                nodes.lock().await.upgrade(node_id, image).await?;
+                nodes.write().await.upgrade(node_id, image).await?;
             }
             Command::Update(_) => unimplemented!(),
             Command::InfoGet(_) => unimplemented!(),
