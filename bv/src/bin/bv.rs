@@ -173,7 +173,7 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
             println!("{:?}", info);
         }
         HostCommand::Metrics => {
-            let metrics = get_host_metrics();
+            let metrics = get_host_metrics()?;
             let to_gb = |n| n as f64 / 1_000_000_000.0;
             println!("Used cpu:       {:>10} %", metrics.used_cpu);
             println!("Used mem:       {:>10.3} GB", to_gb(metrics.used_memory));

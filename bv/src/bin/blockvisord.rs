@@ -145,10 +145,16 @@ async fn host_metrics(host_id: String, endpoint: &Endpoint, token: grpc::AuthTok
     let mut client = grpc::MetricsClient::with_auth(channel, token);
     loop {
         timer.tick().await;
-        let metrics = blockvisord::hosts::get_host_metrics();
-        let metrics = pb::HostMetricsRequest::new(host_id.clone(), metrics);
-        if let Err(e) = client.host(metrics).await {
-            error!("Could not send host metrics! `{e}`");
-        }
+        match blockvisord::hosts::get_host_metrics() {
+            Ok(metrics) => {
+                let metrics = pb::HostMetricsRequest::new(host_id.clone(), metrics);
+                if let Err(e) = client.host(metrics).await {
+                    error!("Could not send host metrics! `{e}`");
+                }
+            }
+            Err(e) => {
+                error!("Could not collect host metrics! `{e}`");
+            }
+        };
     }
 }
