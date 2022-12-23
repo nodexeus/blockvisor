@@ -216,8 +216,6 @@ async fn process_chain_command(command: ChainCommand) -> Result<()> {
                 println!("{version}");
             }
         }
-        ChainCommand::Status { id: _ } => todo!(),
-        ChainCommand::Sync { id: _ } => todo!(),
     }
 
     Ok(())
@@ -392,7 +390,6 @@ impl NodeClient {
                 self.stop_nodes(&ids).await?;
                 self.start_nodes(&ids).await?;
             }
-            NodeCommand::Console { id_or_name: _ } => todo!(),
             NodeCommand::Logs { id_or_name } => {
                 let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
                 let logs = self
