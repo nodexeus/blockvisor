@@ -169,7 +169,16 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
     match command {
         HostCommand::Info => {
             let info = get_host_info();
-            println!("{:?}", info);
+            let to_gb = |opt: Option<_>| {
+                opt.map(|n| (n as f64 / 1_000_000_000.0).to_string())
+                    .unwrap_or_else(|| "-".to_string())
+            };
+            println!("Hostname:       {:>10}", fmt_opt(info.name));
+            println!("OS name:        {:>10}", fmt_opt(info.os));
+            println!("OS version:     {:>10}", fmt_opt(info.os_version));
+            println!("CPU count:      {:>10}", fmt_opt(info.cpu_count));
+            println!("Total mem:      {:>10.3} GB", to_gb(info.mem_size));
+            println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
         }
         HostCommand::Metrics => {
             let metrics = get_host_metrics()?;
