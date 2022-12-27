@@ -13,7 +13,7 @@ use crate::{
     node_connection,
     node_connection::{NodeConnection, NODE_START_TIMEOUT},
     node_data::{NodeData, NodeImage, NodeStatus},
-    services::cookbook_service::CookbookService,
+    services::cookbook::CookbookService,
     utils::{get_process_pid, run_cmd},
 };
 

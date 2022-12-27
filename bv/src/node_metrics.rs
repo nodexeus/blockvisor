@@ -2,7 +2,7 @@
 
 use crate::node;
 use crate::node_data::NodeStatus;
-use crate::services::grpc::pb;
+use crate::services::api::pb;
 use std::collections::HashMap;
 use tracing::warn;
 

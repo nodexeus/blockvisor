@@ -11,8 +11,8 @@ use blockvisord::{
         bv_pb::{self, BlockchainRequestParams},
         BlockvisorServer, BLOCKVISOR_SERVICE_URL,
     },
-    services::cookbook_service::CookbookService,
-    services::grpc::pb,
+    services::api::pb,
+    services::cookbook::CookbookService,
     utils::run_cmd,
 };
 use clap::{crate_version, Parser};

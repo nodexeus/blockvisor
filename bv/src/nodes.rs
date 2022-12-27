@@ -18,9 +18,9 @@ use crate::{
     node::Node,
     node_data::{NodeData, NodeImage, NodeRequirements, NodeStatus},
     services::{
-        cookbook_service::CookbookService,
-        grpc::{pb, pb::node_info::ContainerStatus},
-        key_service::KeyService,
+        api::{pb, pb::node_info::ContainerStatus},
+        cookbook::CookbookService,
+        keyfiles::KeyService,
     },
 };
 

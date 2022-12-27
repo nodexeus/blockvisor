@@ -1,3 +1,3 @@
-pub mod cookbook_service;
-pub mod grpc;
-pub mod key_service;
+pub mod api;
+pub mod cookbook;
+pub mod keyfiles;
