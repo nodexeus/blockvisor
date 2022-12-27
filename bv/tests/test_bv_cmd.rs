@@ -3,7 +3,8 @@ use assert_cmd::Command;
 #[cfg(target_os = "linux")]
 use assert_fs::TempDir;
 #[cfg(target_os = "linux")]
-use blockvisord::grpc::{self, pb};
+use blockvisord::services::grpc::{self, pb};
+#[cfg(target_os = "linux")]
 use blockvisord::set_bv_status;
 #[cfg(target_os = "linux")]
 use futures_util::FutureExt;
@@ -11,6 +12,7 @@ use futures_util::FutureExt;
 use predicates::prelude::*;
 #[cfg(target_os = "linux")]
 use serial_test::serial;
+#[cfg(target_os = "linux")]
 use std::{env, fs};
 #[cfg(target_os = "linux")]
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -542,9 +544,9 @@ async fn test_bv_cmd_cookbook_download() {
 #[cfg(target_os = "linux")]
 async fn test_bv_cmd_grpc_commands() {
     use blockvisord::config::Config;
-    use blockvisord::grpc::process_commands_stream;
     use blockvisord::nodes::Nodes;
     use blockvisord::server::bv_pb;
+    use blockvisord::services::grpc::process_commands_stream;
     use serde_json::json;
     use std::str::FromStr;
     use stub_server::StubServer;

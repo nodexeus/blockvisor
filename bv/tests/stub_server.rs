@@ -1,4 +1,4 @@
-use blockvisord::grpc::pb;
+use blockvisord::services::grpc::pb;
 use std::{pin::Pin, sync::Arc};
 use tokio::sync::{mpsc, Mutex};
 use tokio_stream::{wrappers::ReceiverStream, Stream, StreamExt};

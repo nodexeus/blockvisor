@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
-    cookbook_service::CookbookService,
-    grpc::pb,
     hosts::{get_host_info, get_host_metrics, get_ip_address},
     nodes::{CommonData, Nodes},
     pretty_table::{PrettyTable, PrettyTableRow},
@@ -15,11 +11,14 @@ use blockvisord::{
         bv_pb::{self, BlockchainRequestParams},
         BlockvisorServer, BLOCKVISOR_SERVICE_URL,
     },
+    services::cookbook_service::CookbookService,
+    services::grpc::pb,
     utils::run_cmd,
 };
 use clap::{crate_version, Parser};
 use cli_table::print_stdout;
 use petname::Petnames;
+use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use tonic::transport::Channel;
 use uuid::Uuid;

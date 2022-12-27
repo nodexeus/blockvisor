@@ -2,12 +2,13 @@ use crate::grpc::pb;
 use anyhow::{Context, Result};
 use blockvisord::{
     config::Config,
-    grpc, hosts,
+    hosts,
     logging::setup_logging,
     node_data::NodeStatus,
     node_metrics,
     nodes::Nodes,
     server::{bv_pb, BlockvisorServer, BLOCKVISOR_SERVICE_PORT},
+    services::grpc,
     try_set_bv_status,
 };
 use std::{net::ToSocketAddrs, str::FromStr, sync::Arc};

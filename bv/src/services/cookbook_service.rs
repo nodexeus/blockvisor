@@ -1,7 +1,7 @@
 use crate::{
-    grpc::with_auth,
     node::{KERNEL_FILE, ROOT_FS_FILE},
     node_data::NodeImage,
+    services::grpc::with_auth,
     utils,
 };
 use anyhow::{Context, Result};
