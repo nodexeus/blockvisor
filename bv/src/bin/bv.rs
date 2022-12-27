@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
-    cookbook_service::CookbookService,
-    grpc::pb,
     hosts::{get_host_info, get_host_metrics, get_ip_address},
     nodes::{CommonData, Nodes},
     pretty_table::{PrettyTable, PrettyTableRow},
@@ -15,11 +11,14 @@ use blockvisord::{
         bv_pb::{self, BlockchainRequestParams},
         BlockvisorServer, BLOCKVISOR_SERVICE_URL,
     },
+    services::api::pb,
+    services::cookbook::CookbookService,
     utils::run_cmd,
 };
 use clap::{crate_version, Parser};
 use cli_table::print_stdout;
 use petname::Petnames;
+use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use tonic::transport::Channel;
 use uuid::Uuid;
@@ -170,7 +169,16 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
     match command {
         HostCommand::Info => {
             let info = get_host_info();
-            println!("{:?}", info);
+            let to_gb = |opt: Option<_>| {
+                opt.map(|n| (n as f64 / 1_000_000_000.0).to_string())
+                    .unwrap_or_else(|| "-".to_string())
+            };
+            println!("Hostname:       {:>10}", fmt_opt(info.name));
+            println!("OS name:        {:>10}", fmt_opt(info.os));
+            println!("OS version:     {:>10}", fmt_opt(info.os_version));
+            println!("CPU count:      {:>10}", fmt_opt(info.cpu_count));
+            println!("Total mem:      {:>10.3} GB", to_gb(info.mem_size));
+            println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
         }
         HostCommand::Metrics => {
             let metrics = get_host_metrics()?;

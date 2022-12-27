@@ -9,11 +9,11 @@ use uuid::Uuid;
 
 use crate::node_connection::NODE_RECONNECT_TIMEOUT;
 use crate::{
-    cookbook_service::CookbookService,
     env::*,
     node_connection,
     node_connection::{NodeConnection, NODE_START_TIMEOUT},
     node_data::{NodeData, NodeImage, NodeStatus},
+    services::cookbook::CookbookService,
     utils::{get_process_pid, run_cmd},
 };
 
