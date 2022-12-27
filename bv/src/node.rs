@@ -24,7 +24,6 @@ pub struct Node {
     node_conn: NodeConnection,
 }
 
-// FIXME: Hardcoding everything for now.
 pub const FC_BIN_NAME: &str = "firecracker";
 const FC_BIN_PATH: &str = "/usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
@@ -139,7 +138,7 @@ impl Node {
                 }
                 self.node_conn.wait_for_disconnect(&self.id()).await;
 
-                // FIXME: for some reason firecracker socket is not created by
+                // TODO: for some reason firecracker socket is not created by
                 // consequent start command if we do not wait a bit here
                 sleep(Duration::from_secs(10)).await;
             }
