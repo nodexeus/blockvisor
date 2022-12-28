@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use tokio::fs::{self, DirBuilder, File};
 use tokio::io::AsyncWriteExt;
 use tonic::transport::Channel;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
 
 pub mod cb_pb {
     // https://github.com/tokio-rs/prost/issues/661
@@ -82,7 +82,7 @@ impl CookbookService {
         let path = folder.join(BABEL_CONFIG_NAME);
         let mut f = File::create(path).await?;
         f.write_all(&babel.toml_content).await?;
-        info!("Done downloading config");
+        debug!("Done downloading config");
 
         Ok(())
     }
@@ -104,7 +104,7 @@ impl CookbookService {
         self.download_url_and_ungzip_file(&archive.url, &gz).await?;
         // TODO: change ROOT_FS_FILE to 'blockjoy' to skip that
         tokio::fs::rename(folder.join(BABEL_IMAGE_NAME), path).await?;
-        info!("Done downloading image");
+        debug!("Done downloading image");
 
         Ok(())
     }
@@ -123,7 +123,7 @@ impl CookbookService {
         DirBuilder::new().recursive(true).create(&folder).await?;
         let gz = folder.join(KERNEL_ARCHIVE_NAME);
         self.download_url_and_ungzip_file(&archive.url, &gz).await?;
-        info!("Done downloading kernel");
+        debug!("Done downloading kernel");
 
         Ok(())
     }
@@ -173,7 +173,7 @@ impl CookbookService {
         }
 
         file.flush().await?;
-        info!("Done downloading");
+        debug!("Done downloading");
 
         Ok(())
     }

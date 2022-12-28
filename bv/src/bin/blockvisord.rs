@@ -17,7 +17,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
                             }
                         }
                         NodeStatus::Failed => {
-                            info!("Recovery: node with ID `{id}` cannot be recovered");
+                            warn!("Recovery: node with ID `{id}` cannot be recovered");
                         }
                     }
                 }
