@@ -4,7 +4,7 @@ use firec::Machine;
 use futures_util::StreamExt;
 use std::{collections::HashMap, path::Path, str::FromStr, time::Duration};
 use tokio::{fs::DirBuilder, time::sleep};
-use tracing::{debug, instrument, trace};
+use tracing::{debug, instrument, warn};
 use uuid::Uuid;
 
 use crate::node_connection::NODE_RECONNECT_TIMEOUT;
@@ -130,7 +130,7 @@ impl Node {
             firec::MachineState::SHUTOFF => {}
             firec::MachineState::RUNNING { .. } => {
                 if let Err(err) = self.machine.shutdown().await {
-                    trace!("Graceful shutdown failed: {err}");
+                    warn!("Graceful shutdown failed: {err}");
 
                     if let Err(err) = self.machine.force_shutdown().await {
                         bail!("Forced shutdown failed: {err}");
