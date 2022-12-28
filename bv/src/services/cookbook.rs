@@ -43,7 +43,7 @@ impl CookbookService {
 
     #[instrument(skip(self))]
     pub async fn list_versions(&mut self, protocol: &str, node_type: &str) -> Result<Vec<String>> {
-        info!("Listing versions..");
+        info!("Listing versions...");
         let req = cb_pb::BabelVersionsRequest {
             protocol: protocol.to_string(),
             node_type: node_type.to_string(),
@@ -69,7 +69,7 @@ impl CookbookService {
 
     #[instrument(skip(self))]
     pub async fn download_babel_config(&mut self, image: &NodeImage) -> Result<()> {
-        info!("Downloading config..");
+        info!("Downloading config...");
         let req = image.clone().into();
         let babel: cb_pb::Configuration = self
             .client
@@ -89,7 +89,7 @@ impl CookbookService {
 
     #[instrument(skip(self))]
     pub async fn download_image(&mut self, image: &NodeImage) -> Result<()> {
-        info!("Downloading image..");
+        info!("Downloading image...");
         let req = image.clone().into();
         let archive: cb_pb::ArchiveLocation = self
             .client
@@ -111,7 +111,7 @@ impl CookbookService {
 
     #[instrument(skip(self))]
     pub async fn download_kernel(&mut self, image: &NodeImage) -> Result<()> {
-        info!("Downloading kernel..");
+        info!("Downloading kernel...");
         let req = image.clone().into();
         let archive: cb_pb::ArchiveLocation = self
             .client
@@ -130,7 +130,7 @@ impl CookbookService {
 
     #[instrument]
     pub async fn get_babel_config(image: &NodeImage) -> Result<Babel> {
-        info!("Reading babel config..");
+        info!("Reading babel config...");
 
         let folder = Self::get_image_download_folder_path(image);
         let path = folder.join(BABEL_CONFIG_NAME);
@@ -163,7 +163,7 @@ impl CookbookService {
 
     #[instrument(skip(self))]
     pub async fn download_url(&mut self, url: &str, path: &PathBuf) -> Result<()> {
-        info!("Downloading url..");
+        info!("Downloading url...");
         let mut file = fs::File::create(&path).await?;
 
         let mut resp = reqwest::get(url).await?;
