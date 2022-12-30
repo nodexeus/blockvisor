@@ -16,8 +16,6 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 pub mod pb {
-    // https://github.com/tokio-rs/prost/issues/661
-    #![allow(clippy::derive_partial_eq_without_eq)]
     tonic::include_proto!("blockjoy.api.v1");
 }
 
@@ -160,10 +158,15 @@ async fn process_node_command(
                     .image
                     .ok_or_else(|| anyhow!("Image not provided"))?
                     .into();
+                let properties = args
+                    .properties
+                    .into_iter()
+                    .map(|p| (p.name, p.value))
+                    .collect();
                 nodes
                     .write()
                     .await
-                    .create(node_id, args.name, image, args.ip, args.gateway)
+                    .create(node_id, args.name, image, args.ip, args.gateway, properties)
                     .await?;
             }
             Command::Delete(_) => {
@@ -186,7 +189,30 @@ async fn process_node_command(
                     .into();
                 nodes.write().await.upgrade(node_id, image).await?;
             }
-            Command::Update(_) => unimplemented!(),
+            Command::Update(pb::NodeInfoUpdate {
+                name,
+                self_update,
+                properties,
+            }) => {
+                let mut nodes = nodes.write().await;
+                let node = nodes
+                    .nodes
+                    .get_mut(&node_id)
+                    .ok_or_else(|| anyhow!("No node exists with id `{node_id}`"))?;
+
+                // If the fields we receive are populated, we update the node data.
+                if let Some(name) = name {
+                    node.data.name = name;
+                }
+                if let Some(self_update) = self_update {
+                    node.data.self_update = self_update;
+                }
+                if !properties.is_empty() {
+                    node.data.properties =
+                        properties.into_iter().map(|p| (p.name, p.value)).collect();
+                }
+                node.data.save().await?;
+            }
             Command::InfoGet(_) => unimplemented!(),
             Command::Generic(_) => unimplemented!(),
         },

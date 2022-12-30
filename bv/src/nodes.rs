@@ -16,7 +16,7 @@ use crate::{
     env::{REGISTRY_CONFIG_DIR, REGISTRY_CONFIG_FILE},
     network_interface::NetworkInterface,
     node::Node,
-    node_data::{NodeData, NodeImage, NodeRequirements, NodeStatus},
+    node_data::{NodeData, NodeImage, NodeProperties, NodeRequirements, NodeStatus},
     services::{
         api::{pb, pb::node_info::ContainerStatus},
         cookbook::CookbookService,
@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-fn id_not_found(id: &Uuid) -> anyhow::Error {
+fn id_not_found(id: Uuid) -> anyhow::Error {
     anyhow!("Node with id `{}` not found", id)
 }
 
@@ -61,13 +61,14 @@ impl Nodes {
         image: NodeImage,
         ip: String,
         gateway: String,
+        properties: NodeProperties,
     ) -> Result<()> {
         if self.nodes.contains_key(&id) {
-            bail!(format!("Node with id `{}` exists", &id));
+            bail!("Node with id `{id}` exists");
         }
 
         if self.node_ids.contains_key(&name) {
-            bail!(format!("Node with name `{}` exists", &name));
+            bail!("Node with name `{name}` exists");
         }
 
         let babel = self.fetch_image_data(&image).await?;
@@ -94,6 +95,7 @@ impl Nodes {
             network_interface,
             requirements,
             self_update: false,
+            properties,
         };
         self.save().await?;
 
@@ -116,7 +118,7 @@ impl Nodes {
 
         let need_to_restart = self.status(id).await? == NodeStatus::Running;
         self.stop(id).await?;
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
 
         if image.protocol != node.data.image.protocol {
             bail!("Cannot upgrade protocol to `{}`", image.protocol);
@@ -175,7 +177,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
-        let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(&id))?;
+        let node = self.nodes.remove(&id).ok_or_else(|| id_not_found(id))?;
         self.node_ids.remove(&node.data.name);
 
         let _ = self.send_container_status(&id, ContainerStatus::Deleting);
@@ -192,24 +194,69 @@ impl Nodes {
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
         let _ = self.send_container_status(&id, ContainerStatus::Starting);
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.start().await?;
         debug!("Node started");
 
+        let node_keys = node
+            .data
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_bytes().into()))
+            .collect();
+
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
-        if let Err(e) = self.exchange_keys(&id).await {
-            warn!("Key exchange error: {e:?}")
-        }
+        let secret_keys = match self.exchange_keys(&id).await {
+            Ok(secret_keys) => secret_keys,
+            Err(e) => {
+                error!("Failed to retrieve keys when starting node: `{e}`");
+                HashMap::new()
+            }
+        };
+
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+
+        let params = Self::prep_init_params(secret_keys, node_keys)?;
+        node.init(params).await?;
 
         Ok(())
+    }
+
+    /// Prepares the init params into a representation that the sh-commands we use in babel
+    /// expects. This means that we need to take the secret that is stored in the KeyService, and
+    /// the secrets that are stored in the node data. The result is a map from String to
+    /// Vec<String>. This is because for some secrets, it is possible to provide multiple values.
+    /// We call these the `LIST_SECRETS`. The secrets for which it is possible to provided only one
+    /// value we call the `STRING_SECRETS`.
+    fn prep_init_params(
+        secret_keys: HashMap<String, Vec<u8>>,
+        node_keys: HashMap<String, Vec<u8>>,
+    ) -> Result<HashMap<String, Vec<String>>> {
+        /// The list of possible string secret names.
+        const STRING_SECRETS: [&str; 1] = ["secret"];
+        /// The list of possible list secret names.
+        const LIST_SECRETS: [&str; 1] = ["key"];
+
+        let mut params = HashMap::new();
+        for (name, content) in secret_keys.into_iter().chain(node_keys) {
+            if let Some(&name) = STRING_SECRETS.iter().find(|&&n| n == name) {
+                params.insert(name.to_string(), vec![String::from_utf8(content)?]);
+            } else if let Some(&name) = LIST_SECRETS.iter().find(|&&n| name.starts_with(n)) {
+                params
+                    .entry(name.to_string())
+                    .or_default()
+                    .push(String::from_utf8(content)?);
+            }
+        }
+        Ok(params)
     }
 
     #[instrument(skip(self))]
     pub async fn stop(&mut self, id: Uuid) -> Result<()> {
         let _ = self.send_container_status(&id, ContainerStatus::Stopping);
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(&id))?;
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.stop().await?;
         debug!("Node stopped");
 
@@ -227,7 +274,7 @@ impl Nodes {
 
     #[instrument(skip(self))]
     pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
-        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(&id))?;
+        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(id))?;
 
         Ok(node.status())
     }
@@ -236,14 +283,16 @@ impl Nodes {
         let uuid = self
             .node_ids
             .get(name)
-            .cloned()
+            .copied()
             .ok_or_else(|| name_not_found(name))?;
 
         Ok(uuid)
     }
 
-    pub async fn exchange_keys(&mut self, id: &Uuid) -> Result<()> {
-        let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(id))?;
+    /// Synchronizes the keys in the key server with the keys available locally. Returns a
+    /// refreshed set of all keys.
+    pub async fn exchange_keys(&mut self, id: &Uuid) -> Result<HashMap<String, Vec<u8>>> {
+        let node = self.nodes.get_mut(id).ok_or_else(|| id_not_found(*id))?;
 
         let mut key_service =
             KeyService::connect(&self.api_config.blockjoy_keys_url, &self.api_config.token).await?;
@@ -251,8 +300,8 @@ impl Nodes {
         let api_keys: HashMap<String, Vec<u8>> = key_service
             .download_keys(id)
             .await?
-            .iter()
-            .map(|k| (k.name.clone(), k.content.clone()))
+            .into_iter()
+            .map(|k| (k.name, k.content))
             .collect();
         let api_keys_set: HashSet<&String> = HashSet::from_iter(api_keys.keys());
         debug!("Received API keys: {api_keys_set:?}");
@@ -260,8 +309,8 @@ impl Nodes {
         let node_keys: HashMap<String, Vec<u8>> = node
             .download_keys()
             .await?
-            .iter()
-            .map(|k| (k.name.clone(), k.content.clone()))
+            .into_iter()
+            .map(|k| (k.name, k.content))
             .collect();
         let node_keys_set: HashSet<&String> = HashSet::from_iter(node_keys.keys());
         debug!("Received Node keys: {node_keys_set:?}");
@@ -302,20 +351,20 @@ impl Nodes {
             let gen_keys: Vec<_> = node
                 .download_keys()
                 .await?
-                .iter()
+                .into_iter()
                 .map(|k| pb::Keyfile {
-                    name: k.name.clone(),
-                    content: k.content.clone(),
+                    name: k.name,
+                    content: k.content,
                 })
                 .collect();
-            key_service.upload_keys(id, gen_keys).await?;
+            key_service.upload_keys(id, gen_keys.clone()).await?;
+            return Ok(gen_keys.into_iter().map(|k| (k.name, k.content)).collect());
         }
 
-        Ok(())
+        let all_keys = api_keys.into_iter().chain(node_keys.into_iter()).collect();
+        Ok(all_keys)
     }
-}
 
-impl Nodes {
     pub fn new(api_config: Config, nodes_data: CommonData) -> Self {
         Self {
             api_config,
@@ -452,10 +501,7 @@ impl Nodes {
 pub fn check_babel_version(min_babel_version: &str) -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     if version < min_babel_version {
-        bail!(format!(
-            "Required minimum babel version is `{}`, running is `{}`",
-            min_babel_version, version
-        ));
+        bail!("Required minimum babel version is `{min_babel_version}`, running is `{version}`");
     }
     Ok(())
 }

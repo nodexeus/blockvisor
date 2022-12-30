@@ -30,8 +30,6 @@ use tonic::{
 
 #[cfg(target_os = "linux")]
 pub mod ui_pb {
-    // https://github.com/tokio-rs/prost/issues/661
-    #![allow(clippy::derive_partial_eq_without_eq)]
     tonic::include_proto!("blockjoy.api.ui_v1");
 }
 
@@ -321,6 +319,7 @@ async fn test_bv_cmd_init_localhost() {
 
     let org_get = ui_pb::GetOrganizationsRequest {
         meta: Some(ui_pb::RequestMeta::default()),
+        org_id: None,
     };
     let orgs: ui_pb::GetOrganizationsResponse = client
         .get(with_auth(org_get, &auth_token, &refresh_token))
@@ -593,6 +592,7 @@ async fn test_bv_cmd_grpc_commands() {
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
                     self_update: false,
+                    properties: Default::default(),
                 })),
             })),
         },
@@ -615,6 +615,7 @@ async fn test_bv_cmd_grpc_commands() {
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
                     self_update: false,
+                    properties: Default::default(),
                 })),
             })),
         },
@@ -637,6 +638,7 @@ async fn test_bv_cmd_grpc_commands() {
                     ip: "216.18.214.195".to_string(),
                     gateway: "216.18.214.193".to_string(),
                     self_update: false,
+                    properties: Default::default(),
                 })),
             })),
         },
