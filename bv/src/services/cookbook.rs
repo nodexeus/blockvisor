@@ -99,7 +99,10 @@ impl CookbookService {
         DirBuilder::new().recursive(true).create(&folder).await?;
         let path = folder.join(ROOT_FS_FILE);
         let gz = folder.join(BABEL_ARCHIVE_IMAGE_NAME);
-        utils::download_url_and_ungzip_file(&archive.url, &gz).await?;
+        utils::download_archive(&archive.url, gz)
+            .await?
+            .ungzip()
+            .await?;
         // TODO: change ROOT_FS_FILE to 'blockjoy' to skip that
         tokio::fs::rename(folder.join(BABEL_IMAGE_NAME), path).await?;
         debug!("Done downloading image");
@@ -120,7 +123,10 @@ impl CookbookService {
         let folder = Self::get_image_download_folder_path(image);
         DirBuilder::new().recursive(true).create(&folder).await?;
         let gz = folder.join(KERNEL_ARCHIVE_NAME);
-        utils::download_url_and_ungzip_file(&archive.url, &gz).await?;
+        utils::download_archive(&archive.url, gz)
+            .await?
+            .ungzip()
+            .await?;
         debug!("Done downloading kernel");
 
         Ok(())

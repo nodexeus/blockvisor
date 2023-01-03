@@ -43,8 +43,46 @@ pub fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
     }
 }
 
-pub async fn download_url(url: &str, path: &PathBuf) -> Result<()> {
-    info!("Downloading url...");
+pub struct Archive(PathBuf);
+impl Archive {
+    pub async fn ungzip(self) -> Result<Self> {
+        // pigz is parallel and fast
+        // TODO: pigz is external dependency, we need a reliable way of delivering it to hosts
+        run_cmd(
+            "pigz",
+            &["--decompress", "--force", &self.0.to_string_lossy()],
+        )
+        .await?;
+        if let (Some(parent), Some(name)) = (self.0.parent(), self.0.file_stem()) {
+            Ok(Self(parent.join(name)))
+        } else {
+            bail!("invalid gzip file path {}", self.0.to_string_lossy())
+        }
+    }
+
+    pub async fn untar(self) -> Result<Self> {
+        if let Some(parent_dir) = self.0.parent() {
+            run_cmd(
+                "tar",
+                &[
+                    "-C",
+                    &parent_dir.to_string_lossy(),
+                    "-xf",
+                    &self.0.to_string_lossy(),
+                ],
+            )
+            .await?;
+            let _ = fs::remove_file(&self.0).await;
+
+            Ok(Self(parent_dir.into()))
+        } else {
+            bail!("invalid tar file path {}", self.0.to_string_lossy())
+        }
+    }
+}
+
+pub async fn download_archive(url: &str, path: PathBuf) -> Result<Archive> {
+    debug!("Downloading url...");
     let mut file = fs::File::create(&path).await?;
 
     let mut resp = reqwest::get(url).await?;
@@ -56,18 +94,7 @@ pub async fn download_url(url: &str, path: &PathBuf) -> Result<()> {
     file.flush().await?;
     debug!("Done downloading");
 
-    Ok(())
-}
-
-pub async fn download_url_and_ungzip_file(url: &str, path: &PathBuf) -> Result<()> {
-    download_url(url, path).await?;
-    // pigz is parallel and fast
-    // TODO: pigz is external dependency, we need a reliable way of delivering it to hosts
-    run_cmd(
-        "pigz",
-        &["--decompress", "--force", &path.to_string_lossy()],
-    )
-    .await
+    Ok(Archive(path))
 }
 
 pub fn semver_cmp(a: &str, b: &str) -> Ordering {

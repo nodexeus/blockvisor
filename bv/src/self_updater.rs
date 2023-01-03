@@ -111,25 +111,18 @@ impl<T: Sleeper> SelfUpdater<T> {
             .await?
             .into_inner();
 
-        utils::download_url_and_ungzip_file(
-            &archive.url.clone(),
-            &self.download_path.join("bundle.tar.gz"),
-        )
-        .await?;
-        let tar_path = self.download_path.join("bundle.tar");
         let bundle_path = self.download_path.join("bundle");
         let _ = fs::remove_dir_all(&bundle_path).await;
-        utils::run_cmd(
-            "tar",
-            &[
-                "-C",
-                &self.download_path.to_string_lossy(),
-                "-xf",
-                &tar_path.to_string_lossy(),
-            ],
+
+        utils::download_archive(
+            &archive.url.clone(),
+            self.download_path.join("bundle.tar.gz"),
         )
+        .await?
+        .ungzip()
+        .await?
+        .untar()
         .await?;
-        let _ = fs::remove_file(&tar_path).await;
 
         Command::new(bundle_path.join(installer::INSTALLER_BIN)).spawn()?;
         Ok(())
