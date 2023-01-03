@@ -132,12 +132,12 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
 
-            run_cmd("systemctl", &["start", "blockvisor.service"]).await?;
+            run_cmd("systemctl", ["start", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_START_TIMEOUT).await;
             println!("blockvisor service started successfully");
         }
         Command::Stop(_) => {
-            run_cmd("systemctl", &["stop", "blockvisor.service"]).await?;
+            run_cmd("systemctl", ["stop", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_STOP_TIMEOUT).await;
             println!("blockvisor service stopped successfully");
         }

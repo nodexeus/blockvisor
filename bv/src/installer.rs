@@ -405,6 +405,7 @@ impl<T: Timer> Installer<T> {
 mod tests {
     use super::*;
     use crate::server::bv_pb;
+    use crate::utils;
     use crate::utils::tests::test_channel;
     use anyhow::anyhow;
     use assert_fs::TempDir;
@@ -412,8 +413,10 @@ mod tests {
     use serial_test::serial;
     use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
-    use tokio_stream::wrappers::UnixListenerStream;
-    use tonic::transport::Server;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering::Relaxed;
+    use std::sync::Arc;
+    use std::thread::sleep;
     use tonic::Response;
 
     mock! {
@@ -497,56 +500,72 @@ mod tests {
         fs::OpenOptions::new().create(true).write(true).open(path)
     }
 
-    async fn test_server(tmp_root: &PathBuf, bv_mock: MockTestBV) -> Result<()> {
-        let socket_path = tmp_root.join("test_socket");
-        let uds_stream =
-            UnixListenerStream::new(tokio::net::UnixListener::bind(socket_path.clone())?);
-        Server::builder()
-            .max_concurrent_streams(1)
-            .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(bv_mock))
-            .serve_with_incoming(uds_stream)
-            .await?;
-        Ok(())
+    /// Common staff to setup for all tests like sut (installer in that case),
+    /// path to root dir used in test, instance of AsyncPanicChecker to make sure that all panics
+    /// from other threads will be propagated.
+    struct TestEnv {
+        installer: Installer<MockTestTimer>,
+        tmp_root: PathBuf,
+        _async_panic_checker: utils::tests::AsyncPanicChecker,
     }
 
-    fn create_dummy_installer(path: &PathBuf) -> Result<()> {
-        // create dummy installer that will sleep
-        let _ = fs::create_dir_all(path);
-        let mut installer = fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .mode(0o770)
-            .open(path.join(INSTALLER_BIN))?;
-        writeln!(installer, "#!/bin/sh")?;
-        writeln!(installer, "sleep infinity")?;
-        Ok(())
+    impl TestEnv {
+        async fn new() -> Result<Self> {
+            let tmp_root = TempDir::new()?.to_path_buf();
+            let _ = fs::create_dir_all(&tmp_root);
+
+            Ok(Self {
+                installer: Installer::<MockTestTimer>::new(
+                    tmp_root.clone(),
+                    test_channel(&tmp_root),
+                ),
+                tmp_root,
+                _async_panic_checker: Default::default(),
+            })
+        }
+
+        fn start_test_server(&self, bv_mock: MockTestBV) -> utils::tests::TestServer {
+            utils::tests::start_test_server(
+                self.tmp_root.join("test_socket"),
+                bv_pb::blockvisor_server::BlockvisorServer::new(bv_mock),
+            )
+        }
+
+        fn start_dummy_installer(&self) -> Result<()> {
+            // create dummy installer that will sleep
+            let _ = fs::create_dir_all(&self.installer.paths.current);
+            {
+                let mut installer = fs::OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .mode(0o770)
+                    .open(self.installer.paths.current.join(INSTALLER_BIN))?;
+                writeln!(installer, "#!/bin/sh")?;
+                writeln!(installer, "sleep infinity")?;
+            }
+            tokio::process::Command::new(&self.installer.paths.current.join(INSTALLER_BIN))
+                .spawn()?;
+            Ok(())
+        }
     }
 
     #[tokio::test]
     #[serial]
     async fn test_prepare_running_none() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let _ = fs::create_dir_all(&tmp_root);
-        let channel = test_channel(&tmp_root);
+        let mut test_env = TestEnv::new().await?;
 
-        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
-        installer.prepare_running().await?;
-        let _ = fs::create_dir_all(&installer.paths.current);
-        installer.prepare_running().await?;
+        test_env.installer.prepare_running().await?;
+        let _ = fs::create_dir_all(&test_env.installer.paths.current);
+        test_env.installer.prepare_running().await?;
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_prepare_running_ok() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let _ = fs::create_dir_all(&tmp_root);
-        let channel = test_channel(&tmp_root);
+        let mut test_env = TestEnv::new().await?;
 
-        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
-        create_dummy_installer(&installer.paths.current)?;
-        let mut dummy_installer =
-            tokio::process::Command::new(&installer.paths.current.join(INSTALLER_BIN)).spawn()?;
+        test_env.start_dummy_installer()?;
         let mut bv_mock = MockTestBV::new();
         bv_mock.expect_start_update().once().returning(|_| {
             let reply = bv_pb::StartUpdateResponse {
@@ -554,35 +573,30 @@ mod tests {
             };
             Ok(Response::new(reply))
         });
+        let sleep_ctx = MockTestTimer::sleep_context();
+        sleep_ctx.expect().returning(|_| ());
         let now_ctx = MockTestTimer::now_context();
         let now = Instant::now();
-        now_ctx.expect().once().returning(move || now);
-
-        let resp = tokio::select!(
-            resp = installer.prepare_running() => resp,
-            _ = test_server(&tmp_root, bv_mock) => panic!(),
-            _ = dummy_installer.wait() => Ok(()),
-        );
-        resp?;
+        now_ctx.expect().returning(move || now);
+        let server = test_env.start_test_server(bv_mock);
+        test_env.installer.prepare_running().await?;
+        server.assert().await;
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_prepare_running_timeout() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let _ = fs::create_dir_all(&tmp_root);
-        let channel = test_channel(&tmp_root);
-
-        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
-        create_dummy_installer(&installer.paths.current)?;
-        let mut dummy_installer =
-            tokio::process::Command::new(&installer.paths.current.join(INSTALLER_BIN)).spawn()?;
+        let mut test_env = TestEnv::new().await?;
+        test_env.start_dummy_installer()?;
         let mut bv_mock = MockTestBV::new();
-        bv_mock.expect_start_update().once().returning(|_| {
+        let update_start_called = Arc::new(AtomicBool::new(false));
+        let update_start_called_flag = update_start_called.clone();
+        bv_mock.expect_start_update().once().returning(move |_| {
             let reply = bv_pb::StartUpdateResponse {
                 status: bv_pb::ServiceStatus::Ok.into(),
             };
+            update_start_called_flag.store(true, Relaxed);
             Ok(Response::new(reply))
         });
         let now_ctx = MockTestTimer::now_context();
@@ -593,54 +607,53 @@ mod tests {
             .expect()
             .with(predicate::eq(BV_CHECK_INTERVAL))
             .returning(|_| ());
-        now_ctx.expect().once().returning(move || {
-            now.add(PREPARE_FOR_UPDATE_TIMEOUT)
-                .add(Duration::from_secs(1))
+        now_ctx.expect().returning(move || {
+            if update_start_called.load(Relaxed) {
+                now.add(PREPARE_FOR_UPDATE_TIMEOUT)
+                    .add(Duration::from_secs(1))
+            } else {
+                now
+            }
         });
-
-        let resp = tokio::select!(
-            resp = installer.prepare_running() => resp,
-            _ = test_server(&tmp_root, bv_mock) => panic!(),
-            _ = dummy_installer.wait() => panic!(),
-        );
-        assert!(resp.is_err());
+        let server = test_env.start_test_server(bv_mock);
+        assert!(test_env.installer.prepare_running().await.is_err());
+        server.assert().await;
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_health_check_ok() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let _ = fs::create_dir_all(&tmp_root);
-        let channel = test_channel(&tmp_root);
+        let mut test_env = TestEnv::new().await?;
 
-        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
         let mut bv_mock = MockTestBV::new();
-        bv_mock.expect_health().once().returning(|_| {
+        bv_mock.expect_health().times(2).returning(|_| {
             let reply = bv_pb::HealthResponse {
                 status: bv_pb::ServiceStatus::Ok.into(),
             };
             Ok(Response::new(reply))
         });
         let now_ctx = MockTestTimer::now_context();
-        now_ctx.expect().times(1).returning(move || Instant::now());
+        now_ctx.expect().returning(move || Instant::now());
+        let server = test_env.start_test_server(bv_mock);
+        let mut client = BlockvisorClient::new(test_channel(&test_env.tmp_root));
+        while client
+            .health(bv_pb::HealthRequest::default())
+            .await
+            .is_err()
+        {
+            sleep(Duration::from_millis(10));
+        }
 
-        let resp = tokio::select!(
-            resp = installer.health_check() => resp,
-            _ = test_server(&tmp_root, bv_mock) => panic!(),
-        );
-        resp?;
+        test_env.installer.health_check().await?;
+        server.assert().await;
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_health_check_timeout() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let _ = fs::create_dir_all(&tmp_root);
-        let channel = test_channel(&tmp_root);
-
-        let mut installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        let mut test_env = TestEnv::new().await?;
         let mut bv_mock = MockTestBV::new();
         bv_mock.expect_health().returning(|_| {
             let reply = bv_pb::HealthResponse {
@@ -660,40 +673,50 @@ mod tests {
             .expect()
             .once()
             .returning(move || now.add(HEALTH_CHECK_TIMEOUT).add(Duration::from_secs(1)));
+        let server = test_env.start_test_server(bv_mock);
+        let mut client = BlockvisorClient::new(test_channel(&test_env.tmp_root));
+        while client
+            .health(bv_pb::HealthRequest::default())
+            .await
+            .is_err()
+        {
+            sleep(Duration::from_millis(10));
+        }
 
-        let resp = tokio::select!(
-            resp = installer.health_check() => resp,
-            _ = test_server(&tmp_root, bv_mock) => panic!(),
-        );
-        assert!(resp.is_err());
+        assert!(test_env.installer.health_check().await.is_err());
+        server.assert().await;
         Ok(())
     }
 
     #[tokio::test]
     #[serial]
     async fn test_backup_running_version() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let channel = test_channel(&tmp_root);
-        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
+        let test_env = TestEnv::new().await?;
 
-        fs::create_dir_all(&installer.paths.install_path)?;
+        fs::create_dir_all(&test_env.installer.paths.install_path)?;
         assert_eq!(
             BackupStatus::NothingToBackup,
-            installer.backup_running_version()?
+            test_env.installer.backup_running_version()?
         );
 
-        fs::create_dir_all(&installer.paths.this_version)?;
-        std::os::unix::fs::symlink(&installer.paths.this_version, &installer.paths.current)?;
-        assert_eq!(BackupStatus::Done, installer.backup_running_version()?);
+        fs::create_dir_all(&test_env.installer.paths.this_version)?;
+        std::os::unix::fs::symlink(
+            &test_env.installer.paths.this_version,
+            &test_env.installer.paths.current,
+        )?;
         assert_eq!(
-            &installer.paths.this_version,
-            &installer.paths.backup.read_link()?
+            BackupStatus::Done,
+            test_env.installer.backup_running_version()?
+        );
+        assert_eq!(
+            &test_env.installer.paths.this_version,
+            &test_env.installer.paths.backup.read_link()?
         );
 
-        installer.blacklist_this_version()?;
+        test_env.installer.blacklist_this_version()?;
         assert_eq!(
             BackupStatus::ThisIsRollback,
-            installer.backup_running_version()?
+            test_env.installer.backup_running_version()?
         );
 
         Ok(())
@@ -702,12 +725,11 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_move_bundle_to_install_path() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let bundle_path = tmp_root.join("bundle");
-        let channel = test_channel(&tmp_root);
-        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
+        let test_env = TestEnv::new().await?;
+        let bundle_path = test_env.tmp_root.join("bundle");
 
-        assert!(installer
+        assert!(test_env
+            .installer
             .move_bundle_to_install_path(bundle_path.join("installer"))
             .is_err());
 
@@ -716,17 +738,33 @@ mod tests {
         touch_file(&bundle_path.join("some_file"))?;
         touch_file(&bundle_path.join("some_dir/sub_file"))?;
 
-        installer.move_bundle_to_install_path(bundle_path.join("installer"))?;
-        installer.move_bundle_to_install_path(installer.paths.this_version.join("installer"))?;
+        test_env
+            .installer
+            .move_bundle_to_install_path(bundle_path.join("installer"))?;
+        test_env
+            .installer
+            .move_bundle_to_install_path(test_env.installer.paths.this_version.join("installer"))?;
 
-        assert!(installer.paths.this_version.join("installer").exists());
-        assert!(installer.paths.this_version.join("some_file").exists());
-        assert!(installer
+        assert!(test_env
+            .installer
+            .paths
+            .this_version
+            .join("installer")
+            .exists());
+        assert!(test_env
+            .installer
+            .paths
+            .this_version
+            .join("some_file")
+            .exists());
+        assert!(test_env
+            .installer
             .paths
             .this_version
             .join("some_dir/with_subdir")
             .exists());
-        assert!(installer
+        assert!(test_env
+            .installer
             .paths
             .this_version
             .join("some_dir/sub_file")
@@ -738,33 +776,42 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_install_this_version() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let channel = test_channel(&tmp_root);
-        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
+        let test_env = TestEnv::new().await?;
 
-        assert!(installer.install_this_version().is_err());
+        assert!(test_env.installer.install_this_version().is_err());
 
-        let this_path = &installer.paths.this_version;
+        let this_path = &test_env.installer.paths.this_version;
         fs::create_dir_all(this_path)?;
-        assert!(installer.install_this_version().is_err());
+        assert!(test_env.installer.install_this_version().is_err());
 
         fs::create_dir_all(this_path.join(BLOCKVISOR_BIN))?;
         fs::create_dir_all(this_path.join(BLOCKVISOR_SERVICES))?;
         fs::create_dir_all(this_path.join(FC_BIN))?;
-        installer.install_this_version()?;
+        test_env.installer.install_this_version()?;
 
         touch_file(&this_path.join(BLOCKVISOR_BIN).join("some_bin"))?;
         touch_file(&this_path.join(BLOCKVISOR_SERVICES).join("some_service"))?;
         touch_file(&this_path.join(FC_BIN).join("firecracker"))?;
-        assert!(installer.install_this_version().is_err());
+        assert!(test_env.installer.install_this_version().is_err());
 
-        fs::create_dir_all(&installer.paths.system_bin)?;
-        fs::create_dir_all(&installer.paths.system_services)?;
-        installer.install_this_version()?;
+        fs::create_dir_all(&test_env.installer.paths.system_bin)?;
+        fs::create_dir_all(&test_env.installer.paths.system_services)?;
+        test_env.installer.install_this_version()?;
 
-        assert!(installer.paths.system_bin.join("some_bin").exists());
-        assert!(installer.paths.system_bin.join("firecracker").exists());
-        assert!(installer
+        assert!(test_env
+            .installer
+            .paths
+            .system_bin
+            .join("some_bin")
+            .exists());
+        assert!(test_env
+            .installer
+            .paths
+            .system_bin
+            .join("firecracker")
+            .exists());
+        assert!(test_env
+            .installer
             .paths
             .system_services
             .join("some_service")
@@ -776,42 +823,43 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_broken_installation() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let channel = test_channel(&tmp_root);
-        let installer = Installer::<MockTestTimer>::new(tmp_root.clone(), channel);
+        let test_env = TestEnv::new().await?;
 
-        assert!(installer
+        assert!(test_env
+            .installer
             .handle_broken_installation(BackupStatus::ThisIsRollback, anyhow!("error"))
             .is_err());
-        assert!(!installer.is_blacklisted(THIS_VERSION)?);
+        assert!(!test_env.installer.is_blacklisted(THIS_VERSION)?);
 
-        fs::create_dir_all(&installer.paths.install_path)?;
-        assert!(installer
+        fs::create_dir_all(&test_env.installer.paths.install_path)?;
+        assert!(test_env
+            .installer
             .handle_broken_installation(BackupStatus::NothingToBackup, anyhow!("error"))
             .is_err());
-        assert!(installer.is_blacklisted(THIS_VERSION)?);
+        assert!(test_env.installer.is_blacklisted(THIS_VERSION)?);
 
-        fs::create_dir_all(&installer.paths.backup)?;
+        fs::create_dir_all(&test_env.installer.paths.backup)?;
         {
             // create dummy installer that will touch test file as a proof it was called
             let mut backup_installer = fs::OpenOptions::new()
                 .create(true)
                 .write(true)
                 .mode(0o770)
-                .open(&installer.paths.backup.join(INSTALLER_BIN))?;
+                .open(&test_env.installer.paths.backup.join(INSTALLER_BIN))?;
             writeln!(backup_installer, "#!/bin/sh")?;
             writeln!(
                 backup_installer,
                 "touch {}",
-                tmp_root.join("dummy_installer").to_str().unwrap()
+                test_env.tmp_root.join("dummy_installer").to_str().unwrap()
             )?;
             writeln!(backup_installer, "exit 1")?;
         }
-        let _ = fs::remove_file(tmp_root.join("dummy_installer"));
-        assert!(installer
+        let _ = fs::remove_file(test_env.tmp_root.join("dummy_installer"));
+        assert!(test_env
+            .installer
             .handle_broken_installation(BackupStatus::Done, anyhow!("error"))
             .is_err());
-        assert!(tmp_root.join("dummy_installer").exists());
+        assert!(test_env.tmp_root.join("dummy_installer").exists());
 
         Ok(())
     }
@@ -819,41 +867,44 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_cleanup() -> Result<()> {
-        let tmp_root = TempDir::new()?.to_path_buf();
-        let channel = test_channel(&tmp_root);
-        let installer = Installer::<MockTestTimer>::new(tmp_root, channel);
+        let test_env = TestEnv::new().await?;
 
         // cant cleanup non existing dir nothing
-        assert!(installer.cleanup().is_err());
+        assert!(test_env.installer.cleanup().is_err());
 
-        fs::create_dir_all(&installer.paths.install_path)?;
+        fs::create_dir_all(&test_env.installer.paths.install_path)?;
 
         // cleanup empty dir
-        installer.cleanup()?;
+        test_env.installer.cleanup()?;
 
-        touch_file(&installer.paths.install_path.join("some_file"))?;
-        fs::create_dir_all(&installer.paths.install_path.join("some_dir"))?;
+        touch_file(&test_env.installer.paths.install_path.join("some_file"))?;
+        fs::create_dir_all(&test_env.installer.paths.install_path.join("some_dir"))?;
         touch_file(
-            &installer
+            &test_env
+                .installer
                 .paths
                 .install_path
                 .join("some_dir")
                 .join("another_file"),
         )?;
         std::os::unix::fs::symlink(
-            &installer.paths.install_path.join("some_dir"),
-            &installer.paths.install_path.join("dir_link"),
+            &test_env.installer.paths.install_path.join("some_dir"),
+            &test_env.installer.paths.install_path.join("dir_link"),
         )?;
         std::os::unix::fs::symlink(
-            &installer.paths.install_path.join("some_file"),
-            &installer.paths.install_path.join("file_link"),
+            &test_env.installer.paths.install_path.join("some_file"),
+            &test_env.installer.paths.install_path.join("file_link"),
         )?;
-        fs::create_dir_all(&installer.paths.this_version)?;
-        std::os::unix::fs::symlink(&installer.paths.this_version, &installer.paths.current)?;
-        touch_file(&installer.paths.blacklist)?;
-        installer.cleanup()?;
+        fs::create_dir_all(&test_env.installer.paths.this_version)?;
+        std::os::unix::fs::symlink(
+            &test_env.installer.paths.this_version,
+            &test_env.installer.paths.current,
+        )?;
+        touch_file(&test_env.installer.paths.blacklist)?;
+        test_env.installer.cleanup()?;
 
-        let mut remaining = installer
+        let mut remaining = test_env
+            .installer
             .paths
             .install_path
             .read_dir()?
@@ -861,9 +912,9 @@ mod tests {
             .collect::<Result<Vec<_>, std::io::Error>>()?;
         remaining.sort();
         assert_eq!(3, remaining.len());
-        assert!(remaining.contains(&installer.paths.blacklist));
-        assert!(remaining.contains(&installer.paths.current));
-        assert!(remaining.contains(&installer.paths.this_version));
+        assert!(remaining.contains(&test_env.installer.paths.blacklist));
+        assert!(remaining.contains(&test_env.installer.paths.current));
+        assert!(remaining.contains(&test_env.installer.paths.this_version));
 
         Ok(())
     }
