@@ -60,7 +60,7 @@ impl CookbookService {
             .map(|id| id.node_version)
             .collect();
         // sort desc
-        versions.sort_by(|a, b| b.cmp(a));
+        versions.sort_by(|a, b| utils::semver_cmp(b, a));
 
         Ok(versions)
     }
@@ -99,7 +99,10 @@ impl CookbookService {
         DirBuilder::new().recursive(true).create(&folder).await?;
         let path = folder.join(ROOT_FS_FILE);
         let gz = folder.join(BABEL_ARCHIVE_IMAGE_NAME);
-        self.download_url_and_ungzip_file(&archive.url, &gz).await?;
+        utils::download_archive(&archive.url, gz)
+            .await?
+            .ungzip()
+            .await?;
         // TODO: change ROOT_FS_FILE to 'blockjoy' to skip that
         tokio::fs::rename(folder.join(BABEL_IMAGE_NAME), path).await?;
         debug!("Done downloading image");
@@ -120,7 +123,10 @@ impl CookbookService {
         let folder = Self::get_image_download_folder_path(image);
         DirBuilder::new().recursive(true).create(&folder).await?;
         let gz = folder.join(KERNEL_ARCHIVE_NAME);
-        self.download_url_and_ungzip_file(&archive.url, &gz).await?;
+        utils::download_archive(&archive.url, gz)
+            .await?
+            .ungzip()
+            .await?;
         debug!("Done downloading kernel");
 
         Ok(())
@@ -157,34 +163,6 @@ impl CookbookService {
         Ok(fs::metadata(root).await?.len() > 0
             && fs::metadata(kernel).await?.len() > 0
             && fs::metadata(config).await?.len() > 0)
-    }
-
-    #[instrument(skip(self))]
-    pub async fn download_url(&mut self, url: &str, path: &PathBuf) -> Result<()> {
-        info!("Downloading url...");
-        let mut file = fs::File::create(&path).await?;
-
-        let mut resp = reqwest::get(url).await?;
-
-        while let Some(chunk) = resp.chunk().await? {
-            file.write_all(&chunk).await?;
-        }
-
-        file.flush().await?;
-        debug!("Done downloading");
-
-        Ok(())
-    }
-
-    pub async fn download_url_and_ungzip_file(&mut self, url: &str, path: &PathBuf) -> Result<()> {
-        self.download_url(url, path).await?;
-        // pigz is parallel and fast
-        // TODO: pigz is external dependency, we need a reliable way of delivering it to hosts
-        utils::run_cmd(
-            "pigz",
-            &["--decompress", "--force", &*path.to_string_lossy()],
-        )
-        .await
     }
 }
 

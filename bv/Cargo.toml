@@ -51,6 +51,8 @@ fs_extra = "1.2.0"
 tower = "0.4.13"
 reqwest = {version = "0.11.11", features = ["rustls"]}
 crc ="3.0.0"
+async-trait = "0.1.60"
+semver = "1.0.16"
 
 [build-dependencies]
 tonic-build = {version = "0.7.2", features = ["prost"]}
@@ -59,6 +61,7 @@ tonic-build = {version = "0.7.2", features = ["prost"]}
 assert_cmd = "2.0.4"
 assert_fs = "1.0.7"
 mockall = "0.11.3"
+httpmock = "0.6"
 jsonwebtoken = "7.2.0"
 predicates = "2.1.1"
 serial_test = "0.9.0"

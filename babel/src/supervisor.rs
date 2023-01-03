@@ -220,7 +220,7 @@ mod tests {
         let run = Default::default();
 
         // create dummy babel that will touch control file and sleep
-        let _ = fs::create_dir_all(babel_path.parent().unwrap());
+        fs::create_dir_all(babel_path.parent().unwrap())?;
         let _ = fs::remove_file(&babel_path);
         let mut babel = fs::OpenOptions::new()
             .create(true)

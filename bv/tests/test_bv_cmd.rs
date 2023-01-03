@@ -750,6 +750,7 @@ async fn test_bv_cmd_grpc_commands() {
         blockjoy_api_url: "http://localhost:8081".to_string(),
         blockjoy_keys_url: "http://localhost:8081".to_string(),
         blockjoy_registry_url: "http://localhost:50051".to_string(),
+        update_check_interval_secs: None,
     };
     let nodes = Nodes::load(config.clone()).await.unwrap();
     let updates_tx = nodes.get_updates_sender().await.unwrap().clone();

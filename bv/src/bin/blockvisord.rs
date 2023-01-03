@@ -1,5 +1,7 @@
 use crate::api::pb;
 use anyhow::{Context, Result};
+use async_trait::async_trait;
+use blockvisord::self_updater::SelfUpdater;
 use blockvisord::{
     config::Config,
     hosts,
@@ -7,6 +9,7 @@ use blockvisord::{
     node_data::NodeStatus,
     node_metrics,
     nodes::Nodes,
+    self_updater,
     server::{bv_pb, BlockvisorServer, BLOCKVISOR_SERVICE_PORT},
     services::api,
     try_set_bv_status,
@@ -18,6 +21,14 @@ use tokio::{
 };
 use tonic::transport::{Channel, Endpoint, Server};
 use tracing::{error, info, warn};
+
+struct SysTimer;
+#[async_trait]
+impl self_updater::Sleeper for SysTimer {
+    async fn sleep(duration: Duration) {
+        sleep(duration).await
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -86,14 +97,16 @@ async fn main() -> Result<()> {
 
     let node_metrics_future = node_metrics(nodes.clone(), &endpoint, token.clone());
     let host_metrics_future = host_metrics(config.id.clone(), &endpoint, token.clone());
+    let self_updater = SelfUpdater::<SysTimer>::new(&config)?;
 
-    tokio::select! {
-        _ = internal_api_server_future => {},
-        _ = external_api_client_future => {},
-        _ = nodes_recovery_future => {},
-        _ = node_metrics_future => {},
-        _ = host_metrics_future => {},
-    }
+    let _ = tokio::join!(
+        internal_api_server_future,
+        external_api_client_future,
+        nodes_recovery_future,
+        node_metrics_future,
+        host_metrics_future,
+        self_updater.run()
+    );
 
     info!("Stopping...");
     Ok(())
