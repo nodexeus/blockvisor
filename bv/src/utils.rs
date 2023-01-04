@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use semver::Version;
 use std::cmp::Ordering;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
@@ -9,7 +10,11 @@ use tokio::process::Command;
 use tracing::{debug, info};
 
 /// Runs the specified command and returns error on failure.
-pub async fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
+pub async fn run_cmd<I, S>(cmd: &str, args: I) -> Result<()>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
     let mut cmd = Command::new(cmd);
     cmd.args(args);
     info!("Running command: `{:?}`", cmd);
@@ -50,7 +55,11 @@ impl Archive {
         // TODO: pigz is external dependency, we need a reliable way of delivering it to hosts
         run_cmd(
             "pigz",
-            &["--decompress", "--force", &self.0.to_string_lossy()],
+            [
+                OsStr::new("--decompress"),
+                OsStr::new("--force"),
+                self.0.as_os_str(),
+            ],
         )
         .await?;
         if let (Some(parent), Some(name)) = (self.0.parent(), self.0.file_stem()) {
@@ -64,11 +73,11 @@ impl Archive {
         if let Some(parent_dir) = self.0.parent() {
             run_cmd(
                 "tar",
-                &[
-                    "-C",
-                    &parent_dir.to_string_lossy(),
-                    "-xf",
-                    &self.0.to_string_lossy(),
+                [
+                    OsStr::new("-C"),
+                    parent_dir.as_os_str(),
+                    OsStr::new("-xf"),
+                    self.0.as_os_str(),
                 ],
             )
             .await?;
@@ -108,12 +117,19 @@ pub fn semver_cmp(a: &str, b: &str) -> Ordering {
 
 #[cfg(test)]
 pub mod tests {
-    use std::path::Path;
+    use http::{Request, Response};
+    use hyper::Body;
+    use std::convert::Infallible;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicBool;
     use std::sync::{atomic, Arc};
     use std::time::Duration;
     use tokio::net::UnixStream;
-    use tonic::transport::{Channel, Endpoint, Uri};
+    use tokio::task::JoinHandle;
+    use tokio_stream::wrappers::UnixListenerStream;
+    use tonic::body::BoxBody;
+    use tonic::codegen::Service;
+    use tonic::transport::{Channel, Endpoint, NamedService, Server, Uri};
 
     pub fn test_channel(tmp_root: &Path) -> Channel {
         let socket_path = tmp_root.join("test_socket");
@@ -151,6 +167,47 @@ pub mod tests {
                 async_panic.store(true, atomic::Ordering::Relaxed);
             }));
             Self { flag }
+        }
+    }
+
+    /// Helper struct to gracefully shutdown and join test server,
+    /// to make sure all mock asserts are checked.
+    pub struct TestServer {
+        pub handle: JoinHandle<()>,
+        pub tx: tokio::sync::oneshot::Sender<()>,
+    }
+
+    impl TestServer {
+        pub async fn assert(self) {
+            let _ = self.tx.send(());
+            let _ = self.handle.await;
+        }
+    }
+
+    pub fn start_test_server<S>(socket_path: PathBuf, service_mock: S) -> TestServer
+    where
+        S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
+            + NamedService
+            + Clone
+            + Send
+            + 'static,
+        S::Future: Send + 'static,
+    {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        TestServer {
+            tx,
+            handle: tokio::spawn(async move {
+                let uds_stream =
+                    UnixListenerStream::new(tokio::net::UnixListener::bind(socket_path).unwrap());
+                Server::builder()
+                    .max_concurrent_streams(1)
+                    .add_service(service_mock)
+                    .serve_with_incoming_shutdown(uds_stream, async {
+                        rx.await.ok();
+                    })
+                    .await
+                    .unwrap();
+            }),
         }
     }
 }

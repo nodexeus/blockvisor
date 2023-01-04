@@ -228,7 +228,7 @@ async fn test_bv_cmd_node_recovery() {
 
     let process_id = utils::get_process_pid(FC_BIN_NAME, vm_id).unwrap();
     println!("impolitelly kill node with process id {process_id}");
-    utils::run_cmd("kill", &["-9", &process_id.to_string()])
+    utils::run_cmd("kill", ["-9", &process_id.to_string()])
         .await
         .unwrap();
 

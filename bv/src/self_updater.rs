@@ -137,10 +137,8 @@ mod tests {
     use httpmock::prelude::GET;
     use httpmock::MockServer;
     use mockall::*;
+    use std::ffi::OsStr;
     use tokio::io::AsyncWriteExt;
-    use tokio::task::JoinHandle;
-    use tokio_stream::wrappers::UnixListenerStream;
-    use tonic::transport::Server;
     use tonic::Response;
 
     mock! {
@@ -185,6 +183,9 @@ mod tests {
         }
     }
 
+    /// Common staff to setup for all tests like sut (self updater in that case),
+    /// path to root dir used in test, instance of AsyncPanicChecker to make sure that all panics
+    /// from other threads will be propagated.
     struct TestEnv {
         updater: SelfUpdater<MockTestSleeper>,
         blacklist_path: PathBuf,
@@ -214,22 +215,14 @@ mod tests {
             })
         }
 
-        fn start_test_server(&self, bundles_mock: MockTestBundleService) -> JoinHandle<()> {
-            let tmp_root = self.tmp_root.clone();
-            tokio::spawn(async move {
-                let socket_path = tmp_root.join("test_socket");
-                let uds_stream = UnixListenerStream::new(
-                    tokio::net::UnixListener::bind(socket_path.clone()).unwrap(),
-                );
-                Server::builder()
-                    .max_concurrent_streams(1)
-                    .add_service(cb_pb::bundle_service_server::BundleServiceServer::new(
-                        bundles_mock,
-                    ))
-                    .serve_with_incoming(uds_stream)
-                    .await
-                    .unwrap();
-            })
+        fn start_test_server(
+            &self,
+            bundles_mock: MockTestBundleService,
+        ) -> utils::tests::TestServer {
+            utils::tests::start_test_server(
+                self.tmp_root.join("test_socket"),
+                cb_pb::bundle_service_server::BundleServiceServer::new(bundles_mock),
+            )
         }
 
         async fn blacklist_version(&self, version: &str) -> Result<()> {
@@ -259,12 +252,12 @@ mod tests {
 
             utils::run_cmd(
                 "tar",
-                &[
-                    "-C",
-                    &self.tmp_root.to_string_lossy(),
-                    "-czf",
-                    &self.tmp_root.join("bundle.tar.gz").to_string_lossy(),
-                    "bundle",
+                [
+                    OsStr::new("-C"),
+                    self.tmp_root.as_os_str(),
+                    OsStr::new("-czf"),
+                    self.tmp_root.join("bundle.tar.gz").as_os_str(),
+                    OsStr::new("bundle"),
                 ],
             )
             .await?;
@@ -324,10 +317,11 @@ mod tests {
                 };
                 Ok(Response::new(reply))
             });
-        test_env.start_test_server(bundles_mock);
+        let bundle_server = test_env.start_test_server(bundles_mock);
 
         assert_eq!(None, test_env.updater.get_latest().await);
         assert_eq!(Some(bundle_id), test_env.updater.get_latest().await);
+        bundle_server.assert().await;
         Ok(())
     }
 
@@ -361,7 +355,7 @@ mod tests {
             };
             Ok(Response::new(reply))
         });
-        test_env.start_test_server(bundles_mock);
+        let bundle_server = test_env.start_test_server(bundles_mock);
 
         assert!(test_env
             .updater
@@ -380,6 +374,7 @@ mod tests {
             .await
             .is_err());
         mock.assert();
+        bundle_server.assert().await;
         Ok(())
     }
 
@@ -401,7 +396,7 @@ mod tests {
             };
             Ok(Response::new(reply))
         });
-        test_env.start_test_server(bundles_mock);
+        let bundle_server = test_env.start_test_server(bundles_mock);
 
         test_env
             .create_dummy_bundle(&ctrl_file_path.to_string_lossy())
@@ -423,6 +418,7 @@ mod tests {
         assert!(ctrl_file_path.exists());
 
         mock.assert();
+        bundle_server.assert().await;
         Ok(())
     }
 
@@ -462,7 +458,7 @@ mod tests {
                 };
                 Ok(Response::new(reply))
             });
-        test_env.start_test_server(bundles_mock);
+        let bundle_server = test_env.start_test_server(bundles_mock);
 
         test_env
             .create_dummy_bundle(&ctrl_file_path.to_string_lossy())
@@ -482,6 +478,7 @@ mod tests {
         assert!(ctrl_file_path.exists());
 
         mock.assert();
+        bundle_server.assert().await;
         Ok(())
     }
 
@@ -505,9 +502,10 @@ mod tests {
                 };
                 Ok(Response::new(reply))
             });
-        test_env.start_test_server(bundles_mock);
+        let bundle_server = test_env.start_test_server(bundles_mock);
 
         assert!(test_env.updater.check_for_update().await);
+        bundle_server.assert().await;
         Ok(())
     }
 }

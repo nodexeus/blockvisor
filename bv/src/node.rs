@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use firec::config::JailerMode;
 use firec::Machine;
 use futures_util::StreamExt;
+use std::ffi::OsStr;
 use std::{collections::HashMap, path::Path, str::FromStr, time::Duration};
 use tokio::{fs::DirBuilder, time::sleep};
 use tracing::{debug, instrument, warn};
@@ -174,11 +175,7 @@ impl Node {
             .join("root");
         DirBuilder::new().recursive(true).create(&data_dir).await?;
 
-        run_cmd(
-            "cp",
-            &[&root_fs_path.to_string_lossy(), &data_dir.to_string_lossy()],
-        )
-        .await?;
+        run_cmd("cp", [root_fs_path.as_os_str(), data_dir.as_os_str()]).await?;
 
         Ok(())
     }
@@ -190,11 +187,15 @@ impl Node {
             .join(id.to_string())
             .join("root");
         DirBuilder::new().recursive(true).create(&data_dir).await?;
-        let path = data_dir.join(DATA_FILE).to_string_lossy().into_owned();
+        let path = data_dir.join(DATA_FILE);
 
-        let gb = format!("{disk_size_gb}G");
-        run_cmd("fallocate", &["-l", &gb, &path]).await?;
-        run_cmd("mkfs.ext4", &[&path]).await?;
+        let gb = &format!("{disk_size_gb}G");
+        run_cmd(
+            "fallocate",
+            [OsStr::new("-l"), OsStr::new(gb), path.as_os_str()],
+        )
+        .await?;
+        run_cmd("mkfs.ext4", [path.as_os_str()]).await?;
 
         Ok(())
     }
