@@ -12,7 +12,7 @@ use tokio::{
 };
 use tokio_stream;
 use tonic::transport::{Channel, Endpoint, Uri};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::node_connection::babelsup_pb::babel_sup_client::BabelSupClient;
 use crate::{env::*, node::VSOCK_PATH};
@@ -25,7 +25,7 @@ pub const BABEL_SUP_VSOCK_PORT: u32 = 41;
 pub const BABEL_VSOCK_PORT: u32 = 42;
 pub const NODE_START_TIMEOUT: Duration = Duration::from_secs(60);
 pub const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(15);
+pub const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(30);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(5);
 const GRPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const GRPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
@@ -90,7 +90,9 @@ impl NodeConnection {
         request: S,
     ) -> Result<D> {
         match &mut self.state {
-            NodeConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
+            NodeConnectionState::Closed => {
+                bail!("Cannot change port to babel: node connection is closed")
+            }
             NodeConnectionState::Babel { .. } => {}
             NodeConnectionState::BabelSup { .. } => {
                 debug!("Reconnecting to babel");
@@ -108,7 +110,9 @@ impl NodeConnection {
     /// This function gets gRPC client connected to babelsup. It reconnect to babelsup if necessary.
     pub async fn babelsup_client(&mut self) -> Result<&mut BabelSupClient<Channel>> {
         match &mut self.state {
-            NodeConnectionState::Closed => bail!("Cannot change port: node connection is closed"),
+            NodeConnectionState::Closed => {
+                bail!("Cannot change port to babelsup: node connection is closed")
+            }
             NodeConnectionState::Babel { stream } => {
                 stream.shutdown().await?;
                 debug!("Reconnecting to babelsup");
@@ -119,29 +123,6 @@ impl NodeConnection {
             NodeConnectionState::BabelSup { .. } => {}
         };
         self.try_babelsup_client_mut()
-    }
-
-    // TODO remove it after graceful node shutdown implemented
-    pub async fn wait_for_disconnect(&mut self, node_id: &uuid::Uuid) {
-        if let Ok(node_conn) = self.try_babel_stream_mut() {
-            // We can verify successful shutdown success by checking whether we can read
-            // into a buffer of nonzero length. If the stream is closed, the number of
-            // bytes read should be zero.
-            let read = timeout(NODE_STOP_TIMEOUT, node_conn.read(&mut [0])).await;
-            match read {
-                // Successful shutdown in this case
-                Ok(Ok(0)) => debug!("Node {} gracefully shut down", node_id),
-                // The babel stream has more to say...
-                Ok(Ok(_)) => warn!("Babel stream returned data instead of closing"),
-                // The read timed out. It is still live so the node did not shut down.
-                Err(timeout_err) => warn!("Babel shutdown timeout: {timeout_err}"),
-                // Reading returned _before_ the timeout, but was otherwise unsuccessful.
-                // Could happpen I guess? Lets log the error.
-                Ok(Err(io_err)) => error!("Babel stream broke on closing: {io_err}"),
-            }
-        } else {
-            warn!("Terminating node has no babel conn!");
-        }
     }
 
     /// Tries to return the babel unix stream, and if there isn't one, returns an error message.
