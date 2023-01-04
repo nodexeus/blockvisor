@@ -60,6 +60,7 @@ services:
       R2_URL: https://19afdffb308beea3e9c1ef3a95085d3b.r2.cloudflarestorage.com
       R2_ROOT: cookbook-dev
       DIR_CHAINS_PREFIX: chains
-      DIR_BUNDLES_PREFIX: bundles
+      DIR_BUNDLES_PREFIX: bundle
+      BUNDLE_STAGE: dev
       PRESIGNED_URL_EXPIRATION_SECS: 60
       RUST_LOG: debug

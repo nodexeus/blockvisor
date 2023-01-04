@@ -281,7 +281,6 @@ mod tests {
         let mut test_env = TestEnv::new().await?;
         let bundle_id = BundleIdentifier {
             version: "3.2.1".to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
 
         // no server
@@ -306,12 +305,10 @@ mod tests {
                     identifiers: vec![
                         cb_pb::BundleIdentifier {
                             version: "1.2.3".to_string(),
-                            status: cb_pb::StatusName::Development.into(),
                         },
                         expected_bundle_id.clone(),
                         cb_pb::BundleIdentifier {
                             version: "0.1.2".to_string(),
-                            status: cb_pb::StatusName::Development.into(),
                         },
                     ],
                 };
@@ -330,7 +327,6 @@ mod tests {
         let mut test_env = TestEnv::new().await?;
         let bundle_id = BundleIdentifier {
             version: "3.2.1".to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
         let server = MockServer::start();
 
@@ -384,7 +380,6 @@ mod tests {
         let ctrl_file_path = test_env.tmp_root.join("ctrl_file");
         let bundle_id = BundleIdentifier {
             version: "3.2.1".to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
         let server = MockServer::start();
 
@@ -428,7 +423,6 @@ mod tests {
         let ctrl_file_path = test_env.tmp_root.join("ctrl_file");
         let bundle_id = BundleIdentifier {
             version: "3.2.1".to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
 
         // continue if no update installed
@@ -487,7 +481,6 @@ mod tests {
         let mut test_env = TestEnv::new().await?;
         let bundle_id = BundleIdentifier {
             version: "3.2.1".to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
         test_env.blacklist_version(&bundle_id.version).await?;
 
