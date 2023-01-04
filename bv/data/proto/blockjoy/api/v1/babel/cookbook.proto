@@ -27,8 +27,6 @@ message ConfigIdentifier {
 message BundleIdentifier {
   /* semantic version string of the bundle version */
   string version = 1;
-  /* Does defined tuple have the requested tag assigned */
-  StatusName status = 2;
 }
 
 message Configuration {
