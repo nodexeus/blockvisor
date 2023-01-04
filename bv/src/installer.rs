@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 use std::{env, fs};
 use tonic::transport::Channel;
+use tracing::{debug, info, warn};
 
 const SYSTEM_SERVICES: &str = "etc/systemd/system";
 const SYSTEM_BIN: &str = "usr/bin";
@@ -70,10 +71,11 @@ pub struct Installer<T: Timer> {
 
 impl<T: Timer> Installer<T> {
     pub async fn run(mut self) -> Result<()> {
+        info!("installing BV {THIS_VERSION}...");
         if self.is_blacklisted(THIS_VERSION)? {
             bail!("BV {THIS_VERSION} is on a blacklist - can't install")
         }
-        println!("installing BV {THIS_VERSION}...");
+        info!("installing BV {THIS_VERSION}...");
 
         match self.preinstall() {
             Ok(backup_status) => {
@@ -82,7 +84,7 @@ impl<T: Timer> Installer<T> {
                         // try cleanup after install, but cleanup result should not affect exit code
                         let _ = self
                             .cleanup() // do not interrupt cleanup on errors
-                            .map_err(|err| println!("failed to cleanup after install with: {err}"));
+                            .map_err(|err| warn!("failed to cleanup after install with: {err}"));
                         Ok(())
                     }
                     Err(err) => self.handle_broken_installation(backup_status, err),
@@ -122,7 +124,7 @@ impl<T: Timer> Installer<T> {
             .with_context(|| "non canonical current binary path")?;
         let bin_dir = bin_path.parent().expect("invalid current binary dir");
         if self.paths.this_version != bin_dir {
-            println!(
+            info!(
                 "move BV files from {} to install path {}",
                 bin_dir.to_string_lossy(),
                 self.paths.this_version.to_string_lossy()
@@ -174,7 +176,7 @@ impl<T: Timer> Installer<T> {
             if self.is_blacklisted(running_version.as_str())? {
                 Ok(BackupStatus::ThisIsRollback)
             } else {
-                println!("backup previously installed BV {running_version}");
+                info!("backup previously installed BV {running_version}");
                 let _ = fs::remove_file(&self.paths.backup);
                 std::os::unix::fs::symlink(
                     fs::read_link(&self.paths.current)
@@ -229,7 +231,7 @@ impl<T: Timer> Installer<T> {
         {
             return Ok(());
         }
-        println!("prepare running BV for update");
+        info!("prepare running BV for update");
         let timestamp = T::now();
         let expired = || {
             let now = T::now();
@@ -262,7 +264,7 @@ impl<T: Timer> Installer<T> {
     }
 
     fn install_this_version(&self) -> Result<()> {
-        println!("update system symlinks");
+        info!("update system symlinks");
         // switch current to this version
         let _ = fs::remove_file(&self.paths.current);
         std::os::unix::fs::symlink(&self.paths.this_version, &self.paths.current)
@@ -296,7 +298,7 @@ impl<T: Timer> Installer<T> {
     }
 
     fn restart_blockvisor() -> Result<()> {
-        println!("request blockvisor service restart (systemctl restart blockvisor)");
+        info!("request blockvisor service restart (systemctl restart blockvisor)");
         let status_code = Command::new("systemctl")
             .args(["restart", "blockvisor"])
             .status()
@@ -311,7 +313,7 @@ impl<T: Timer> Installer<T> {
     }
 
     async fn health_check(&mut self) -> Result<()> {
-        println!("verify newly installed BV");
+        info!("verify newly installed BV");
         let timestamp = T::now();
         let expired = || {
             let now = T::now();
@@ -365,7 +367,7 @@ impl<T: Timer> Installer<T> {
     }
 
     fn cleanup(&self) -> Result<()> {
-        println!("cleanup old BV files:");
+        info!("cleanup old BV files:");
         let persistent = [
             &self.paths.blacklist,
             &self.paths.current,
@@ -380,7 +382,7 @@ impl<T: Timer> Installer<T> {
             let entry = entry.with_context(|| "failed to get cleanup list entry")?;
 
             if !persistent.contains(&&entry.path()) {
-                println!("remove {}", entry.path().to_string_lossy());
+                debug!("remove {}", entry.path().to_string_lossy());
                 let _ = if entry.path().is_dir() {
                     fs::remove_dir_all(entry.path())
                 } else {
@@ -389,7 +391,7 @@ impl<T: Timer> Installer<T> {
                 // do not interrupt cleanup on errors
                 .map_err(|err| {
                     let path = entry.path();
-                    println!(
+                    warn!(
                         "failed to cleanup after install, can't remove {} with: {}",
                         path.to_string_lossy(),
                         err
