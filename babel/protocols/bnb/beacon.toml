@@ -2,19 +2,19 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "solana"
+protocol = "bbc" # binance beacon chain
 node_type = "validator"
-node_version = "1.10.34"
+node_version = "0.8.2"
 min_babel_version = "0.0.1"
-description = "solana blockchain validator"
-api_host = "http://localhost:8899/"
-ports = [8899]
+description = "bbc blockchain validator"
+api_host = "http://localhost:27147/" 
+ports = [27147]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
-vcpu_count = 32
-mem_size_mb = 131072
-disk_size_gb = 1500
+vcpu_count = 4
+mem_size_mb = 8192
+disk_size_gb = 500 
 
 [supervisor]
 backoff_timeout_ms = 60000
@@ -28,25 +28,34 @@ log_buffer_capacity_ln = 1000
 [[methods]]
 name = "height"
 transport = "jrpc"
-method = "getBlockHeight"
+method = "abci_info"
+
+    [methods.response]
+    code = 200
+    field = "result.response.last_block_height"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "validator_info.address" 
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "health"
 
     [methods.response]
     code = 200
     field = "result"
 
 [[methods]]
-name = "address"
+name = "genesis_info"
 transport = "jrpc"
-method = "getClusterNodes"
-    
-    [methods.response]
-    code = 200
-    field = "pubkey"
-
-[[methods]]
-name = "status"
-transport = "jrpc"
-method = "getHealth"
+method = "genesis"
 
     [methods.response]
     code = 200

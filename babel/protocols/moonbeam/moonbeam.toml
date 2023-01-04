@@ -4,7 +4,7 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "moonbeam"
 node_type = "validator"
-node_version = "0.27.1"
+node_version = "0.28.0"
 min_babel_version = "0.0.1"
 description = "moonbeam blockchain validator"
 api_host = "http://localhost:9933/"
@@ -12,9 +12,9 @@ ports = [9933]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
-vcpu_count = 1
-mem_size_mb = 8192
-disk_size_gb = 10
+vcpu_count = 8
+mem_size_mb = 16384
+disk_size_gb = 1000
 
 [supervisor]
 backoff_timeout_ms = 60000

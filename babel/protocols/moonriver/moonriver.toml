@@ -2,19 +2,19 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "solana"
+protocol = "moonbeam"
 node_type = "validator"
-node_version = "1.10.34"
+node_version = "0.28.0"
 min_babel_version = "0.0.1"
-description = "solana blockchain validator"
-api_host = "http://localhost:8899/"
-ports = [8899]
+description = "moonbeam blockchain validator"
+api_host = "http://localhost:9933/"
+ports = [9933]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
-vcpu_count = 32
-mem_size_mb = 131072
-disk_size_gb = 1500
+vcpu_count = 8
+mem_size_mb = 16384
+disk_size_gb = 1000 
 
 [supervisor]
 backoff_timeout_ms = 60000
@@ -28,26 +28,26 @@ log_buffer_capacity_ln = 1000
 [[methods]]
 name = "height"
 transport = "jrpc"
-method = "getBlockHeight"
+method = "chain_getFinalizedHead"
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result" # find this
 
 [[methods]]
 name = "address"
 transport = "jrpc"
-method = "getClusterNodes"
-    
+method = "system_localPeerId" 
+
     [methods.response]
     code = 200
-    field = "pubkey"
+    field = "result" # find this
 
 [[methods]]
 name = "status"
 transport = "jrpc"
-method = "getHealth"
+method = "system_syncState"
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result" # find this

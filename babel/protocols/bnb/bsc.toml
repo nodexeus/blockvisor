@@ -2,7 +2,7 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "bsc"
+protocol = "bsc" # binance smart chain
 node_type = "validator"
 node_version = "1.1.17"
 min_babel_version = "0.0.1"
@@ -12,9 +12,9 @@ ports = [8545]
 data_directory_mount_point = "/blockjoy/miner/data"
 
 [requirements]
-vcpu_count = 1
-mem_size_mb = 8192
-disk_size_gb = 10
+vcpu_count = 16
+mem_size_mb = 65536
+disk_size_gb = 2000
 
 [supervisor]
 backoff_timeout_ms = 60000
