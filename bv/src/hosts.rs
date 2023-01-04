@@ -36,12 +36,6 @@ pub fn get_host_info() -> HostInfo {
     }
 }
 
-pub fn get_ip_address(ifa_name: &str) -> String {
-    let ifas = local_ip_address::list_afinet_netifas().unwrap();
-    let (_, ip) = local_ip_address::find_ifa(ifas, ifa_name).unwrap();
-    ip.to_string()
-}
-
 #[derive(Debug)]
 pub struct HostMetrics {
     pub used_cpu: u32,

@@ -5,6 +5,7 @@ build:
 build-release:
 	cargo build -p blockvisord --release
 	strip target/release/bv
+	strip target/release/bvup
 	strip target/release/blockvisord
 	cargo build -p babel --target x86_64-unknown-linux-musl --release
 	strip target/x86_64-unknown-linux-musl/release/babel
@@ -21,6 +22,7 @@ get-firecraker:
 bundle: get-firecraker build-release
 	rm -rf /tmp/bundle.tar.gz
 	rm -rf /tmp/bundle
+	rm -rf /tmp/bvup
 	mkdir -p /tmp/bundle/blockvisor/bin /tmp/bundle/blockvisor/services
 	cp target/release/bv /tmp/bundle/blockvisor/bin
 	cp target/release/blockvisord /tmp/bundle/blockvisor/bin
@@ -35,11 +37,12 @@ bundle: get-firecraker build-release
 	cp /tmp/fc/firecracker /tmp/bundle/firecracker/bin
 	cp /tmp/fc/jailer /tmp/bundle/firecracker/bin
 	tar -C /tmp -czvf /tmp/bundle.tar.gz bundle
+	cp target/release/bvup /tmp/bvup
 
 tag: CARGO_VERSION = $(shell grep '^version' Cargo.toml | sed "s/ //g" | cut -d = -f 2 | sed "s/\"//g")
 tag: GIT_VERSION = $(shell git describe --tags)
 tag:
-	@if [ "${CARGO_VERSION}" == "${GIT_VERSION}" ]; then echo "Version ${CARGO_VERSION} already tagged!"; \
+	@if [ "${CARGO_VERSION}" = "${GIT_VERSION}" ]; then echo "Version ${CARGO_VERSION} already tagged!"; \
 	else git tag -a ${CARGO_VERSION} -m "Set version ${CARGO_VERSION}"; git push origin ${CARGO_VERSION}; \
 	fi
 
