@@ -13,11 +13,20 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::fs;
 use tokio::process::Command;
+use tokio::time::sleep;
 use tonic::transport::Channel;
 
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const BUNDLES_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+pub struct SysTimer;
+#[async_trait]
+impl Sleeper for SysTimer {
+    async fn sleep(duration: Duration) {
+        sleep(duration).await
+    }
+}
 
 #[async_trait]
 pub trait Sleeper {
@@ -79,7 +88,7 @@ impl<T: Sleeper> SelfUpdater<T> {
         true
     }
 
-    async fn get_latest(&mut self) -> Option<cb_pb::BundleIdentifier> {
+    pub async fn get_latest(&mut self) -> Option<cb_pb::BundleIdentifier> {
         let mut resp = self
             .bundles
             .list_bundle_versions(with_auth(
@@ -104,7 +113,7 @@ impl<T: Sleeper> SelfUpdater<T> {
                 .contains(version))
     }
 
-    async fn download_and_install(&mut self, bundle: BundleIdentifier) -> Result<()> {
+    pub async fn download_and_install(&mut self, bundle: BundleIdentifier) -> Result<()> {
         let archive = self
             .bundles
             .retrieve(with_auth(bundle, &self.auth_token))
@@ -118,11 +127,14 @@ impl<T: Sleeper> SelfUpdater<T> {
             &archive.url.clone(),
             self.download_path.join("bundle.tar.gz"),
         )
-        .await?
+        .await
+        .with_context(|| "failed to download bundle")?
         .ungzip()
-        .await?
+        .await
+        .with_context(|| "failed to extract downloaded bundle")?
         .untar()
-        .await?;
+        .await
+        .with_context(|| "failed to extract downloaded bundle")?;
 
         Command::new(bundle_path.join(installer::INSTALLER_BIN)).spawn()?;
         Ok(())

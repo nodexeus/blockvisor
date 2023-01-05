@@ -2,8 +2,7 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::Config,
-    hosts::{get_host_info, get_host_metrics, get_ip_address},
-    nodes::{CommonData, Nodes},
+    hosts::{get_host_info, get_host_metrics},
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
         bv_pb::blockvisor_client::BlockvisorClient,
@@ -14,7 +13,7 @@ use blockvisord::{
     services::cookbook::CookbookService,
     utils::run_cmd,
 };
-use clap::{crate_version, Parser};
+use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
 use std::collections::HashMap;
@@ -31,55 +30,6 @@ async fn main() -> Result<()> {
     let args = App::parse();
 
     match args.command {
-        Command::Init(cmd_args) => {
-            println!("Configuring blockvisor");
-
-            let ip = get_ip_address(&cmd_args.ifa);
-            let host_info = get_host_info();
-
-            let info = pb::HostInfo {
-                id: None,
-                name: host_info.name,
-                version: Some(crate_version!().to_string()),
-                location: None,
-                cpu_count: host_info.cpu_count,
-                mem_size: host_info.mem_size,
-                disk_size: host_info.disk_size,
-                os: host_info.os,
-                os_version: host_info.os_version,
-                ip: Some(ip),
-                ip_range_to: None,
-                ip_range_from: None,
-                ip_gateway: None,
-            };
-            let create = pb::ProvisionHostRequest {
-                request_id: Some(Uuid::new_v4().to_string()),
-                otp: cmd_args.otp,
-                info: Some(info),
-                status: pb::ConnectionStatus::Online.into(),
-            };
-            println!("{:?}", create);
-
-            let mut client =
-                pb::hosts_client::HostsClient::connect(cmd_args.blockjoy_api_url.clone()).await?;
-
-            let host = client.provision(create).await?.into_inner();
-
-            let api_config = Config {
-                id: host.host_id,
-                token: host.token,
-                blockjoy_api_url: cmd_args.blockjoy_api_url,
-                blockjoy_keys_url: cmd_args.blockjoy_keys_url,
-                blockjoy_registry_url: cmd_args.blockjoy_registry_url,
-                update_check_interval_secs: None,
-            };
-            api_config.save().await?;
-
-            if !Nodes::exists() {
-                let nodes_data = CommonData { machine_index: 0 };
-                Nodes::new(api_config, nodes_data).save().await?;
-            }
-        }
         Command::Reset(cmd_args) => {
             let confirm = if cmd_args.yes {
                 true

@@ -11,28 +11,6 @@ pub struct App {
 }
 
 #[derive(Debug, Args)]
-pub struct InitArgs {
-    /// One-time password
-    pub otp: String,
-
-    /// BlockJoy API url
-    #[clap(long = "api", default_value = "https://api.dev.blockjoy.com")]
-    pub blockjoy_api_url: String,
-
-    /// BlockJoy keys service url
-    #[clap(long = "keys", default_value = "https://api.dev.blockjoy.com")]
-    pub blockjoy_keys_url: String,
-
-    /// BlockJoy registry url
-    #[clap(long = "registry", default_value = "https://api.dev.blockjoy.com")]
-    pub blockjoy_registry_url: String,
-
-    /// Network interface name
-    #[clap(long = "ifa", default_value = "bvbr0")]
-    pub ifa: String,
-}
-
-#[derive(Debug, Args)]
 pub struct ResetArgs {
     /// Assume "yes" as answer to all prompts
     #[clap(short, long)]
@@ -50,10 +28,6 @@ pub struct StatusArgs {}
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Initialise blockvisor to run on this host
-    #[clap(alias = "i")]
-    Init(InitArgs),
-
     /// Completelly remove all nodes, configs and unregister the host from the API
     Reset(ResetArgs),
 

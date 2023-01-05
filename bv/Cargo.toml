@@ -23,6 +23,10 @@ path = "src/bin/blockvisord.rs"
 name = "installer"
 path = "src/bin/installer.rs"
 
+[[bin]]
+name = "bvup"
+path = "src/bin/bvup.rs"
+
 [dependencies]
 anyhow = "1.0.56"
 babel_api = {version = "*", path = "../babel_api"}

@@ -254,8 +254,8 @@ fn test_bv_cmd_init_unknown_otp() {
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
 
-    let mut cmd = Command::cargo_bin("bv").unwrap();
-    cmd.args(&["init", otp])
+    let mut cmd = Command::cargo_bin("bvup").unwrap();
+    cmd.args(&[otp, "--skip-download"])
         .args(&["--ifa", ifa])
         .args(&["--api", url])
         .args(&["--keys", url])
@@ -361,16 +361,18 @@ async fn test_bv_cmd_init_localhost() {
     let url = "http://localhost:8080";
     let registry = "http://localhost:50051";
 
-    Command::cargo_bin("bv")
+    Command::cargo_bin("bvup")
         .unwrap()
-        .args(&["init", &otp])
+        .args(&[&otp, "--skip-download"])
         .args(&["--ifa", ifa])
         .args(&["--api", url])
         .args(&["--keys", url])
         .args(&["--registry", registry])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Configuring blockvisor"));
+        .stdout(predicate::str::contains(
+            "Provision and init blockvisor configuration",
+        ));
 
     println!("read host id");
     let config_path = "/etc/blockvisor.toml";
@@ -892,9 +894,9 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         let config_path = format!("{}/etc/blockvisor.toml", tmp_dir.to_string_lossy());
 
         println!("bv init");
-        Command::cargo_bin("bv")
+        Command::cargo_bin("bvup")
             .unwrap()
-            .args(&["init", otp])
+            .args(&[otp, "--skip-download"])
             .args(&["--ifa", ifa])
             .args(&["--api", url])
             .args(&["--keys", url])
@@ -902,7 +904,9 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()
-            .stdout(predicate::str::contains("Configuring blockvisor"));
+            .stdout(predicate::str::contains(
+                "Provision and init blockvisor configuration",
+            ));
 
         assert_eq!(Path::new(&config_path).exists(), true);
 
