@@ -157,18 +157,9 @@ impl Nodes {
             )
             .await?;
 
-            cookbook_service
-                .download_babel_config(image)
-                .await
-                .with_context(|| format!("Failed to download babel config: `{image:?}`"))?;
-            cookbook_service
-                .download_image(image)
-                .await
-                .with_context(|| format!("Failed to download kernel: `{image:?}`"))?;
-            cookbook_service
-                .download_kernel(image)
-                .await
-                .with_context(|| format!("Failed to download OS image: `{image:?}`"))?;
+            cookbook_service.download_babel_config(image).await?;
+            cookbook_service.download_image(image).await?;
+            cookbook_service.download_kernel(image).await?;
         }
 
         let babel = CookbookService::get_babel_config(image).await?;
