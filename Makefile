@@ -1,12 +1,12 @@
 build:
-	cargo build -p blockvisord
+	cargo build -p blockvisord --target x86_64-unknown-linux-musl
 	cargo build -p babel --target x86_64-unknown-linux-musl
 
 build-release:
-	cargo build -p blockvisord --release
-	strip target/release/bv
-	strip target/release/bvup
-	strip target/release/blockvisord
+	cargo build -p blockvisord --target x86_64-unknown-linux-musl --release
+	strip target/x86_64-unknown-linux-musl/release/bv
+	strip target/x86_64-unknown-linux-musl/release/bvup
+	strip target/x86_64-unknown-linux-musl/release/blockvisord
 	cargo build -p babel --target x86_64-unknown-linux-musl --release
 	strip target/x86_64-unknown-linux-musl/release/babel
 	strip target/x86_64-unknown-linux-musl/release/babelsup
@@ -24,9 +24,9 @@ bundle: get-firecraker build-release
 	rm -rf /tmp/bundle
 	rm -rf /tmp/bvup
 	mkdir -p /tmp/bundle/blockvisor/bin /tmp/bundle/blockvisor/services
-	cp target/release/bv /tmp/bundle/blockvisor/bin
-	cp target/release/blockvisord /tmp/bundle/blockvisor/bin
-	cp target/release/installer /tmp/bundle
+	cp target/x86_64-unknown-linux-musl/release/bv /tmp/bundle/blockvisor/bin
+	cp target/x86_64-unknown-linux-musl/release/blockvisord /tmp/bundle/blockvisor/bin
+	cp target/x86_64-unknown-linux-musl/release/installer /tmp/bundle
 	cp bv/data/tmux.service /tmp/bundle/blockvisor/services
 	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
 	mkdir -p /tmp/bundle/babel/bin /tmp/bundle/babel/services
@@ -37,7 +37,7 @@ bundle: get-firecraker build-release
 	cp /tmp/fc/firecracker /tmp/bundle/firecracker/bin
 	cp /tmp/fc/jailer /tmp/bundle/firecracker/bin
 	tar -C /tmp -czvf /tmp/bundle.tar.gz bundle
-	cp target/release/bvup /tmp/bvup
+	cp target/x86_64-unknown-linux-musl/release/bvup /tmp/bvup
 
 tag: CARGO_VERSION = $(shell grep '^version' Cargo.toml | sed "s/ //g" | cut -d = -f 2 | sed "s/\"//g")
 tag: GIT_VERSION = $(shell git describe --tags)
