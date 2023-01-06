@@ -5,10 +5,10 @@ use futures_util::StreamExt;
 use std::ffi::OsStr;
 use std::{collections::HashMap, path::Path, str::FromStr, time::Duration};
 use tokio::{fs::DirBuilder, time::sleep};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
-use crate::node_connection::{NODE_RECONNECT_TIMEOUT, NODE_START_TIMEOUT};
+use crate::node_connection::{NODE_RECONNECT_TIMEOUT, NODE_START_TIMEOUT, NODE_STOP_TIMEOUT};
 use crate::{
     env::*,
     node_connection,
@@ -104,6 +104,7 @@ impl Node {
             || (self.status() == NodeStatus::Failed
                 && self.expected_status() == NodeStatus::Stopped)
         {
+            info!("Node is recovering, will not start immediately");
             return Ok(());
         }
 
@@ -138,13 +139,24 @@ impl Node {
                         bail!("Forced shutdown failed: {err}");
                     }
                 }
-                self.node_conn.wait_for_disconnect(&self.id()).await;
-
-                // TODO: for some reason firecracker socket is not created by
-                // consequent start command if we do not wait a bit here
-                sleep(Duration::from_secs(10)).await;
             }
         }
+
+        let start = std::time::Instant::now();
+        let elapsed = || std::time::Instant::now() - start;
+        loop {
+            match get_process_pid(FC_BIN_NAME, &self.data.id.to_string()) {
+                Ok(_) if elapsed() < NODE_STOP_TIMEOUT => {
+                    debug!("Firecracker process not shutdown yet, will retry");
+                    sleep(Duration::from_secs(1)).await;
+                }
+                Ok(_) => {
+                    bail!("Firecracker shutdown timeout");
+                }
+                Err(_) => break,
+            }
+        }
+
         self.data.expected_status = NodeStatus::Stopped;
         self.data.save().await?;
         self.node_conn = NodeConnection::closed(self.id());
