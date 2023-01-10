@@ -4,10 +4,12 @@ use async_trait::async_trait;
 use babel_api::config::{Entrypoint, SupervisorConfig as Config};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Instant;
+use sysinfo::{Pid, Process, ProcessExt, System, SystemExt};
 use tokio::process::Command;
 use tokio::sync::{broadcast, watch};
 use tokio::time::Duration;
@@ -57,12 +59,16 @@ impl<T: Timer> Supervisor<T> {
     pub async fn run(self) -> eyre::Result<()> {
         let mut babel_change_rx = self.babel_change_rx.clone();
         let mut run = self.run.clone();
+        // if there is no babel binary yet, then just wait for babel start signal from blockvisord
         if babel_change_rx.borrow_and_update().is_none() {
             tokio::select!(
                 res = babel_change_rx.changed() => {res},
                 _ = run.wait() => {Ok(())},
             )?;
         }
+
+        self.kill_all_remnants();
+
         let mut futures = FuturesUnordered::new();
         for entry_point in &self.config.entry_point {
             futures.push(self.run_entrypoint(entry_point));
@@ -70,6 +76,22 @@ impl<T: Timer> Supervisor<T> {
         let entry_futures = async { while (futures.next().await).is_some() {} };
         tokio::join!(entry_futures, self.run_babel(babel_change_rx));
         Ok(())
+    }
+
+    /// Check if there are no remnant child processes after previous run.
+    /// If so, just kill them all.
+    fn kill_all_remnants(&self) {
+        let mut sys = System::new();
+        sys.refresh_processes();
+        let ps = sys.processes();
+        kill_remnants(
+            &self.babel_path.to_string_lossy().to_string(),
+            &Default::default(),
+            ps,
+        );
+        for entry_point in &self.config.entry_point {
+            kill_remnants(&entry_point.command, &entry_point.args, ps);
+        }
     }
 
     async fn run_babel(&self, mut babel_change_rx: watch::Receiver<Option<u32>>) {
@@ -133,6 +155,31 @@ impl<T: Timer> Supervisor<T> {
                 backoff.wait().await;
             }
         }
+    }
+}
+
+fn kill_remnants(cmd: &String, args: &Vec<String>, ps: &HashMap<Pid, Process>) {
+    let remnants: Vec<_> = ps
+        .iter()
+        .filter(|(_, process)| {
+            let proc_call = process.cmd();
+            if let Some(proc_cmd) = proc_call.first() {
+                if proc_cmd == "/bin/sh" {
+                    // if first element is shell call, just ignore it and treat second as cmd, rest are arguments
+                    proc_call.len() > 1 && cmd == &proc_call[1] && args == &proc_call[2..].to_vec()
+                } else {
+                    // first element is cmd, rest are arguments
+                    cmd == proc_cmd && args == &proc_call[1..].to_vec()
+                }
+            } else {
+                false
+            }
+        })
+        .collect();
+
+    for (_, proc) in remnants {
+        proc.kill();
+        proc.wait();
     }
 }
 
@@ -525,6 +572,27 @@ mod tests {
             lines.push(line);
         }
         assert_eq!(vec!["babel log\n"], lines);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_kill_remnants() -> Result<()> {
+        let test_env = setup_test_env()?;
+        let mut cmd = Command::new(&test_env.babel_path);
+        cmd.args(["a", "b", "c"]);
+        let mut child = cmd.spawn()?;
+        let test_run = test_env.run.clone();
+        wait_for_babel(test_run.clone(), test_env.ctrl_file.clone());
+        let mut sys = System::new();
+        sys.refresh_processes();
+        let ps = sys.processes();
+        kill_remnants(
+            &test_env.babel_path.to_string_lossy().to_string(),
+            &["a".to_string(), "b".to_string(), "c".to_string()].to_vec(),
+            ps,
+        );
+        assert!(child.kill().await.is_err());
         Ok(())
     }
 }
