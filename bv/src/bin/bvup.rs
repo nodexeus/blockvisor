@@ -108,7 +108,7 @@ async fn main() -> Result<()> {
         let mut updater = self_updater::SelfUpdater::<self_updater::SysTimer>::new(&api_config)?;
         let bundle_id = updater
             .get_latest()
-            .await
+            .await?
             .ok_or_else(|| anyhow!("No bv bundle found"))?;
         updater.download_and_install(bundle_id).await?;
     }
