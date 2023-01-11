@@ -3,6 +3,7 @@ use crate::node_data::NodeImage;
 use crate::nodes::Nodes;
 use crate::server::bv_pb;
 use anyhow::{anyhow, bail, Result};
+use base64::Engine;
 use pb::command_flow_client::CommandFlowClient;
 use pb::metrics_service_client::MetricsServiceClient;
 use pb::node_command::Command;
@@ -33,7 +34,10 @@ pub type MetricsClient =
 impl Interceptor for AuthToken {
     fn call(&mut self, request: Request<()>) -> Result<Request<()>, Status> {
         let mut request = request;
-        let val = format!("Bearer {}", base64::encode(self.0.clone()));
+        let val = format!(
+            "Bearer {}",
+            base64::engine::general_purpose::STANDARD.encode(self.0.clone())
+        );
         request
             .metadata_mut()
             .insert("authorization", val.parse().unwrap());
@@ -226,9 +230,12 @@ pub fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
     let mut request = Request::new(inner);
     request.metadata_mut().insert(
         "authorization",
-        format!("Bearer {}", base64::encode(auth_token))
-            .parse()
-            .unwrap(),
+        format!(
+            "Bearer {}",
+            base64::engine::general_purpose::STANDARD.encode(auth_token)
+        )
+        .parse()
+        .unwrap(),
     );
     request
 }

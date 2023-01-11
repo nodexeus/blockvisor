@@ -1,4 +1,6 @@
 use anyhow::{bail, Context, Result};
+use babel_api::config::Entrypoint;
+use base64::Engine;
 use firec::config::JailerMode;
 use firec::Machine;
 use futures_util::StreamExt;
@@ -9,6 +11,7 @@ use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::node_connection::{NODE_RECONNECT_TIMEOUT, NODE_START_TIMEOUT, NODE_STOP_TIMEOUT};
+use crate::node_data::NodeProperties;
 use crate::{
     env::*,
     node_connection,
@@ -33,13 +36,14 @@ pub const KERNEL_FILE: &str = "kernel";
 const DATA_FILE: &str = "data.img";
 pub const VSOCK_PATH: &str = "/vsock.socket";
 const VSOCK_GUEST_CID: u32 = 3;
+const MAX_KERNEL_ARGS_LEN: usize = 1024;
 
 impl Node {
     /// Creates a new node according to specs.
     #[instrument]
     pub async fn create(data: NodeData) -> Result<Self> {
         let node_id = data.id;
-        let config = Node::create_config(&data)?;
+        let config = Node::create_config(&data).await?;
         Node::create_data_image(&node_id, data.requirements.disk_size_gb).await?;
         let machine = firec::Machine::create(config).await?;
 
@@ -55,7 +59,7 @@ impl Node {
     /// Returns node previously created on this host.
     #[instrument]
     pub async fn connect(data: NodeData) -> Result<Self> {
-        let config = Node::create_config(&data)?;
+        let config = Node::create_config(&data).await?;
         let cmd = data.id.to_string();
         let (state, node_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
             Ok(pid) => {
@@ -212,15 +216,49 @@ impl Node {
         Ok(())
     }
 
-    fn create_config(data: &NodeData) -> Result<firec::config::Config<'static>> {
+    fn build_entrypoint_params(
+        entry_points: &[Entrypoint],
+        properties: &NodeProperties,
+    ) -> Result<String> {
+        // join all entrypoints arguments
+        let args = entry_points
+            .iter()
+            .fold(String::new(), |mut args, entrypoint| {
+                args.push_str(&entrypoint.args.join(""));
+                args
+            });
+        let params: HashMap<&String, &String> = properties
+            .iter()
+            // leave only properties that are used in entrypoints args
+            .filter(|(key, _)| args.contains(&format!("{{{{{}}}}}", key.to_uppercase())))
+            .collect();
+        // validate params values and fail early
+        if let Some((key, invalid_value)) = params.iter().find(|(_, value)| {
+            !value
+                .chars()
+                .all(|c| c.is_alphanumeric() || "_-,.".contains(c))
+        }) {
+            bail!("entry_point param '{key}' has invalid value '{invalid_value}'")
+        }
+        Ok(
+            base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .encode(postcard::to_allocvec(&params)?),
+        )
+    }
+
+    async fn create_config(data: &NodeData) -> Result<firec::config::Config<'static>> {
+        let babel = CookbookService::get_babel_config(&data.image).await?;
         let kernel_args = format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
             ip={}::{}:255.255.255.240::eth0:on {}{}",
             data.network_interface.ip,
             data.network_interface.gateway,
             babel_api::BABELSUP_ENTRYPOINT_PARAMS,
-            "{}" //TODO MJR get entrypoint params from data
+            Self::build_entrypoint_params(&babel.supervisor.entry_point, &data.properties)?,
         );
+        if kernel_args.len() > MAX_KERNEL_ARGS_LEN {
+            bail!("to long kernel_args {kernel_args}")
+        }
         let iface =
             firec::config::network::Interface::new(data.network_interface.name.clone(), "eth0");
         let root_fs_path =
@@ -387,5 +425,44 @@ impl Node {
             HashMap::new(),
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_entrypoint_params() -> Result<()> {
+        let entrypoints = vec![Entrypoint {
+            command: "irrelevant".to_string(),
+            args: vec![
+                "none_parametrized_argument".to_string(),
+                "first_parametrized_{{PARAM1}}_argument".to_string(),
+                "second_parametrized{{PARAM1}}_{{PARAM2}}_argument".to_string(),
+            ],
+        }];
+        let mut node_props = HashMap::from([
+            ("PARAM1".to_string(), "Value.1,-_Q".to_string()),
+            ("PARAM2".to_string(), "Value.2,-_Q".to_string()),
+            ("PARAM3".to_string(), "?Value.1,-_Q".to_string()),
+        ]);
+        assert_eq!(
+            HashMap::from([
+                ("PARAM1".to_string(), "Value.1,-_Q".to_string()),
+                ("PARAM2".to_string(), "Value.2,-_Q".to_string()),
+            ]),
+            postcard::from_bytes::<HashMap<String, String>>(
+                &base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .decode(Node::build_entrypoint_params(&entrypoints, &node_props)?)?,
+            )?
+        );
+        assert_eq!(
+            "AA",
+            Node::build_entrypoint_params(&entrypoints, &Default::default())?
+        );
+        node_props.get_mut("PARAM1").unwrap().push('@');
+        assert!(Node::build_entrypoint_params(&entrypoints, &node_props).is_err());
+        Ok(())
     }
 }

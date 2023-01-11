@@ -3,6 +3,7 @@ use crate::run_flag::RunFlag;
 use crate::utils;
 use async_trait::async_trait;
 use babel_api::config::{Entrypoint, SupervisorConfig as Config};
+use base64::Engine;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
@@ -192,14 +193,19 @@ fn kill_remnants(cmd: &String, args: &Vec<String>, ps: &HashMap<Pid, Process>) {
     }
 }
 
-fn parse_entrypoint_params(
-    cmdline: &str,
-) -> Result<Option<HashMap<String, String>>, serde_json::Error> {
+fn parse_entrypoint_params(cmdline: &str) -> eyre::Result<Option<HashMap<String, String>>> {
     cmdline
+        // split cmdline into separate arguments
         .split(' ')
-        .find_map(|x| {
-            x.strip_prefix(babel_api::BABELSUP_ENTRYPOINT_PARAMS)
-                .map(serde_json::from_str::<HashMap<String, String>>)
+        .find_map(|arg| {
+            // find one that starts with babel_api::BABELSUP_ENTRYPOINT_PARAMS and strip prefix
+            arg.strip_prefix(babel_api::BABELSUP_ENTRYPOINT_PARAMS)
+                .map(|val| {
+                    // decode value from base64 and parse as params map using 'postcard'
+                    Ok(postcard::from_bytes::<HashMap<String, String>>(
+                        &base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(val)?,
+                    )?)
+                })
         })
         .transpose()
 }
@@ -632,16 +638,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_parse_entrypoint_params() -> Result<()> {
-        assert_eq!(None, parse_entrypoint_params(r#"{"A":"valA","B":"valB"}"#)?);
-        assert!(
-            parse_entrypoint_params(r#"babelsup.entrypoint_params={"A":"valA","B":3}"#).is_err()
-        );
+        assert_eq!(None, parse_entrypoint_params("no params")?);
+        assert!(parse_entrypoint_params(&format!(
+            "{}{}",
+            babel_api::BABELSUP_ENTRYPOINT_PARAMS,
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode("invalid param")
+        ))
+        .is_err());
         assert_eq!(
             Some(HashMap::from([
                 ("A".to_string(), "valA".to_string()),
                 ("B".to_string(), "valB".to_string()),
             ])),
-            parse_entrypoint_params(r#"babelsup.entrypoint_params={"A":"valA","B":"valB"}"#)?
+            parse_entrypoint_params(&format!(
+                "{}{}",
+                babel_api::BABELSUP_ENTRYPOINT_PARAMS,
+                encode([("A", "valA"), ("B", "valB")])
+            ))?
         );
         Ok(())
     }
@@ -668,7 +681,11 @@ mod tests {
 
         assert!(Supervisor::<MockTestTimer>::new(
             test_env.run.clone(),
-            r#"babelsup.entrypoint_params={InvalidJson}"#,
+            &format!(
+                "{}{}",
+                babel_api::BABELSUP_ENTRYPOINT_PARAMS,
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.encode("{InvalidJson}")
+            ),
             cfg.clone(),
             test_env.babel_path.clone(),
             test_env.babel_change_rx.clone(),
@@ -677,7 +694,11 @@ mod tests {
 
         let supervisor = Supervisor::<MockTestTimer>::new(
             test_env.run,
-            r#"babelsup.entrypoint_params={"A":"valA","B":"valB"}"#,
+            &format!(
+                "{}{}",
+                babel_api::BABELSUP_ENTRYPOINT_PARAMS,
+                encode([("A", "valA"), ("B", "valB")])
+            ),
             cfg,
             test_env.babel_path,
             test_env.babel_change_rx,
@@ -727,5 +748,10 @@ mod tests {
                 .unwrap()
         );
         Ok(())
+    }
+
+    fn encode<const N: usize>(arr: [(&str, &str); N]) -> String {
+        base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(postcard::to_allocvec(&HashMap::from(arr)).unwrap())
     }
 }
