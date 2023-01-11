@@ -77,10 +77,10 @@ name = "init"
 transport = "sh"
 body = """
 test /blockjoy/.init && \
-    echo {{secret}} > /blockjoy/secret && \
+    echo {{SECRET}} > /blockjoy/secret && \
     rm /blockjoy/validator_keys/* -f && \
-    for key in {{keys}}; do echo $key > /blockjoy/validator_keys/${uuidgen}.json; done && \
-    lighthouse --network {{network}} account validator import --directory /blockjoy/validator_keys --reuse-password --password-file /blockjoy/secret && \
+    for key in {{KEYS}}; do echo $key > /blockjoy/validator_keys/${uuidgen}.json; done && \
+    lighthouse --network {{NETWORK}} account validator import --directory /blockjoy/validator_keys --reuse-password --password-file /blockjoy/secret && \
     touch /blockjoy/.init
 """
 
