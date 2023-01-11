@@ -146,7 +146,7 @@ fn test_bv_cmd_logs() {
     println!("get logs");
     bv_run(
         &["node", "logs", vm_id],
-        "Helium entry_point not configured!",
+        "Helium entry_point not configured, but parametrized with {{HELIUM_PARAM}}!",
     );
 
     println!("stop started node");

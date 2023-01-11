@@ -21,6 +21,8 @@ path = "src/bin/babelsup.rs"
 [dependencies]
 babel_api = {version = "*", path = "../babel_api"}
 eyre = "0.6.8"
+base64 = "0.21.0"
+postcard = "1.0.2"
 futures = "0.3.21"
 gjson = "0.8"
 ctrlc = "3.2.3"
@@ -56,3 +58,4 @@ serial_test = "0.9.0"
 httpmock = "0.6"
 walkdir = "2"
 tower ="0.4.13"
+postcard = {version = "1.0.2",features= ["alloc"]}
