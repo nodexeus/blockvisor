@@ -338,7 +338,6 @@ async fn test_bv_cmd_init_localhost() {
         meta: Some(ui_pb::RequestMeta::default()),
         host_provision: Some(ui_pb::HostProvision {
             id: None,
-            org_id: org_id.clone(),
             host_id: None,
             created_at: None,
             claimed_at: None,
