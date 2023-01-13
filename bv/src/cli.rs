@@ -129,8 +129,15 @@ pub enum NodeCommand {
     #[clap(alias = "d", alias = "rm")]
     Delete {
         /// One or more node id or names.
-        #[clap(required(true))]
         id_or_names: Vec<String>,
+
+        /// Delete all nodes on this host.
+        #[clap(long, short)]
+        all: bool,
+
+        /// Skip all [y/N] prompts and `just do it`.
+        #[clap(short, long)]
+        yes: bool,
     },
 
     /// Display node logs
