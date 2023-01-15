@@ -41,7 +41,9 @@ pub struct CmdArgs {
 
 pub fn get_ip_address(ifa_name: &str) -> Result<String> {
     let ifas = local_ip_address::list_afinet_netifas()?;
-    let (_, ip) = local_ip_address::find_ifa(ifas, ifa_name)
+    let (_, ip) = ifas
+        .into_iter()
+        .find(|(name, ipaddr)| name == ifa_name && ipaddr.is_ipv4())
         .ok_or_else(|| anyhow!("interface {ifa_name} not found"))?;
     Ok(ip.to_string())
 }
