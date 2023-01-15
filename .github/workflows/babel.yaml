@@ -22,6 +22,9 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+      - name: Setup packages
+        run: >
+          sudo apt install protobuf-compiler
       - name: Test
         run: >
           cargo test -p babel
@@ -36,6 +39,9 @@ jobs:
           profile: minimal
           components: clippy, rustfmt
           override: true
+      - name: Setup packages
+        run: >
+          sudo apt install protobuf-compiler
       - name: Check formatting
         uses: actions-rs/cargo@v1
         with:
