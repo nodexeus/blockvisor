@@ -7,6 +7,7 @@ pub struct Babel {
     pub env: Option<Env>,
     pub config: Config,
     pub requirements: Requirements,
+    pub nets: Vec<NetConfiguration>,
     /// Commands to start blockchain node
     pub supervisor: SupervisorConfig,
     pub keys: Option<HashMap<String, String>>,
@@ -91,6 +92,22 @@ pub struct Requirements {
     pub mem_size_mb: usize,
     // Size of data drive for storing blockchain data (not to be confused with OS drive)
     pub disk_size_gb: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum NetType {
+    Dev,
+    Test,
+    Main,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NetConfiguration {
+    pub name: String,
+    pub url: String,
+    pub net_type: NetType,
+    pub meta: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
