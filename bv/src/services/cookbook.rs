@@ -19,7 +19,7 @@ pub mod cb_pb {
 const BABEL_ARCHIVE_IMAGE_NAME: &str = "blockjoy.gz";
 const BABEL_IMAGE_NAME: &str = "blockjoy";
 const KERNEL_ARCHIVE_NAME: &str = "kernel.gz";
-const BABEL_CONFIG_NAME: &str = "babel.yml";
+const BABEL_CONFIG_NAME: &str = "babel.toml";
 
 pub struct CookbookService {
     token: String,

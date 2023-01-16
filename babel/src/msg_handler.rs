@@ -334,6 +334,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([
@@ -423,6 +424,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([
                 ("first".to_string(), format!("{tmp_dir_str}/first/key")),
@@ -528,6 +530,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: Some(HashMap::from([(
                 WILDCARD_KEY_NAME.to_string(),
@@ -588,6 +591,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
@@ -644,6 +648,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
@@ -711,6 +716,7 @@ mod tests {
                 mem_size_mb: 1,
                 disk_size_gb: 1,
             },
+            nets: vec![],
             supervisor: SupervisorConfig::default(),
             keys: None,
             methods: BTreeMap::from([(
