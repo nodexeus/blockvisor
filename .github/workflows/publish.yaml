@@ -23,7 +23,7 @@ jobs:
           PB_REL="https://github.com/protocolbuffers/protobuf/releases"
           curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
           unzip protoc-3.15.8-linux-x86_64.zip
-          cp bin/protoc /usr/bin/
+          sudo cp bin/protoc /usr/bin/
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
