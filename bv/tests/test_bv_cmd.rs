@@ -411,6 +411,7 @@ async fn test_bv_cmd_init_localhost() {
             id: None,
             org_id: Some(org_id.clone()),
             host_id: Some(host_id.to_string()),
+            host_name: None,
             blockchain_id: Some(blockchain_id.to_string()),
             name: None,
             groups: vec![],
