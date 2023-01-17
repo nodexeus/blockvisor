@@ -429,6 +429,7 @@ async fn test_bv_cmd_init_localhost() {
             staking_status: None,
             ip_gateway: None,
             self_update: Some(false),
+            network: Some("".to_string()),
         }),
     };
     let node: ui_pb::CreateNodeResponse = node_client
