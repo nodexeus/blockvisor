@@ -17,7 +17,7 @@ jobs:
       - name: Get Version
         run: echo GIT_VERSION=$(git describe --tags) >> $GITHUB_ENV
       - name: Install packages
-        run: sudo apt install -y musl-tools
+        run: sudo apt install -y musl-tools protobuf-compiler
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
