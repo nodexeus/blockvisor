@@ -86,3 +86,21 @@ test /blockjoy/.init && \
     [methods.response]
     status = 200
     format = "raw"
+
+[[nets]]
+name = "mainnet"
+net_type = "main"
+url = "https://rpc.ankr.com/eth"
+# meta = {}
+
+[[nets]]
+name = "sepolia"
+net_type = "test"
+url = "https://rpc.sepolia.dev"
+#meta = {}
+
+[[nets]] # will be depreciated
+name = "goerli"
+net_type = "test"
+url = "https://goerli.prylabs.net"
+#meta = {}
