@@ -53,3 +53,11 @@ method = "system_syncState"
     [methods.response]
     code = 200
     field = "result" # find this
+
+[nets.mainnet]
+net_type = "main"
+url = "https://edgeware-evm.jelliedowl.net/"
+
+[nets.testnet]
+net_type = "test"
+url = "https://beresheet-evm.jelliedowl.net/"

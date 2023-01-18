@@ -53,3 +53,7 @@ method = "system_syncState"
     [methods.response]
     code = 200
     field = "result" # find
+
+[nets.mainnet]
+net_type = "main"
+url = "wss://kusama-rpc.polkadot.io"

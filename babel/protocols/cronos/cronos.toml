@@ -53,3 +53,7 @@ method = "eth_syncing"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://rpc-t3.cronos.org/"

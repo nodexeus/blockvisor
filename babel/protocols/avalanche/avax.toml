@@ -54,3 +54,11 @@ method = "platform.getBlockchainStatus"
     code = 200
     field = "result.status"
     # status_enum = { syncing = "Syncing", follower = "Created"}
+
+[nets.mainnet]
+net_type = "main"
+url = "https://api.avax.network/ext/bc/C/rpc"
+
+[nets.testnet]
+net_type = "test"
+url = "https://api.avax-test.network/ext/bc/C/rpc"

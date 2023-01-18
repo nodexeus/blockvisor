@@ -53,3 +53,11 @@ method = "eth_syncing"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://fsn.dev/api"
+
+[nets.testnet]
+net_type = "test"
+url = "https://testnet.fsn.dev/api"

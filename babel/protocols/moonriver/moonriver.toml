@@ -53,3 +53,7 @@ method = "system_syncState"
     [methods.response]
     code = 200
     field = "result" # find this
+
+[nets.mainnet]
+net_type = "main"
+url = "https://moonriver.public.blastapi.io"

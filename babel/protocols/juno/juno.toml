@@ -63,3 +63,10 @@ method = "genesis"
     code = 200
     field = "result"
 
+[nets.mainnet]
+net_type = "main"
+url = "https://raw.githubusercontent.com/CosmosContracts/mainnet/main/juno-1/genesis.json >~/.juno/config/genesis.json" # tbd
+
+[nets.testnet]
+net_type = "test"
+url = "https://raw.githubusercontent.com/CosmosContracts/testnets/main/$CHAIN_ID" # tbd

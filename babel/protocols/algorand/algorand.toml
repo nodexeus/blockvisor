@@ -87,6 +87,10 @@ echo -n "incomplete"
     format = "raw"
 
 
+[nets.mainnet]
+net_type = "main"
+url = "https://algorand-catchpoints.s3.us-east-2.amazonaws.com/channel/mainnet/latest.catchpoint"
+
 [nets.testnet]
 net_type = "test"
-url = "x"
+url = "https://algorand-catchpoints.s3.us-east-2.amazonaws.com/channel/testnet/latest.catchpoint"

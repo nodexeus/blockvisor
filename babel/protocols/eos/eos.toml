@@ -53,3 +53,7 @@ method = "v1/net/connections"
     [methods.response]
     code = 200
     field = "syncing"
+
+[nets.mainnet]
+net_type = "main"
+url = "mainnet.eosamsterdam.net" # tbd

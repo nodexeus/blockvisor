@@ -57,3 +57,15 @@ method = "hello"
     status = 200
     field = "hello" 
     format = "json"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://api.multiversx.com"
+
+[nets.testnet]
+net_type = "test"
+url = "https://testnet-api.multiversx.com"
+
+[nets.devnet]
+net_type = "dev"
+url = "https://devnet-api.multiversx.com"

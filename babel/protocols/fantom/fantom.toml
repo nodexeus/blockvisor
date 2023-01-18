@@ -53,3 +53,11 @@ method = "eth_syncing"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://rpc.ankr.com/fantom/"
+
+[nets.testnet]
+net_type = "test"
+url = "https://rpc.ankr.com/fantom_testnet/"

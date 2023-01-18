@@ -62,3 +62,11 @@ method = "genesis"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://rpc.cosmos.network:26657"
+
+[nets.testnet]
+net_type = "test"
+url = "https://cosmos-testnet-rpc.allthatnode.com:26657"

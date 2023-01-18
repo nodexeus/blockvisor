@@ -53,3 +53,15 @@ method = "system_syncState"
     [methods.response]
     code = 200
     field = "result" # find this
+
+[nets.mainnet]
+net_type = "main"
+url = "wss://rpc.polkadot.io"
+
+[nets.westend]
+net_type = "test"
+url = "wss://westend-rpc.polkadot.io"
+
+[nets.rococo]
+net_type = "test"
+url = "	wss://rococo-rpc.polkadot.io"

@@ -57,3 +57,11 @@ method = "syncing"
     status = 200
     field = "syncing" 
     format = "json"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://evm.kava.io"
+
+[nets.testnet]
+net_type = "test"
+url = "https://evm.testnet.kava.io"

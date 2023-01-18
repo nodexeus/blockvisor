@@ -53,3 +53,15 @@ method = "getHealth"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://rpc.ankr.com/solana"
+
+[nets.testnet]
+net_type = "test"
+url = "https://api.testnet.solana.com"
+
+[nets.devnet]
+net_type = "dev"
+url = "https://api.devnet.solana.com"

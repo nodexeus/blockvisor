@@ -56,3 +56,11 @@ method = "" # find
     status = 200
     field = "" # find
     format = "raw" # find
+
+[nets.mainnet]
+net_type = "main"
+url = "https://emerald.oasis.dev"
+
+[nets.testnet]
+net_type = "test"
+url = "https://testnet.emerald.oasis.dev"

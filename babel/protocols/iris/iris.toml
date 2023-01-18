@@ -62,3 +62,11 @@ method = "genesis"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://raw.githubusercontent.com/irisnet/mainnet/master/config/config.toml" # tbd
+
+[nets.testnet]
+net_type = "test"
+url = "https://github.com/irisnet/testnets/blob/master/nyancat/config/config.toml" # tbd

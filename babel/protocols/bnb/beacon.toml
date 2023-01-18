@@ -62,3 +62,11 @@ method = "genesis"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://dataseed1.binance.org:443"
+
+[nets.testnet]
+net_type = "test"
+url = "https://data-seed-pre-0-s1.binance.org:443"

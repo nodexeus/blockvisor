@@ -9,7 +9,7 @@ node_type = "validator"
 node_version = "1.8..0" 
 min_babel_version = "0.0.1"
 description = "chainlink blockchain validator"
-api_host = "http://localhost:8000/"
+api_host = "http://localhost:6688/"
 ports = [8000]
 
 [requirements]
@@ -66,3 +66,7 @@ method = "/eth/v1/beacon/genesis"
     status = 200
     field = "data"
     format = "json"
+
+[nets.mainnet] # tbd
+net_type = "main"
+url = "http://chain.link"
