@@ -295,9 +295,6 @@ impl NodeClient {
                 let id = Uuid::new_v4();
                 let name = Petnames::default().generate_one(3, "_");
                 let node_image = parse_image(&image)?;
-                // TODO: this configurations is useful for testing on CI machine
-                let gateway = gateway.unwrap_or_else(|| "216.18.214.193".to_string());
-                let ip = ip.unwrap_or_else(|| "216.18.214.195".to_string());
                 let props: HashMap<String, String> = props
                     .as_deref()
                     .map(serde_json::from_str)

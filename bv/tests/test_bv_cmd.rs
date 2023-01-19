@@ -54,7 +54,15 @@ fn create_node(image: &str) -> String {
     use std::str;
 
     let mut cmd = Command::cargo_bin("bv").unwrap();
-    let cmd = cmd.args(&["node", "create", image]);
+    let cmd = cmd.args(&[
+        "node",
+        "create",
+        image,
+        "--gateway",
+        "216.18.214.193",
+        "--ip",
+        "216.18.214.195",
+    ]);
     let output = cmd.output().unwrap();
     let stdout = str::from_utf8(&output.stdout).unwrap();
     let stderr = str::from_utf8(&output.stderr).unwrap();
