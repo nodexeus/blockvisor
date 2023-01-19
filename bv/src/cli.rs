@@ -80,11 +80,11 @@ pub enum NodeCommand {
 
         /// Node IP Address
         #[clap(long)]
-        ip: Option<String>,
+        ip: String,
 
         /// Gateway IP Address
         #[clap(long)]
-        gateway: Option<String>,
+        gateway: String,
 
         /// The properties that are passed to the node. These are used for running certain babel
         /// commands. For example, the ether nodes require that at least one property whose name
