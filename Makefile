@@ -48,8 +48,6 @@ install: bundle
 	rm -rf /opt/blockvisor
 	/tmp/bundle/installer
 
-	systemctl daemon-reload
-	systemctl enable blockvisor.service
 	for image in $$(find /var/lib/blockvisor/images/ -name "*.img"); do \
 		echo $$image; \
 		mount $$image /mnt/fc; \
