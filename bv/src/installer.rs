@@ -1,6 +1,6 @@
 use crate::server::bv_pb::blockvisor_client::BlockvisorClient;
 use crate::server::{bv_pb, BLOCKVISOR_SERVICE_URL};
-use crate::utils::get_process_pid;
+use crate::utils::{get_process_pid, run_cmd};
 use anyhow::{bail, ensure, Context, Error, Result};
 use std::io::Write;
 use std::marker::PhantomData;
@@ -217,7 +217,7 @@ impl<T: Timer> Installer<T> {
     async fn install(&mut self) -> Result<()> {
         self.prepare_running().await?;
         self.install_this_version()?;
-        Self::restart_blockvisor()?;
+        Self::restart_and_reenable_blockvisor().await?;
         self.health_check().await
     }
 
@@ -297,18 +297,11 @@ impl<T: Timer> Installer<T> {
         symlink_all(BLOCKVISOR_SERVICES, &self.paths.system_services)
     }
 
-    fn restart_blockvisor() -> Result<()> {
-        info!("request blockvisor service restart (systemctl restart blockvisor)");
-        let status_code = Command::new("systemctl")
-            .args(["restart", "blockvisor"])
-            .status()
-            .with_context(|| "failed to restart blockvisor service")?
-            .code()
-            .with_context(|| "failed to get systemctl exit status code")?;
-        ensure!(
-            status_code == 0,
-            "blockvisor service restart failed with exit code {status_code}"
-        );
+    async fn restart_and_reenable_blockvisor() -> Result<()> {
+        run_cmd("systemctl", ["daemon-reload"]).await?;
+        run_cmd("systemctl", ["restart", "blockvisor.service"]).await?;
+        run_cmd("systemctl", ["enable", "blockvisor.service"]).await?;
+
         Ok(())
     }
 
