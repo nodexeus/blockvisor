@@ -1,4 +1,4 @@
-use clap::{ArgEnum, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[clap(name = "bv", author, version, about)]
@@ -216,7 +216,7 @@ pub enum ChainCommand {
     },
 }
 
-#[derive(ArgEnum, PartialEq, Eq, Debug, Clone)]
+#[derive(ValueEnum, PartialEq, Eq, Debug, Clone)]
 pub enum FormatArg {
     Text,
     Json,
@@ -225,10 +225,10 @@ pub enum FormatArg {
 #[derive(Debug, Args)]
 pub struct GlobalOpts {
     /// Verbosity level (can be specified multiple times)
-    #[clap(long, short, global = true, parse(from_occurrences))]
-    verbose: usize,
+    #[clap(long, short, global = true, action = clap::ArgAction::Count)]
+    verbose: u8,
 
     /// Output format
-    #[clap(long, short, global = true, arg_enum, default_value = "text")]
+    #[clap(long, short, global = true, value_enum, default_value = "text")]
     pub format: FormatArg,
 }

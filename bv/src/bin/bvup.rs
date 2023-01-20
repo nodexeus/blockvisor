@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 #[derive(Parser, Debug)]
 #[clap(version, about, long_about = None)]
-#[clap(group(ArgGroup::new("input").required(true).args(&["otp", "skip-init"])))]
-#[clap(group(ArgGroup::new("skip").args(&["skip-download", "skip-init"])))]
+#[clap(group(ArgGroup::new("input").required(true).args(&["otp", "skip_init"])))]
+#[clap(group(ArgGroup::new("skip").args(&["skip_download", "skip_init"])))]
 pub struct CmdArgs {
     /// One-time password
     pub otp: Option<String>,
