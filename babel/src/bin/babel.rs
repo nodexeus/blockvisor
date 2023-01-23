@@ -1,4 +1,3 @@
-#[cfg(target_os = "linux")]
 use babel::{babel_service, logging, run_flag::RunFlag};
 use eyre::Context;
 use tonic::transport::Server;
