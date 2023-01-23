@@ -33,7 +33,7 @@ where
 }
 
 /// Get the pid of the running VM process knowing its process name and part of command line.
-pub fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
+pub fn get_process_pid(process_name: &str, cmd: &str) -> Result<u32> {
     let mut sys = System::new();
     debug!("Retrieving pid for process `{process_name}` and cmd like `{cmd}`");
     // TODO: would be great to save the System and not do a full refresh each time
@@ -45,7 +45,7 @@ pub fn get_process_pid(process_name: &str, cmd: &str) -> Result<i32> {
 
     match processes.len() {
         0 => bail!("No {process_name} processes running for id: {cmd}"),
-        1 => processes[0].pid().as_u32().try_into().map_err(Into::into),
+        1 => Ok(processes[0].pid().as_u32()),
         _ => bail!("More then 1 {process_name} process running for id: {cmd}"),
     }
 }
