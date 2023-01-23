@@ -127,7 +127,7 @@ async fn serve(
 #[cfg(not(target_os = "linux"))]
 async fn serve(
     _run: RunFlag,
-    _sup_setup_tx: supervisor::SupervisorSetupTx,
+    _sup_setup: SupervisorSetup,
     _babel_change_tx: supervisor::BabelChangeTx,
 ) -> eyre::Result<()> {
     unimplemented!()
