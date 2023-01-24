@@ -138,7 +138,7 @@ fn walk_toml_tree<'a>(
 }
 
 /// Get a Babel config value string specified by `path` argument.
-/// Path are '.' separated names of sub nodes in the config structure treee.
+/// Path are '.' separated names of sub nodes in the config structure tree.
 /// See `walk_toml_tree()` for more.
 pub fn get_config_value_by_path(value: &toml::Value, path: &str) -> Option<String> {
     walk_toml_tree(value, path.split('.')).map(|v| {
