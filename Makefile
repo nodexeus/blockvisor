@@ -64,7 +64,7 @@ install: bundle
 	done
 
 reinstall:
-	systemctl stop blockvisor.service
+	systemctl stop blockvisor.service || true
 	make install
 	systemctl start blockvisor.service
 

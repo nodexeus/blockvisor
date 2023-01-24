@@ -315,27 +315,38 @@ async fn test_bv_cmd_init_localhost() {
     println!("user created: {user:?}");
     assert_eq!(user.meta.as_ref().unwrap().origin_request_id, request_id);
     let user_id = get_first_message(user.meta);
-
     let id = uuid::Uuid::parse_str(&user_id).unwrap();
-    let auth_token = token::TokenGenerator::create_auth(id, "1245456".to_string());
-    let refresh_token = token::TokenGenerator::create_refresh(id, "23942390".to_string());
 
-    println!("get user organization id");
-    let mut client = ui_pb::organization_service_client::OrganizationServiceClient::connect(url)
+    println!("confirm user");
+    let mut client =
+        ui_pb::authentication_service_client::AuthenticationServiceClient::connect(url)
+            .await
+            .unwrap();
+    let confirm_user = ui_pb::ConfirmRegistrationRequest {
+        meta: Some(ui_pb::RequestMeta::default()),
+    };
+    let refresh_token = token::TokenGenerator::create_refresh(id, "23942390".to_string());
+    let register_token = token::TokenGenerator::create_register(id, "23ß357320".to_string());
+    client
+        .confirm(with_auth(confirm_user, &register_token, &refresh_token))
         .await
         .unwrap();
 
-    let org_get = ui_pb::GetOrganizationsRequest {
+    println!("login user");
+    let login_user = ui_pb::LoginUserRequest {
         meta: Some(ui_pb::RequestMeta::default()),
-        org_id: None,
+        email: email.to_string(),
+        password: password.to_string(),
     };
-    let orgs: ui_pb::GetOrganizationsResponse = client
-        .get(with_auth(org_get, &auth_token, &refresh_token))
-        .await
-        .unwrap()
-        .into_inner();
-    println!("user org: {orgs:?}");
-    let org_id = orgs.organizations.first().unwrap().id.as_ref().unwrap();
+    let login: ui_pb::LoginUserResponse = client.login(login_user).await.unwrap().into_inner();
+    println!("user login: {login:?}");
+    let login_token = login.token.unwrap().value;
+    let login_auth: token::AuthClaim =
+        token::TokenGenerator::from_encoded("1245456".to_string(), &login_token).unwrap();
+    let login_data = login_auth.data.unwrap();
+    let org_id = login_data.get("org_id").unwrap();
+
+    let auth_token = token::TokenGenerator::create_auth(id, "1245456".to_string(), org_id.clone());
 
     println!("create host provision");
     let mut client = ui_pb::host_provision_service_client::HostProvisionServiceClient::connect(url)
