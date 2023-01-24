@@ -23,7 +23,7 @@ data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
     command = "/usr/bin/lighthouse"
-    args = ["--datadir", "/blockjoy/lighthouse", "vc", "--network", "{{NETWORK}}", "--http", "--suggested-fee-recipient", "{{ETH_WALLET}}", "--beacon-nodes", "babelref:'nets.{{NETWORK}}.beacon_nodes_csv'"]
+    args = ["--datadir", "/blockjoy/lighthouse", "vc", "--network", "{{NETWORK}}", "--http", "--suggested-fee-recipient", "{{FEE-RECIPIENT}}", "--beacon-nodes", "babelref:'nets.{{NETWORK}}.beacon_nodes_csv'"]
 
 [keys]
 "*" = "/opt/secrets"
