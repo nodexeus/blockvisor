@@ -17,12 +17,12 @@ use crate::{
     network_interface::NetworkInterface,
     node::Node,
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
+    render,
     services::{
         api::{pb, pb::node_info::ContainerStatus},
         cookbook::CookbookService,
         keyfiles::KeyService,
     },
-    utils,
 };
 
 fn id_not_found(id: Uuid) -> anyhow::Error {
@@ -74,8 +74,9 @@ impl Nodes {
 
         let mut babel_conf = self.fetch_image_data(&image).await?;
         check_babel_version(&babel_conf.config.min_babel_version)?;
+        let conf = toml::Value::try_from(&babel_conf)?;
         babel_conf.supervisor.entry_point =
-            render_entry_point_args(&babel_conf.supervisor.entry_point, &properties)?;
+            render_entry_point_args(&babel_conf.supervisor.entry_point, &properties, &conf)?;
 
         let _ = self.send_container_status(&id, ContainerStatus::Creating);
 
@@ -497,6 +498,7 @@ pub fn check_babel_version(min_babel_version: &str) -> Result<()> {
 fn render_entry_point_args(
     entry_points: &[Entrypoint],
     params: &NodeProperties,
+    conf: &toml::Value,
 ) -> Result<Vec<Entrypoint>> {
     // join all entrypoints arguments
     let args = entry_points
@@ -522,7 +524,7 @@ fn render_entry_point_args(
     let mut entry_points = entry_points.to_vec();
     for item in &mut entry_points {
         for arg in &mut item.args {
-            *arg = utils::render(arg.as_str(), &params);
+            *arg = render::render(arg, &params, conf);
         }
     }
     Ok(entry_points)
@@ -530,6 +532,8 @@ fn render_entry_point_args(
 
 #[cfg(test)]
 mod tests {
+    use crate::utils;
+
     use super::*;
     use babel_api::config::{Method, MethodResponseFormat, Requirements, ShResponse};
     use std::collections::BTreeMap;
@@ -537,6 +541,10 @@ mod tests {
 
     #[test]
     fn test_render_entry_point_args() -> Result<()> {
+        let conf = toml::toml!(
+        [aa]
+        bb = "cc"
+        );
         let entrypoints = vec![
             Entrypoint {
                 command: "cmd1".to_string(),
@@ -544,6 +552,7 @@ mod tests {
                     "none_parametrized_argument".to_string(),
                     "first_parametrized_{{PARAM1}}_argument".to_string(),
                     "second_parametrized_{{PARAM1}}_{{PARAM2}}_argument".to_string(),
+                    "third_parammy_babelref:'aa.{{PARAM_BB}}'_argument".to_string(),
                 ],
             },
             Entrypoint {
@@ -558,6 +567,7 @@ mod tests {
             ("PARAM1".to_string(), "://Value.1,-_Q".to_string()),
             ("PARAM2".to_string(), "Value.2,-_Q".to_string()),
             ("PARAM3".to_string(), "!Invalid_but_not_used".to_string()),
+            ("PARAM_BB".to_string(), "bb".to_string()),
         ]);
         assert_eq!(
             vec![
@@ -567,6 +577,7 @@ mod tests {
                         "none_parametrized_argument".to_string(),
                         "first_parametrized_://Value.1,-_Q_argument".to_string(),
                         "second_parametrized_://Value.1,-_Q_Value.2,-_Q_argument".to_string(),
+                        "third_parammy_cc_argument".to_string(),
                     ],
                 },
                 Entrypoint {
@@ -577,10 +588,10 @@ mod tests {
                     ],
                 }
             ],
-            render_entry_point_args(&entrypoints, &node_props)?
+            render_entry_point_args(&entrypoints, &node_props, &conf)?
         );
         node_props.get_mut("PARAM1").unwrap().push('@');
-        assert!(render_entry_point_args(&entrypoints, &node_props).is_err());
+        render_entry_point_args(&entrypoints, &node_props, &conf).unwrap_err();
         Ok(())
     }
 
