@@ -37,6 +37,15 @@ bundle: get-firecraker build-release
 	tar -C /tmp -czvf /tmp/bundle.tar.gz bundle
 	cp target/x86_64-unknown-linux-musl/release/bvup /tmp/bvup
 
+babelsup: build-release
+	rm -rf /tmp/babelsup.tar.gz
+	rm -rf /tmp/babelsup
+	mkdir -p /tmp/babelsup/usr/bin/ /tmp/babelsup/etc/systemd/system/ /tmp/babelsup/etc/systemd/system/multi-user.target.wants/
+	cp target/x86_64-unknown-linux-musl/release/babelsup /tmp/babelsup/usr/bin/
+	cp babel/data/babelsup.service /tmp/babelsup/etc/systemd/system/
+	ln -sr /tmp/babelsup/etc/systemd/system/babelsup.service /tmp/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service
+	tar -C /tmp -czvf /tmp/babelsup.tar.gz babelsup
+
 tag: CARGO_VERSION = $(shell grep '^version' Cargo.toml | sed "s/ //g" | cut -d = -f 2 | sed "s/\"//g")
 tag: GIT_VERSION = $(shell git describe --tags)
 tag:
@@ -54,8 +63,7 @@ install: bundle
 		rm -f /mnt/fc/usr/bin/babel; \
 		install -m u=rwx,g=rx,o=rx target/x86_64-unknown-linux-musl/release/babelsup /mnt/fc/usr/bin/; \
 		install -m u=rw,g=r,o=r babel/data/babelsup.service /mnt/fc/etc/systemd/system/; \
-		rm -f /mnt/fc/etc/systemd/system/multi-user.target.wants/babelsup.service; \
-		ln -s /mnt/fc/etc/systemd/system/babelsup.service /mnt/fc/etc/systemd/system/multi-user.target.wants/babelsup.service; \
+		ln -srf /mnt/fc/etc/systemd/system/babelsup.service /mnt/fc/etc/systemd/system/multi-user.target.wants/babelsup.service; \
 		umount /mnt/fc; \
 	done
 	for babel_conf in $$(find /var/lib/blockvisor/images/ -name "*.toml"); do \

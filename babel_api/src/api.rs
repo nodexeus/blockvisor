@@ -17,6 +17,7 @@ pub enum BabelMethod {
 
 #[tonic_rpc::tonic_rpc(bincode)]
 pub trait BabelSup {
+    fn get_version() -> String;
     #[server_streaming]
     fn get_logs() -> String;
     fn check_babel(checksum: u32) -> BabelStatus;

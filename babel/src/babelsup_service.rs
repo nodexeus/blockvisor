@@ -34,6 +34,10 @@ pub struct BabelSupService<T: SupervisorConfigObserver> {
 impl<T: SupervisorConfigObserver + Sync + Send + 'static> babel_api::babel_sup_server::BabelSup
     for BabelSupService<T>
 {
+    async fn get_version(&self, _request: Request<()>) -> Result<Response<String>, Status> {
+        Ok(Response::new(env!("CARGO_PKG_VERSION").to_string()))
+    }
+
     type GetLogsStream = tokio_stream::Iter<std::vec::IntoIter<Result<String, Status>>>;
 
     async fn get_logs(
