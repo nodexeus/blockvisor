@@ -1,27 +1,38 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use base64::Engine;
 use jsonwebtoken as jwt;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub trait Claim {}
 
-#[derive(Serialize)]
-struct AuthClaim {
-    id: uuid::Uuid,
-    exp: i64,
-    token_type: String,
-    role: String,
+#[derive(Serialize, Deserialize)]
+pub struct AuthClaim {
+    pub id: uuid::Uuid,
+    pub exp: i64,
+    pub token_type: String,
+    pub role: String,
+    pub data: Option<HashMap<String, String>>,
 }
 
 #[derive(Serialize)]
-struct RefreshClaim {
-    id: uuid::Uuid,
-    exp: i64,
-    token_type: String,
+pub struct RefreshClaim {
+    pub id: uuid::Uuid,
+    pub exp: i64,
+    pub token_type: String,
+}
+
+#[derive(Serialize)]
+pub struct RegistrationClaim {
+    pub id: uuid::Uuid,
+    pub exp: i64,
+    pub token_type: String,
+    pub role: String,
 }
 
 impl Claim for AuthClaim {}
 impl Claim for RefreshClaim {}
+impl Claim for RegistrationClaim {}
 
 pub struct TokenGenerator;
 
@@ -36,12 +47,30 @@ impl TokenGenerator {
         Self::encode(&claim, &secret).unwrap()
     }
 
-    pub fn create_auth(id: uuid::Uuid, secret: String) -> String {
+    pub fn create_register(id: uuid::Uuid, secret: String) -> String {
+        let claim = RegistrationClaim {
+            id,
+            exp: 1768022101,
+            token_type: "registration_confirmation".to_string(),
+            role: "user".to_string(),
+        };
+
+        match Self::encode(&claim, &secret) {
+            Ok(token) => base64::engine::general_purpose::STANDARD.encode(token),
+            Err(_) => String::default(),
+        }
+    }
+
+    pub fn create_auth(id: uuid::Uuid, secret: String, org_id: String) -> String {
         let claim = AuthClaim {
             id,
             exp: 1768022101,
             token_type: "user_auth".to_string(),
             role: "admin".to_string(),
+            data: Some(HashMap::from([
+                ("org_id".to_string(), org_id),
+                ("org_role".to_string(), "owner".to_string()),
+            ])),
         };
 
         match Self::encode(&claim, &secret) {
@@ -55,5 +84,20 @@ impl TokenGenerator {
         let key = jwt::EncodingKey::from_secret(secret.as_ref());
 
         jwt::encode(&headers, &claim, &key).map_err(|e| anyhow!(e))
+    }
+
+    pub fn from_encoded<T: Claim + DeserializeOwned>(secret: String, token: &str) -> Result<T> {
+        let validation = jwt::Validation::new(jwt::Algorithm::HS512);
+        let token = base64::engine::general_purpose::STANDARD.decode(token)?;
+        let token = std::str::from_utf8(&token)?;
+
+        match jwt::decode::<T>(
+            token,
+            &jwt::DecodingKey::from_secret(secret.as_bytes()),
+            &validation,
+        ) {
+            Ok(token) => Ok(token.claims),
+            Err(e) => bail!("Error decoding token: {e:?}"),
+        }
     }
 }
