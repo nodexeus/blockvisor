@@ -187,13 +187,6 @@ impl Nodes {
         node.start().await?;
         debug!("Node started");
 
-        let node_keys = node
-            .data
-            .properties
-            .iter()
-            .map(|(k, v)| (k.clone(), v.as_bytes().into()))
-            .collect();
-
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
         let secret_keys = match self.exchange_keys(&id).await {
@@ -206,39 +199,27 @@ impl Nodes {
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
 
+        let node_keys = node
+            .data
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_bytes().into()));
+
         let params = Self::prep_init_params(secret_keys, node_keys)?;
         node.init(params).await?;
 
         Ok(())
     }
 
-    /// Prepares the init params into a representation that the sh-commands we use in babel
-    /// expects. This means that we need to take the secret that is stored in the KeyService, and
-    /// the secrets that are stored in the node data. The result is a map from String to
-    /// Vec<String>. This is because for some secrets, it is possible to provide multiple values.
-    /// We call these the `LIST_SECRETS`. The secrets for which it is possible to provided only one
-    /// value we call the `STRING_SECRETS`.
     fn prep_init_params(
         secret_keys: HashMap<String, Vec<u8>>,
-        node_keys: HashMap<String, Vec<u8>>,
+        node_keys: impl Iterator<Item = (String, Vec<u8>)>,
     ) -> Result<HashMap<String, Vec<String>>> {
-        /// The list of possible string secret names.
-        const STRING_SECRETS: [&str; 1] = ["secret"];
-        /// The list of possible list secret names.
-        const LIST_SECRETS: [&str; 1] = ["key"];
-
-        let mut params = HashMap::new();
-        for (name, content) in secret_keys.into_iter().chain(node_keys) {
-            if let Some(&name) = STRING_SECRETS.iter().find(|&&n| n == name) {
-                params.insert(name.to_string(), vec![String::from_utf8(content)?]);
-            } else if let Some(&name) = LIST_SECRETS.iter().find(|&&n| name.starts_with(n)) {
-                params
-                    .entry(name.to_string())
-                    .or_default()
-                    .push(String::from_utf8(content)?);
-            }
+        let mut res: HashMap<String, Vec<String>> = HashMap::new();
+        for (k, v) in secret_keys.into_iter().chain(node_keys) {
+            res.entry(k).or_default().push(String::from_utf8(v)?);
         }
-        Ok(params)
+        Ok(res)
     }
 
     #[instrument(skip(self))]
