@@ -73,7 +73,7 @@ name = "init"
 transport = "sh"
 body = """
 test /blockjoy/.init && \
-    echo {{voting-pwd}} > /blockjoy/secret && \
+    echo {{VOTING-PWD}} > /blockjoy/secret && \
     mkdir /blockjoy/validator_keys -p && \
     rm /blockjoy/validator_keys/* -f && \
     for key in {{KEYS}}; do echo $key > /blockjoy/validator_keys/keystore-$(shuf -i 100000-999999 -n 1).json; done && \
