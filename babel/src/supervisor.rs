@@ -643,7 +643,7 @@ mod tests {
             &["a".to_string(), "b".to_string(), "c".to_string()].to_vec(),
             ps,
         );
-        assert!(child.kill().await.is_err());
+        child.kill().await.unwrap_err();
         Ok(())
     }
 }

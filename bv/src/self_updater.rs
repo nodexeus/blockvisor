@@ -297,7 +297,7 @@ mod tests {
         };
 
         // no server
-        assert!(test_env.updater.get_latest().await.is_err());
+        test_env.updater.get_latest().await.unwrap_err();
 
         let mut bundles_mock = MockTestBundleService::new();
         bundles_mock
@@ -347,11 +347,11 @@ mod tests {
         let server = MockServer::start();
 
         // no server
-        assert!(test_env
+        test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await
-            .is_err());
+            .unwrap_err();
 
         let mut bundles_mock = MockTestBundleService::new();
         bundles_mock.expect_retrieve().once().returning(|_| {
@@ -369,22 +369,22 @@ mod tests {
         });
         let bundle_server = test_env.start_test_server(bundles_mock);
 
-        assert!(test_env
+        test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await
-            .is_err());
+            .unwrap_err();
 
         let mock = server.mock(|when, then| {
             when.method(GET);
             then.status(200).body("invalid");
         });
 
-        assert!(test_env
+        test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await
-            .is_err());
+            .unwrap_err();
         mock.assert();
         bundle_server.assert().await;
         Ok(())
