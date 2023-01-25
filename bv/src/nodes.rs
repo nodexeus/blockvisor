@@ -187,13 +187,6 @@ impl Nodes {
         node.start().await?;
         debug!("Node started");
 
-        let node_keys = node
-            .data
-            .properties
-            .iter()
-            .map(|(k, v)| (k.clone(), v.as_bytes().into()))
-            .collect();
-
         let _ = self.send_container_status(&id, ContainerStatus::Running);
 
         let secret_keys = match self.exchange_keys(&id).await {
@@ -206,6 +199,12 @@ impl Nodes {
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
 
+        let node_keys = node
+            .data
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_bytes().into()));
+
         let params = Self::prep_init_params(secret_keys, node_keys)?;
         node.init(params).await?;
 
@@ -214,7 +213,7 @@ impl Nodes {
 
     fn prep_init_params(
         secret_keys: HashMap<String, Vec<u8>>,
-        node_keys: HashMap<String, Vec<u8>>,
+        node_keys: impl Iterator<Item = (String, Vec<u8>)>,
     ) -> Result<HashMap<String, Vec<String>>> {
         let mut res: HashMap<String, Vec<String>> = HashMap::new();
         for (k, v) in secret_keys.into_iter().chain(node_keys) {
