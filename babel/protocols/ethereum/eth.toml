@@ -98,4 +98,4 @@ beacon_nodes_csv = "http://beacon01.sepolia.eth.blockjoy.com,http://beacon02.sep
 [nets.goerli] # will be depreciated
 net_type = "test"
 url = "https://goerli.prylabs.net"
-beacon_nodes_csv = "http://beacon02.goerli.eth.blockjoy.com:6868,http://beacon01.goerli.eth.blockjoy.com:6868"
+beacon_nodes_csv = "http://beacon02.goerli.eth.nyc.blockjoy.com:6868,http://beacon01.goerli.eth.nyc.blockjoy.com:6868"
