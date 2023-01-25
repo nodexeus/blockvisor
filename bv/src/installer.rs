@@ -611,7 +611,7 @@ mod tests {
             }
         });
         let server = test_env.start_test_server(bv_mock);
-        assert!(test_env.installer.prepare_running().await.is_err());
+        test_env.installer.prepare_running().await.unwrap_err();
         server.assert().await;
         Ok(())
     }
@@ -678,7 +678,7 @@ mod tests {
             sleep(Duration::from_millis(10));
         }
 
-        assert!(test_env.installer.health_check().await.is_err());
+        test_env.installer.health_check().await.unwrap_err();
         server.assert().await;
         Ok(())
     }
@@ -723,10 +723,10 @@ mod tests {
         let test_env = TestEnv::new().await?;
         let bundle_path = test_env.tmp_root.join("bundle");
 
-        assert!(test_env
+        test_env
             .installer
             .move_bundle_to_install_path(bundle_path.join("installer"))
-            .is_err());
+            .unwrap_err();
 
         fs::create_dir_all(&bundle_path.join("some_dir/with_subdir"))?;
         touch_file(&bundle_path.join("installer"))?;
@@ -773,11 +773,11 @@ mod tests {
     async fn test_install_this_version() -> Result<()> {
         let test_env = TestEnv::new().await?;
 
-        assert!(test_env.installer.install_this_version().is_err());
+        test_env.installer.install_this_version().unwrap_err();
 
         let this_path = &test_env.installer.paths.this_version;
         fs::create_dir_all(this_path)?;
-        assert!(test_env.installer.install_this_version().is_err());
+        test_env.installer.install_this_version().unwrap_err();
 
         fs::create_dir_all(this_path.join(BLOCKVISOR_BIN))?;
         fs::create_dir_all(this_path.join(BLOCKVISOR_SERVICES))?;
@@ -787,7 +787,7 @@ mod tests {
         touch_file(&this_path.join(BLOCKVISOR_BIN).join("some_bin"))?;
         touch_file(&this_path.join(BLOCKVISOR_SERVICES).join("some_service"))?;
         touch_file(&this_path.join(FC_BIN).join("firecracker"))?;
-        assert!(test_env.installer.install_this_version().is_err());
+        test_env.installer.install_this_version().unwrap_err();
 
         fs::create_dir_all(&test_env.installer.paths.system_bin)?;
         fs::create_dir_all(&test_env.installer.paths.system_services)?;
@@ -820,17 +820,17 @@ mod tests {
     async fn test_broken_installation() -> Result<()> {
         let test_env = TestEnv::new().await?;
 
-        assert!(test_env
+        test_env
             .installer
             .handle_broken_installation(BackupStatus::ThisIsRollback, anyhow!("error"))
-            .is_err());
+            .unwrap_err();
         assert!(!test_env.installer.is_blacklisted(THIS_VERSION)?);
 
         fs::create_dir_all(&test_env.installer.paths.install_path)?;
-        assert!(test_env
+        test_env
             .installer
             .handle_broken_installation(BackupStatus::NothingToBackup, anyhow!("error"))
-            .is_err());
+            .unwrap_err();
         assert!(test_env.installer.is_blacklisted(THIS_VERSION)?);
 
         fs::create_dir_all(&test_env.installer.paths.backup)?;
@@ -850,10 +850,10 @@ mod tests {
             writeln!(backup_installer, "exit 1")?;
         }
         let _ = fs::remove_file(test_env.tmp_root.join("dummy_installer"));
-        assert!(test_env
+        test_env
             .installer
             .handle_broken_installation(BackupStatus::Done, anyhow!("error"))
-            .is_err());
+            .unwrap_err();
         assert!(test_env.tmp_root.join("dummy_installer").exists());
 
         Ok(())
@@ -865,7 +865,7 @@ mod tests {
         let test_env = TestEnv::new().await?;
 
         // cant cleanup non existing dir nothing
-        assert!(test_env.installer.cleanup().is_err());
+        test_env.installer.cleanup().unwrap_err();
 
         fs::create_dir_all(&test_env.installer.paths.install_path)?;
 

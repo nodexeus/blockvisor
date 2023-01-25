@@ -309,20 +309,20 @@ mod tests {
             babel_api::BabelBin::Bin(vec![21, 22, 23, 24, 26, 27, 28, 29, 30]),
         ];
 
-        assert!(test_env
+        test_env
             .client
             .start_new_babel(tokio_stream::iter(incomplete_babel_bin.clone()))
             .await
-            .is_err());
+            .unwrap_err();
         assert!(!test_env.babel_change_rx.has_changed()?);
 
         let mut invalid_babel_bin = incomplete_babel_bin.clone();
         invalid_babel_bin.push(babel_api::BabelBin::Checksum(123));
-        assert!(test_env
+        test_env
             .client
             .start_new_babel(tokio_stream::iter(invalid_babel_bin))
             .await
-            .is_err());
+            .unwrap_err();
         assert!(!test_env.babel_change_rx.has_changed()?);
 
         let mut babel_bin = incomplete_babel_bin.clone();

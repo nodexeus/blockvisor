@@ -105,7 +105,7 @@ mod tests {
             .attach::<tokio::io::Empty, tokio::io::Empty>("name1", None, None)
             .await
             .unwrap();
-        assert!(rx.try_recv().is_err());
+        rx.try_recv().unwrap_err();
     }
 
     #[tokio::test]
