@@ -120,6 +120,13 @@ fn test_bv_chain_list() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
+fn test_bv_cmd_delete_all() {
+    bv_run(&["node", "rm", "--all", "--yes"], "");
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_cmd_node_start_and_stop_all() {
     const NODES_COUNT: usize = 2;
     println!("create {NODES_COUNT} nodes");
@@ -182,9 +189,6 @@ async fn test_bv_cmd_node_lifecycle() {
 
     println!("restart stopped node");
     bv_run(&["node", "start", vm_id], "Started node");
-
-    // TODO: think about better way to make the following metrics test stable
-    sleep(Duration::from_secs(10)).await;
 
     println!("query metrics");
     bv_run(&["node", "metrics", vm_id], "In consensus:        false");

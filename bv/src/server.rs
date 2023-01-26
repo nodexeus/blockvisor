@@ -381,7 +381,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
 
 impl fmt::Display for bv_pb::NodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

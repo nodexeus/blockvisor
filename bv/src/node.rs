@@ -22,7 +22,7 @@ use crate::{
 
 const NODE_START_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(30);
+const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
@@ -123,6 +123,9 @@ impl Node {
             .await?
             .setup_supervisor(self.data.babel_conf.supervisor.clone())
             .await?;
+
+        // TODO: sadly this is still requiered for reasons we do not yet understand
+        sleep(Duration::from_secs(10)).await;
 
         // We save the `running` status only after all of the previous steps have succeeded.
         self.data.expected_status = NodeStatus::Running;

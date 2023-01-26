@@ -21,12 +21,12 @@ where
     match cmd
         .status()
         .await
-        .with_context(|| format!("Failed to run command `{:?}`", cmd))?
+        .with_context(|| format!("Failed to run command `{cmd:?}`"))?
         .code()
     {
-        Some(code) if code != 0 => bail!("Command `{:?}` failed with exit code {}", cmd, code),
+        Some(code) if code != 0 => bail!("Command `{cmd:?}` failed with exit code {code}"),
         Some(_) => Ok(()),
-        None => bail!("Command `{:?}` failed with no exit code", cmd),
+        None => bail!("Command `{cmd:?}` failed with no exit code"),
     }
 }
 
