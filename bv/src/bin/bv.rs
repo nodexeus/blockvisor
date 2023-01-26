@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
                     .nodes;
                 for node in nodes {
                     let id = node.id;
-                    println!("Deleting node with ID `{}`", &id);
+                    println!("Deleting node with ID `{id}`");
                     service_client
                         .delete_node(bv_pb::DeleteNodeRequest { id })
                         .await?;
@@ -247,7 +247,7 @@ impl NodeClient {
             self.client
                 .start_node(bv_pb::StartNodeRequest { id: id.clone() })
                 .await?;
-            println!("Started node `{}`", id);
+            println!("Started node `{id}`");
         }
         Ok(())
     }
@@ -257,7 +257,7 @@ impl NodeClient {
             self.client
                 .stop_node(bv_pb::StopNodeRequest { id: id.clone() })
                 .await?;
-            println!("Stopped node `{}`", id);
+            println!("Stopped node `{id}`");
         }
         Ok(())
     }
@@ -314,10 +314,7 @@ impl NodeClient {
                         properties,
                     })
                     .await?;
-                println!(
-                    "Created new node from `{}` image with ID `{}` and name `{}`",
-                    image, id, &name
-                );
+                println!("Created new node from `{image}` image with ID `{id}` and name `{name}`");
             }
             NodeCommand::Upgrade { id_or_names, image } => {
                 let node_image = parse_image(&image)?;
@@ -329,7 +326,7 @@ impl NodeClient {
                             image: Some(node_image.clone()),
                         })
                         .await?;
-                    println!("Upgraded node `{}` to `{}` image", id, image);
+                    println!("Upgraded node `{id}` to `{image}` image");
                 }
             }
             NodeCommand::Start { id_or_names } => {
@@ -381,7 +378,7 @@ impl NodeClient {
                     .get_node_logs(bv_pb::GetNodeLogsRequest { id: id.clone() })
                     .await?;
                 for log in logs.into_inner().logs {
-                    print!("{}", log);
+                    print!("{log}");
                 }
             }
             NodeCommand::Status { id_or_names } => {
@@ -405,7 +402,7 @@ impl NodeClient {
                     .get_node_keys(bv_pb::GetNodeKeysRequest { id })
                     .await?;
                 for name in keys.into_inner().names {
-                    println!("{}", name);
+                    println!("{name}");
                 }
             }
             NodeCommand::Capabilities { id_or_name } => {

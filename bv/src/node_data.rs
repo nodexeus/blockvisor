@@ -23,7 +23,7 @@ pub enum NodeStatus {
 
 impl fmt::Display for NodeStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
