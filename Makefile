@@ -57,6 +57,7 @@ install: bundle
 	rm -rf /opt/blockvisor
 	/tmp/bundle/installer
 
+	mkdir -p /mnt/fc
 	for image in $$(find /var/lib/blockvisor/images/ -name "*.img"); do \
 		echo $$image; \
 		mount $$image /mnt/fc; \
