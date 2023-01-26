@@ -120,6 +120,13 @@ fn test_bv_chain_list() {
 #[test]
 #[serial]
 #[cfg(target_os = "linux")]
+fn test_bv_cmd_delete_all() {
+    bv_run(&["node", "rm", "--all", "--yes"], "");
+}
+
+#[test]
+#[serial]
+#[cfg(target_os = "linux")]
 fn test_bv_cmd_node_start_and_stop_all() {
     const NODES_COUNT: usize = 2;
     println!("create {NODES_COUNT} nodes");
