@@ -124,6 +124,9 @@ impl Node {
             .setup_supervisor(self.data.babel_conf.supervisor.clone())
             .await?;
 
+        // TODO: sadly this is still requiered for reasons we do not yet understand
+        sleep(Duration::from_secs(10)).await;
+
         // We save the `running` status only after all of the previous steps have succeeded.
         self.data.expected_status = NodeStatus::Running;
         self.data.save().await

@@ -190,9 +190,6 @@ async fn test_bv_cmd_node_lifecycle() {
     println!("restart stopped node");
     bv_run(&["node", "start", vm_id], "Started node");
 
-    // TODO: think about better way to make the following metrics test stable
-    sleep(Duration::from_secs(10)).await;
-
     println!("query metrics");
     bv_run(&["node", "metrics", vm_id], "In consensus:        false");
 
