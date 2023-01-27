@@ -332,7 +332,8 @@ async fn test_bv_cmd_init_localhost() {
         meta: Some(ui_pb::RequestMeta::default()),
     };
     let refresh_token = token::TokenGenerator::create_refresh(id, "23942390".to_string());
-    let register_token = token::TokenGenerator::create_register(id, "23ß357320".to_string());
+    let register_token =
+        token::TokenGenerator::create_register(id, "23ß357320".to_string(), email.to_string());
     client
         .confirm(with_auth(confirm_user, &register_token, &refresh_token))
         .await
@@ -352,7 +353,12 @@ async fn test_bv_cmd_init_localhost() {
     let login_data = login_auth.data.unwrap();
     let org_id = login_data.get("org_id").unwrap();
 
-    let auth_token = token::TokenGenerator::create_auth(id, "1245456".to_string(), org_id.clone());
+    let auth_token = token::TokenGenerator::create_auth(
+        id,
+        "1245456".to_string(),
+        org_id.clone(),
+        email.to_string(),
+    );
 
     println!("create host provision");
     let mut client = ui_pb::host_provision_service_client::HostProvisionServiceClient::connect(url)
