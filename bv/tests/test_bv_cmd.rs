@@ -825,33 +825,43 @@ async fn test_bv_cmd_grpc_commands() {
 
     println!("got updates: {updates:?}");
     let expected_updates = vec![
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Creating),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         error_command_update(&command_id, format!("Node with id `{node_id}` exists")),
+        ack_command_update(&command_id),
         error_command_update(&command_id, format!("Node with name `{node_name}` exists")),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
         node_update(&node_id, pb::node_info::ContainerStatus::Starting),
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Upgrading),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
         node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
@@ -859,6 +869,7 @@ async fn test_bv_cmd_grpc_commands() {
         node_update(&node_id, pb::node_info::ContainerStatus::Running),
         node_update(&node_id, pb::node_info::ContainerStatus::Upgraded),
         success_command_update(&command_id),
+        ack_command_update(&command_id),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleting),
         node_update(&node_id, pb::node_info::ContainerStatus::Deleted),
         success_command_update(&command_id),
@@ -868,7 +879,7 @@ async fn test_bv_cmd_grpc_commands() {
         assert_eq!(actual.unwrap(), expected);
     }
 
-    assert_eq!(updates_count, 37);
+    assert_eq!(updates_count, 48);
 }
 
 #[cfg(target_os = "linux")]
@@ -889,6 +900,17 @@ fn error_command_update(command_id: &str, message: String) -> pb::InfoUpdate {
             id: command_id.to_string(),
             response: Some(message),
             exit_code: Some(1),
+        })),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn ack_command_update(command_id: &str) -> pb::InfoUpdate {
+    pb::InfoUpdate {
+        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
+            id: command_id.to_string(),
+            response: None,
+            exit_code: None,
         })),
     }
 }
