@@ -216,7 +216,6 @@ impl BabelService {
     }
 }
 
-//TODO MJR align tests
 #[cfg(test)]
 mod tests {
     use super::*;
