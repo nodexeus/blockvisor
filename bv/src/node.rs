@@ -292,13 +292,13 @@ impl Node {
 
     /// Returns the height of the blockchain (in blocks).
     pub async fn height(&mut self) -> Result<u64> {
-        self.call_method(&babel_api::BabelMethod::Height, HashMap::new())
+        self.call_method(babel_api::BabelMethod::Height, HashMap::new())
             .await
     }
 
     /// Returns the block age of the blockchain (in seconds).
     pub async fn block_age(&mut self) -> Result<u64> {
-        self.call_method(&babel_api::BabelMethod::BlockAge, HashMap::new())
+        self.call_method(babel_api::BabelMethod::BlockAge, HashMap::new())
             .await
     }
 
@@ -312,7 +312,7 @@ impl Node {
     /// ### Example
     /// `chilly-peach-kangaroo`
     pub async fn name(&mut self) -> Result<String> {
-        self.call_method(&babel_api::BabelMethod::Name, HashMap::new())
+        self.call_method(babel_api::BabelMethod::Name, HashMap::new())
             .await
     }
 
@@ -320,13 +320,23 @@ impl Node {
     /// ### Example
     /// `/p2p/11Uxv9YpMpXvLf8ZyvGWBdbgq3BXv8z1pra1LBqkRS5wmTEHNW3`
     pub async fn address(&mut self) -> Result<String> {
-        self.call_method(&babel_api::BabelMethod::Address, HashMap::new())
+        self.call_method(babel_api::BabelMethod::Address, HashMap::new())
             .await
     }
 
     /// Returns whether this node is in consensus or not.
     pub async fn consensus(&mut self) -> Result<bool> {
-        self.call_method(&babel_api::BabelMethod::Consensus, HashMap::new())
+        self.call_method(babel_api::BabelMethod::Consensus, HashMap::new())
+            .await
+    }
+
+    pub async fn application_status(&mut self) -> Result<String> {
+        self.call_method(babel_api::BabelMethod::ApplicationStatus, HashMap::new())
+            .await
+    }
+
+    pub async fn sync_status(&mut self) -> Result<String> {
+        self.call_method(babel_api::BabelMethod::SyncStatus, HashMap::new())
             .await
     }
 
@@ -355,14 +365,13 @@ impl Node {
             params.entry(k).or_default().push(String::from_utf8(v)?);
         }
 
-        self.call_method(&babel_api::BabelMethod::Init, params)
-            .await
+        self.call_method(babel_api::BabelMethod::Init, params).await
     }
 
     /// This function calls babel by sending a blockchain command using the specified method name.
     pub async fn call_method<T>(
         &mut self,
-        name: impl Display + Copy,
+        name: impl Display,
         params: HashMap<String, Vec<String>>,
     ) -> Result<T>
     where
@@ -522,7 +531,7 @@ impl Node {
 
     /// Generates keys on node
     pub async fn generate_keys(&mut self) -> Result<String> {
-        self.call_method(&babel_api::BabelMethod::GenerateKeys, HashMap::new())
+        self.call_method(babel_api::BabelMethod::GenerateKeys, HashMap::new())
             .await
     }
 }
