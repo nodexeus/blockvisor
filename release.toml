@@ -1,2 +1,3 @@
 publish = false
 tag-name = "{{version}}"
+pre-release-commit-message = "BV {{version}} release"
