@@ -22,7 +22,7 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
-    command = "test -f /blockjoy/.init && /usr/bin/lighthouse"
+    command = "if [ ! -f  '/blockjoy/.init' ]; then exit 1; else  /usr/bin/lighthouse;fi"
     args = ["--datadir", "/blockjoy/lighthouse", "vc", "--network", "{{NETWORK}}", "--http", "--suggested-fee-recipient", "{{FEE-RECIPIENT}}", "--beacon-nodes", "babelref:'nets.{{NETWORK}}.beacon_nodes_csv'"]
 
 [keys]
