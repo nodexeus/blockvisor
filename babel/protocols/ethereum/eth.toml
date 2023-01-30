@@ -22,7 +22,7 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
-    command = "/usr/bin/lighthouse"
+    command = "test -f /blockjoy/.init && /usr/bin/lighthouse"
     args = ["--datadir", "/blockjoy/lighthouse", "vc", "--network", "{{NETWORK}}", "--http", "--suggested-fee-recipient", "{{FEE-RECIPIENT}}", "--beacon-nodes", "babelref:'nets.{{NETWORK}}.beacon_nodes_csv'"]
 
 [keys]
@@ -72,7 +72,7 @@ method = "/eth/v1/beacon/genesis"
 name = "init"
 transport = "sh"
 body = """
-test /blockjoy/.init && \
+! test -f /blockjoy/.init && \
     echo {{VOTING-PWD}} > /blockjoy/secret && \
     lighthouse --network {{NETWORK}} --datadir /blockjoy/lighthouse account validator import --directory /opt/secrets --reuse-password --password-file /blockjoy/secret && \
     touch /blockjoy/.init
