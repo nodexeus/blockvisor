@@ -18,7 +18,7 @@ on:
           - rc
 
 jobs:
-  linux:
+  release:
     name: BV release
     runs-on: self-hosted
     steps:
@@ -39,4 +39,6 @@ jobs:
       - name: Cargo Release
         run: >
           cargo release --execute --no-confirm ${{ inputs.bump_level }}
-      - uses: ./.github/workflows/publish.yaml
+  call-publish-workflow:
+    needs: release
+    uses: ./.github/workflows/publish.yaml
