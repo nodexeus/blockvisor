@@ -453,6 +453,11 @@ impl NodeClient {
                 println!("Block age:      {:>10}", fmt_opt(metrics.block_age));
                 println!("Staking Status: {:>10}", fmt_opt(metrics.staking_status));
                 println!("In consensus:   {:>10}", fmt_opt(metrics.consensus));
+                println!(
+                    "App Status:     {:>10}",
+                    fmt_opt(metrics.application_status)
+                );
+                println!("Sync Status:    {:>10}", fmt_opt(metrics.sync_status));
             }
         }
         Ok(())
