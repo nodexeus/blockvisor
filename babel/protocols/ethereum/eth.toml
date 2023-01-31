@@ -85,6 +85,17 @@ body = """
     status = 200
     format = "raw"
 
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = """
+curl http://localhost:5062/lighthouse/validators -H "Authorization: Bearer `cat /blockjoy/data/lighthouse/validators/api-token.txt`" | jq '[ .data[].enabled ] | all' | grep -q true && echo processing || echo cancelled
+"""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
 [nets.mainnet]
 net_type = "main"
 url = "https://rpc.ankr.com/eth"
