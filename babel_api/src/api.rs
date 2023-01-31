@@ -15,6 +15,7 @@ pub enum BabelMethod {
     Name,
     ApplicationStatus,
     SyncStatus,
+    StakingStatus,
 }
 
 #[tonic_rpc::tonic_rpc(bincode)]
