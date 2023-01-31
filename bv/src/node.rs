@@ -302,11 +302,6 @@ impl Node {
             .await
     }
 
-    /// TODO: Wait for Sean to tell us how to do this.
-    pub async fn stake_status(&mut self) -> Result<i32> {
-        Ok(0)
-    }
-
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per blockchain.
     /// ### Example
@@ -337,6 +332,11 @@ impl Node {
 
     pub async fn sync_status(&mut self) -> Result<String> {
         self.call_method(babel_api::BabelMethod::SyncStatus, HashMap::new())
+            .await
+    }
+
+    pub async fn staking_status(&mut self) -> Result<String> {
+        self.call_method(babel_api::BabelMethod::StakingStatus, HashMap::new())
             .await
     }
 

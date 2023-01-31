@@ -375,6 +375,8 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             block_age: metrics.block_age,
             staking_status: metrics.staking_status,
             consensus: metrics.consensus,
+            application_status: metrics.application_status,
+            sync_status: metrics.sync_status,
         }))
     }
 }

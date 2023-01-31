@@ -155,6 +155,8 @@ message GetNodeMetricsRequest {
 message GetNodeMetricsResponse {
     optional uint64 height = 1;
     optional uint64 block_age = 2;
-    optional int32 staking_status = 3;
+    optional string staking_status = 3;
     optional bool consensus = 4;
+    optional string application_status = 5;
+    optional string sync_status = 6;
 }
