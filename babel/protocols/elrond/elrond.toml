@@ -7,7 +7,7 @@ node_type = "validator"
 node_version = "1.3.44"
 min_babel_version = "0.0.1"
 description = "elrond blockchain validator"
-api_host = "https://api.elrond.com/"
+api_host = "https://api.multiversx.com"
 ports = []
 
 [requirements]
