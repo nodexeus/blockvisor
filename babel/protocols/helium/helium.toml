@@ -22,13 +22,12 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
-    name = "echo"
+    name = "helium"
     body = "/blockjoy/miner/bin/miner foreground"
 
-[keys] # this is just an example
-first = "/opt/secrets/first.key"
-second = "/opt/secrets/second.key"
-"*" = "/tmp"
+[keys]
+"*" = "/opt/secrets"
+
 
 # METHOD BLOCK-HEIGHT
 # example:
@@ -222,7 +221,7 @@ body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo sec
 [[methods]]
 name = "init"
 transport = "sh"
-body = "echo 'noop for helium'"
+body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
 
     [methods.response]
     status = 200
