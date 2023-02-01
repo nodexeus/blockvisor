@@ -70,5 +70,7 @@ reinstall:
 	make install
 	systemctl start blockvisor.service
 
-net-clean:
-	for i in {1..5000}; do ip link delete bv$i type tuntap; done
+ci-clean:
+	bv node rm --all --yes
+	rm -rf /var/lib/blockvisor/nodes/
+	for i in $$(seq 1 1000); do ip link delete bv$$i type tuntap; done || true
