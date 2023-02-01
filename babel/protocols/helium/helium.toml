@@ -141,7 +141,9 @@ echo hello
 [nets.mainnet]
 net_type = "main"
 url = "https://snapshots.helium.wtf/genesis.mainnet"
+download = "https://snapshots.helium.wtf/genesis.mainnet"
 
 [nets.testnet]
 net_type = "test"
 url = "https://snapshots.helium.wtf/genesis.testnet"
+download = "https://snapshots.helium.wtf/genesis.testnet"
