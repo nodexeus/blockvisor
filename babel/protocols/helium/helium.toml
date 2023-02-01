@@ -121,7 +121,7 @@ body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo sec
 name = "init"
 transport = "sh"
 body = """
-curl babelref:'nets.{{NETWORK}}.url' > /opt/miner/update/genesis
+curl babelref:'nets.{{NETWORK}}.download' > /opt/miner/update/genesis
 """
 
     [methods.response]
