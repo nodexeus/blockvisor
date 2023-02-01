@@ -234,6 +234,9 @@ transport = "sh"
 body = """
 echo hello
 """
+    [methods.response]
+    status = 200
+    format = "raw"
 
 [nets.mainnet]
 net_type = "main"
