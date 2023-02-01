@@ -17,7 +17,7 @@ disk_size_gb = 200
 
 [supervisor]
 backoff_timeout_ms = 60000
-backoff_base_ms = 10000
+backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
