@@ -23,7 +23,7 @@ data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
     name = "echo"
-    body = "echo \"Helium entry_point not configured, but parametrized with {{HELIUM_PARAM}}!\""
+    body = "/blockjoy/miner/bin/miner foreground"
 
 [keys] # this is just an example
 first = "/opt/secrets/first.key"
