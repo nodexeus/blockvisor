@@ -24,6 +24,7 @@ data_directory_mount_point = "/blockjoy/miner/data"
     [[supervisor.entry_point]]
     name = "helium"
     body = """
+    test -f /blockjoy/.init && \
     /blockjoy/miner/bin/miner foreground
     """
 
@@ -121,7 +122,10 @@ body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo sec
 name = "init"
 transport = "sh"
 body = """
-curl babelref:'nets.{{NETWORK}}.download' > /opt/miner/update/genesis
+! test -f /blockjoy/.init && \
+    curl babelref:'nets.{{NETWORK}}.download' > /opt/miner/update/genesis && \
+    touch /blockjoy/.init
+
 """
 
     [methods.response]
