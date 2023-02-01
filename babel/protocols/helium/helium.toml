@@ -120,7 +120,9 @@ body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo sec
 [[methods]]
 name = "init"
 transport = "sh"
-body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key"
+body = """
+mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key
+"""
 
     [methods.response]
     status = 200
