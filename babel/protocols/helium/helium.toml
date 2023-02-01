@@ -228,6 +228,13 @@ body = "echo 'noop for helium'"
     status = 200
     format = "raw"
 
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = """
+echo hello
+"""
+
 [nets.mainnet]
 net_type = "main"
 url = "https://rpc.ankr.com/eth"
