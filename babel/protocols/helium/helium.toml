@@ -121,7 +121,7 @@ body = "mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo sec
 name = "init"
 transport = "sh"
 body = """
-mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key
+curl babelref:'nets.{{NETWORK}}.url' > /opt/miner/update/genesis
 """
 
     [methods.response]
@@ -140,8 +140,8 @@ echo hello
 
 [nets.mainnet]
 net_type = "main"
-url = "https://rpc.ankr.com/eth"
+url = "https://snapshots.helium.wtf/genesis.mainnet"
 
 [nets.testnet]
 net_type = "test"
-url = "https://testnet-api.helium.wtf/v1/"
+url = "https://snapshots.helium.wtf/genesis.testnet"
