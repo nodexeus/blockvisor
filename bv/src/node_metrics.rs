@@ -88,20 +88,17 @@ impl From<Metrics> for pb::NodeMetricsRequest {
             .0
             .into_iter()
             .map(|(k, v)| {
-                let application_status =
-                    v.application_status
-                        .map(|s| s.to_lowercase())
-                        .and_then(|s| {
-                            ApplicationStatus::from_str_name(&s)
-                                .ok_or_else(|| warn!("Could not parse `{s}` as application status"))
-                                .ok()
-                        });
-                let sync_status = v.sync_status.map(|s| s.to_lowercase()).and_then(|s| {
+                let application_status = v.application_status.and_then(|s| {
+                    ApplicationStatus::from_str_name(&s)
+                        .ok_or_else(|| warn!("Could not parse `{s}` as application status"))
+                        .ok()
+                });
+                let sync_status = v.sync_status.and_then(|s| {
                     SyncStatus::from_str_name(&s)
                         .ok_or_else(|| warn!("Could not parse `{s}` as sync status"))
                         .ok()
                 });
-                let staking_status = v.staking_status.map(|s| s.to_lowercase()).and_then(|s| {
+                let staking_status = v.staking_status.and_then(|s| {
                     StakingStatus::from_str_name(&s)
                         .ok_or_else(|| warn!("Could not parse `{s}` as staking status"))
                         .ok()
