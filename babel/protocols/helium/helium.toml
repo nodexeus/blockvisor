@@ -136,7 +136,7 @@ body = """
 name = "application_status"
 transport = "sh"
 body = """
-if [ `/blockjoy/miner/bin/miner info block_age` -gt 900 ]; then echo "processing"; fi
+if [ `/blockjoy/miner/bin/miner info block_age` -gt 900 ]; then echo -n "processing"; fi
 """
     [methods.response]
     status = 200
