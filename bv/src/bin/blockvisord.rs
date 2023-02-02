@@ -14,6 +14,7 @@ use blockvisord::{
     services::api,
     try_set_bv_status,
 };
+use std::collections::HashMap;
 use std::{net::ToSocketAddrs, str::FromStr, sync::Arc};
 use tokio::{
     sync::RwLock,
@@ -24,6 +25,7 @@ use tracing::{error, info, warn};
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+const INFO_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -100,6 +102,7 @@ async fn main() -> Result<()> {
         }
     };
 
+    let node_updates_future = node_updates(nodes.clone());
     let node_metrics_future = node_metrics(nodes.clone(), &endpoint, token.clone());
     let host_metrics_future = host_metrics(config.id.clone(), &endpoint, token.clone());
     let self_updater = SelfUpdater::<self_updater::SysTimer>::new(&config)?;
@@ -108,6 +111,7 @@ async fn main() -> Result<()> {
         internal_api_server_future,
         external_api_client_future,
         nodes_recovery_future,
+        node_updates_future,
         node_metrics_future,
         host_metrics_future,
         self_updater.run()
@@ -134,6 +138,40 @@ async fn wait_for_channel(endpoint: &Endpoint) -> Channel {
             Err(e) => {
                 error!("Error connecting to endpoint: {:?}", e);
                 sleep(RECONNECT_INTERVAL).await;
+            }
+        }
+    }
+}
+
+/// This task runs periodically to send important info about nodes to API.
+async fn node_updates(nodes: Arc<RwLock<Nodes>>) {
+    let mut timer = tokio::time::interval(INFO_UPDATE_INTERVAL);
+    let mut known_addresses: HashMap<String, String> = HashMap::new();
+    loop {
+        timer.tick().await;
+        let mut nodes_lock = nodes.write().await;
+
+        let mut updates = vec![];
+        for node in nodes_lock.nodes.values_mut() {
+            if let Ok(address) = node.address().await {
+                updates.push((node.id().to_string(), address));
+            }
+        }
+
+        for (node_id, address) in updates {
+            if known_addresses.get(&node_id) == Some(&address) {
+                continue;
+            }
+
+            let update = pb::NodeInfo {
+                id: node_id.clone(),
+                address: Some(address.clone()),
+                ..Default::default()
+            };
+
+            if nodes_lock.send_info_update(update).is_ok() {
+                // cache addresses to not send the same address if it has not changed
+                known_addresses.entry(node_id).or_insert(address);
             }
         }
     }

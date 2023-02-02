@@ -206,8 +206,8 @@ impl Nodes {
         };
 
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
-
         node.init(secret_keys).await?;
+
         Ok(())
     }
 
@@ -447,24 +447,30 @@ impl Nodes {
         Path::new(&*REGISTRY_CONFIG_FILE).exists()
     }
 
+    // Notify API that container is 'Running' or 'Stopped', etc
     pub fn send_container_status(&self, id: &Uuid, status: ContainerStatus) -> Result<()> {
+        let update = pb::NodeInfo {
+            id: id.to_string(),
+            container_status: Some(status.into()),
+            ..Default::default()
+        };
+        self.send_info_update(update)
+    }
+
+    // Optimistically try to send node info update to API
+    pub fn send_info_update(&self, update: pb::NodeInfo) -> Result<()> {
         if !self.tx.initialized() {
             bail!("Updates channel not initialized")
         }
 
-        let node_id = id.to_string();
         let update = pb::InfoUpdate {
-            info: Some(pb::info_update::Info::Node(pb::NodeInfo {
-                id: node_id,
-                container_status: Some(status.into()),
-                ..Default::default()
-            })),
+            info: Some(pb::info_update::Info::Node(update)),
         };
 
         match self.tx.get().unwrap().send(update) {
             Ok(_) => Ok(()),
             Err(error) => {
-                let msg = format!("Cannot send node status: {error:?}");
+                let msg = format!("Cannot send node update: {error:?}");
                 error!(msg);
                 Err(anyhow!(msg))
             }
