@@ -1,0 +1,61 @@
+[env] # new
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "stellar"
+node_type = "validator"
+node_version = "19.7.0"
+min_babel_version = "0.0.1"
+description = "stellar blockchain validator"
+api_host = "https://horizon.stellar.org/"
+ports = []
+
+[requirements]
+vcpu_count = 4 
+mem_size_mb = 8192
+disk_size_gb = 500
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+data_directory_mount_point = "/blockjoy/miner/data"
+
+    [[supervisor.entry_point]]
+    name = "todo"
+    body = ""
+
+[[methods]]
+name = "height"
+transport = "sh"
+body = "" # height
+    
+    [methods.response]
+    status = 200
+    format = "json"
+
+[[methods]]
+name = "address"
+transport = "sh"
+body = "stellar-core http-command 'quorum'"
+
+    [methods.response]
+    status = 200
+    format = "json"
+
+[[methods]]
+name = "status"
+transport = "sh"
+body = "stellar-core http-command 'info'"
+
+    [methods.response]
+    status = 200
+    format = "json"
+    
+[nets.mainnet]
+net_type = "main"
+url = "https://horizon.stellar.org"
+
+[nets.testnet]
+net_type = "test"
+url = "https://horizon-testnet.stellar.org./"

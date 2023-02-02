@@ -1,0 +1,74 @@
+[env] 
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "evmos"
+node_type = "validator"
+node_version = "11.0.0"
+min_babel_version = "0.0.1"
+description = "evmos blockchain validator"
+api_host = "http://localhost:26657/"
+ports = [26657]
+
+[requirements]
+vcpu_count = 4
+mem_size_mb = 32768
+disk_size_gb = 500
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+data_directory_mount_point = "/blockjoy/miner/data"
+
+    [[supervisor.entry_point]]
+    name = "todo"
+    body = ""
+
+[[methods]]
+name = "height"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "sync_info.latest_block_height"
+
+[[methods]]
+name = "address"
+transport = "jrpc"
+method = "status"
+
+    [methods.response]
+    code = 200
+    field = "validator_info.pub_key.value" 
+
+[[methods]]
+name = "status"
+transport = "jrpc"
+method = "health"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[[methods]]
+name = "genesis_info"
+transport = "jrpc"
+method = "genesis"
+
+    [methods.response]
+    code = 200
+    field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://archive.evmos.org/mainnet/genesis.json"
+
+[nets.testnet4]
+net_type = "test"
+url = "https://archive.evmos.dev/evmos_9000-4/genesis.json" 
+
+[nets.testnet3]
+net_type = "test"
+url = "https://archive.evmos.dev/evmos_9000-3/genesis.json"
