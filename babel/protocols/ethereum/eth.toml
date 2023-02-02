@@ -89,7 +89,7 @@ body = """
 name = "application_status"
 transport = "sh"
 body = """
-curl http://localhost:5062/lighthouse/validators -H "Authorization: Bearer `cat /blockjoy/data/lighthouse/validators/api-token.txt`" | jq '[ .data[].enabled ] | all' | grep -q true && echo processing || echo cancelled
+curl http://localhost:5062/lighthouse/validators -H "Authorization: Bearer `cat /blockjoy/data/lighthouse/validators/api-token.txt`" | jq '[ .data[].enabled ] | all' | grep -q true && echo -n processing || echo cancelled
 """
 
     [methods.response]
