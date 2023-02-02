@@ -99,12 +99,12 @@ curl http://localhost:5062/lighthouse/validators -H "Authorization: Bearer `cat 
 [nets.mainnet]
 net_type = "main"
 url = "https://rpc.ankr.com/eth"
-beacon_nodes_csv = "http://beacon01.mainnet.eth.blockjoy.com:6868,http://beacon02.mainnet.eth.blockjoy.com:6868"
+beacon_nodes_csv = "http://beacon01.mainnet.eth.nyc.blockjoy.com:6868,http://beacon02.mainnet.eth.nyc.blockjoy.com:6868"
 
 #[nets.sepolia]
 #net_type = "test"
 #url = "https://rpc.sepolia.dev"
-#beacon_nodes_csv = "http://beacon01.sepolia.eth.blockjoy.com,http://beacon02.sepolia.eth.blockjoy.com"
+#beacon_nodes_csv = "http://beacon01.sepolia.eth.nyc.blockjoy.com,http://beacon02.sepolia.eth.blockjoy.com"
 
 [nets.goerli] # will be depreciated
 net_type = "test"
