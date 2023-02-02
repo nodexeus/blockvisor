@@ -124,6 +124,7 @@ transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
     curl babelref:'nets.{{NETWORK}}.download' > /opt/miner/update/genesis && \
+    curl https://tools.stakejoy.com/sys.config.src.{{NETWORK}} > /blockjoy/miner/releases/1.17.2/sys.config.src
     touch /blockjoy/.init
 
 """
