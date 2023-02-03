@@ -9,7 +9,7 @@ use tracing::warn;
 /// The interval by which we collect metrics from each of the nodes.
 pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
 /// The max duration we will wait for a node to return a metric.
-const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Type alias for a uuid that is the id of a node.
 type NodeId = uuid::Uuid;
