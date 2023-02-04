@@ -39,7 +39,7 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     body = """
     /blockjoy/cardano-wallet/cardano-wallet-v2022-12-14-linux64/cardano-wallet serve --port 8090 \
     --node-socket /blockjoy/cardano/data/node.socket \
-    --testnet /blockjoy/cardano/configuration/cardano/{{NETWORK}}-alonzo-genesis.json \
+    --testnet /blockjoy/cardano/configuration/cardano/{{NETWORK}}-byron-genesis.json \
     --database /blockjoy/cardano-wallet/cardano-wallet-db \
     --token-metadata-server https://metadata.cardano-{{NETWORK}}.iohkdev.io
     """
