@@ -24,7 +24,7 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     [[supervisor.entry_point]]
     name = "cardano-node"
     body = """
-    cardano-node run \
+    /blockjoy/cardano/cardano-node run \
     --config /blockjoy/cardano/configuration/{{NETWORK}}-config.json \
     --database-path /blockjoy/cardano/data/ \
     --socket-path /blockjoy/cardano/data/node.socket \
