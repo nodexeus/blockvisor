@@ -33,7 +33,17 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     --port 1337 \
     --topology /blockjoy/cardano/configuration/cardano/{{NETWORK}}-topology.json
     """
-
+    
+    [[supervisor.entry_point]]
+    name = "cardano-wallet"
+    body = """
+    /blockjoy/cardano-wallet/cardano-wallet-v2022-12-14-linux64/cardano-wallet serve --port 8090 \
+    --node-socket /blockjoy/cardano/data/node.socket \
+    --testnet /blockjoy/cardano/configuration/cardano/{{NETWORK}}-alonzo-genesis.json \
+    --database /blockjoy/cardano-wallet/cardano-wallet-db \
+    --token-metadata-server https://metadata.cardano-{{NETWORK}}.iohkdev.io
+    """
+    
 [[methods]]
 name = "height"
 transport = "jrpc"
