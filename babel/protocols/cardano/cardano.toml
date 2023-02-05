@@ -82,7 +82,7 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-    rm -rf /blockjoy/cardano/data/* && pip3 install jupyterlab && pip3 install jupyter-server && pip3 install jupyterthemes && jt -t onedork
+    rm -rf /blockjoy/cardano/data/* && /usr/bin/pip3 install jupyterlab; /usr/bin/pip3 install jupyter-server; /usr/bin/pip3 install jupyterthemes; jt -t onedork
     touch /blockjoy/.init
 """
 
