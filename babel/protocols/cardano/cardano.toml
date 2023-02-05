@@ -44,6 +44,12 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     --token-metadata-server https://metadata.cardano-{{NETWORK}}.iohkdev.io
     """
     
+    [[supervisor.entry_point]]
+    name = "jupyter"
+    body = """
+    jt -t onedork && jupyter notebook --allow-root --ip 0.0.0.0
+    """
+    
 [[methods]]
 name = "height"
 transport = "jrpc"
