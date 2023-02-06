@@ -46,8 +46,9 @@ const MAX_KERNEL_ARGS_LEN: usize = 1024;
 
 impl Node {
     /// Creates a new node according to specs.
-    #[instrument]
+    #[instrument(skip(data))]
     pub async fn create(data: NodeData) -> Result<Self> {
+        info!("Creating node with data: {data:?}");
         let node_id = data.id;
         let config = Node::create_config(&data).await?;
         Node::create_data_image(&node_id, data.babel_conf.requirements.disk_size_gb).await?;
@@ -63,8 +64,9 @@ impl Node {
     }
 
     /// Returns node previously created on this host.
-    #[instrument]
+    #[instrument(skip(data))]
     pub async fn connect(data: NodeData) -> Result<Self> {
+        info!("Connecting to node with data: {data:?}");
         let config = Node::create_config(&data).await?;
         let cmd = data.id.to_string();
         let (state, node_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
