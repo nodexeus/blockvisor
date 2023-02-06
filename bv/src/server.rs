@@ -323,9 +323,7 @@ impl bv_pb::blockvisor_server::Blockvisor for BlockvisorServer {
             .nodes
             .get_mut(&node_id)
             .ok_or_else(|| Status::invalid_argument("No such node"))?
-            .capabilities()
-            .await
-            .map_err(|e| Status::internal(format!("Call to babel failed: `{e}`")))?;
+            .capabilities();
         Ok(Response::new(bv_pb::ListCapabilitiesResponse {
             capabilities,
         }))

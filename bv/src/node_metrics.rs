@@ -45,14 +45,41 @@ pub async fn collect_metrics(nodes: impl Iterator<Item = &mut node::Node>) -> Me
 
 /// Returns the metric for a single node.
 pub async fn collect_metric(node: &mut node::Node) -> (NodeId, Metric) {
-    let metric = Metric {
-        height: timeout(node.height()).await.ok(),
-        block_age: timeout(node.block_age()).await.ok(),
-        staking_status: timeout(node.staking_status()).await.ok(),
-        consensus: timeout(node.consensus()).await.ok(),
-        application_status: timeout(node.application_status()).await.ok(),
-        sync_status: timeout(node.sync_status()).await.ok(),
+    use babel_api::BabelMethod;
+
+    let capabilities = node.capabilities();
+    let height = match capabilities.contains(&BabelMethod::Height.to_string()) {
+        true => timeout(node.height()).await.ok(),
+        false => None,
     };
+    let block_age = match capabilities.contains(&BabelMethod::BlockAge.to_string()) {
+        true => timeout(node.block_age()).await.ok(),
+        false => None,
+    };
+    let staking_status = match capabilities.contains(&BabelMethod::StakingStatus.to_string()) {
+        true => timeout(node.staking_status()).await.ok(),
+        false => None,
+    };
+    let consensus = match capabilities.contains(&BabelMethod::Consensus.to_string()) {
+        true => timeout(node.consensus()).await.ok(),
+        false => None,
+    };
+    let sync_status = match capabilities.contains(&BabelMethod::SyncStatus.to_string()) {
+        true => timeout(node.sync_status()).await.ok(),
+        false => None,
+    };
+
+    let metric = Metric {
+        // these could be optional
+        height,
+        block_age,
+        staking_status,
+        consensus,
+        sync_status,
+        // these are expected in every chain
+        application_status: timeout(node.application_status()).await.ok(),
+    };
+
     (node.id(), metric)
 }
 
