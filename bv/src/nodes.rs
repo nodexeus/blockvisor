@@ -345,9 +345,7 @@ impl Nodes {
         // Generate keys if we should (and can)
         if api_keys_set.is_empty()
             && node_keys_set.is_empty()
-            && node
-                .has_capability(&babel_api::BabelMethod::GenerateKeys.to_string())
-                .await?
+            && node.has_capability(&babel_api::BabelMethod::GenerateKeys.to_string())
         {
             node.generate_keys().await?;
             let gen_keys: Vec<_> = node

@@ -459,20 +459,18 @@ impl Node {
 
     /// Returns the methods that are supported by this blockchain. Calling any method on this
     /// blockchain that is not listed here will result in an error being returned.
-    pub async fn capabilities(&mut self) -> Result<Vec<String>> {
-        Ok(self
-            .data
+    pub fn capabilities(&mut self) -> Vec<String> {
+        self.data
             .babel_conf
             .methods
             .keys()
             .map(|method| method.to_string())
-            .collect())
+            .collect()
     }
 
     /// Checks if node has some particular capability
-    pub async fn has_capability(&mut self, method: &str) -> Result<bool> {
-        let caps = self.capabilities().await?;
-        Ok(caps.contains(&method.to_owned()))
+    pub fn has_capability(&mut self, method: &str) -> bool {
+        self.capabilities().contains(&method.to_owned())
     }
 
     /// Returns the list of logs from blockchain entry_points.
