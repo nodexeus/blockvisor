@@ -22,28 +22,40 @@ impl NetworkInterface {
         // First create the interface.
         run_cmd("ip", ["tuntap", "add", &name, "mode", "tap"]).await?;
 
-        // Set bridge as the interface's master.
-        if let Err(e) = run_cmd("ip", ["link", "set", &name, "master", BRIDGE_IFACE])
-            // Start the interface.
-            .and_then(|_| run_cmd("ip", ["link", "set", &name, "up"]))
-            .await
-        {
-            // Clean up the interface if we failed to set it up completely.
-            delete_interface(&name).await?;
-
-            return Err(e);
-        }
+        // Then link it to master
+        remaster(&name).await?;
 
         Ok(Self { name, ip, gateway })
     }
 
+    /// Remaster the network interface.
+    pub async fn remaster(self) -> Result<()> {
+        remaster(&self.name).await
+    }
+
     /// Delete the network interface.
     pub async fn delete(self) -> Result<()> {
-        delete_interface(&self.name).await
+        delete(&self.name).await
     }
 }
 
-async fn delete_interface(name: &str) -> Result<()> {
+async fn remaster(name: &str) -> Result<()> {
+    // Set bridge as the interface's master.
+    if let Err(e) = run_cmd("ip", ["link", "set", name, "master", BRIDGE_IFACE])
+        // Start the interface.
+        .and_then(|_| run_cmd("ip", ["link", "set", name, "up"]))
+        .await
+    {
+        // Clean up the interface if we failed to set it up completely.
+        delete(name).await?;
+
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+async fn delete(name: &str) -> Result<()> {
     run_cmd("ip", ["link", "delete", name, "type", "tuntap"]).await
 }
 

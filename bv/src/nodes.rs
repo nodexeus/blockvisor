@@ -476,7 +476,7 @@ impl Nodes {
     }
 
     /// Create and return the next network interface using machine index
-    pub async fn create_network_interface(
+    async fn create_network_interface(
         &mut self,
         ip: IpAddr,
         gateway: IpAddr,
@@ -504,7 +504,7 @@ impl Nodes {
     }
 }
 
-pub fn check_babel_version(min_babel_version: &str) -> Result<()> {
+fn check_babel_version(min_babel_version: &str) -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     if version < min_babel_version {
         bail!("Required minimum babel version is `{min_babel_version}`, running is `{version}`");
