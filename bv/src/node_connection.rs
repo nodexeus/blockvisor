@@ -14,7 +14,7 @@ use tokio::{
 };
 use tokio_stream;
 use tonic::transport::{Channel, Endpoint, Uri};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 pub const BABEL_SUP_VSOCK_PORT: u32 = 41;
@@ -177,7 +177,7 @@ async fn handshake(stream: &mut UnixStream, port: u32) -> Result<()> {
         stream.readable().await?;
         match stream.try_read(&mut sock_opened_buf) {
             Ok(0) => {
-                error!("Socket responded to open message with empty message :(");
+                info!("Socket responded to open message with empty message :(");
                 bail!("Socket responded to open message with empty message :(");
             }
             Ok(n) => {
