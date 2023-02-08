@@ -32,6 +32,7 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     --host-addr 0.0.0.0 \
     --port 1337 \
     --topology /blockjoy/cardano/configuration/cardano/{{NETWORK}}-topology.json
+     --testnet-magic 
     """
     
     [[supervisor.entry_point]]
@@ -42,6 +43,7 @@ data_directory_mount_point = "/blockjoy/cardano/data"
     --testnet /blockjoy/cardano/configuration/cardano/{{NETWORK}}-byron-genesis.json \
     --database /blockjoy/cardano-wallet/cardano-wallet-db \
     --token-metadata-server https://metadata.cardano-{{NETWORK}}.iohkdev.io
+    --testnet-magic babelref:'nets.{{NETWORK}}.magic'
     """
     
     [[supervisor.entry_point]]
@@ -103,4 +105,5 @@ echo -n "incomplete"
 [nets.testnet]
 net_type = "test"
 url = "https://cardano.org"
+magic = "1"
 
