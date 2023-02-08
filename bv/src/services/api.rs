@@ -13,7 +13,7 @@ use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tonic::codegen::InterceptedService;
 use tonic::service::Interceptor;
 use tonic::{Request, Status};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub mod pb {
@@ -97,7 +97,13 @@ pub async fn process_commands_stream(
     info!("Getting pending commands from stream...");
     while let Some(received) = commands_stream.next().await {
         info!("Received command: {received:?}");
-        let received = received?;
+        let received = match received {
+            Ok(command) => command,
+            Err(status) => {
+                warn!("Skipping error command: {status}");
+                continue;
+            }
+        };
 
         let maybe_update = match received.r#type {
             Some(pb::command::Type::Node(node_command)) => {

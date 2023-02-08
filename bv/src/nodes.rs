@@ -177,13 +177,8 @@ impl Nodes {
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
         if let Some(node) = self.nodes.remove(&id) {
             self.node_ids.remove(&node.data.name);
-
-            let _ = self.send_container_status(&id, ContainerStatus::Deleting);
-
             node.delete().await?;
             debug!("Node deleted");
-
-            let _ = self.send_container_status(&id, ContainerStatus::Deleted);
         }
         Ok(())
     }
