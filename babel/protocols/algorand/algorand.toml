@@ -9,7 +9,7 @@ node_type = "validator"
 node_version = "3.12.2"
 min_babel_version = "0.0.1"
 description = "algo blockchain validator"
-api_host = "https://localhost:4001/"
+api_host = "https://localhost:4001"
 ports = [4001]
 
 [requirements]
@@ -50,7 +50,7 @@ method = "" # find
 [[methods]]
 name = "status"
 transport = "rest"
-method = "v2/status" 
+method = "/v2/status" 
 
     [methods.response]
     status = 200
@@ -60,7 +60,7 @@ method = "v2/status"
 [[methods]]
 name = "genesis_info"
 transport = "rest"
-method = "genesis" 
+method = "/genesis" 
 
     [methods.response]
     status = 200
