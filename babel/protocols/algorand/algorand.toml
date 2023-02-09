@@ -6,10 +6,10 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "algo"
 node_type = "validator"
-node_version = "3.12.2"
+node_version = "3.14.2"
 min_babel_version = "0.0.1"
 description = "algo blockchain validator"
-api_host = "https://localhost:4001/"
+api_host = "https://localhost:4001"
 ports = [4001]
 
 [requirements]
@@ -24,8 +24,8 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
-    name = "todo"
-    body = ""
+    name = "algod"
+    body = "/usr/bin/algod -d /blockjoy/algorand/data/ -g /var/lib/algorand/genesis/{{NETWORK}}/genesis.json -o"
 
 [[methods]]
 name = "height"
@@ -50,7 +50,7 @@ method = "" # find
 [[methods]]
 name = "status"
 transport = "rest"
-method = "v2/status" 
+method = "/v2/status" 
 
     [methods.response]
     status = 200
@@ -60,7 +60,7 @@ method = "v2/status"
 [[methods]]
 name = "genesis_info"
 transport = "rest"
-method = "genesis" 
+method = "/genesis" 
 
     [methods.response]
     status = 200
