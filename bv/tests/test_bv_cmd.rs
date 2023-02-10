@@ -477,14 +477,17 @@ async fn test_bv_cmd_init_localhost() {
 
     sleep(Duration::from_secs(30)).await;
 
-    println!("list created node");
-    bv_run(&["node", "status", &node_id], "Stopped");
+    println!("list created node, should be auto-started");
+    bv_run(&["node", "status", &node_id], "Running");
 
     let mut client = ui_pb::command_service_client::CommandServiceClient::connect(url)
         .await
         .unwrap();
 
-    let node_start = ui_pb::CommandRequest {
+    println!("check node keys");
+    bv_run(&["node", "keys", &node_id], "first");
+
+    let node_stop = ui_pb::CommandRequest {
         meta: Some(ui_pb::RequestMeta::default()),
         id: host_id.to_string(),
         params: vec![ui_pb::Parameter {
@@ -493,19 +496,16 @@ async fn test_bv_cmd_init_localhost() {
         }],
     };
     let command: ui_pb::CommandResponse = client
-        .start_node(with_auth(node_start, &auth_token, &refresh_token))
+        .stop_node(with_auth(node_stop, &auth_token, &refresh_token))
         .await
         .unwrap()
         .into_inner();
-    println!("executed start node command: {command:?}");
+    println!("executed stop node command: {command:?}");
 
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(15)).await;
 
     println!("get node status");
-    bv_run(&["node", "status", &node_id], "Running");
-
-    println!("check node keys");
-    bv_run(&["node", "keys", &node_id], "first");
+    bv_run(&["node", "status", &node_id], "Stopped");
 
     let node_delete = ui_pb::DeleteNodeRequest {
         meta: Some(ui_pb::RequestMeta::default()),
