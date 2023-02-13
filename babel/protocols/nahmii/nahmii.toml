@@ -1,19 +1,19 @@
-[env]
+[env] # new
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "solana"
+protocol = "nahmii"
 node_type = "validator"
-node_version = "1.10.34"
+node_version = "1.0.0"
 min_babel_version = "0.0.1"
-description = "solana blockchain validator"
-api_host = "http://localhost:8899/"
-ports = [8899]
+description = "nahmii blockchain validator"
+api_host = "http://localhost:8547/"
+ports = [8547]
 
 [requirements]
-vcpu_count = 32
-mem_size_mb = 131072
-disk_size_gb = 1500
+vcpu_count = 4 
+mem_size_mb = 8192
+disk_size_gb = 1000
 
 [supervisor]
 backoff_timeout_ms = 60000
@@ -28,25 +28,25 @@ data_directory_mount_point = "/blockjoy/miner/data"
 [[methods]]
 name = "height"
 transport = "jrpc"
-method = "getBlockHeight"
+method = "eth_syncing" # only if syncing
 
     [methods.response]
     code = 200
-    field = "result"
+    field = "result.highestBlock"
 
 [[methods]]
-name = "address"
+name = "address" # depreciated
 transport = "jrpc"
-method = "getClusterNodes"
-    
+method = "eth_accounts"
+
     [methods.response]
     code = 200
-    field = "pubkey"
+    field = "result" 
 
 [[methods]]
 name = "status"
 transport = "jrpc"
-method = "getHealth"
+method = "eth_syncing"
 
     [methods.response]
     code = 200
@@ -54,12 +54,9 @@ method = "getHealth"
 
 [nets.mainnet]
 net_type = "main"
-url = "https://rpc.ankr.com/solana"
+url = "https://l2.nahmii.io/"
 
-[nets.testnet]
+[nets.nitrogoerli]
 net_type = "test"
-url = "https://api.testnet.solana.com"
+url = "https://l2.testnet.nahmii.io/" # tbd
 
-[nets.devnet]
-net_type = "dev"
-url = "https://api.devnet.solana.com"

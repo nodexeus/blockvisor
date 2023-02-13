@@ -152,3 +152,7 @@ download = "https://snapshots.helium.wtf/genesis.mainnet"
 net_type = "test"
 url = "https://snapshots.helium.wtf/genesis.testnet"
 download = "https://snapshots.helium.wtf/genesis.testnet"
+
+[nets.devnet]
+net_type = "dev"
+url = "https://snapshots.helium.wtf/genesis.devnet"

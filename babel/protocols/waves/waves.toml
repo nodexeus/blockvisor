@@ -2,19 +2,18 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "kava"
+protocol = "waves"
 node_type = "validator"
-node_version = "0.16.1" # recc mainnet
-min_babel_version = "0.0.1"
-description = "kava blockchain validator"
-api_host = "http://localhost:26656/"
-# kava evm endopoint to connect to metamask: http://localhost:8545
-ports = [26656, 8545]
+node_version = "1.4.13"
+min_babel_version = "0.0.1" 
+description = "waves blockchain validator"
+api_host = "http://localhost:6870/"
+ports = [6870]
 
 [requirements]
 vcpu_count = 2
-mem_size_mb = 8192
-disk_size_gb = 500
+mem_size_mb = 4096
+disk_size_gb = 100
 
 [supervisor]
 backoff_timeout_ms = 60000
@@ -29,37 +28,41 @@ data_directory_mount_point = "/blockjoy/miner/data"
 [[methods]]
 name = "height"
 transport = "rest"
-method = "blocks/latest"
+method = "/blocks/height"
 
     [methods.response]
     status = 200
-    field = "block.height"
+    field = "height"
     format = "json"
 
 [[methods]]
 name = "address"
 transport = "rest"
-method = "kava/hard/v1beta1/accounts"
+method = "/addresses"
 
     [methods.response]
     status = 200
-    field = "accounts.base_account.pub_key.value"
+    field = "result" 
     format = "json"
 
 [[methods]]
 name = "status"
 transport = "rest"
-method = "syncing"
+method = "/activation/status"
 
     [methods.response]
     status = 200
-    field = "syncing" 
+    field = "features.nodeStatus"
     format = "json"
 
 [nets.mainnet]
 net_type = "main"
-url = "https://evm.kava.io"
+url = "http://blockchain.wavesnodes.com/blockchain_last.tar"
 
 [nets.testnet]
 net_type = "test"
-url = "https://evm.testnet.kava.io"
+url = "http://blockchain-testnet.wavesnodes.com/blockchain_last.tar"
+
+[nets.stagenet]
+net_type = "test"
+url = "http://blockchain-stagenet.wavesnodes.com/blockchain_last.tar"

@@ -1,19 +1,19 @@
-[env]
+[env] # new
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "elrond"
+protocol = "aptos"
 node_type = "validator"
-node_version = "1.3.44"
+node_version = "1.2.4"
 min_babel_version = "0.0.1"
-description = "elrond blockchain validator"
-api_host = "https://api.multiversx.com"
-ports = []
+description = "aptos blockchain validator"
+api_host = "http://localhost:8080/"
+ports = [8080]
 
 [requirements]
-vcpu_count = 4
-mem_size_mb = 8192
-disk_size_gb = 200
+vcpu_count = 8
+mem_size_mb =  32768
+disk_size_gb =  2000
 
 [supervisor]
 backoff_timeout_ms = 60000
@@ -28,42 +28,41 @@ data_directory_mount_point = "/blockjoy/miner/data"
 [[methods]]
 name = "height"
 transport = "rest"
-method = "blocks/count"
-
+method = "fullnode.mainnet.aptoslabs.com/v1"
+    
     [methods.response]
     status = 200
-    field = "result"
+    field = "block_height"
     format = "json"
 
 [[methods]]
 name = "address"
 transport = "rest"
-# TODO: can we make this `USERNAME` parameter into something that works cross-blockchain?
-method = "usernames/{{USERNAME}}"
+method = "fullnode.mainnet.aptoslabs.com/v1/transactions"
 
     [methods.response]
     status = 200
-    field = "address"
+    field = "signature.public_key" 
     format = "json"
 
 [[methods]]
 name = "status"
 transport = "rest"
-method = "hello"
+method = "fullnode.mainnet.aptoslabs.com/v1/-/healthy"
 
     [methods.response]
     status = 200
-    field = "hello" 
+    field = "message"
     format = "json"
 
 [nets.mainnet]
 net_type = "main"
-url = "https://api.multiversx.com"
+url = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob"
 
 [nets.testnet]
 net_type = "test"
-url = "https://testnet-api.multiversx.com"
+url = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/testnet/genesis.blob"
 
 [nets.devnet]
 net_type = "dev"
-url = "https://devnet-api.multiversx.com"
+url = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/devnet/genesis.blob"

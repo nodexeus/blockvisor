@@ -1,17 +1,17 @@
-[env]
+[env] 
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "juno"
+protocol = "evmos"
 node_type = "validator"
-node_version = "9.0.0"
+node_version = "11.0.0"
 min_babel_version = "0.0.1"
-description = "juno blockchain validator"
+description = "evmos blockchain validator"
 api_host = "http://localhost:26657/"
 ports = [26657]
 
 [requirements]
-vcpu_count = 8
+vcpu_count = 4
 mem_size_mb = 32768
 disk_size_gb = 500
 
@@ -63,8 +63,12 @@ method = "genesis"
 
 [nets.mainnet]
 net_type = "main"
-url = "https://raw.githubusercontent.com/CosmosContracts/mainnet/main/juno-1/genesis.json >~/.juno/config/genesis.json" # tbd
+url = "https://archive.evmos.org/mainnet/genesis.json"
 
-[nets.testnet]
+[nets.testnet4]
 net_type = "test"
-url = "https://raw.githubusercontent.com/CosmosContracts/testnets/main/$CHAIN_ID" # tbd
+url = "https://archive.evmos.dev/evmos_9000-4/genesis.json" 
+
+[nets.testnet3]
+net_type = "test"
+url = "https://archive.evmos.dev/evmos_9000-3/genesis.json"

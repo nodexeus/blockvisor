@@ -1,5 +1,3 @@
-nets = {}
-
 [env]
 path_append = "/blockjoy/bin/"
 
@@ -54,3 +52,7 @@ method = "" #find this
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://pokt-rpc.gateway.pokt.network"

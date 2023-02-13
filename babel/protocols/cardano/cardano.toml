@@ -107,3 +107,14 @@ net_type = "test"
 url = "https://cardano.org"
 magic = "1"
 
+[nets.mainnet]
+net_type = "main"
+url = "https://book.world.dev.cardano.org/environments/mainnet/config.json"
+
+[nets.preview]
+net_type = "test"
+url = "https://book.world.dev.cardano.org/environments/preview/config.json"
+
+[nets.preprod]
+net_type = "test"
+url = "https://book.world.dev.cardano.org/environments/preprod/config.json"

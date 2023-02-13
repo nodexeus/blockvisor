@@ -1,5 +1,3 @@
-nets = {}
-
 [env]
 path_append = "/blockjoy/bin/"
 
@@ -62,3 +60,11 @@ method = "genesis"
     [methods.response]
     code = 200
     field = "result"
+
+[nets.mainnet]
+net_type = "main"
+url = "https://rpc.osmosis.zone"
+
+[nets.testnet]
+net_type = "test"
+url = "https://rpc-test.osmosis.zone"
