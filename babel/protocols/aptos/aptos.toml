@@ -22,8 +22,11 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/miner/data"
 
     [[supervisor.entry_point]]
-    name = "todo"
-    body = ""
+    name = "cardano-node"
+    body = """
+    test -f /blockjoy/.init && \
+    /blockjoy/aptos/aptos-node -f /blockjoy/aptos/fullnode.yaml
+    """
 
 [[methods]]
 name = "height"
@@ -54,6 +57,29 @@ method = "fullnode.mainnet.aptoslabs.com/v1/-/healthy"
     status = 200
     field = "message"
     format = "json"
+
+
+[[methods]]
+name = "init"
+transport = "sh"
+body = """
+! test -f /blockjoy/.init && \
+    touch /blockjoy/.init
+"""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = """
+echo -n "incomplete"
+"""
+    [methods.response]
+    status = 200
+    format = "raw"
 
 [nets.mainnet]
 net_type = "main"
