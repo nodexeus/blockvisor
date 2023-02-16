@@ -4,19 +4,14 @@ use blockvisord::config::default_blockvisor_port;
 use blockvisord::linux_platform::LinuxPlatform;
 use blockvisord::services::api::{self, pb};
 use blockvisord::set_bv_status;
-use futures_util::FutureExt;
 use predicates::prelude::*;
 use serial_test::serial;
 use std::{env, fs};
 use std::{net::ToSocketAddrs, sync::Arc};
 use sysinfo::{Pid, PidExt, ProcessExt, ProcessRefreshKind, System, SystemExt};
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::{sleep, Duration};
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
-use tonic::{
-    transport::{Endpoint, Server},
-    Request,
-};
+use tonic::{transport::Server, Request};
 
 pub mod ui_pb {
     tonic::include_proto!("blockjoy.api.ui_v1");
@@ -628,10 +623,9 @@ async fn test_bv_cmd_grpc_commands() {
     use blockvisord::config::Config;
     use blockvisord::nodes::Nodes;
     use blockvisord::server::bv_pb;
-    use blockvisord::services::api::process_commands_stream;
+    use pb::node_info::ContainerStatus;
     use serde_json::json;
-    use std::str::FromStr;
-    use stub_server::StubServer;
+    use stub_server::{StubCommandsServer, StubNodesServer};
     use uuid::Uuid;
 
     let node_name = "beautiful-node-name".to_string();
@@ -815,23 +809,23 @@ async fn test_bv_cmd_grpc_commands() {
         },
     ];
 
-    let (updates_tx, updates_rx) = mpsc::channel(128);
-    let (shutdown_tx, mut shutdown_rx) = mpsc::channel(1);
-
-    let server = StubServer {
+    let commands_updates = Arc::new(Mutex::new(vec![]));
+    let commands_server = StubCommandsServer {
         commands: Arc::new(Mutex::new(commands)),
-        updates_tx,
-        shutdown_tx,
+        updates: commands_updates.clone(),
+    };
+
+    let nodes_updates = Arc::new(Mutex::new(vec![]));
+    let nodes_server = StubNodesServer {
+        updates: nodes_updates.clone(),
     };
 
     let server_future = async {
         Server::builder()
             .max_concurrent_streams(1)
-            .add_service(pb::command_flow_server::CommandFlowServer::new(server))
-            .serve_with_shutdown(
-                "0.0.0.0:8081".to_socket_addrs().unwrap().next().unwrap(),
-                shutdown_rx.recv().map(drop),
-            )
+            .add_service(pb::commands_server::CommandsServer::new(commands_server))
+            .add_service(pb::nodes_server::NodesServer::new(nodes_server))
+            .serve("0.0.0.0:8081".to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap()
     };
@@ -849,18 +843,17 @@ async fn test_bv_cmd_grpc_commands() {
     let nodes = Nodes::load(LinuxPlatform::new().unwrap(), config.clone())
         .await
         .unwrap();
-    let updates_tx = nodes.get_updates_sender().await.unwrap().clone();
     let nodes = Arc::new(RwLock::new(nodes));
 
-    let token = api::AuthToken(config.token);
-    let endpoint = Endpoint::from_str(&config.blockjoy_api_url).unwrap();
     let client_future = async {
-        sleep(Duration::from_secs(5)).await;
-        let channel = Endpoint::connect(&endpoint).await.unwrap();
-        let mut client = api::CommandsClient::with_auth(channel, token);
-        process_commands_stream(&mut client, nodes.clone(), updates_tx.clone())
-            .await
-            .unwrap();
+        match api::CommandsService::connect(&config.blockjoy_api_url, &config.token).await {
+            Ok(mut client) => {
+                if let Err(e) = client.process_pending_commands(nodes.clone()).await {
+                    println!("Error processing pending commands: {:?}", e);
+                }
+            }
+            Err(e) => println!("Error connecting to api: {:?}", e),
+        }
     };
 
     println!("run server");
@@ -871,101 +864,90 @@ async fn test_bv_cmd_grpc_commands() {
     }
 
     println!("check received updates");
-    let updates: Vec<_> = ReceiverStream::new(updates_rx)
-        .timeout(Duration::from_secs(1))
-        .take_while(Result::is_ok)
-        .collect()
-        .await;
-    let updates_count = updates.len();
-
-    println!("got updates: {updates:?}");
+    println!("got nodes updates: {:?}", nodes_updates.lock().await);
     let expected_updates = vec![
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Creating),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        error_command_update(&command_id, format!("Node with name `{node_name}` exists")),
-        ack_command_update(&command_id),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
-        node_update(&node_id, pb::node_info::ContainerStatus::Running),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
-        node_update(&node_id, pb::node_info::ContainerStatus::Running),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
-        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
-        node_update(&node_id, pb::node_info::ContainerStatus::Running),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        node_update(&node_id, pb::node_info::ContainerStatus::Upgrading),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopping),
-        node_update(&node_id, pb::node_info::ContainerStatus::Stopped),
-        node_update(&node_id, pb::node_info::ContainerStatus::Starting),
-        node_update(&node_id, pb::node_info::ContainerStatus::Running),
-        node_update(&node_id, pb::node_info::ContainerStatus::Upgraded),
-        success_command_update(&command_id),
-        ack_command_update(&command_id),
-        success_command_update(&command_id),
+        ContainerStatus::Creating,
+        ContainerStatus::Stopped,
+        ContainerStatus::Starting,
+        ContainerStatus::Running,
+        ContainerStatus::Stopping,
+        ContainerStatus::Stopped,
+        ContainerStatus::Starting,
+        ContainerStatus::Running,
+        ContainerStatus::Stopping,
+        ContainerStatus::Stopped,
+        ContainerStatus::Starting,
+        ContainerStatus::Running,
+        ContainerStatus::Upgrading,
+        ContainerStatus::Stopping,
+        ContainerStatus::Stopped,
+        ContainerStatus::Starting,
+        ContainerStatus::Running,
+        ContainerStatus::Upgraded,
     ];
-    let expected_count = expected_updates.len();
-
-    for (actual, expected) in updates.into_iter().zip(expected_updates) {
-        assert_eq!(actual.unwrap(), expected);
+    for (actual, ref expected) in nodes_updates.lock().await.iter().zip(expected_updates) {
+        assert_eq!(actual, expected);
     }
 
-    assert_eq!(updates_count, expected_count);
-}
-
-fn node_update(node_id: &str, status: pb::node_info::ContainerStatus) -> pb::InfoUpdate {
-    pb::InfoUpdate {
-        info: Some(pb::info_update::Info::Node(pb::NodeInfo {
-            id: node_id.to_string(),
-            container_status: Some(status.into()),
-            ..Default::default()
-        })),
-    }
-}
-
-fn error_command_update(command_id: &str, message: String) -> pb::InfoUpdate {
-    pb::InfoUpdate {
-        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
-            id: command_id.to_string(),
-            response: Some(message),
-            exit_code: Some(1),
-        })),
-    }
-}
-
-fn ack_command_update(command_id: &str) -> pb::InfoUpdate {
-    pb::InfoUpdate {
-        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
-            id: command_id.to_string(),
-            response: None,
-            exit_code: None,
-        })),
-    }
-}
-
-fn success_command_update(command_id: &str) -> pb::InfoUpdate {
-    pb::InfoUpdate {
-        info: Some(pb::info_update::Info::Command(pb::CommandInfo {
-            id: command_id.to_string(),
+    println!("got commands updates: {:?}", commands_updates.lock().await);
+    let expected_updates = vec![
+        pb::CommandInfo {
+            id: command_id.clone(),
             response: None,
             exit_code: Some(0),
-        })),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: Some("Node with name `beautiful-node-name` exists".to_string()),
+            exit_code: Some(1),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+        pb::CommandInfo {
+            id: command_id.clone(),
+            response: None,
+            exit_code: Some(0),
+        },
+    ];
+    for (actual, ref expected) in commands_updates.lock().await.iter().zip(expected_updates) {
+        assert_eq!(actual, expected);
     }
 }

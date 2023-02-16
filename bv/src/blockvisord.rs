@@ -51,7 +51,6 @@ where
         };
 
         try_set_bv_status(bv_pb::ServiceStatus::Ok).await;
-        let updates_tx = nodes.get_updates_sender().await?.clone();
         let nodes = Arc::new(RwLock::new(nodes));
 
         let url = format!("0.0.0.0:{}", config.blockvisor_port);
@@ -64,16 +63,13 @@ where
         let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
         let external_api_client_future = async {
             loop {
-                info!("Creating gRPC client...");
-                let mut client = api::CommandsClient::with_auth(
-                    Self::wait_for_channel(&endpoint).await,
-                    token.clone(),
-                );
-                if let Err(e) =
-                    api::process_commands_stream(&mut client, nodes.clone(), updates_tx.clone())
-                        .await
-                {
-                    error!("Error processing pending commands: {:?}", e);
+                match api::CommandsService::connect(&config.blockjoy_api_url, &config.token).await {
+                    Ok(mut client) => {
+                        if let Err(e) = client.process_pending_commands(nodes.clone()).await {
+                            error!("Error processing pending commands: {:?}", e);
+                        }
+                    }
+                    Err(e) => error!("Error connecting to api: {:?}", e),
                 }
                 sleep(RECONNECT_INTERVAL).await;
             }
@@ -184,7 +180,7 @@ where
                     ..Default::default()
                 };
 
-                if nodes_lock.send_info_update(update).is_ok() {
+                if nodes_lock.send_info_update(update).await.is_ok() {
                     // cache addresses to not send the same address if it has not changed
                     known_addresses.entry(node_id).or_insert(address);
                 }
