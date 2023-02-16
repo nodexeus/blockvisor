@@ -64,6 +64,11 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
+wget -O /blockjoy/aptos/waypoint.txt babelref:'nets.{{NETWORK}}.waypoint' \
+wget -O /blockjoy/aptos/genesis.blob babelref:'nets.{{NETWORK}}.url' \
+wget -O /blockjoy/aptos/node/aptos.tar.lz4 babelref:'nets.{{NETWORK}}.url' \
+cd /blockjoy/aptos/node && lz4 -c -d aptos_88332425.tar.lz4  | tar -x -C /blockjoy/aptos/node/ \
+rm aptos.tar.lz4 \
     touch /blockjoy/.init
 """
 
@@ -84,6 +89,8 @@ echo -n "incomplete"
 [nets.mainnet]
 net_type = "main"
 url = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob"
+waypoint = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt"
+snapshot = "https://snapshots.polkachu.com/snapshots/aptos/aptos_88332425.tar.lz4"
 
 [nets.testnet]
 net_type = "test"
