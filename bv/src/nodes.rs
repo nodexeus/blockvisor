@@ -8,8 +8,6 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::{self, read_dir};
-use tokio::sync::broadcast::{self, Sender};
-use tokio::sync::OnceCell;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -21,7 +19,7 @@ use crate::{
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
     render,
     services::{
-        api::{pb, pb::node_info::ContainerStatus, pb::Parameter},
+        api::{self, pb, pb::node_info::ContainerStatus, pb::Parameter},
         cookbook::CookbookService,
         keyfiles::KeyService,
     },
@@ -57,7 +55,6 @@ pub struct Nodes<P: Pal + Debug> {
     pub nodes: HashMap<Uuid, Node<P>>,
     pub node_ids: HashMap<String, Uuid>,
     data: CommonData,
-    tx: OnceCell<Sender<pb::InfoUpdate>>,
     pal: Arc<P>,
 }
 
@@ -92,7 +89,8 @@ impl<P: Pal + Debug> Nodes<P> {
         babel_conf.supervisor.entry_point =
             render_entry_points(babel_conf.supervisor.entry_point, &properties, &conf)?;
 
-        let _ = self.send_container_status(id, ContainerStatus::Creating);
+        self.send_container_status(id, ContainerStatus::Creating)
+            .await;
 
         self.data.machine_index += 1;
         let ip = ip.parse()?;
@@ -116,7 +114,8 @@ impl<P: Pal + Debug> Nodes<P> {
         self.node_ids.insert(name, id);
         debug!("Node with id `{}` created", id);
 
-        let _ = self.send_container_status(id, ContainerStatus::Stopped);
+        self.send_container_status(id, ContainerStatus::Stopped)
+            .await;
 
         Ok(())
     }
@@ -134,7 +133,8 @@ impl<P: Pal + Debug> Nodes<P> {
             let babel = self.fetch_image_data(&image).await?;
             check_babel_version(&babel.config.min_babel_version)?;
 
-            let _ = self.send_container_status(id, ContainerStatus::Upgrading);
+            self.send_container_status(id, ContainerStatus::Upgrading)
+                .await;
 
             let need_to_restart = self.status(id).await? == NodeStatus::Running;
             self.stop(id).await?;
@@ -160,7 +160,8 @@ impl<P: Pal + Debug> Nodes<P> {
                 self.start(id).await?;
             }
 
-            let _ = self.send_container_status(id, ContainerStatus::Upgraded);
+            self.send_container_status(id, ContainerStatus::Upgraded)
+                .await;
         }
         Ok(())
     }
@@ -199,12 +200,15 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn force_start(&mut self, id: Uuid) -> Result<()> {
-        let _ = self.send_container_status(id, ContainerStatus::Starting);
+        self.send_container_status(id, ContainerStatus::Starting)
+            .await;
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.start().await?;
         debug!("Node started");
 
-        let _ = self.send_container_status(id, ContainerStatus::Running);
+        self.send_container_status(id, ContainerStatus::Running)
+            .await;
 
         let secret_keys = match self.exchange_keys(id).await {
             Ok(secret_keys) => secret_keys,
@@ -252,12 +256,15 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn force_stop(&mut self, id: Uuid) -> Result<()> {
-        let _ = self.send_container_status(id, ContainerStatus::Stopping);
+        self.send_container_status(id, ContainerStatus::Stopping)
+            .await;
+
         let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.stop().await?;
         debug!("Node stopped");
 
-        let _ = self.send_container_status(id, ContainerStatus::Stopped);
+        self.send_container_status(id, ContainerStatus::Stopped)
+            .await;
         Ok(())
     }
 
@@ -380,7 +387,6 @@ impl<P: Pal + Debug> Nodes<P> {
             data: CommonData { machine_index: 0 },
             nodes: HashMap::new(),
             node_ids: HashMap::new(),
-            tx: OnceCell::new(),
             pal: Arc::new(pal),
         }
     }
@@ -437,7 +443,6 @@ impl<P: Pal + Debug> Nodes<P> {
             data,
             nodes,
             node_ids,
-            tx: OnceCell::new(),
             pal,
         })
     }
@@ -467,34 +472,29 @@ impl<P: Pal + Debug> Nodes<P> {
         build_registry_filename(bv_root).exists()
     }
 
-    // Notify API that container is 'Running' or 'Stopped', etc
-    pub fn send_container_status(&self, id: Uuid, status: ContainerStatus) -> Result<()> {
+    // Optimistically try to notify API that container is 'Running' or 'Stopped', etc
+    pub async fn send_container_status(&self, id: Uuid, status: ContainerStatus) {
         let update = pb::NodeInfo {
             id: id.to_string(),
             container_status: Some(status.into()),
             ..Default::default()
         };
-        self.send_info_update(update)
+        if let Err(e) = self.send_info_update(update).await {
+            error!("Cannot send container status: {e}");
+        };
     }
 
-    // Optimistically try to send node info update to API
-    pub fn send_info_update(&self, update: pb::NodeInfo) -> Result<()> {
-        if !self.tx.initialized() {
-            bail!("Updates channel not initialized")
-        }
-
-        let update = pb::InfoUpdate {
-            info: Some(pb::info_update::Info::Node(update)),
-        };
-
-        match self.tx.get().unwrap().send(update) {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let msg = format!("Cannot send node update: {error:?}");
-                error!(msg);
-                Err(anyhow!(msg))
-            }
-        }
+    // Send node info update to API
+    pub async fn send_info_update(&self, update: pb::NodeInfo) -> Result<()> {
+        let mut client =
+            api::NodesService::connect(&self.api_config.blockjoy_api_url, &self.api_config.token)
+                .await
+                .with_context(|| "Error connecting to api".to_string())?;
+        client
+            .send_node_update(update)
+            .await
+            .with_context(|| "Cannot send node update".to_string())?;
+        Ok(())
     }
 
     /// Create and return the next network interface using machine index
@@ -515,16 +515,6 @@ impl<P: Pal + Debug> Nodes<P> {
             ))?;
 
         Ok(iface)
-    }
-
-    // Get or init updates sender
-    pub async fn get_updates_sender(&self) -> Result<&Sender<pb::InfoUpdate>> {
-        self.tx
-            .get_or_try_init(|| async {
-                let (tx, _rx) = broadcast::channel(128);
-                Ok(tx)
-            })
-            .await
     }
 }
 
