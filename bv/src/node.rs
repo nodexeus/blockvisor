@@ -441,16 +441,16 @@ impl<P: Pal + Debug> Node<P> {
     }
 
     /// This function calls babel by sending a blockchain command using the specified method name.
+    #[instrument(skip(self), fields(id = %self.data.id, name = name.to_string()), err, ret(Debug))]
     pub async fn call_method<T>(
         &mut self,
         name: impl Display,
         params: HashMap<String, Vec<String>>,
     ) -> Result<T>
     where
-        T: FromStr,
+        T: FromStr + Debug,
         <T as FromStr>::Err: std::error::Error + Send + Sync + 'static,
     {
-        debug!("Calling method: {name}");
         let get_api_host = |method: &str| -> Result<&String> {
             self.data
                 .babel_conf
