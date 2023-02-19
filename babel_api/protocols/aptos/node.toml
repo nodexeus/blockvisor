@@ -13,7 +13,7 @@ ports = [8080]
 [requirements]
 vcpu_count = 8
 mem_size_mb =  32768
-disk_size_gb =  2000
+disk_size_gb = 1000
 
 [supervisor]
 backoff_timeout_ms = 60000
