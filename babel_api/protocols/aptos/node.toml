@@ -22,7 +22,7 @@ log_buffer_capacity_ln = 1000
 data_directory_mount_point = "/blockjoy/aptos/node"
 
     [[supervisor.entry_point]]
-    name = "cardano-node"
+    name = "aptos-node"
     body = """
     test -f /blockjoy/.init && \
     /blockjoy/aptos/aptos-node -f /blockjoy/aptos/fullnode.yaml
@@ -64,10 +64,10 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-wget -O /blockjoy/aptos/waypoint.txt babelref:'nets.{{NETWORK}}.waypoint' \
-wget -O /blockjoy/aptos/genesis.blob babelref:'nets.{{NETWORK}}.url' \
-wget -O /blockjoy/aptos/node/aptos.tar.lz4 babelref:'nets.{{NETWORK}}.snapshot' \
-cd /blockjoy/aptos/node && lz4 -c -d aptos_88332425.tar.lz4  | tar -x -C /blockjoy/aptos/node/ \
+curl babelref:'nets.{{NETWORK}}.waypoint' > /blockjoy/aptos/waypoint.txt \
+curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/aptos/genesis.blob  \
+curl babelref:'nets.{{NETWORK}}.snapshot' > /blockjoy/aptos/node/aptos.tar.lz4  \
+cd /blockjoy/aptos/node && lz4 -c -d aptos_89414826.tar.lz4  | tar -x -C /blockjoy/aptos/node/ \
 rm aptos.tar.lz4 \
     touch /blockjoy/.init
 """
@@ -90,7 +90,7 @@ echo -n "incomplete"
 net_type = "main"
 url = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/genesis.blob"
 waypoint = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/mainnet/waypoint.txt"
-snapshot = "https://snapshots.polkachu.com/snapshots/aptos/aptos_88332425.tar.lz4"
+snapshot = "https://snapshots.polkachu.com/snapshots/aptos/aptos_89414826.tar.lz4"
 
 [nets.testnet]
 net_type = "test"
