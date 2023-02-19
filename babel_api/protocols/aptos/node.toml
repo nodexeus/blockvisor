@@ -7,7 +7,7 @@ node_type = "validator"
 node_version = "1.2.4"
 min_babel_version = "0.0.1"
 description = "aptos blockchain validator"
-api_host = "http://localhost:8080/"
+api_host = "http://localhost:8080"
 ports = [8080]
 
 [requirements]
@@ -31,7 +31,7 @@ data_directory_mount_point = "/blockjoy/aptos/node"
 [[methods]]
 name = "height"
 transport = "rest"
-method = "fullnode.mainnet.aptoslabs.com/v1"
+method = "/v1"
     
     [methods.response]
     status = 200
