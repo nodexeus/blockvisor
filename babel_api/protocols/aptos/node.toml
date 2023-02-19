@@ -67,7 +67,7 @@ body = """
 touch /blockjoy/.initbusy && \
 curl babelref:'nets.{{NETWORK}}.waypoint' > /blockjoy/aptos/waypoint.txt 2>&1 | logger && \
 curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/aptos/genesis.blob 2>&1 | logger && \
-axel -n 10 http://swarm01.stakejoy.com/aptos.tar.lz4 2>&1 | logger && \
+axel -o /blockjoy/aptos/node/aptos.tar.lz4 -n 10 http://swarm01.stakejoy.com/aptos.tar.lz4 2>&1 | logger && \
 cd /blockjoy/aptos/node && lz4 -d --rm  aptos.tar.lz4 2>&1 | logger && tar xvf /blockjoy/aptos/node/aptos.tar --directory /blockjoy/aptos/node/ 2>&1 | logger && \
 rm aptos.tar &&  \
 touch /blockjoy/.init && \
