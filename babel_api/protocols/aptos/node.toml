@@ -68,10 +68,10 @@ touch /blockjoy/.initbusy && \
 curl babelref:'nets.{{NETWORK}}.waypoint' > /blockjoy/aptos/waypoint.txt && \
 curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/aptos/genesis.blob && \
 curl babelref:'nets.{{NETWORK}}.snapshot' > /blockjoy/aptos/node/aptos.tar.lz4 && \
-cd /blockjoy/aptos/node && lz4 -c -d aptos.tar.lz4  | tar -x -C /blockjoy/aptos/node/ \
-rm aptos.tar.lz4  \
-    touch /blockjoy/.init && \
-    rm /blockjoy/.initbusy
+cd /blockjoy/aptos/node && lz4 -d --rm  aptos.tar.lz4 && tar xvf /blockjoy/aptos/node/aptos.tar --directory /blockjoy/aptos/node/ && \
+rm aptos.tar &&  \
+touch /blockjoy/.init && \
+rm /blockjoy/.initbusy
 """
 
     [methods.response]
