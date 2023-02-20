@@ -64,11 +64,11 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && ! test -f /blockjoy/.initbusy && \
-touch /blockjoy/.initbusy && \
+touch /blockjoy/.initbusy && export TERM=xterm && \
 curl babelref:'nets.{{NETWORK}}.waypoint' > /blockjoy/aptos/waypoint.txt 2>&1 | logger -t babel.init && \
 curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/aptos/genesis.blob 2>&1 | logger && \
 axel -o /blockjoy/aptos/node/aptos.tar.lz4 -n 10 http://swarm01.stakejoy.com/aptos.tar.lz4 2>&1 | logger -t babel.init && \
-lz4 -d --rm  /blockjoy/aptos/node/aptos.tar.lz4 /blockjoy/aptos/node/aptos.tar && tar xvf /blockjoy/aptos/node/aptos.tar --directory /blockjoy/aptos/node/ 2>&1 | logger -t babel.init && \
+lz4 -d -c --rm  /blockjoy/aptos/node/aptos.tar.lz4 || echo error | logger -t babel.init && tar -x /blockjoy/aptos/node/aptos.tar -C /blockjoy/aptos/node/ 2>&1 | logger -t babel.init && \
 rm aptos.tar &&  \
 touch /blockjoy/.init && \
 rm /blockjoy/.initbusy
