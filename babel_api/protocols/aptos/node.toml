@@ -68,7 +68,7 @@ touch /blockjoy/.initbusy && export TERM=xterm && \
 curl babelref:'nets.{{NETWORK}}.waypoint' > /blockjoy/aptos/waypoint.txt 2>&1 | logger -t babel.init && \
 curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/aptos/genesis.blob 2>&1 | logger && \
 axel -o /blockjoy/aptos/node/aptos.tar.lz4 -n 10 http://swarm01.stakejoy.com/aptos.tar.lz4 2>&1 | logger -t babel.init && \
-lz4 -d -c --rm  /blockjoy/aptos/node/aptos.tar.lz4 || echo error | logger -t babel.init && tar -x /blockjoy/aptos/node/aptos.tar -C /blockjoy/aptos/node/ 2>&1 | logger -t babel.init && \
+sync && sleep 10 && lz4 -d -c  /blockjoy/aptos/node/aptos.tar.lz4 | tar -x -C /blockjoy/aptos/node/ && \
 rm aptos.tar &&  \
 touch /blockjoy/.init && \
 rm /blockjoy/.initbusy
