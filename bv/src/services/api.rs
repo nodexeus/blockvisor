@@ -19,6 +19,7 @@ use tonic::{Request, Status};
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
+#[allow(clippy::large_enum_variant)]
 pub mod pb {
     tonic::include_proto!("blockjoy.api.v1");
 }
@@ -69,7 +70,7 @@ impl CommandsService {
         })
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     pub async fn process_pending_commands<P: Pal + Debug>(
         &mut self,
         nodes: Arc<RwLock<Nodes<P>>>,
@@ -186,7 +187,7 @@ async fn process_node_command<P: Pal + Debug>(
     nodes: Arc<RwLock<Nodes<P>>>,
     node_command: pb::NodeCommand,
 ) -> Result<()> {
-    let node_id = Uuid::from_str(&node_command.id)?;
+    let node_id = Uuid::from_str(&node_command.node_id)?;
     match node_command.command {
         Some(cmd) => match cmd {
             Command::Create(args) => {

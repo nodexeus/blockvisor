@@ -358,6 +358,7 @@ async fn test_bv_cmd_init_localhost() {
             ip_gateway: "216.18.214.193".to_string(),
             ip_range_from: "216.18.214.195".to_string(),
             ip_range_to: "216.18.214.206".to_string(),
+            org_id: None,
         }),
     };
     let provision: ui_pb::CreateHostProvisionResponse = client
@@ -628,6 +629,7 @@ async fn test_bv_cmd_grpc_commands() {
     use stub_server::{StubCommandsServer, StubNodesServer};
     use uuid::Uuid;
 
+    let host_id = Uuid::new_v4().to_string();
     let node_name = "beautiful-node-name".to_string();
     let node_id = Uuid::new_v4().to_string();
     let id = node_id.clone();
@@ -653,9 +655,10 @@ async fn test_bv_cmd_grpc_commands() {
         // create
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
@@ -679,9 +682,10 @@ async fn test_bv_cmd_grpc_commands() {
         // create with same node id
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: "some-new-name".to_string(),
                     image: Some(pb::ContainerImage {
@@ -705,9 +709,10 @@ async fn test_bv_cmd_grpc_commands() {
         // create with same node name
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: Uuid::new_v4().to_string(),
+                node_id: Uuid::new_v4().to_string(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                     name: node_name.clone(),
                     image: Some(pb::ContainerImage {
@@ -731,63 +736,70 @@ async fn test_bv_cmd_grpc_commands() {
         // stop stopped
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
             })),
         },
         // start
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
             })),
         },
         // start running
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Start(pb::NodeStart {})),
             })),
         },
         // stop
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Stop(pb::NodeStop {})),
             })),
         },
         // restart stopped
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
         // restart running
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Restart(pb::NodeRestart {})),
             })),
         },
         // upgrade running
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Upgrade(pb::NodeUpgrade {
                     image: Some(pb::ContainerImage {
                         protocol: "testing".to_string(),
@@ -801,9 +813,10 @@ async fn test_bv_cmd_grpc_commands() {
         // delete
         pb::Command {
             r#type: Some(pb::command::Type::Node(pb::NodeCommand {
-                id: id.clone(),
+                node_id: id.clone(),
                 api_command_id: command_id.clone(),
                 created_at: None,
+                host_id: host_id.clone(),
                 command: Some(pb::node_command::Command::Delete(pb::NodeDelete {})),
             })),
         },
