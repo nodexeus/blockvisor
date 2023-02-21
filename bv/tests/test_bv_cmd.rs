@@ -249,6 +249,7 @@ fn test_bv_cmd_init_unknown_otp() {
     let otp = "NOT_FOUND";
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
+    let mqtt = "mqtt://localhost:1883";
 
     let mut cmd = Command::cargo_bin("bvup").unwrap();
     cmd.args([otp, "--skip-download"])
@@ -256,6 +257,7 @@ fn test_bv_cmd_init_unknown_otp() {
         .args(["--api", url])
         .args(["--keys", url])
         .args(["--registry", url])
+        .args(["--mqtt", mqtt])
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
@@ -373,6 +375,7 @@ async fn test_bv_cmd_init_localhost() {
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
     let registry = "http://localhost:50051";
+    let mqtt = "mqtt://localhost:1883";
 
     Command::cargo_bin("bvup")
         .unwrap()
@@ -381,6 +384,7 @@ async fn test_bv_cmd_init_localhost() {
         .args(["--api", url])
         .args(["--keys", url])
         .args(["--registry", registry])
+        .args(["--mqtt", mqtt])
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -534,6 +538,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
         let tmp_dir = TempDir::new().unwrap();
         let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
         let url = "http://localhost:8082";
+        let mqtt = "mqtt://localhost:1883";
         let otp = "AWESOME";
         let config_path = format!("{}/etc/blockvisor.toml", tmp_dir.to_string_lossy());
 
@@ -545,6 +550,7 @@ async fn test_bv_cmd_grpc_stub_init_reset() {
             .args(["--api", url])
             .args(["--keys", url])
             .args(["--registry", url])
+            .args(["--mqtt", mqtt])
             .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()
@@ -849,6 +855,7 @@ async fn test_bv_cmd_grpc_commands() {
         blockjoy_api_url: "http://localhost:8081".to_string(),
         blockjoy_keys_url: "http://localhost:8081".to_string(),
         blockjoy_registry_url: "http://localhost:50051".to_string(),
+        blockjoy_mqtt_url: "mqtt://localhost:1883".to_string(),
         update_check_interval_secs: None,
         blockvisor_port: default_blockvisor_port(),
     };
