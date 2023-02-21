@@ -27,6 +27,10 @@ pub struct CmdArgs {
     #[clap(long = "registry", default_value = "https://api.dev.blockjoy.com")]
     pub blockjoy_registry_url: String,
 
+    /// BlockJoy MQTT url
+    #[clap(long = "mqtt")]
+    pub blockjoy_mqtt_url: String,
+
     /// Network interface name
     #[clap(long = "ifa", default_value = "bvbr0")]
     pub ifa: String,
@@ -93,6 +97,7 @@ async fn main() -> Result<()> {
             blockjoy_api_url: cmd_args.blockjoy_api_url,
             blockjoy_keys_url: cmd_args.blockjoy_keys_url,
             blockjoy_registry_url: cmd_args.blockjoy_registry_url,
+            blockjoy_mqtt_url: cmd_args.blockjoy_mqtt_url,
             update_check_interval_secs: None,
             blockvisor_port: config::default_blockvisor_port(),
         };

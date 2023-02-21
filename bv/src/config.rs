@@ -22,6 +22,8 @@ pub struct Config {
     pub blockjoy_keys_url: String,
     /// Url of cookbook service for getting fs images, babel configs, kernel files, etc.
     pub blockjoy_registry_url: String,
+    /// Url for mqtt broker to receive commands and updates from.
+    pub blockjoy_mqtt_url: String,
     /// Self update check interval - how often blockvisor shall check for new version of itself
     pub update_check_interval_secs: Option<u64>,
     /// Port to be used by blockvisor internal service
