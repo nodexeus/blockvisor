@@ -16,6 +16,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
+use tracing::instrument;
 
 async fn status_check() -> Result<(), Status> {
     match get_bv_status().await {
@@ -40,6 +41,7 @@ where
     P: Pal + Debug + Send + Sync + 'static,
     <P as Pal>::NetInterface: Send + Sync + 'static,
 {
+    #[instrument(skip(self), ret(Debug))]
     async fn health(
         &self,
         _request: Request<bv_pb::HealthRequest>,
@@ -50,6 +52,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn start_update(
         &self,
         _request: Request<bv_pb::StartUpdateRequest>,
@@ -60,6 +63,7 @@ where
         }))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn create_node(
         &self,
         request: Request<bv_pb::CreateNodeRequest>,
@@ -96,6 +100,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn upgrade_node(
         &self,
         request: Request<bv_pb::UpgradeNodeRequest>,
@@ -120,6 +125,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn delete_node(
         &self,
         request: Request<bv_pb::DeleteNodeRequest>,
@@ -139,6 +145,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn start_node(
         &self,
         request: Request<bv_pb::StartNodeRequest>,
@@ -159,6 +166,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn stop_node(
         &self,
         request: Request<bv_pb::StopNodeRequest>,
@@ -179,6 +187,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_nodes(
         &self,
         _request: Request<bv_pb::GetNodesRequest>,
@@ -210,6 +219,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_node_status(
         &self,
         request: Request<bv_pb::GetNodeStatusRequest>,
@@ -238,6 +248,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_node_logs(
         &self,
         request: Request<bv_pb::GetNodeLogsRequest>,
@@ -258,6 +269,7 @@ where
         Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_node_keys(
         &self,
         request: Request<bv_pb::GetNodeKeysRequest>,
@@ -279,6 +291,7 @@ where
         Ok(Response::new(bv_pb::GetNodeKeysResponse { names }))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_node_id_for_name(
         &self,
         request: Request<bv_pb::GetNodeIdForNameRequest>,
@@ -300,6 +313,7 @@ where
         Ok(Response::new(reply))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn list_capabilities(
         &self,
         request: Request<bv_pb::ListCapabilitiesRequest>,
@@ -321,6 +335,7 @@ where
     }
 
     /// Calls an arbitrary method on a the blockchain node running inside the VM.
+    #[instrument(skip(self), ret(Debug))]
     async fn blockchain(
         &self,
         request: Request<bv_pb::BlockchainRequest>,
@@ -346,6 +361,7 @@ where
         Ok(Response::new(bv_pb::BlockchainResponse { value }))
     }
 
+    #[instrument(skip(self), ret(Debug))]
     async fn get_node_metrics(
         &self,
         request: Request<bv_pb::GetNodeMetricsRequest>,
