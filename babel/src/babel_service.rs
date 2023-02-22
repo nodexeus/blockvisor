@@ -176,7 +176,7 @@ impl BabelService {
         request: Request<(String, babel_api::config::RestResponse)>,
     ) -> Result<babel_api::BlockchainResponse> {
         let (url, response) = request.into_inner();
-        let text = self.post(url).send().await?.text().await?;
+        let text = self.get(url).send().await?.text().await?;
         let value = match &response.field {
             Some(field) => gjson::get(&text, field).to_string(),
             None => text,
@@ -383,7 +383,7 @@ mod tests {
         let server = MockServer::start();
 
         let mock = server.mock(|when, then| {
-            when.method(POST).path("/items");
+            when.method(GET).path("/items");
             then.status(200)
                 .header("content-type", "application/json")
                 .json_body(json!({"result": [1, 2, 3]}));
@@ -412,7 +412,7 @@ mod tests {
         let server = MockServer::start();
 
         let mock = server.mock(|when, then| {
-            when.method(POST).path("/items");
+            when.method(GET).path("/items");
             then.status(200)
                 .header("content-type", "application/json")
                 .json_body(json!({"result": [1, 2, 3]}));
