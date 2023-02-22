@@ -65,12 +65,16 @@ where
             loop {
                 match api::CommandsService::connect(&config.blockjoy_api_url, &config.token).await {
                     Ok(mut client) => {
-                        if let Err(e) = client.process_pending_commands(nodes.clone()).await {
+                        if let Err(e) = client
+                            .get_and_process_pending_commands(&config.id, nodes.clone())
+                            .await
+                        {
                             error!("Error processing pending commands: {:?}", e);
                         }
                     }
                     Err(e) => error!("Error connecting to api: {:?}", e),
                 }
+
                 sleep(RECONNECT_INTERVAL).await;
             }
         };

@@ -868,7 +868,10 @@ async fn test_bv_cmd_grpc_commands() {
     let client_future = async {
         match api::CommandsService::connect(&config.blockjoy_api_url, &config.token).await {
             Ok(mut client) => {
-                if let Err(e) = client.process_pending_commands(nodes.clone()).await {
+                if let Err(e) = client
+                    .get_and_process_pending_commands(&config.id, nodes.clone())
+                    .await
+                {
                     println!("Error processing pending commands: {:?}", e);
                 }
             }

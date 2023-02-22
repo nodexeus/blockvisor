@@ -70,22 +70,42 @@ impl CommandsService {
         })
     }
 
-    #[instrument(skip_all)]
-    pub async fn process_pending_commands<P: Pal + Debug>(
+    #[instrument(skip(self, nodes))]
+    pub async fn get_and_process_pending_commands<P: Pal + Debug>(
         &mut self,
+        host_id: &str,
         nodes: Arc<RwLock<Nodes<P>>>,
     ) -> Result<()> {
-        info!("Processing pending commands");
+        info!("Get and process pending commands");
+
+        let commands = self.get_pending_commands(host_id).await?;
+        self.process_commands(commands, nodes).await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn get_pending_commands(&mut self, host_id: &str) -> Result<Vec<pb::Command>> {
+        info!("Get pending commands");
 
         let req = pb::PendingCommandsRequest {
-            host_id: nodes.read().await.api_config.id.clone(),
+            host_id: host_id.to_string(),
             filter_type: None,
         };
         let resp =
             with_retry!(self.client.pending(with_auth(req.clone(), &self.token)))?.into_inner();
 
-        for command in resp.commands {
-            info!("Received command: {command:?}");
+        Ok(resp.commands)
+    }
+
+    #[instrument(skip(self, nodes))]
+    pub async fn process_commands<P: Pal + Debug>(
+        &mut self,
+        commands: Vec<pb::Command>,
+        nodes: Arc<RwLock<Nodes<P>>>,
+    ) -> Result<()> {
+        info!("Processing commands");
+
+        for command in commands {
+            info!("Processing command: {command:?}");
 
             match command.r#type {
                 Some(pb::command::Type::Node(node_command)) => {
