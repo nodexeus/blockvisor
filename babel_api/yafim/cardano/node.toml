@@ -1,0 +1,36 @@
+application_name = "cardano"
+node_type = "node"
+version = "1.35.5-build.1"
+
+[image]
+debian_version = "focal"
+rootfs_size = "5G"
+fs_type = "ext4"
+apt_image = ["jq","python3-pip"]
+apt_source = ["universe"]
+cmds = [
+  "wget -O cardano.tar.gz https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-1.35.5-linux.tar.gz",
+  "wget -O cardano-wallet.tar.gz https://github.com/input-output-hk/cardano-wallet/releases/download/v2022-12-14/cardano-wallet-v2022-12-14-linux64.tar.gz",
+  "mkdir -p /blockjoy/cardano",
+  "mkdir -p /blockjoy/cardano-wallet",
+  "tar xvzf cardano.tar.gz --directory /blockjoy/cardano/",
+  "tar xvzf cardano-wallet.tar.gz --directory /blockjoy/cardano-wallet/",
+  "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml && cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release", 
+               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/cardano/mnt/usr/bin/",
+		"cp blockvisor/babel/data/babelsup.service protocols/cardano/mnt/etc/systemd/system/",
+		"cp blockvisor/babel/protocols/cardano/cardano.toml protocols/cardano/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/cardano/mnt",
+		"echo cardano > /root/yafim/protocols/cardano/mnt/etc/hostname"
+]

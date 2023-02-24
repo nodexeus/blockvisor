@@ -1,0 +1,35 @@
+application_name = "algorand"
+node_type = "node"
+version = "3.14.2"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["gnupg2"]
+apt_source = ["universe"]
+cmds = [
+  "curl -o - https://releases.algorand.com/key.pub | sudo tee /etc/apt/trusted.gpg.d/algorand.asc",
+  """add-apt-repository "deb [arch=amd64] https://releases.algorand.com/deb/ stable main" """,
+  "apt-get update",
+  "apt install -y algorand-devtools",
+  "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+  "systemctl disable algorand.service"
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml && cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release", 
+               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/algorand/mnt/usr/bin/",
+		"cp blockvisor/babel/data/babelsup.service protocols/algorand/mnt/etc/systemd/system/",
+		"cp blockvisor/babel/protocols/algorand/algorand.toml protocols/algorand/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/algorand/mnt",
+		"echo algorand > /root/yafim/protocols/algorand/mnt/etc/hostname"
+]

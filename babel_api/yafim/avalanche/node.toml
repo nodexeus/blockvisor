@@ -1,0 +1,37 @@
+application_name = "avalanche"
+node_type = "node"
+version = ""
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["build-essential"]
+apt_source = ["universe","multiverse"]
+cmds = [
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+  "sudo apt update",
+  "sudo apt upgrade -y",
+  "wget https://github.com/ava-labs/avalanchego/releases/download/v1.9.9/avalanchego-linux-amd64-v1.9.9.tar.gz",
+  "tar xvzf avalanchego-linux-amd64-v1.9.9.tar.gz",
+  "sudo cp avalanchego-v1.9.9/avalanchego /usr/bin/",
+  "avalanchego --version",
+
+]
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  [
+		"cp babelsup/usr/bin/babelsup target/avalanche/node/mnt/usr/bin/",
+		"cp babelsup/etc/systemd/system/babelsup.service target/avalanche/node/mnt/etc/systemd/system/",
+		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service target/avalanche/node/mnt/etc/systemd/system/multi-user.target.wants/",
+                "cp blockvisor/babel_api/protocols/avalanche/node.toml /root/yafim/target/avalanche/node/mnt/etc/babel.conf",	
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/target/avalanche/node/mnt/",
+		"echo avalanche-node > /root/yafim/target/avalanche/node/mnt/etc/hostname",
+]

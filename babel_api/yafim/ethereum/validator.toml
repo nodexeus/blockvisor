@@ -1,0 +1,32 @@
+application_name = "ethereum"
+node_type = "validator"
+version = "3.4.0-build.7"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["jq"]
+apt_source = ["universe"]
+cmds = [
+  "wget -O lighthouse.tar.gz https://github.com/sigp/lighthouse/releases/download/v3.4.0/lighthouse-v3.4.0-x86_64-unknown-linux-gnu.tar.gz",
+  "mkdir -p /blockjoy","tar xvzf lighthouse.tar.gz --directory /usr/bin/",
+  "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf"
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml && cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release", 
+               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/eth/mnt/usr/bin/",
+		"cp blockvisor/babel/data/babelsup.service protocols/eth/mnt/etc/systemd/system/",
+		"cp blockvisor/babel_api/protocols/ethereum/validator.toml protocols/eth/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/eth/mnt",
+		"echo eth > /root/yafim/protocols/eth/mnt/etc/hostname"
+]

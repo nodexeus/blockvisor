@@ -1,0 +1,24 @@
+application_name = "cosmos"
+node_type = "node"
+version = "1.70.0"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = []
+apt_source = []
+cmds = [
+  
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = "https://github.com/cosmos/gaia.git"
+git_tag = "v7.1.0"
+build_cmds =  [
+		"cd gaia && make build-linux",
+		"cp gaia/build/gaiad target/cosmos/node/mnt/bin/"
+	      ]
+
+

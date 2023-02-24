@@ -1,0 +1,36 @@
+application_name = "aptos"
+node_type = "node"
+version = "1.2.4-build.1"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["jq","libssl-dev","snapd","lz4","axel"]
+apt_source = ["universe"]
+cmds = [
+  "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = ""
+git_tag = ""
+build_cmds =  [
+	        "cp babelsup/usr/bin/babelsup target/aptos/node/mnt/usr/bin/",
+		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service target/aptos/node/mnt/etc/systemd/system/",
+		"cp blockvisor/babel_api/protocols/aptos/node.toml target/aptos/node/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/target/aptos/node/mnt",
+		"echo aptos > /root/yafim/target/aptos/node/mnt/etc/hostname",
+		"mkdir -p target/aptos/node/mnt/blockjoy/aptos",
+		"wget -O aptos.tar.gz https://github.com/aptos-labs/aptos-core/archive/refs/tags/aptos-node-v1.2.4.tar.gz",
+		"tar xvzf aptos.tar.gz",
+		"cd aptos-core* && ./scripts/dev_setup.sh -b && cargo build -p aptos-node --release && cp target/release/aptos-node ../target/aptos/node/mnt/blockjoy/aptos/",
+		"cp protocols/aptos/supporting-files/fullnode.yaml target/aptos/node/mnt/blockjoy/aptos/",
+                   
+]

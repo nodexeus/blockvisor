@@ -1,0 +1,35 @@
+application_name = "tezos"
+node_type = "node"
+version = "15.1.0-build.1"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["build-essential","patch","unzip","wget","m4","git","pkg-config","libgmp-dev","libev-dev","libhidapi-dev"]
+apt_source = ["universe","multiverse"]
+cmds = [
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+  "sudo apt upgrade -y",
+  "wget https://github.com/serokell/tezos-packaging/releases/download/v15.1-2/binaries-15.1-2.tar.gz",
+  "sudo tar -xvzf binaries-15.1-2.tar.gz",
+  "sudo chmod +x  octez-*",
+  "sudo mv octez-* /usr/bin/",
+]
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  [
+		"cp babelsup/usr/bin/babelsup target/tezos/node/mnt/usr/bin/",
+		"cp babelsup/etc/systemd/system/babelsup.service target/tezos/node/mnt/etc/systemd/system/",
+		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service target/tezos/node/mnt/etc/systemd/system/multi-user.target.wants/",
+                "cp blockvisor/babel_api/protocols/tezos/node.toml /root/yafim/target/tezos/node/mnt/etc/babel.conf",	
+		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/target/tezos/node/mnt/",
+		"echo tezos-node > /root/yafim/target/tezos/node/mnt/etc/hostname",
+]

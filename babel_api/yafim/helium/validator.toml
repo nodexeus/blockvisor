@@ -1,0 +1,35 @@
+application_name = "helium"
+node_type = "validator"
+version = "1.17.2-build.5"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = ["jq","libsodium-dev","libdbus-1-dev"]
+apt_source = ["universe"]
+cmds = [
+  "wget -O helium.tar.gz https://tools.stakejoy.com/helium-linux/miner-1.17.2.tar.gz",
+  "mkdir -p /blockjoy/miner/data",
+  "mkdir -p /opt/miner/update",
+ "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
+  "tar xvzf helium.tar.gz --directory /blockjoy/miner/",
+  "ln -s /blockjoy/miner/bin/miner /bin/miner", 
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf"
+] 
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml &&  cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release",
+               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/helium/mnt/usr/bin/",
+                "cp blockvisor/babel/data/babelsup.service protocols/helium/mnt/etc/systemd/system/",
+                "cp blockvisor/babel/protocols/helium/helium.toml protocols/helium/mnt/etc/babel.conf",
+                "echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/helium//mnt",
+                "echo helium > /root/yafim/protocols/helium/mnt/etc/hostname"
+]
