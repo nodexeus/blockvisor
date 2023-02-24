@@ -22,8 +22,8 @@ cmds = [
 
 [build_machine]
 apt_build_machine = []
-git_repo = "git@github.com:blockjoy/blockvisor.git"
-git_tag = "master"
+git_repo = ""
+git_tag = ""
 build_cmds =  [
 		"cp babelsup/usr/bin/babelsup {{.YafimHome}}/target/tendermint/node/mnt/usr/bin/",
 		"cp babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/tendermint/node/mnt/etc/systemd/system/",
