@@ -1,0 +1,93 @@
+[env]
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "sui"
+node_type = "node"
+node_version = "0.27.0"
+min_babel_version = "0.0.1"
+description = "sui node"
+api_host = "https://localhost:8080" #need to find the port
+ports = [8080]
+
+[requirements]
+vcpu_count = 10 
+mem_size_mb = 32768 
+disk_size_gb = 1024
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+data_directory_mount_point = "/blockjoy/sui/data"
+
+    [[supervisor.entry_point]]
+    name = ""
+    body = ""
+
+[[methods]]
+name = "height"
+transport = "rest"
+method = "" # find 
+
+    [methods.response]
+    status = 200
+    field = "" # find
+    format = "raw" # find
+
+[[methods]]
+name = "address"
+transport = "rest"
+method = "" # find 
+
+    [methods.response]
+    status = 200
+    field = "" # find 
+    format = "raw" # find
+
+[[methods]]
+name = "status"
+transport = "rest"
+method = "" 
+
+    [methods.response]
+    status = 200
+    field = "" # find with test
+    format = "json"
+
+[[methods]]
+name = "genesis_info"
+transport = "rest"
+method = "" 
+
+    [methods.response]
+    status = 200
+    field = "result" # find with test
+    format = "json"
+
+[[methods]]
+name = "init"
+transport = "sh"
+body = ""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = ""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+
+[nets.devnet]
+net_type = "devnet"
+url = "https://github.com/MystenLabs/sui-genesis/raw/main/devnet/genesis.blob"
+
+[nets.testnet]
+net_type = "test"
+url = "https://github.com/MystenLabs/sui-genesis/raw/main/testnet/genesis.blob"
