@@ -1,0 +1,79 @@
+[env] # new
+path_append = "/blockjoy/bin/"
+
+[config]
+protocol = "aleo"
+node_type = "node"
+node_version = "1.6.3"
+min_babel_version = "0.0.1"
+description = "aleo node"
+api_host = "http://localhost:4180"
+ports = [8080]
+
+[requirements]
+vcpu_count = 32 
+mem_size_mb =  32768
+disk_size_gb = 128
+
+[supervisor]
+backoff_timeout_ms = 60000
+backoff_base_ms = 100
+log_buffer_capacity_ln = 1000
+data_directory_mount_point = "/blockjoy/aleo/node"
+
+    [[supervisor.entry_point]]
+    name = "aleo-node"
+    body = ""
+
+[[methods]]
+name = "height"
+transport = "rest"
+method = "/testnet3/latest/block/height"
+    
+    [methods.response]
+    status = 200
+    field = "block_height"
+    format = "json"
+
+[[methods]]
+name = "address"
+transport = "rest"
+method = ""
+
+    [methods.response]
+    status = 200
+    field = "signature.public_key" 
+    format = "json"
+
+[[methods]]
+name = "status"
+transport = "rest"
+method = ""
+
+    [methods.response]
+    status = 200
+    field = "message"
+    format = "json"
+
+
+[[methods]]
+name = "init"
+transport = "sh"
+body = ""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = "" 
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+[nets.testnet3]
+net_type = "testnet3"
+url = "https://developer.aleo.org/getting_started/"
