@@ -19,11 +19,14 @@ disk_size_gb = 1000
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/miner/data"
+data_directory_mount_point = "/blockjoy/avalanche/node"
 
     [[supervisor.entry_point]]
-    name = "todo"
-    body = ""
+    name = "avalanchego-node"
+    body = """
+    test -f /blockjoy/.init && \
+    avalanchego --version 
+    """
 
 [[methods]]
 name = "height"

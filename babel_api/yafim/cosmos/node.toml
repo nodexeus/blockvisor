@@ -1,3 +1,10 @@
+#Manual https://hub.cosmos.network/main/hub-tutorials/join-mainnet.html#General-Configuration
+
+#NODE SPECS:
+#Validator	32GB	500GB-2TB*
+#Full	        16GB	2TB
+#Default	16GB	1TB
+
 application_name = "cosmos"
 node_type = "node"
 version = "1.70.0"
@@ -9,17 +16,34 @@ fs_type = "ext4"
 apt_image = []
 apt_source = []
 cmds = [
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+  "wget -O /root/genesis.cosmoshub-4.json.gz  https://raw.githubusercontent.com/cosmos/mainnet/master/genesis/genesis.cosmoshub-4.json.gz",
+  "gunzip /root/genesis.cosmoshub-4.json.gz",
+  #"gaiad init test-cosmos-node",
+  #"mv /root/genesis.cosmoshub-4.json /root/.gaia/config/genesis.json",
+  #"gaiad start --x-crisis-skip-assert-invariants",
+
   
 ] 
 
 [build_machine]
 apt_build_machine = []
 git_repo = "https://github.com/cosmos/gaia.git"
-git_tag = "v8.0.1"
+git_tag = "v7.1.0"
 build_cmds =  [
+                "cp babelsup/usr/bin/babelsup /var/lib/yafim/target/cosmos/node/mnt/usr/bin/",
+                "cp babelsup/etc/systemd/system/babelsup.service /var/lib/yafim/target/cosmos/node/mnt/etc/systemd/system/",
+                "cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service /var/lib/yafim/target/cosmos/node/mnt/etc/systemd/system/multi-user.target.wants/",
+                "echo 'root:f&IS_rwh' | chpasswd -R /var/lib/yafim/target/cosmos/node/mnt/",
+                "echo cosmos > /var/lib/yafim/target/cosmos/node/mnt/etc/hostname",
+                "sudo apt update",
+                "sudo apt install -y build-essential git binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake gcc g++ python libssl-dev pkg-config clang llvm",
 		"cd gaia && make build-linux",
-		#"cd gaia && make install",
-		#"cp gaia/build/gaiad target/cosmos/node/mnt/bin/"
+		"cp gaia/build/gaiad target/cosmos/node/mnt/usr/bin/"
 	      ]
 
 
