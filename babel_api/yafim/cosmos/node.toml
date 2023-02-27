@@ -23,8 +23,15 @@ cmds = [
   "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
   "wget -O /root/genesis.cosmoshub-4.json.gz  https://raw.githubusercontent.com/cosmos/mainnet/master/genesis/genesis.cosmoshub-4.json.gz",
   "gunzip /root/genesis.cosmoshub-4.json.gz",
-  #"gaiad init test-cosmos-node",
+  #"gaiad init test-cosmos-node --chain-id cosmoshub-4",
+  #"sed -i'' 's/minimum-gas-prices = ""/minimum-gas-prices = "0.0025uatom"/' $HOME/.gaia/config/app.toml
+  #"sed -i'' 's/persistent_peers = ""/persistent_peers = '"\"$(curl -s https://raw.githubusercontent.com/cosmos/chain-registry/master/cosmoshub/chain.json | jq -r '[foreach .peers.seeds[] as $item (""; "\($item.id)@\($item.address)")] | join(",")')\""'/' $HOME/.gaia/config/config.toml
+  #"sed -i'' 's/enable = false/enable = true/' $HOME/.gaia/config/config.toml",
+  #"sed -i'' 's/trust_height = 0/trust_height = <BLOCK_HEIGHT>/' $HOME/.gaia/config/config.toml",
+  #"sed -i'' 's/trust_hash = ""/trust_hash = "<BLOCK_HASH>"/' $HOME/.gaia/config/config.toml",
+  #"sed -i'' 's/rpc_servers = ""/rpc_servers = "https:\/\/cosmos-rpc.polkachu.com:443,https:\/\/rpc-cosmoshub-ia.cosmosia.notional.ventures:443,https:\/\/rpc.cosmos.network:443"/' $HOME/.gaia/config/config.toml",
   #"mv /root/genesis.cosmoshub-4.json /root/.gaia/config/genesis.json",
+
   #"gaiad start --x-crisis-skip-assert-invariants",
 
   
