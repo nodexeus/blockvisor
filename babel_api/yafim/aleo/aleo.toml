@@ -1,0 +1,33 @@
+application_name = "aleo"
+node_type = "node"
+version = "2.0.2-build.1"
+
+[image]
+debian_version = "focal"
+rootfs_size = "10G"
+fs_type = "ext4"
+apt_image = []
+apt_source = []
+cmds = [
+  "systemctl disable systemd-resolved.service",
+  "rm /etc/dhcp/dhclient-enter-hooks.d/resolved",
+  "rm /etc/resolv.conf",
+  "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
+  "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
+  "wget -O snarkos.zip https://github.com/AleoHQ/snarkOS/releases/download/v2.0.2/aleo-testnet1-v2.0.2-x86_64-unknown-linux-gnu.zip",
+  "unzip snarkos.zip",
+  "mv snarkos /usr/bin/",
+  "rm snarkos.zip"
+]
+
+[build_machine]
+apt_build_machine = []
+git_repo = "git@github.com:blockjoy/blockvisor.git"
+git_tag = "master"
+build_cmds =  [
+		"cp babelsup/usr/bin/babelsup {{.YafimHome}}/target/aleo/node/mnt/usr/bin/",
+		"cp babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/",
+		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/multi-user.target.wants/",
+		"cp blockvisor/babel_api/protocols/aleo/aleo.toml {{.YafimHome}}/target/aleo/node/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/aleo/node/mnt",
+		"echo aleo > {{.YafimHome}}/target/aleo/node/mnt/etc/hostname",

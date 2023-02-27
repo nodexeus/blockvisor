@@ -15,10 +15,11 @@ cmds = [
 [build_machine]
 apt_build_machine = []
 git_repo = "https://github.com/cosmos/gaia.git"
-git_tag = "v7.1.0"
+git_tag = "v8.0.1"
 build_cmds =  [
 		"cd gaia && make build-linux",
-		"cp gaia/build/gaiad target/cosmos/node/mnt/bin/"
+		#"cd gaia && make install",
+		#"cp gaia/build/gaiad target/cosmos/node/mnt/bin/"
 	      ]
 
 
