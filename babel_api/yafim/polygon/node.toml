@@ -26,14 +26,14 @@ cmds = [
 
 [build_machine]
 apt_build_machine = []
-git_repo = "git@github.com:blockjoy/blockvisor.git"
-git_tag = "master"
+git_repo = ""
+git_tag = ""
 build_cmds =  [
-                "cp babelsup/usr/bin/babelsup target/polygon/node/mnt/usr/bin/",
-                "cp babelsup/etc/systemd/system/babelsup.service target/polygon/node/mnt/etc/systemd/system/",
-                "cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service target/polygon/node/mnt/etc/systemd/system/multi-user.target.wants/",
-		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/target/polygon/node/mnt/",
-		"echo polygon > /root/yafim/target/polygon/node/mnt/etc/hostname",
+                "cp babelsup/usr/bin/babelsup /var/lib/yafim/target/polygon/node/mnt/usr/bin/",
+                "cp babelsup/etc/systemd/system/babelsup.service /var/lib/yafim/target/polygon/node/mnt/etc/systemd/system/",
+                "cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service /var/lib/yafim/target/polygon/node/mnt/etc/systemd/system/multi-user.target.wants/",
+		"echo 'root:f&IS_rwh' | chpasswd -R /var/lib/yafim/target/polygon/node/mnt/",
+		"echo polygon > /var/lib/yafim/target/polygon/node/mnt/etc/hostname",
 		"sudo apt update",
 		"sudo apt install -y build-essential git binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake gcc g++ python libssl-dev pkg-config clang llvm",
                 "wget -O ./go-install.sh https://raw.githubusercontent.com/maticnetwork/node-ansible/master/go-install.sh",
@@ -44,12 +44,12 @@ build_cmds =  [
 		"git clone https://github.com/maticnetwork/launch",
                 "cd heimdall && git checkout v0.3.0 && make install && cd -",
                 "cd bor && git checkout v0.3.0 && make bor && cd -",
-                "sudo cp ~/.go/bin/go /root/yafim/target/polygon/node/mnt/usr/bin/",
-                "sudo cp -rf ~/go /root/yafim/target/polygon/node/mnt/root/",
-                "sudo cp ~/go/bin/* /root/yafim/target/polygon/node/mnt/usr/bin/",
-		"cd ~/yafim/bor/cmd/bootnode/ && go build -o ~/yafim/bor/cmd/bootnode/bootnode ~/yafim/bor/cmd/bootnode/main.go && sudo cp ~/yafim/bor/cmd/bootnode/bootnode /root/yafim/target/polygon/node/mnt/usr/bin/ ",
-		"sudo mkdir -p /root/yafim/target/polygon/node/mnt/root/node /root/yafim/target/polygon/node/mnt/root/.bor/data/bor /root/yafim/target/polygon/node/mnt/usr/bin/root/.heimdall",
-		"sudo bash ~/yafim/launch/mainnet-v1/service.sh",
-		"sudo cp /root/yafim/*.service /root/yafim/target/polygon/node/mnt/etc/systemd/system/",
-	        "sudo cp -rf /root/yafim/launch/mainnet-v1/sentry/sentry/* /root/yafim/target/polygon/node/mnt/root/node",
+                "sudo cp ~/.go/bin/go /var/lib/yafim/target/polygon/node/mnt/usr/bin/",
+                "sudo cp -rf ~/go /var/lib/yafim/target/polygon/node/mnt/root/",
+                "sudo cp ~/go/bin/* /var/lib/yafim/target/polygon/node/mnt/usr/bin/",
+		"cd /var/lib/yafim/bor/cmd/bootnode/ && go build -o /var/lib/yafim/bor/cmd/bootnode/bootnode /var/lib/yafim/bor/cmd/bootnode/main.go && sudo cp /var/lib/yafim/bor/cmd/bootnode/bootnode /var/lib/yafim/target/polygon/node/mnt/usr/bin/ ",
+		"sudo mkdir -p /var/lib/yafim/target/polygon/node/mnt/root/node /var/lib/yafim/target/polygon/node/mnt/root/.bor/data/bor /var/lib/yafim/target/polygon/node/mnt/usr/bin/root/.heimdall",
+		"sudo bash /var/lib/yafim/launch/mainnet-v1/service.sh",
+		"sudo cp /var/lib/yafim/*.service /var/lib/yafim/target/polygon/node/mnt/etc/systemd/system/",
+	        "sudo cp -rf /var/lib/yafim/launch/mainnet-v1/sentry/sentry/* /var/lib/yafim/target/polygon/node/mnt/root/node",
 ]
