@@ -22,15 +22,15 @@ apt_build_machine = []
 git_repo = ""
 git_tag = ""
 build_cmds =  [
-	        "cp babelsup/usr/bin/babelsup target/aptos/node/mnt/usr/bin/",
-		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service target/aptos/node/mnt/etc/systemd/system/",
-		"cp blockvisor/babel_api/protocols/aptos/node.toml target/aptos/node/mnt/etc/babel.conf",
-		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/target/aptos/node/mnt",
-		"echo aptos > /root/yafim/target/aptos/node/mnt/etc/hostname",
-		"mkdir -p target/aptos/node/mnt/blockjoy/aptos",
+	        "cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/aptos/node/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/aptos/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/aptos/node.toml {{.YafimHome}}/target/aptos/node/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/aptos/node/mnt",
+		"echo aptos > {{.YafimHome}}/target/aptos/node/mnt/etc/hostname",
+		"mkdir -p {{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos",
 		"wget -O aptos.tar.gz https://github.com/aptos-labs/aptos-core/archive/refs/tags/aptos-node-v1.2.4.tar.gz",
 		"tar xvzf aptos.tar.gz",
-		"cd aptos-core* && ./scripts/dev_setup.sh -b && cargo build -p aptos-node --release && cp target/release/aptos-node ../target/aptos/node/mnt/blockjoy/aptos/",
-		"cp protocols/aptos/supporting-files/fullnode.yaml target/aptos/node/mnt/blockjoy/aptos/",
+		"cd aptos-core* && ./scripts/dev_setup.sh -b && cargo build -p aptos-node --release && cp {{.YafimHome}}/target/release/aptos-node ..{{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/aptos/supporting-files/fullnode.yaml {{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos/",
                    
 ]

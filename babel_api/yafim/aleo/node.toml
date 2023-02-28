@@ -26,9 +26,9 @@ apt_build_machine = []
 git_repo = ""
 git_tag = ""
 build_cmds =  [
-		"cp babelsup/usr/bin/babelsup {{.YafimHome}}/target/aleo/node/mnt/usr/bin/",
-		"cp babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/",
-		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/multi-user.target.wants/",
+		"cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/aleo/node/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/aleo/node/mnt/etc/systemd/system/multi-user.target.wants/",
 		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/aleo/node.toml {{.YafimHome}}/target/aleo/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/aleo/node/mnt",
 		"echo aleo > {{.YafimHome}}/target/aleo/node/mnt/etc/hostname",
