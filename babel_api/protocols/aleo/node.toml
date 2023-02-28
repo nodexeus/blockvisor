@@ -75,5 +75,5 @@ body = ""
     format = "raw"
 
 [nets.testnet3]
-net_type = "testnet3"
+net_type = "test"
 url = "https://developer.aleo.org/getting_started/"
