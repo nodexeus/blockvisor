@@ -70,7 +70,6 @@ impl CommandsService {
         })
     }
 
-    #[instrument(skip(self, nodes))]
     pub async fn get_and_process_pending_commands<P: Pal + Debug>(
         &mut self,
         host_id: &str,
@@ -82,7 +81,6 @@ impl CommandsService {
         self.process_commands(commands, nodes).await
     }
 
-    #[instrument(skip(self))]
     pub async fn get_pending_commands(&mut self, host_id: &str) -> Result<Vec<pb::Command>> {
         info!("Get pending commands");
 
@@ -96,7 +94,6 @@ impl CommandsService {
         Ok(resp.commands)
     }
 
-    #[instrument(skip(self, nodes))]
     pub async fn process_commands<P: Pal + Debug>(
         &mut self,
         commands: Vec<pb::Command>,

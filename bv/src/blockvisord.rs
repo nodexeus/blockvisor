@@ -7,7 +7,7 @@ use crate::{
     pal::{NetInterface, Pal},
     self_updater,
     server::{bv_pb, BlockvisorServer},
-    services::{api, api::pb},
+    services::{api, api::pb, mqtt},
     try_set_bv_status,
 };
 use anyhow::{Context, Result};
@@ -18,7 +18,7 @@ use std::net::SocketAddr;
 use std::{str::FromStr, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::{
-    sync::RwLock,
+    sync::{watch, RwLock},
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
@@ -78,28 +78,67 @@ where
         };
         let internal_api_server_future = Self::create_server(run.clone(), self.listener, server);
 
-        let token = api::AuthToken(self.config.token.to_owned());
-        let endpoint = Endpoint::from_str(&self.config.blockjoy_api_url)?;
+        let (cmd_watch_tx, mut cmd_watch_rx) = watch::channel(());
         let external_api_client_future = async {
             let mut run = run.clone();
             while run.load() {
-                match api::CommandsService::connect(
-                    &self.config.blockjoy_api_url,
+                tokio::select! {
+                    _ = cmd_watch_rx.changed() => {
+                        info!("MQTT watch triggerred");
+                        match api::CommandsService::connect(&self.config.blockjoy_api_url, &self.config.token).await {
+                            Ok(mut client) => {
+                                if let Err(e) = client.get_and_process_pending_commands(&self.config.id, nodes.clone()).await {
+                                    error!("Error processing pending commands: {:?}", e);
+                                }
+                            }
+                            Err(e) => error!("Error connecting to api: {:?}", e),
+                        }
+                    }
+                    _ = sleep(RECONNECT_INTERVAL) => {
+                        info!("Waiting for commands notification...");
+                    }
+                    _ = run.wait() => {}
+                }
+            }
+        };
+
+        let notify = || {
+            info!("MQTT send notification");
+            cmd_watch_tx
+                .send(())
+                .unwrap_or_else(|_| error!("MQTT command watch error"));
+        };
+        let mqtt_notification_future = async {
+            let mut run = run.clone();
+            while run.load() {
+                info!("Connecting to MQTT");
+                match mqtt::CommandsStream::connect(
+                    &self.config.blockjoy_mqtt_url,
+                    &self.config.id,
                     &self.config.token,
                 )
                 .await
                 {
                     Ok(mut client) => {
-                        if let Err(e) = client
-                            .get_and_process_pending_commands(&self.config.id, nodes.clone())
-                            .await
-                        {
-                            error!("Error processing pending commands: {:?}", e);
+                        // get pending commands on reconnect
+                        notify();
+                        while run.load() {
+                            info!("MQTT watch wait...");
+                            match client.wait_for_pending_commands().await {
+                                Ok(Some(_)) => notify(),
+                                Ok(None) => {}
+                                Err(e) => {
+                                    error!("MQTT error: {e:?}");
+                                    break;
+                                }
+                            }
                         }
                     }
-                    Err(e) => error!("Error connecting to api: {:?}", e),
+                    Err(e) => error!("Error connecting to MQTT: {:?}", e),
                 }
                 run.select(sleep(RECONNECT_INTERVAL)).await;
+                // get pending commands if mqtt is not avail
+                notify();
             }
         };
 
@@ -144,6 +183,9 @@ where
             }
         };
 
+        let token = api::AuthToken(self.config.token.to_owned());
+        let endpoint = Endpoint::from_str(&self.config.blockjoy_api_url)?;
+
         let node_updates_future = Self::node_updates(run.clone(), nodes.clone());
         let node_metrics_future =
             Self::node_metrics(run.clone(), nodes.clone(), &endpoint, token.clone());
@@ -158,6 +200,7 @@ where
         let _ = tokio::join!(
             internal_api_server_future,
             external_api_client_future,
+            mqtt_notification_future,
             nodes_recovery_future,
             node_updates_future,
             node_metrics_future,

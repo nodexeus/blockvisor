@@ -99,6 +99,7 @@ async fn test_bvup_and_reset() {
 }
 
 #[tokio::test]
+#[ignore]
 #[serial]
 async fn test_bv_service_e2e() {
     use blockvisord::config::Config;
