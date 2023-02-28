@@ -19,11 +19,14 @@ disk_size_gb = 2000
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/miner/data"
+data_directory_mount_point = "/blockjoy/tendermint/data"
 
     [[supervisor.entry_point]]
-    name = "todo"
-    body = ""
+    name = "tendermint-node"
+    body = """
+    test -f /blockjoy/.init && \
+    tendermint start --home /blockjoy/tendermint/  
+    """
 
 [[methods]]
 name = "height"
@@ -51,6 +54,30 @@ method = "health"
     [methods.response]
     code = 200
     field = "result"
+
+[[methods]]
+name = "init"
+transport = "sh"
+body = """
+! test -f /blockjoy/.init && \
+tendermint init --home /blockjoy/tendermint/ && \
+touch /blockjoy/.init
+"""
+
+    [methods.response]
+    status = 200
+    format = "raw"
+
+[[methods]]
+name = "application_status"
+transport = "sh"
+body = """
+echo -n "Cancelled"
+"""
+
+    [methods.response]
+    status = 200
+    format = "raw"
 
 [[methods]]
 name = "genesis_info"
