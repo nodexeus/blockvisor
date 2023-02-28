@@ -85,7 +85,7 @@ body = ""
 
 
 [nets.devnet]
-net_type = "devnet"
+net_type = "dev"
 url = "https://github.com/MystenLabs/sui-genesis/raw/main/devnet/genesis.blob"
 
 [nets.testnet]
