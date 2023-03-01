@@ -19,13 +19,13 @@ disk_size_gb = 2000
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/tendermint/data"
+data_directory_mount_point = "/blockjoy/tendermint/"
 
     [[supervisor.entry_point]]
     name = "tendermint-node"
     body = """
     test -f /blockjoy/.init && \
-    tendermint start --home /blockjoy/tendermint/  
+    tendermint start --home babelref:'supervisor.data_directory_mount_point'  
     """
 
 [[methods]]
@@ -60,7 +60,7 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-tendermint init --home /blockjoy/tendermint/ && \
+tendermint init --home babelref:'supervisor.data_directory_mount_point' && \
 touch /blockjoy/.init
 """
 

@@ -33,5 +33,5 @@ build_cmds =  [
 		"rustup default stable-x86_64-unknown-linux-gnu",
 		"cd nearcore && git checkout 1.31.0 && make neard",
 		"mkdir -p {{.YafimHome}}/target/near/node/mnt/blockjoy/near",
-		"cp nearcore/target/release/neard {{.YafimHome}}/target/near/node/mnt/blockjoy/near/"
+		"cp nearcore/target/release/neard {{.YafimHome}}/target/near/node/mnt/usr/bin/"
 ]

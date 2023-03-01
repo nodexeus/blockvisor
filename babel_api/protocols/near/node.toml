@@ -25,7 +25,7 @@ data_directory_mount_point = "/blockjoy/near/data"
     name = "near-node"
     body = """
     test -f /blockjoy/.init && \
-    neard --home /blockjoy/near/data run
+    neard --home babelref:'supervisor.data_directory_mount_point' run
     """
 
 [[methods]]
@@ -60,7 +60,7 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-neard --home /blockjoy/near/data init --chain-id {{NETWORK}} --download-genesis  && \ 
+neard --home babelref:'supervisor.data_directory_mount_point' init --chain-id {{NETWORK}} --download-genesis  && \ 
 touch /blockjoy/.init
 """
 
