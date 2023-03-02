@@ -15,10 +15,6 @@ cmds = [
   "rm /etc/resolv.conf",
   "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
   "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
-  "wget -O snarkos.zip https://github.com/AleoHQ/snarkOS/releases/download/v2.0.2/aleo-testnet1-v2.0.2-x86_64-unknown-linux-gnu.zip",
-  "unzip snarkos.zip",
-  "mv snarkos /usr/bin/",
-  "rm snarkos.zip"
 ]
 
 [build_machine]
@@ -32,4 +28,8 @@ build_cmds =  [
 		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/aleo/node.toml {{.YafimHome}}/target/aleo/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/aleo/node/mnt",
 		"echo aleo > {{.YafimHome}}/target/aleo/node/mnt/etc/hostname",
+		"git clone https://github.com/AleoHQ/snarkOS.git --depth 1",
+		"cd snarkOS && ./build_ubuntu.sh && cargo install --path .",
+		"mkdir -p {{.YafimHome}}/target/aleo/node/mnt/blockjoy/aleo",
+		"cp snarkOS/target/release/snarkos {{.YafimHome}}/target/aleo/node/mnt/usr/bin/"
 ]
