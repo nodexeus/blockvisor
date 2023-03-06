@@ -32,7 +32,7 @@ impl CommandsStream {
                 .ok_or_else(|| anyhow!("Cannot parse port from: `{url}`"))?;
             // use host id as client id
             let mut options = MqttOptions::new(&host_id, host, port);
-            options.set_keep_alive(Duration::from_secs(10));
+            options.set_keep_alive(Duration::from_secs(30));
             // use last will to notify about host going offline
             let status_topic = format!("/bv/hosts/{host_id}/status");
             options.set_last_will(LastWill {

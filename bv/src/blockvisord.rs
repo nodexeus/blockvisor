@@ -4,7 +4,7 @@ use crate::{
     node_data::NodeStatus,
     node_metrics,
     nodes::Nodes,
-    pal::{NetInterface, Pal},
+    pal::Pal,
     self_updater,
     server::{bv_pb, BlockvisorServer},
     services::{api, api::pb, mqtt},
@@ -20,7 +20,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info};
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
@@ -113,6 +113,8 @@ where
             self_updater_future
         );
         info!("Stopping...");
+        // store fresh config before exit since service urls could change
+        self.config.read().await.save(&bv_root).await?;
         Ok(())
     }
 
@@ -142,7 +144,7 @@ where
         while run.load() {
             tokio::select! {
                 _ = cmd_watch_rx.changed() => {
-                    info!("MQTT watch triggerred");
+                    debug!("MQTT watch triggerred");
                     match api::CommandsService::connect(config.read().await).await {
                         Ok(mut client) => {
                             if let Err(e) = client.get_and_process_pending_commands(&config.read().await.id, nodes.clone()).await {
@@ -153,7 +155,7 @@ where
                     }
                 }
                 _ = sleep(RECONNECT_INTERVAL) => {
-                    info!("Waiting for commands notification...");
+                    debug!("Waiting for commands notification...");
                 }
                 _ = run.wait() => {}
             }
@@ -166,19 +168,19 @@ where
         config: &SharedConfig,
     ) {
         let notify = || {
-            info!("MQTT send notification");
+            debug!("MQTT send notification");
             cmd_watch_tx
                 .send(())
                 .unwrap_or_else(|_| error!("MQTT command watch error"));
         };
         while run.load() {
-            info!("Connecting to MQTT");
+            debug!("Connecting to MQTT");
             match mqtt::CommandsStream::connect(config).await {
                 Ok(mut client) => {
                     // get pending commands on reconnect
                     notify();
                     while run.load() {
-                        info!("MQTT watch wait...");
+                        debug!("MQTT watch wait...");
                         tokio::select! {
                             cmds = client.wait_for_pending_commands() => {
                                 match cmds {
@@ -210,31 +212,13 @@ where
                 .list()
                 .await
                 .iter()
-                .map(|node| (node.data.clone(), node.status()))
+                .map(|node| (node.data.id, node.status(), node.expected_status()))
                 .collect();
 
-            for (node_data, node_status) in list {
-                let id = node_data.id;
-                if node_status == NodeStatus::Failed {
-                    match node_data.expected_status {
-                        NodeStatus::Running => {
-                            info!("Recovery: starting node with ID `{id}`");
-                            if let Err(e) = node_data.network_interface.remaster().await {
-                                error!("Recovery: remastering network for node with ID `{id}` failed: {e}");
-                            }
-                            if let Err(e) = nodes.write().await.force_start(id).await {
-                                error!("Recovery: starting node with ID `{id}` failed: {e}");
-                            }
-                        }
-                        NodeStatus::Stopped => {
-                            info!("Recovery: stopping node with ID `{id}`");
-                            if let Err(e) = nodes.write().await.force_stop(id).await {
-                                error!("Recovery: stopping node with ID `{id}` failed: {e}",);
-                            }
-                        }
-                        NodeStatus::Failed => {
-                            warn!("Recovery: node with ID `{id}` cannot be recovered");
-                        }
+            for (id, node_status, expected_status) in list {
+                if node_status == NodeStatus::Failed && expected_status != NodeStatus::Failed {
+                    if let Err(e) = nodes.write().await.recover(id).await {
+                        error!("Recovery: node with ID `{id}` failed: {e}");
                     }
                 }
             }
