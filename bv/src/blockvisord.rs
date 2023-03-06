@@ -20,7 +20,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
@@ -144,7 +144,7 @@ where
         while run.load() {
             tokio::select! {
                 _ = cmd_watch_rx.changed() => {
-                    info!("MQTT watch triggerred");
+                    debug!("MQTT watch triggerred");
                     match api::CommandsService::connect(config.read().await).await {
                         Ok(mut client) => {
                             if let Err(e) = client.get_and_process_pending_commands(&config.read().await.id, nodes.clone()).await {
@@ -155,7 +155,7 @@ where
                     }
                 }
                 _ = sleep(RECONNECT_INTERVAL) => {
-                    info!("Waiting for commands notification...");
+                    debug!("Waiting for commands notification...");
                 }
                 _ = run.wait() => {}
             }
@@ -168,19 +168,19 @@ where
         config: &SharedConfig,
     ) {
         let notify = || {
-            info!("MQTT send notification");
+            debug!("MQTT send notification");
             cmd_watch_tx
                 .send(())
                 .unwrap_or_else(|_| error!("MQTT command watch error"));
         };
         while run.load() {
-            info!("Connecting to MQTT");
+            debug!("Connecting to MQTT");
             match mqtt::CommandsStream::connect(config).await {
                 Ok(mut client) => {
                     // get pending commands on reconnect
                     notify();
                     while run.load() {
-                        info!("MQTT watch wait...");
+                        debug!("MQTT watch wait...");
                         tokio::select! {
                             cmds = client.wait_for_pending_commands() => {
                                 match cmds {
