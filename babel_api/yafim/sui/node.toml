@@ -6,7 +6,7 @@ version = "0.27.0-build.1"
 debian_version = "focal"
 rootfs_size = "10G"
 fs_type = "ext4"
-apt_image = []
+apt_image = ["libssl-dev","libpq-dev"]
 apt_source = []
 cmds = [
   "systemctl disable systemd-resolved.service",
