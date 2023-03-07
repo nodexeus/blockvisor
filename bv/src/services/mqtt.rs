@@ -1,6 +1,7 @@
 use crate::{config::SharedConfig, pal, services};
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use metrics::{register_counter, Counter};
 use reqwest::Url;
 use rumqttc::{AsyncClient, Event, EventLoop, Incoming, LastWill, MqttOptions, QoS};
 use std::time::Duration;
@@ -8,6 +9,12 @@ use tracing::info;
 
 const ONLINE: &[u8] = "online".as_bytes();
 const OFFLINE: &[u8] = "offline".as_bytes();
+
+lazy_static::lazy_static! {
+    pub static ref MQTT_POLL_COUNTER: Counter = register_counter!("mqtt.connection.poll");
+    pub static ref MQTT_NOTIFY_COUNTER: Counter = register_counter!("mqtt.connection.notification");
+    pub static ref MQTT_ERROR_COUNTER: Counter = register_counter!("mqtt.connection.error");
+}
 
 pub struct MqttConnector {
     pub config: SharedConfig,
@@ -73,6 +80,7 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
 #[async_trait]
 impl pal::CommandsStream for MqttStream {
     async fn wait_for_pending_commands(&mut self) -> Result<Option<Vec<u8>>> {
+        MQTT_POLL_COUNTER.increment(1);
         match self.event_loop.poll().await {
             Ok(Event::Incoming(Incoming::Publish(p))) => {
                 info!("MQTT incoming topic: {}, payload: {:?}", p.topic, p.payload);
