@@ -1,6 +1,6 @@
 application_name = "algorand"
 node_type = "node"
-version = "3.14.2"
+version = "3.14.2-build.1"
 
 [image]
 debian_version = "focal"
@@ -24,12 +24,13 @@ cmds = [
 
 [build_machine]
 apt_build_machine = []
-git_repo = "git@github.com:blockjoy/blockvisor.git"
-git_tag = "master"
-build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml && cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release", 
-               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/algorand/mnt/usr/bin/",
-		"cp blockvisor/babel/data/babelsup.service protocols/algorand/mnt/etc/systemd/system/",
-		"cp blockvisor/babel/protocols/algorand/algorand.toml protocols/algorand/mnt/etc/babel.conf",
-		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/algorand/mnt",
-		"echo algorand > /root/yafim/protocols/algorand/mnt/etc/hostname"
+git_repo = ""
+git_tag = ""
+build_cmds =  [ 
+		"cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/algorand/node/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/algorand/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/algorand/node/mnt/etc/systemd/system/multi-user.target.wants/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/algorand/node.toml {{.YafimHome}}/target/algorand/node/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/algorand/node/mnt",
+		"echo algorand > {{.YafimHome}}/target/algorand/node/mnt/etc/hostname"
 ]

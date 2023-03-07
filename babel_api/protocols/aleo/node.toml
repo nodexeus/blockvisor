@@ -4,10 +4,10 @@ path_append = "/blockjoy/bin/"
 [config]
 protocol = "aleo"
 node_type = "node"
-node_version = "1.6.3"
+node_version = "2.0.2"
 min_babel_version = "0.0.1"
 description = "aleo node"
-api_host = "http://localhost:4180"
+api_host = "http://localhost:8080"
 ports = [8080]
 
 [requirements]
@@ -19,11 +19,14 @@ disk_size_gb = 128
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/aleo/node"
+data_directory_mount_point = "/root/.aleo"
 
     [[supervisor.entry_point]]
     name = "aleo-node"
-    body = ""
+    body = """
+    test -f /blockjoy/.init && \
+    snarkos start --nodisplay --network babelref:'nets.{{NETWORK}}.id' --rest 127.0.0.1:8080
+    """
 
 [[methods]]
 name = "height"
@@ -59,7 +62,10 @@ method = ""
 [[methods]]
 name = "init"
 transport = "sh"
-body = ""
+body = """
+! test -f /blockjoy/.init && \
+touch /blockjoy/.init
+"""
 
     [methods.response]
     status = 200
@@ -68,12 +74,25 @@ body = ""
 [[methods]]
 name = "application_status"
 transport = "sh"
-body = "" 
+body = """
+echo -n "Cancelled"
+""" 
 
     [methods.response]
     status = 200
     format = "raw"
 
+[nets.testnet1]
+net_type = "test"
+id = "1"
+url = "https://developer.aleo.org/getting_started/"
+
+[nets.testnet2]
+net_type = "test"
+id = "2"
+url = "https://developer.aleo.org/getting_started/" 
+
 [nets.testnet3]
 net_type = "test"
+id = "3"
 url = "https://developer.aleo.org/getting_started/"

@@ -7,8 +7,8 @@ node_type = "node"
 node_version = "0.27.0"
 min_babel_version = "0.0.1"
 description = "sui node"
-api_host = "https://localhost:8080" #need to find the port
-ports = [8080]
+api_host = "https://localhost:9000"
+ports = [9000]
 
 [requirements]
 vcpu_count = 10 
@@ -19,11 +19,14 @@ disk_size_gb = 1024
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/sui/data"
+data_directory_mount_point = "/blockjoy/sui/suidb"
 
     [[supervisor.entry_point]]
-    name = ""
-    body = ""
+    name = "sui-node"
+    body = """
+    test -f /blockjoy/.init && \
+    sui-node --config-path /blockjoy/sui/fullnode.yaml
+    """
 
 [[methods]]
 name = "height"
@@ -68,7 +71,11 @@ method = ""
 [[methods]]
 name = "init"
 transport = "sh"
-body = ""
+body = """
+! test -f /blockjoy/.init && \
+curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/sui/genesis.blob && \
+touch /blockjoy/.init
+"""
 
     [methods.response]
     status = 200
@@ -77,7 +84,9 @@ body = ""
 [[methods]]
 name = "application_status"
 transport = "sh"
-body = ""
+body = """
+echo -n "Cancelled"
+"""
 
     [methods.response]
     status = 200

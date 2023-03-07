@@ -1,12 +1,12 @@
 application_name = "near"
 node_type = "node"
-version = "1.31.0"
+version = "1.31.0-build.1"
 
 [image]
 debian_version = "focal"
 rootfs_size = "10G"
 fs_type = "ext4"
-apt_image = []
+apt_image = ["awscli"]
 apt_source = ["universe"]
 cmds = [
   "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
@@ -19,19 +19,19 @@ cmds = [
 
 [build_machine]
 apt_build_machine = []
-git_repo = "git@github.com:blockjoy/blockvisor.git"
-git_tag = "master"
+git_repo = ""
+git_tag = ""
 build_cmds =  [
-                "cp babelsup/usr/bin/babelsup protocols/near/mnt/usr/bin/",
-		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service protocols/near/mnt/etc/systemd/system/",
-		"cp blockvisor/babel/protocols/near/near.toml protocols/near/mnt/etc/babel.conf",
-		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/near/mnt",
-		"echo near > /root/yafim/protocols/near/mnt/etc/hostname",
+                "cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/near/node/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/near/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/near/node.toml {{.YafimHome}}/target/near/node/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/near/node/mnt",
+		"echo near > {{.YafimHome}}/target/near/node/mnt/etc/hostname",
 		"sudo apt update",
 		"sudo apt install -y git binutils-dev libcurl4-openssl-dev zlib1g-dev libdw-dev libiberty-dev cmake gcc g++ python libssl-dev pkg-config clang llvm",
-		"git clone https://github.com/near/nearcore.git",
+		"git clone https://github.com/near/nearcore.git || true",
 		"rustup default stable-x86_64-unknown-linux-gnu",
 		"cd nearcore && git checkout 1.31.0 && make neard",
-		"mkdir -p /protocols/mnt/near/blockjoy/near",
-		"cp nearcore/target/release/neard /protocols/mnt/near/blockjoy/near/"
+		"mkdir -p {{.YafimHome}}/target/near/node/mnt/blockjoy/near",
+		"cp nearcore/target/release/neard {{.YafimHome}}/target/near/node/mnt/usr/bin/"
 ]

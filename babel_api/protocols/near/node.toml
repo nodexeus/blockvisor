@@ -2,30 +2,30 @@
 path_append = "/blockjoy/bin/"
 
 [config]
-protocol = "tendermint"
+protocol = "near"
 node_type = "node"
-node_version = "0.34.24"
+node_version = "1.28.0"
 min_babel_version = "0.0.1"
-description = "tendermint blockchain validator"
-api_host = "http://localhost:26657/"
-ports = [26657]
+description = "near blockchain node"
+api_host = "http://localhost:3030"
+ports = [3030]
 
 [requirements]
-vcpu_count = 2
-mem_size_mb = 32768
-disk_size_gb = 2000
+vcpu_count = 8
+mem_size_mb = 24576
+disk_size_gb = 2048 
 
 [supervisor]
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/tendermint/"
+data_directory_mount_point = "/blockjoy/near"
 
     [[supervisor.entry_point]]
-    name = "tendermint-node"
+    name = "near-node"
     body = """
     test -f /blockjoy/.init && \
-    tendermint start --home babelref:'supervisor.data_directory_mount_point'  
+    neard --home babelref:'supervisor.data_directory_mount_point' run
     """
 
 [[methods]]
@@ -35,32 +35,34 @@ method = "status"
 
     [methods.response]
     code = 200
-    field = "sync_info.latest_block_height"
+    field = "sync_info.latest_block_height" 
 
 [[methods]]
 name = "address"
+transport = "jrpc"
+method = "query" 
+
+    [methods.response]
+    code = 200
+    field = "result.keys.public_key"
+
+[[methods]]
+name = "status"
 transport = "jrpc"
 method = "status"
 
     [methods.response]
     code = 200
-    field = "validator_info.pub_key.value" 
-
-[[methods]]
-name = "status"
-transport = "jrpc"
-method = "health"
-
-    [methods.response]
-    code = 200
-    field = "result"
+    field = "sync_info.syncing"
 
 [[methods]]
 name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-tendermint init --home babelref:'supervisor.data_directory_mount_point' && \
+neard --home babelref:'supervisor.data_directory_mount_point' init --chain-id {{NETWORK}} --download-genesis --download-config  && \
+aws s3 --no-sign-request cp s3://near-protocol-public/backups/{{NETWORK}}/rpc/latest . && \
+aws s3 --no-sign-request cp --no-sign-request --recursive s3://near-protocol-public/backups/{{NETWORK}}/rpc/$(cat latest) babelref:'supervisor.data_directory_mount_point'/data && \
 touch /blockjoy/.init
 """
 
@@ -79,19 +81,10 @@ echo -n "Cancelled"
     status = 200
     format = "raw"
 
-[[methods]]
-name = "genesis_info"
-transport = "jrpc"
-method = "genesis"
-
-    [methods.response]
-    code = 200
-    field = "result"
-
 [nets.mainnet]
 net_type = "main"
-url = "https://rpc.cosmos.network:26657"
+url = "https://rpc.mainnet.near.org"
 
 [nets.testnet]
 net_type = "test"
-url = "https://cosmos-testnet-rpc.allthatnode.com:26657"
+url = "https://rpc.testnet.near.org"

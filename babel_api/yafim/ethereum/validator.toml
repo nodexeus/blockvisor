@@ -21,12 +21,13 @@ cmds = [
 
 [build_machine]
 apt_build_machine = []
-git_repo = "git@github.com:blockjoy/blockvisor.git"
-git_tag = "master"
-build_cmds =  ["cd blockvisor  && git submodule update --init --recursive && rm rust-toolchain.toml && cargo clean && rustup target add x86_64-unknown-linux-musl && make build-release", 
-               "cp blockvisor/target/x86_64-unknown-linux-musl/release/babelsup protocols/eth/mnt/usr/bin/",
-		"cp blockvisor/babel/data/babelsup.service protocols/eth/mnt/etc/systemd/system/",
-		"cp blockvisor/babel_api/protocols/ethereum/validator.toml protocols/eth/mnt/etc/babel.conf",
-		"echo 'root:f&IS_rwh' | chpasswd -R /root/yafim/protocols/eth/mnt",
-		"echo eth > /root/yafim/protocols/eth/mnt/etc/hostname"
+git_repo = ""
+git_tag = ""
+build_cmds =  [
+                "cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/ethereum/validator/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/ethereum/validator/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/ethereum/validator/mnt/etc/systemd/system/multi-user.target.wants/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/ethereum/validator.toml {{.YafimHome}}/target/ethereum/validator/mnt/etc/babel.conf",
+		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/ethereum/validator/mnt",
+		"echo eth > {{.YafimHome}}/target/ethereum/validator/mnt/etc/hostname"
 ]

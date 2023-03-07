@@ -25,10 +25,10 @@ apt_build_machine = []
 git_repo = ""
 git_tag = ""
 build_cmds =  [
-		"cp babelsup/usr/bin/babelsup {{.YafimHome}}/target/tendermint/node/mnt/usr/bin/",
-		"cp babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/tendermint/node/mnt/etc/systemd/system/",
-		"cp babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/tendermint/node/mnt/etc/systemd/system/multi-user.target.wants/",
-		"cp blockvisor/babel_api/protocols/tendermint/tendermint.toml {{.YafimHome}}/target/tendermint/node/mnt/etc/babel.conf",
+		"cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/tendermint/node/mnt/usr/bin/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/tendermint/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/tendermint/node/mnt/etc/systemd/system/multi-user.target.wants/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/tendermint/tendermint.toml {{.YafimHome}}/target/tendermint/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/tendermint/node/mnt",
 		"echo tendermint > {{.YafimHome}}/target/tendermint/node/mnt/etc/hostname",
 ]
