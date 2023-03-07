@@ -1,6 +1,6 @@
 application_name = "near"
 node_type = "node"
-version = "1.31.0"
+version = "1.31.0-build.1"
 
 [image]
 debian_version = "focal"
