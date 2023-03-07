@@ -19,13 +19,13 @@ disk_size_gb = 1024
 backoff_timeout_ms = 60000
 backoff_base_ms = 100
 log_buffer_capacity_ln = 1000
-data_directory_mount_point = "/blockjoy/sui/data"
+data_directory_mount_point = "/blockjoy/sui/suidb"
 
     [[supervisor.entry_point]]
     name = "sui-node"
     body = """
     test -f /blockjoy/.init && \
-    #find me
+    sui-node --config-path /blockjoy/sui/fullnode.yaml
     """
 
 [[methods]]
@@ -73,7 +73,7 @@ name = "init"
 transport = "sh"
 body = """
 ! test -f /blockjoy/.init && \
-#find me
+curl babelref:'nets.{{NETWORK}}.url' > /blockjoy/sui/genesis.blob && \
 touch /blockjoy/.init
 """
 

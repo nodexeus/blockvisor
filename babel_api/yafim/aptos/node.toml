@@ -31,6 +31,6 @@ build_cmds =  [
 		"wget -O aptos.tar.gz https://github.com/aptos-labs/aptos-core/archive/refs/tags/aptos-node-v1.2.4.tar.gz",
 		"tar xvzf aptos.tar.gz",
 		"cd aptos-core* && ./scripts/dev_setup.sh -b && cargo build -p aptos-node --release && cp {{.YafimHome}}/target/release/aptos-node ..{{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos/",
-		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/aptos/supporting-files/fullnode.yaml {{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos/",
+		"cp {{.YafimHome}}/blockvisor/babel_api/yafim/aptos/supporting-files/fullnode.yaml {{.YafimHome}}/target/aptos/node/mnt/blockjoy/aptos/",
                    
 ]

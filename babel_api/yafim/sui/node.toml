@@ -38,4 +38,5 @@ build_cmds =  [
 		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/sui/node.toml {{.YafimHome}}/target/sui/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/sui/node/mnt",
 		"echo sui > {{.YafimHome}}/target/sui/node/mnt/etc/hostname",
+		"cp {{.YafimHome}}/blockvisor/babel_api/yafim/sui/supporting-files/fullnode.yaml {{.YafimHome}}/target/sui/node/mnt/blockjoy/sui"
 ]
