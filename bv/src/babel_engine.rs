@@ -191,7 +191,7 @@ impl BabelEngine {
 
     /// Returns the methods that are supported by this blockchain. Calling any method on this
     /// blockchain that is not listed here will result in an error being returned.
-    pub fn capabilities(&mut self) -> Vec<String> {
+    pub fn capabilities(&self) -> Vec<String> {
         self.babel_conf
             .methods
             .keys()
@@ -200,7 +200,7 @@ impl BabelEngine {
     }
 
     /// Checks if node has some particular capability
-    pub fn has_capability(&mut self, method: &str) -> bool {
+    pub fn has_capability(&self, method: &str) -> bool {
         self.capabilities().contains(&method.to_owned())
     }
 
@@ -231,7 +231,7 @@ impl BabelEngine {
         Ok(())
     }
 
-    fn get_keys_config(&mut self) -> Result<KeysConfig> {
+    fn get_keys_config(&self) -> Result<KeysConfig> {
         self.babel_conf
             .keys
             .clone()
