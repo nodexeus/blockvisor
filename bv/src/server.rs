@@ -325,10 +325,10 @@ where
         let node_id = helpers::parse_uuid(request.node_id)?;
         let capabilities = self
             .nodes
-            .write()
+            .read()
             .await
             .nodes
-            .get_mut(&node_id)
+            .get(&node_id)
             .ok_or_else(|| Status::invalid_argument("No such node"))?
             .babel_engine
             .capabilities();

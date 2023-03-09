@@ -330,7 +330,6 @@ impl<P: Pal + Debug> Nodes<P> {
         // Keys present in API, but not on Node, will be sent to Node
         let keys1: Vec<_> = api_keys_set
             .difference(&node_keys_set)
-            .into_iter()
             .map(|n| babel_api::BlockchainKey {
                 name: n.to_string(),
                 content: api_keys.get(*n).unwrap().to_vec(), // checked
