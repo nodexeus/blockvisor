@@ -7,11 +7,12 @@ use crate::{
     pal::{CommandsStream, Pal, ServiceConnector},
     self_updater,
     server::{bv_pb, BlockvisorServer},
-    services::{api, api::pb},
+    services::{api, api::pb, mqtt},
     try_set_bv_status,
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::watch::Sender;
 use tokio::{
@@ -64,6 +65,12 @@ where
             env!("CARGO_PKG_NAME"),
             env!("CARGO_PKG_VERSION")
         );
+
+        // setup metrics endpoint
+        let builder = PrometheusBuilder::new();
+        builder
+            .install()
+            .unwrap_or_else(|e| error!("Cannot create Prometheus endpoint: {e}"));
 
         let bv_root = self.pal.bv_root().to_path_buf();
         let cmds_connector = self.pal.create_commands_stream_connector(&self.config);
@@ -170,6 +177,7 @@ where
     ) {
         let notify = || {
             debug!("MQTT send notification");
+            mqtt::MQTT_NOTIFY_COUNTER.increment(1);
             cmd_watch_tx
                 .send(())
                 .unwrap_or_else(|_| error!("MQTT command watch error"));
@@ -189,6 +197,7 @@ where
                                     Ok(None) => {}
                                     Err(e) => {
                                         warn!("MQTT error: {e:?}");
+                                        mqtt::MQTT_ERROR_COUNTER.increment(1);
                                         break;
                                     }
                                 }
