@@ -159,7 +159,7 @@ impl TestEnv {
         }
     }
 
-    pub fn create_node(&self, image: &str) -> String {
+    pub fn create_node(&self, image: &str, ip: &str) -> String {
         let mut cmd = Command::cargo_bin("bv").unwrap();
         let cmd = cmd
             .args([
@@ -171,7 +171,7 @@ impl TestEnv {
                 "--gateway",
                 "216.18.214.193",
                 "--ip",
-                "216.18.214.195",
+                ip,
             ])
             .env("BV_ROOT", &self.bv_root);
         let output = cmd.output().unwrap();

@@ -12,7 +12,7 @@ use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::node::build_registry_dir;
-use crate::pal::Pal;
+use crate::pal::{NetInterface, Pal};
 use crate::{
     config::SharedConfig,
     node::Node,
@@ -80,6 +80,17 @@ impl<P: Pal + Debug> Nodes<P> {
             bail!("Node with name `{name}` exists");
         }
 
+        let ip = ip.parse()?;
+        let gateway = gateway.parse()?;
+
+        if self
+            .nodes
+            .values()
+            .any(|n| n.data.network_interface.ip() == &ip)
+        {
+            bail!("Node with ip address `{ip}` exists");
+        }
+
         let mut babel_conf = self.fetch_image_data(&image).await?;
         check_babel_version(&babel_conf.config.min_babel_version)?;
         let conf = toml::Value::try_from(&babel_conf)?;
@@ -90,8 +101,6 @@ impl<P: Pal + Debug> Nodes<P> {
             .await;
 
         self.data.machine_index += 1;
-        let ip = ip.parse()?;
-        let gateway = gateway.parse()?;
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
         let node_data = NodeData {
