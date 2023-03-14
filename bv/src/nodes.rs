@@ -297,8 +297,18 @@ impl<P: Pal + Debug> Nodes<P> {
         self.send_container_status(id, ContainerStatus::UndefinedContainerStatus)
             .await;
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(id))?;
+        if !node.is_data_valid().await? {
+            // If some files are corrupted, the files will be recreated.
+            // Some intermediate data could be lost in that case.
+            let node_data = node.data.clone();
+            self.fetch_image_data(&node_data.image).await?;
+            let new = Node::create(self.pal.clone(), node_data).await?;
+            self.nodes.insert(id, new);
+            debug!("Node recreated");
+        }
 
+        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.recover().await
     }
 

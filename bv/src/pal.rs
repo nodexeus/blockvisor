@@ -25,7 +25,7 @@ pub trait Pal {
 
     /// Type representing network interface. It is required to be Serialize/Deserialize
     /// since it's going to be part of node data.
-    type NetInterface: NetInterface + Serialize + DeserializeOwned + Debug;
+    type NetInterface: NetInterface + Serialize + DeserializeOwned + Debug + Clone;
     /// Creates the new network interface and add it to our bridge.
     /// The `ip` is not assigned on the host but rather by the API.
     async fn create_net_interface(

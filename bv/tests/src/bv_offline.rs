@@ -13,7 +13,7 @@ use blockvisord::{
     server::bv_pb,
     services,
     services::{api, api::pb},
-    set_bv_status, utils,
+    set_bv_status, utils, BV_VAR_PATH,
 };
 use bv_utils::run_flag::RunFlag;
 use pb::node_info::ContainerStatus;
@@ -176,6 +176,15 @@ async fn test_bv_cmd_node_recovery() -> Result<()> {
 
     println!("list running node");
     test_env.bv_run(&["node", "status", vm_id], "Running");
+
+    let chroot = test_env
+        .bv_root
+        .join(BV_VAR_PATH)
+        .join(FC_BIN_NAME)
+        .join(vm_id)
+        .join("root");
+    let _ = tokio::fs::remove_dir_all(&chroot).await;
+    println!("impolitely remove all files from `{chroot:?}` location");
 
     let process_id = utils::get_process_pid(FC_BIN_NAME, vm_id).unwrap();
     println!("impolitely kill node with process id {process_id}");

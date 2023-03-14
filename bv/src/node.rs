@@ -17,9 +17,11 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
-use tokio::{fs::DirBuilder, time::Instant};
+use tokio::{
+    fs::{self, DirBuilder, File},
+    time::Instant,
+};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -29,7 +31,6 @@ const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 pub const REGISTRY_CONFIG_DIR: &str = "nodes";
 pub const FC_BIN_NAME: &str = "firecracker";
-const DATA_IMG_FILENAME: &str = "data.img";
 const FC_BIN_PATH: &str = "usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
 pub const ROOT_FS_FILE: &str = "os.img";
@@ -67,17 +68,23 @@ struct RecoveryCounters {
 struct Paths {
     bv_root: PathBuf,
     chroot: PathBuf,
+    data_dir: PathBuf,
     registry: PathBuf,
     data: PathBuf,
 }
 
 impl Paths {
-    fn build(bv_root: &Path) -> Self {
+    fn build(bv_root: &Path, id: &Uuid) -> Self {
         Self {
             bv_root: bv_root.to_path_buf(),
             chroot: bv_root.join(BV_VAR_PATH),
+            data_dir: bv_root
+                .join(BV_VAR_PATH)
+                .join(FC_BIN_NAME)
+                .join(id.to_string())
+                .join("root"),
             registry: build_registry_dir(bv_root),
-            data: bv_root.join(BV_VAR_PATH).join(DATA_IMG_FILENAME),
+            data: bv_root.join(BV_VAR_PATH).join(DATA_FILE),
         }
     }
 }
@@ -88,10 +95,10 @@ impl<P: Pal + Debug> Node<P> {
     pub async fn create(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Node<P>> {
         info!("Creating node with data: {data:?}");
         let node_id = data.id;
-        let paths = Paths::build(pal.bv_root());
+        let paths = Paths::build(pal.bv_root(), &data.id);
+        let _ = tokio::fs::remove_dir_all(&paths.data_dir).await;
         let config = Node::<P>::create_config(&paths, &data).await?;
-        Node::<P>::create_data_image(&paths, &node_id, data.babel_conf.requirements.disk_size_gb)
-            .await?;
+        Node::<P>::create_data_image(&paths, data.babel_conf.requirements.disk_size_gb).await?;
         let machine = Machine::create(config).await?;
 
         data.save(&paths.registry).await?;
@@ -116,7 +123,7 @@ impl<P: Pal + Debug> Node<P> {
     #[instrument(skip(data))]
     pub async fn attach(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Node<P>> {
         info!("Attaching to node with data: {data:?}");
-        let paths = Paths::build(pal.bv_root());
+        let paths = Paths::build(pal.bv_root(), &data.id);
         let config = Node::<P>::create_config(&paths, &data).await?;
         let node_id = data.id;
         let cmd = node_id.to_string();
@@ -418,19 +425,30 @@ impl<P: Pal + Debug> Node<P> {
         self.data.save(&self.paths.registry).await
     }
 
+    /// Check if chroot location contains valid data
+    pub async fn is_data_valid(&self) -> Result<bool> {
+        let data_dir = &self.paths.data_dir;
+
+        let root = data_dir.join(ROOT_FS_FILE);
+        let kernel = data_dir.join(KERNEL_FILE);
+        let data = data_dir.join(DATA_FILE);
+        if !root.exists() || !kernel.exists() || !data.exists() {
+            return Ok(false);
+        }
+
+        Ok(fs::metadata(root).await?.len() > 0
+            && fs::metadata(kernel).await?.len() > 0
+            && fs::metadata(data).await?.len() > 0)
+    }
+
     /// Copy OS drive into chroot location.
     async fn copy_os_image(&self, image: &NodeImage) -> Result<()> {
         let root_fs_path =
             CookbookService::get_image_download_folder_path(&self.paths.bv_root, image)
                 .join(ROOT_FS_FILE);
 
-        let data_dir = self
-            .paths
-            .chroot
-            .join(FC_BIN_NAME)
-            .join(self.id().to_string())
-            .join("root");
-        DirBuilder::new().recursive(true).create(&data_dir).await?;
+        let data_dir = &self.paths.data_dir;
+        DirBuilder::new().recursive(true).create(data_dir).await?;
 
         run_cmd("cp", [root_fs_path.as_os_str(), data_dir.as_os_str()]).await?;
 
@@ -438,13 +456,9 @@ impl<P: Pal + Debug> Node<P> {
     }
 
     /// Create new data drive in chroot location.
-    async fn create_data_image(paths: &Paths, id: &Uuid, disk_size_gb: usize) -> Result<()> {
-        let data_dir = paths
-            .chroot
-            .join(FC_BIN_NAME)
-            .join(id.to_string())
-            .join("root");
-        DirBuilder::new().recursive(true).create(&data_dir).await?;
+    async fn create_data_image(paths: &Paths, disk_size_gb: usize) -> Result<()> {
+        let data_dir = &paths.data_dir;
+        DirBuilder::new().recursive(true).create(data_dir).await?;
         let path = data_dir.join(DATA_FILE);
 
         let gb = &format!("{disk_size_gb}G");
@@ -469,7 +483,7 @@ impl<P: Pal + Debug> Node<P> {
             data.network_interface.gateway(),
         );
         if kernel_args.len() > MAX_KERNEL_ARGS_LEN {
-            bail!("to long kernel_args {kernel_args}")
+            bail!("too long kernel_args {kernel_args}")
         }
         let iface =
             firec::config::network::Interface::new(data.network_interface.name().clone(), "eth0");
