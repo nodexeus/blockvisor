@@ -92,13 +92,13 @@ impl Paths {
 impl<P: Pal + Debug> Node<P> {
     /// Creates a new node according to specs.
     #[instrument(skip(data))]
-    pub async fn create(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Node<P>> {
+    pub async fn create(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Self> {
         info!("Creating node with data: {data:?}");
         let node_id = data.id;
         let paths = Paths::build(pal.bv_root(), &data.id);
         let _ = tokio::fs::remove_dir_all(&paths.data_dir).await;
-        let config = Node::<P>::create_config(&paths, &data).await?;
-        Node::<P>::create_data_image(&paths, data.babel_conf.requirements.disk_size_gb).await?;
+        let config = Self::create_config(&paths, &data).await?;
+        Self::create_data_image(&paths, data.babel_conf.requirements.disk_size_gb).await?;
         let machine = Machine::create(config).await?;
 
         data.save(&paths.registry).await?;
@@ -121,10 +121,10 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Returns node previously created on this host.
     #[instrument(skip(data))]
-    pub async fn attach(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Node<P>> {
+    pub async fn attach(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Self> {
         info!("Attaching to node with data: {data:?}");
         let paths = Paths::build(pal.bv_root(), &data.id);
-        let config = Node::<P>::create_config(&paths, &data).await?;
+        let config = Self::create_config(&paths, &data).await?;
         let node_id = data.id;
         let cmd = node_id.to_string();
         let (pid, node_conn) = match get_process_pid(FC_BIN_NAME, &cmd) {
