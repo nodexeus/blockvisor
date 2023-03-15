@@ -413,7 +413,10 @@ impl<P: Pal + Debug> Node<P> {
     ) -> Result<()> {
         // If the fields we receive are populated, we update the node data.
         if let Some(name) = name {
-            self.data.name = name;
+            // TODO: we need to remove it from protos
+            if self.data.name == name {
+                warn!("Cannot change node name to `{name}`, operation is not supported");
+            }
         }
         if let Some(self_update) = self_update {
             self.data.self_update = self_update;
