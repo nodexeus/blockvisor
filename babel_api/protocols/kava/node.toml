@@ -48,6 +48,10 @@ kava --home babelref:'supervisor.data_directory_mount_point' init kava-node --ch
 touch /blockjoy/.init
 """
 
+    [methods.response]
+    status = 200
+    format = "raw"
+
 [[methods]]
 name = "height"
 transport = "rest"
