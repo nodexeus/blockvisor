@@ -9,6 +9,15 @@ services:
       POSTGRES_USER: blockvisor
       POSTGRES_PASSWORD: password
       POSTGRES_DB: blockvisor_db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U blockvisor -d blockvisor_db"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mqtt:
     image: emqx/emqx-enterprise:5.0.0
@@ -54,14 +63,8 @@ services:
       RUST_LOG: debug
 
     depends_on:
-      - database
-
-  migrations:
-    image: 'us-docker.pkg.dev/blockjoy-deployer/blockvisor-api-migrations/dev-blockvisor-api-migrations:latest'
-    environment:
-      DATABASE_URL: postgres://blockvisor:password@database:5432/blockvisor_db
-    depends_on:
-      - api
+      database:
+        condition: service_healthy
 
   cookbook:
     image: 'us-docker.pkg.dev/blockjoy-deployer/babel-cookbook/dev-babel-cookbook:latest'
