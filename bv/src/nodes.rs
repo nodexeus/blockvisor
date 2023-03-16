@@ -172,7 +172,7 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    async fn fetch_image_data(&mut self, image: &NodeImage) -> Result<Babel> {
+    async fn fetch_image_data(&self, image: &NodeImage) -> Result<Babel> {
         if !CookbookService::is_image_cache_valid(self.pal.bv_root(), image)
             .await
             .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
@@ -525,12 +525,10 @@ impl<P: Pal + Debug> Nodes<P> {
 
     /// Create and return the next network interface using machine index
     async fn create_network_interface(
-        &mut self,
+        &self,
         ip: IpAddr,
         gateway: IpAddr,
     ) -> Result<<P as Pal>::NetInterface> {
-        self.data.machine_index += 1;
-
         let iface = self
             .pal
             .create_net_interface(self.data.machine_index, ip, gateway)
