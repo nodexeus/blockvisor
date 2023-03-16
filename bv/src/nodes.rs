@@ -8,6 +8,7 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::{self, read_dir};
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -50,7 +51,7 @@ pub enum ServiceStatus {
 pub struct Nodes<P: Pal + Debug> {
     api_config: SharedConfig,
     pub nodes: HashMap<Uuid, Node<P>>,
-    node_ids: HashMap<String, Uuid>,
+    node_ids: RwLock<HashMap<String, Uuid>>,
     data: CommonData,
     pal: Arc<P>,
 }
@@ -76,7 +77,7 @@ impl<P: Pal + Debug> Nodes<P> {
             return Ok(());
         }
 
-        if self.node_ids.contains_key(&name) {
+        if self.node_ids.read().await.contains_key(&name) {
             bail!("Node with name `{name}` exists");
         }
 
@@ -121,7 +122,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
         let node = Node::create(self.pal.clone(), node_data).await?;
         self.nodes.insert(id, node);
-        self.node_ids.insert(name, id);
+        self.node_ids.write().await.insert(name, id);
         debug!("Node with id `{}` created", id);
 
         self.send_container_status(id, ContainerStatus::Stopped)
@@ -193,7 +194,7 @@ impl<P: Pal + Debug> Nodes<P> {
     #[instrument(skip(self))]
     pub async fn delete(&mut self, id: Uuid) -> Result<()> {
         if let Some(node) = self.nodes.remove(&id) {
-            self.node_ids.remove(&node.data.name);
+            self.node_ids.write().await.remove(&node.data.name);
             node.delete().await?;
             debug!("Node deleted");
         }
@@ -325,6 +326,8 @@ impl<P: Pal + Debug> Nodes<P> {
     pub async fn node_id_for_name(&self, name: &str) -> Result<Uuid> {
         let uuid = self
             .node_ids
+            .read()
+            .await
             .get(name)
             .copied()
             .ok_or_else(|| name_not_found(name))?;
@@ -424,7 +427,7 @@ impl<P: Pal + Debug> Nodes<P> {
                 api_config,
                 data,
                 nodes,
-                node_ids,
+                node_ids: RwLock::new(node_ids),
                 pal,
             }
         } else {
