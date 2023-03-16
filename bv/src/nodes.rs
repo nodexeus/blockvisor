@@ -132,14 +132,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
-        if image
-            != self
-                .nodes
-                .get(&id)
-                .ok_or_else(|| id_not_found(id))?
-                .data
-                .image
-        {
+        if image != self.image(id)? {
             let babel_config = self.fetch_image_data(&image).await?;
             babel_api::check_babel_config(&babel_config)?;
 
@@ -209,13 +202,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        if NodeStatus::Running
-            != self
-                .nodes
-                .get(&id)
-                .ok_or_else(|| id_not_found(id))?
-                .expected_status()
-        {
+        if NodeStatus::Running != self.expected_status(id)? {
             self.send_container_status(id, ContainerStatus::Starting)
                 .await;
 
@@ -262,13 +249,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn stop(&mut self, id: Uuid) -> Result<()> {
-        if NodeStatus::Stopped
-            != self
-                .nodes
-                .get(&id)
-                .ok_or_else(|| id_not_found(id))?
-                .expected_status()
-        {
+        if NodeStatus::Stopped != self.expected_status(id)? {
             self.send_container_status(id, ContainerStatus::Stopping)
                 .await;
 
@@ -294,9 +275,31 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
-        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(id))?;
+        Ok(self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .status())
+    }
 
-        Ok(node.status())
+    #[instrument(skip(self))]
+    pub fn expected_status(&self, id: Uuid) -> Result<NodeStatus> {
+        Ok(self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .expected_status())
+    }
+
+    #[instrument(skip(self))]
+    pub fn image(&self, id: Uuid) -> Result<NodeImage> {
+        Ok(self
+            .nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .data
+            .image
+            .clone())
     }
 
     #[instrument(skip(self))]
