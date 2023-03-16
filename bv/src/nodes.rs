@@ -52,7 +52,7 @@ pub struct Nodes<P: Pal + Debug> {
     api_config: SharedConfig,
     pub nodes: HashMap<Uuid, Node<P>>,
     node_ids: RwLock<HashMap<String, Uuid>>,
-    data: CommonData,
+    data: RwLock<CommonData>,
     pal: Arc<P>,
 }
 
@@ -105,7 +105,6 @@ impl<P: Pal + Debug> Nodes<P> {
         self.send_container_status(id, ContainerStatus::Creating)
             .await;
 
-        self.data.machine_index += 1;
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
         let node_data = NodeData {
@@ -425,7 +424,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
             Self {
                 api_config,
-                data,
+                data: RwLock::new(data),
                 nodes,
                 node_ids: RwLock::new(node_ids),
                 pal,
@@ -433,7 +432,7 @@ impl<P: Pal + Debug> Nodes<P> {
         } else {
             let nodes = Self {
                 api_config,
-                data: CommonData { machine_index: 0 },
+                data: RwLock::new(CommonData { machine_index: 0 }),
                 nodes: Default::default(),
                 node_ids: Default::default(),
                 pal,
@@ -495,7 +494,7 @@ impl<P: Pal + Debug> Nodes<P> {
             "Writing nodes common config file: {}",
             registry_path.display()
         );
-        let config = toml::Value::try_from(&self.data)?;
+        let config = toml::Value::try_from(&*self.data.read().await)?;
         let config = toml::to_string(&config)?;
         fs::write(&*registry_path, &*config).await?;
 
@@ -532,13 +531,15 @@ impl<P: Pal + Debug> Nodes<P> {
         ip: IpAddr,
         gateway: IpAddr,
     ) -> Result<<P as Pal>::NetInterface> {
+        let mut data = self.data.write().await;
+        data.machine_index += 1;
         let iface = self
             .pal
-            .create_net_interface(self.data.machine_index, ip, gateway)
+            .create_net_interface(data.machine_index, ip, gateway)
             .await
             .context(format!(
                 "failed to create VM bridge bv{}",
-                self.data.machine_index
+                data.machine_index
             ))?;
 
         Ok(iface)
