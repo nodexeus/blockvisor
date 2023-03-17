@@ -1,12 +1,8 @@
 //! Here we have the code related to the metrics for nodes. We
 
 use crate::babel_engine::BabelEngine;
-use crate::node;
-use crate::node_data::NodeStatus;
-use crate::pal::Pal;
 use crate::services::api::pb;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use tracing::warn;
 
 /// The interval by which we collect metrics from each of the nodes.
@@ -19,7 +15,7 @@ type NodeId = uuid::Uuid;
 
 /// The metrics for a group of nodes.
 #[derive(serde::Serialize)]
-pub struct Metrics(HashMap<NodeId, Metric>);
+pub struct Metrics(pub HashMap<NodeId, Metric>);
 
 /// The metrics for a single node.
 #[derive(serde::Serialize)]
@@ -30,22 +26,6 @@ pub struct Metric {
     pub consensus: Option<bool>,
     pub application_status: Option<String>,
     pub sync_status: Option<String>,
-}
-
-/// Given a list of nodes, returns for each node their metric. It does this concurrently for each
-/// running node, but queries the different metrics sequentially for a given node. Normally this would not
-/// be efficient, but since we are dealing with a virtual socket the latency is very low, in the
-/// hundres of nanoseconds. Furthermore, we require unique access to the node to query a metric, so
-/// sequentially is easier to program.
-pub async fn collect_metrics<P: Pal + Debug + 'static>(
-    nodes: impl Iterator<Item = &mut node::Node<P>>,
-) -> Metrics {
-    let metrics_fut: Vec<_> = nodes
-        .filter(|n| n.status() == NodeStatus::Running)
-        .map(|node| async { (node.id(), collect_metric(&mut node.babel_engine).await) })
-        .collect();
-    let metrics: Vec<_> = futures_util::future::join_all(metrics_fut).await;
-    Metrics(metrics.into_iter().collect())
 }
 
 /// Returns the metric for a single node.

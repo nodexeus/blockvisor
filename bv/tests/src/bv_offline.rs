@@ -21,7 +21,7 @@ use serde_json::json;
 use std::{net::ToSocketAddrs, sync::Arc};
 use sysinfo::{Pid, PidExt, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use tokio::{
-    sync::{Mutex, RwLock},
+    sync::Mutex,
     time::{sleep, Duration},
 };
 use tonic::transport::Server;
@@ -543,13 +543,13 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         blockvisor_port: 0,
     };
 
-    let nodes = Arc::new(RwLock::new(
+    let nodes = Arc::new(
         Nodes::load(
             test_env.build_dummy_platform(),
             SharedConfig::new(config.clone()),
         )
         .await?,
-    ));
+    );
 
     let client_future = async {
         match api::CommandsService::connect(config).await {

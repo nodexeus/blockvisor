@@ -20,7 +20,6 @@ use std::{
     fmt::Debug,
     {str::FromStr, sync::Arc},
 };
-use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tonic::{
     codegen::InterceptedService, service::Interceptor, transport::Channel, Request, Status,
@@ -101,7 +100,7 @@ impl CommandsService {
     pub async fn get_and_process_pending_commands<P: Pal + Debug>(
         &mut self,
         host_id: &str,
-        nodes: Arc<RwLock<Nodes<P>>>,
+        nodes: Arc<Nodes<P>>,
     ) -> Result<()> {
         info!("Get and process pending commands");
 
@@ -125,7 +124,7 @@ impl CommandsService {
     pub async fn process_commands<P: Pal + Debug>(
         &mut self,
         commands: Vec<pb::Command>,
-        nodes: Arc<RwLock<Nodes<P>>>,
+        nodes: Arc<Nodes<P>>,
     ) -> Result<()> {
         info!("Processing commands");
 
@@ -229,7 +228,7 @@ impl CommandsService {
 }
 
 async fn process_node_command<P: Pal + Debug>(
-    nodes: Arc<RwLock<Nodes<P>>>,
+    nodes: Arc<Nodes<P>>,
     node_command: pb::NodeCommand,
 ) -> Result<()> {
     let node_id = Uuid::from_str(&node_command.node_id)?;
@@ -247,31 +246,29 @@ async fn process_node_command<P: Pal + Debug>(
                     .map(|p| (p.name, p.value))
                     .collect();
                 nodes
-                    .write()
-                    .await
                     .create(node_id, args.name, image, args.ip, args.gateway, properties)
                     .await?;
                 API_CREATE_COUNTER.increment(1);
                 API_CREATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::Delete(_) => {
-                nodes.write().await.delete(node_id).await?;
+                nodes.delete(node_id).await?;
                 API_DELETE_COUNTER.increment(1);
                 API_DELETE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::Start(_) => {
-                nodes.write().await.start(node_id).await?;
+                nodes.start(node_id).await?;
                 API_START_COUNTER.increment(1);
                 API_START_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::Stop(_) => {
-                nodes.write().await.stop(node_id).await?;
+                nodes.stop(node_id).await?;
                 API_STOP_COUNTER.increment(1);
                 API_STOP_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::Restart(_) => {
-                nodes.write().await.stop(node_id).await?;
-                nodes.write().await.start(node_id).await?;
+                nodes.stop(node_id).await?;
+                nodes.start(node_id).await?;
                 API_RESTART_COUNTER.increment(1);
                 API_RESTART_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
@@ -280,7 +277,7 @@ async fn process_node_command<P: Pal + Debug>(
                     .image
                     .ok_or_else(|| anyhow!("Image not provided"))?
                     .into();
-                nodes.write().await.upgrade(node_id, image).await?;
+                nodes.upgrade(node_id, image).await?;
                 API_UPGRADE_COUNTER.increment(1);
                 API_UPGRADE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
@@ -289,22 +286,14 @@ async fn process_node_command<P: Pal + Debug>(
                 self_update,
                 properties,
             }) => {
-                nodes
-                    .write()
-                    .await
-                    .update(node_id, name, self_update, properties)
-                    .await?;
+                nodes.update(node_id, name, self_update, properties).await?;
                 API_UPDATE_COUNTER.increment(1);
                 API_UPDATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::InfoGet(_) => unimplemented!(),
             Command::Generic(_) => unimplemented!(),
             Command::FirewallUpdate(update) => {
-                nodes
-                    .write()
-                    .await
-                    .firewall_update(node_id, update.try_into()?)
-                    .await?;
+                nodes.firewall_update(node_id, update.try_into()?).await?;
                 API_FIREWALL_UPDATE_COUNTER.increment(1);
                 API_FIREWALL_UPDATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }

@@ -18,7 +18,7 @@ use crate::{
     config::SharedConfig,
     node::Node,
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
-    render,
+    node_metrics, render,
     services::{
         api::{self, pb, pb::node_info::ContainerStatus, pb::Parameter},
         cookbook::CookbookService,
@@ -50,7 +50,7 @@ pub enum ServiceStatus {
 #[derive(Debug)]
 pub struct Nodes<P: Pal + Debug> {
     api_config: SharedConfig,
-    pub nodes: HashMap<Uuid, Node<P>>,
+    pub nodes: RwLock<HashMap<Uuid, RwLock<Node<P>>>>,
     node_ids: RwLock<HashMap<String, Uuid>>,
     data: RwLock<CommonData>,
     pal: Arc<P>,
@@ -64,7 +64,7 @@ pub struct CommonData {
 impl<P: Pal + Debug> Nodes<P> {
     #[instrument(skip(self))]
     pub async fn create(
-        &mut self,
+        &self,
         id: Uuid,
         name: String,
         image: NodeImage,
@@ -72,7 +72,7 @@ impl<P: Pal + Debug> Nodes<P> {
         gateway: String,
         properties: NodeProperties,
     ) -> Result<()> {
-        if self.nodes.contains_key(&id) {
+        if self.nodes.read().await.contains_key(&id) {
             warn!("Node with id `{id}` exists");
             return Ok(());
         }
@@ -88,12 +88,11 @@ impl<P: Pal + Debug> Nodes<P> {
             .parse()
             .with_context(|| format!("invalid gateway {gateway} for node {id}"))?;
 
-        if self
-            .nodes
-            .values()
-            .any(|n| n.data.network_interface.ip() == &ip)
-        {
-            bail!("Node with ip address `{ip}` exists");
+        let nodes_lock = self.nodes.read().await;
+        for n in nodes_lock.values() {
+            if n.read().await.data.network_interface.ip() == &ip {
+                bail!("Node with ip address `{ip}` exists");
+            }
         }
 
         let mut babel_conf = self.fetch_image_data(&image).await?;
@@ -120,7 +119,7 @@ impl<P: Pal + Debug> Nodes<P> {
         self.save().await?;
 
         let node = Node::create(self.pal.clone(), node_data).await?;
-        self.nodes.insert(id, node);
+        self.nodes.write().await.insert(id, RwLock::new(node));
         self.node_ids.write().await.insert(name, id);
         debug!("Node with id `{}` created", id);
 
@@ -131,8 +130,8 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn upgrade(&mut self, id: Uuid, image: NodeImage) -> Result<()> {
-        if image != self.image(id)? {
+    pub async fn upgrade(&self, id: Uuid, image: NodeImage) -> Result<()> {
+        if image != self.image(id).await? {
             let babel_config = self.fetch_image_data(&image).await?;
             babel_api::check_babel_config(&babel_config)?;
 
@@ -141,18 +140,24 @@ impl<P: Pal + Debug> Nodes<P> {
 
             let need_to_restart = self.status(id).await? == NodeStatus::Running;
             self.stop(id).await?;
-            let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
 
-            if image.protocol != node.data.image.protocol {
+            let nodes = self.nodes.read().await;
+            let mut node = nodes
+                .get(&id)
+                .ok_or_else(|| id_not_found(id))?
+                .write()
+                .await;
+            let data = &node.data;
+
+            if image.protocol != data.image.protocol {
                 bail!("Cannot upgrade protocol to `{}`", image.protocol);
             }
-            if image.node_type != node.data.image.node_type {
+            if image.node_type != data.image.node_type {
                 bail!("Cannot upgrade node type to `{}`", image.node_type);
             }
-            if node.data.babel_conf.requirements.vcpu_count != babel_config.requirements.vcpu_count
-                || node.data.babel_conf.requirements.mem_size_mb
-                    != babel_config.requirements.mem_size_mb
-                || node.data.babel_conf.requirements.disk_size_gb
+            if data.babel_conf.requirements.vcpu_count != babel_config.requirements.vcpu_count
+                || data.babel_conf.requirements.mem_size_mb != babel_config.requirements.mem_size_mb
+                || data.babel_conf.requirements.disk_size_gb
                     != babel_config.requirements.disk_size_gb
             {
                 bail!("Cannot upgrade node requirements");
@@ -191,8 +196,9 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn delete(&mut self, id: Uuid) -> Result<()> {
-        if let Some(node) = self.nodes.remove(&id) {
+    pub async fn delete(&self, id: Uuid) -> Result<()> {
+        if let Some(node_lock) = self.nodes.write().await.remove(&id) {
+            let node = node_lock.into_inner();
             self.node_ids.write().await.remove(&node.data.name);
             node.delete().await?;
             debug!("Node deleted");
@@ -201,12 +207,14 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn start(&mut self, id: Uuid) -> Result<()> {
-        if NodeStatus::Running != self.expected_status(id)? {
+    pub async fn start(&self, id: Uuid) -> Result<()> {
+        if NodeStatus::Running != self.expected_status(id).await? {
             self.send_container_status(id, ContainerStatus::Starting)
                 .await;
 
-            let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+            let nodes = self.nodes.read().await;
+            let node_lock = nodes.get(&id).ok_or_else(|| id_not_found(id))?;
+            let mut node = node_lock.write().await;
             node.start().await?;
             debug!("Node started");
 
@@ -221,7 +229,6 @@ impl<P: Pal + Debug> Nodes<P> {
                 }
             };
 
-            let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
             node.babel_engine.init(secret_keys).await?;
             // We save the `running` status only after all of the previous steps have succeeded.
             node.set_expected_status(NodeStatus::Running).await?;
@@ -231,94 +238,155 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn update(
-        &mut self,
+        &self,
         id: Uuid,
         name: Option<String>,
         self_update: Option<bool>,
         properties: Vec<Parameter>,
     ) -> Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
         node.update(name, self_update, properties).await
     }
 
     #[instrument(skip(self))]
-    pub async fn firewall_update(&mut self, id: Uuid, config: firewall::Config) -> Result<()> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+    pub async fn logs(&self, id: Uuid) -> Result<Vec<String>> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+        node.babel_engine.get_logs().await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn metrics(&self, id: Uuid) -> Result<node_metrics::Metric> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+
+        let metrics = node_metrics::collect_metric(&mut node.babel_engine).await;
+        Ok(metrics)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn keys(&self, id: Uuid) -> Result<Vec<babel_api::BlockchainKey>> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+        node.babel_engine.download_keys().await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn capabilities(&self, id: Uuid) -> Result<Vec<String>> {
+        let nodes = self.nodes.read().await;
+        let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
+        Ok(node.babel_engine.capabilities())
+    }
+
+    #[instrument(skip(self))]
+    pub async fn firewall_update(&self, id: Uuid, config: firewall::Config) -> Result<()> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
         node.firewall_update(config).await
     }
 
     #[instrument(skip(self))]
-    pub async fn stop(&mut self, id: Uuid) -> Result<()> {
-        if NodeStatus::Stopped != self.expected_status(id)? {
+    pub async fn call_method(
+        &self,
+        id: Uuid,
+        method: &str,
+        params: HashMap<String, Vec<String>>,
+    ) -> Result<String> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+        node.babel_engine.call_method(method, params).await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn stop(&self, id: Uuid) -> Result<()> {
+        if NodeStatus::Stopped != self.expected_status(id).await? {
             self.send_container_status(id, ContainerStatus::Stopping)
                 .await;
 
-            let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+            let nodes = self.nodes.read().await;
+            let mut node = nodes
+                .get(&id)
+                .ok_or_else(|| id_not_found(id))?
+                .write()
+                .await;
             node.stop().await?;
             debug!("Node stopped");
 
             self.send_container_status(id, ContainerStatus::Stopped)
                 .await;
 
-            let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
             node.set_expected_status(NodeStatus::Stopped).await?;
         }
         Ok(())
     }
 
     #[instrument(skip(self))]
-    pub async fn list(&self) -> Vec<&Node<P>> {
-        debug!("Listing {} nodes", self.nodes.len());
-
-        self.nodes.values().collect()
-    }
-
-    #[instrument(skip(self))]
     pub async fn status(&self, id: Uuid) -> Result<NodeStatus> {
-        Ok(self
-            .nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .status())
+        let nodes = self.nodes.read().await;
+        let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
+        Ok(node.status())
     }
 
     #[instrument(skip(self))]
-    pub fn expected_status(&self, id: Uuid) -> Result<NodeStatus> {
-        Ok(self
-            .nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .expected_status())
+    pub async fn expected_status(&self, id: Uuid) -> Result<NodeStatus> {
+        let nodes = self.nodes.read().await;
+        let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
+        Ok(node.expected_status())
     }
 
     #[instrument(skip(self))]
-    pub fn image(&self, id: Uuid) -> Result<NodeImage> {
-        Ok(self
-            .nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .data
-            .image
-            .clone())
+    pub async fn image(&self, id: Uuid) -> Result<NodeImage> {
+        let nodes = self.nodes.read().await;
+        let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
+        Ok(node.data.image.clone())
     }
 
     #[instrument(skip(self))]
-    pub async fn recover(&mut self, id: Uuid) -> Result<()> {
+    pub async fn recover(&self, id: Uuid) -> Result<()> {
         self.send_container_status(id, ContainerStatus::UndefinedContainerStatus)
             .await;
 
-        let node = self.nodes.get(&id).ok_or_else(|| id_not_found(id))?;
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
         if !node.is_data_valid().await? {
             // If some files are corrupted, the files will be recreated.
             // Some intermediate data could be lost in that case.
             let node_data = node.data.clone();
             self.fetch_image_data(&node_data.image).await?;
             let new = Node::create(self.pal.clone(), node_data).await?;
-            self.nodes.insert(id, new);
+            self.nodes.write().await.insert(id, RwLock::new(new));
             debug!("Node recreated");
         }
 
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
         node.recover().await
     }
 
@@ -336,8 +404,13 @@ impl<P: Pal + Debug> Nodes<P> {
 
     /// Synchronizes the keys in the key server with the keys available locally. Returns a
     /// refreshed set of all keys.
-    pub async fn exchange_keys(&mut self, id: Uuid) -> Result<HashMap<String, Vec<u8>>> {
-        let node = self.nodes.get_mut(&id).ok_or_else(|| id_not_found(id))?;
+    pub async fn exchange_keys(&self, id: Uuid) -> Result<HashMap<String, Vec<u8>>> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
 
         let mut key_service = KeyService::connect(&self.api_config).await?;
 
@@ -425,7 +498,7 @@ impl<P: Pal + Debug> Nodes<P> {
             Self {
                 api_config,
                 data: RwLock::new(data),
-                nodes,
+                nodes: RwLock::new(nodes),
                 node_ids: RwLock::new(node_ids),
                 pal,
             }
@@ -456,7 +529,7 @@ impl<P: Pal + Debug> Nodes<P> {
     async fn load_nodes(
         pal: Arc<P>,
         registry_dir: &Path,
-    ) -> Result<(HashMap<Uuid, Node<P>>, HashMap<String, Uuid>)> {
+    ) -> Result<(HashMap<Uuid, RwLock<Node<P>>>, HashMap<String, Uuid>)> {
         info!("Reading nodes config dir: {}", registry_dir.display());
         let mut nodes = HashMap::new();
         let mut node_ids = HashMap::new();
@@ -475,7 +548,7 @@ impl<P: Pal + Debug> Nodes<P> {
             {
                 Ok(node) => {
                     node_ids.insert(node.data.name.clone(), node.id());
-                    nodes.insert(node.data.id, node);
+                    nodes.insert(node.data.id, RwLock::new(node));
                 }
                 Err(e) => {
                     // blockvisord should not bail on problems with individual node files.

@@ -12,12 +12,13 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
+use futures_util::future::join_all;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::watch::Sender;
 use tokio::{
     net::TcpListener,
-    sync::{watch, watch::Receiver, RwLock},
+    sync::{watch, watch::Receiver},
     time::{sleep, Duration},
 };
 use tonic::transport::{Channel, Endpoint, Server};
@@ -77,7 +78,7 @@ where
         let nodes = Nodes::load(self.pal, self.config.clone()).await?;
 
         try_set_bv_status(bv_pb::ServiceStatus::Ok).await;
-        let nodes = Arc::new(RwLock::new(nodes));
+        let nodes = Arc::new(nodes);
 
         let server = BlockvisorServer {
             nodes: nodes.clone(),
@@ -145,7 +146,7 @@ where
 
     async fn create_external_api_listener(
         mut run: RunFlag,
-        nodes: Arc<RwLock<Nodes<P>>>,
+        nodes: Arc<Nodes<P>>,
         mut cmd_watch_rx: Receiver<()>,
         config: &SharedConfig,
     ) {
@@ -214,20 +215,17 @@ where
         }
     }
 
-    async fn nodes_recovery(mut run: RunFlag, nodes: Arc<RwLock<Nodes<P>>>) {
+    async fn nodes_recovery(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
         while run.load() {
-            let list: Vec<_> = nodes
-                .read()
-                .await
-                .list()
-                .await
-                .iter()
-                .map(|node| (node.data.id, node.status(), node.expected_status()))
-                .collect();
+            let list: Vec<_> = join_all(nodes.nodes.read().await.values().map(|node| async {
+                let node = node.read().await;
+                (node.id(), node.status(), node.expected_status())
+            }))
+            .await;
 
             for (id, node_status, expected_status) in list {
                 if node_status == NodeStatus::Failed && expected_status != NodeStatus::Failed {
-                    if let Err(e) = nodes.write().await.recover(id).await {
+                    if let Err(e) = nodes.recover(id).await {
                         error!("Recovery: node with ID `{id}` failed: {e}");
                     }
                 }
@@ -237,15 +235,15 @@ where
     }
 
     /// This task runs periodically to send important info about nodes to API.
-    async fn node_updates(mut run: RunFlag, nodes: Arc<RwLock<Nodes<P>>>) {
+    async fn node_updates(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
         let mut timer = tokio::time::interval(INFO_UPDATE_INTERVAL);
         let mut known_addresses: HashMap<String, String> = HashMap::new();
         while run.load() {
             run.select(timer.tick()).await;
-            let mut nodes_lock = nodes.write().await;
 
             let mut updates = vec![];
-            for node in nodes_lock.nodes.values_mut() {
+            for node in nodes.nodes.read().await.values() {
+                let mut node = node.write().await;
                 if let Ok(address) = node.babel_engine.address().await {
                     updates.push((node.id().to_string(), address));
                 }
@@ -262,7 +260,7 @@ where
                     ..Default::default()
                 };
 
-                if nodes_lock.send_info_update(update).await.is_ok() {
+                if nodes.send_info_update(update).await.is_ok() {
                     // cache addresses to not send the same address if it has not changed
                     known_addresses.entry(node_id).or_insert(address);
                 }
@@ -283,21 +281,43 @@ where
         None
     }
 
+    /// Given a list of nodes, returns for each node their metric. It does this concurrently for each
+    /// running node, but queries the different metrics sequentially for a given node. Normally this would not
+    /// be efficient, but since we are dealing with a virtual socket the latency is very low, in the
+    /// hundres of nanoseconds. Furthermore, we require unique access to the node to query a metric, so
+    /// sequentially is easier to program.
+    pub async fn collect_metrics(nodes: Arc<Nodes<P>>) -> node_metrics::Metrics {
+        let nodes_lock = nodes.nodes.read().await;
+        let metrics_fut: Vec<_> = nodes_lock
+            .values()
+            .map(|n| async {
+                let mut node = n.write().await;
+                if n.read().await.status() == NodeStatus::Running {
+                    None
+                } else {
+                    Some((
+                        node.id(),
+                        node_metrics::collect_metric(&mut node.babel_engine).await,
+                    ))
+                }
+            })
+            .collect();
+        let metrics: Vec<_> = futures_util::future::join_all(metrics_fut).await;
+        node_metrics::Metrics(metrics.into_iter().flatten().collect())
+    }
+
     /// This task runs every minute to aggregate metrics from every node. It will call into the nodes
     /// query their metrics, then send them to blockvisor-api.
     async fn node_metrics(
         mut run: RunFlag,
-        nodes: Arc<RwLock<Nodes<P>>>,
+        nodes: Arc<Nodes<P>>,
         endpoint: &Endpoint,
         config: SharedConfig,
     ) -> Option<()> {
         let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
         while run.load() {
             run.select(timer.tick()).await;
-            let mut lock = nodes.write().await;
-            let metrics = node_metrics::collect_metrics(lock.nodes.values_mut()).await;
-            // Drop the lock as early as possible.
-            drop(lock);
+            let metrics = Self::collect_metrics(nodes.clone()).await;
             let mut client = api::MetricsClient::with_auth(
                 Self::wait_for_channel(run.clone(), endpoint).await?,
                 api::AuthToken(config.read().await.token),
