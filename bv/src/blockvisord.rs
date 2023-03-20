@@ -12,7 +12,6 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
-use futures_util::future::join_all;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::watch::Sender;
@@ -217,19 +216,7 @@ where
 
     async fn nodes_recovery(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
         while run.load() {
-            let list: Vec<_> = join_all(nodes.nodes.read().await.values().map(|node| async {
-                let node = node.read().await;
-                (node.id(), node.status(), node.expected_status())
-            }))
-            .await;
-
-            for (id, node_status, expected_status) in list {
-                if node_status == NodeStatus::Failed && expected_status != NodeStatus::Failed {
-                    if let Err(e) = nodes.recover(id).await {
-                        error!("Recovery: node with ID `{id}` failed: {e}");
-                    }
-                }
-            }
+            let _ = nodes.recover().await;
             run.select(sleep(RECOVERY_CHECK_INTERVAL)).await;
         }
     }
@@ -292,7 +279,7 @@ where
             .values()
             .map(|n| async {
                 let mut node = n.write().await;
-                if n.read().await.status() == NodeStatus::Running {
+                if node.status() == NodeStatus::Running {
                     None
                 } else {
                     Some((

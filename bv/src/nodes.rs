@@ -88,8 +88,7 @@ impl<P: Pal + Debug> Nodes<P> {
             .parse()
             .with_context(|| format!("invalid gateway {gateway} for node {id}"))?;
 
-        let nodes_lock = self.nodes.read().await;
-        for n in nodes_lock.values() {
+        for n in self.nodes.read().await.values() {
             if n.read().await.data.network_interface.ip() == &ip {
                 bail!("Node with ip address `{ip}` exists");
             }
@@ -138,17 +137,17 @@ impl<P: Pal + Debug> Nodes<P> {
             self.send_container_status(id, ContainerStatus::Upgrading)
                 .await;
 
-            let need_to_restart = self.status(id).await? == NodeStatus::Running;
-            self.stop(id).await?;
-
-            let nodes = self.nodes.read().await;
-            let mut node = nodes
+            let nodes_lock = self.nodes.read().await;
+            let mut node = nodes_lock
                 .get(&id)
                 .ok_or_else(|| id_not_found(id))?
                 .write()
                 .await;
-            let data = &node.data;
 
+            let need_to_restart = node.status() == NodeStatus::Running;
+            self.node_stop(&mut node).await?;
+
+            let data = &node.data;
             if image.protocol != data.image.protocol {
                 bail!("Cannot upgrade protocol to `{}`", image.protocol);
             }
@@ -167,7 +166,7 @@ impl<P: Pal + Debug> Nodes<P> {
             debug!("Node upgraded");
 
             if need_to_restart {
-                self.start(id).await?;
+                self.node_start(&mut node).await?;
             }
 
             self.send_container_status(id, ContainerStatus::Upgraded)
@@ -208,20 +207,29 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn start(&self, id: Uuid) -> Result<()> {
-        if NodeStatus::Running != self.expected_status(id).await? {
+        let nodes_lock = self.nodes.read().await;
+        let mut node = nodes_lock
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+        self.node_start(&mut node).await
+    }
+
+    #[instrument(skip(self))]
+    async fn node_start(&self, node: &mut Node<P>) -> Result<()> {
+        let id = node.id();
+        if NodeStatus::Running != node.expected_status() {
             self.send_container_status(id, ContainerStatus::Starting)
                 .await;
 
-            let nodes = self.nodes.read().await;
-            let node_lock = nodes.get(&id).ok_or_else(|| id_not_found(id))?;
-            let mut node = node_lock.write().await;
             node.start().await?;
             debug!("Node started");
 
             self.send_container_status(id, ContainerStatus::Running)
                 .await;
 
-            let secret_keys = match self.exchange_keys(id).await {
+            let secret_keys = match self.exchange_keys(node).await {
                 Ok(secret_keys) => secret_keys,
                 Err(e) => {
                     error!("Failed to retrieve keys when starting node: `{e}`");
@@ -324,16 +332,23 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn stop(&self, id: Uuid) -> Result<()> {
-        if NodeStatus::Stopped != self.expected_status(id).await? {
+        let nodes_lock = self.nodes.read().await;
+        let mut node = nodes_lock
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+
+        self.node_stop(&mut node).await
+    }
+
+    #[instrument(skip(self))]
+    async fn node_stop(&self, node: &mut Node<P>) -> Result<()> {
+        let id = node.id();
+        if NodeStatus::Stopped != node.expected_status() {
             self.send_container_status(id, ContainerStatus::Stopping)
                 .await;
 
-            let nodes = self.nodes.read().await;
-            let mut node = nodes
-                .get(&id)
-                .ok_or_else(|| id_not_found(id))?
-                .write()
-                .await;
             node.stop().await?;
             debug!("Node stopped");
 
@@ -353,41 +368,48 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn expected_status(&self, id: Uuid) -> Result<NodeStatus> {
+    async fn expected_status(&self, id: Uuid) -> Result<NodeStatus> {
         let nodes = self.nodes.read().await;
         let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
         Ok(node.expected_status())
     }
 
     #[instrument(skip(self))]
-    pub async fn image(&self, id: Uuid) -> Result<NodeImage> {
+    async fn image(&self, id: Uuid) -> Result<NodeImage> {
         let nodes = self.nodes.read().await;
         let node = nodes.get(&id).ok_or_else(|| id_not_found(id))?.read().await;
         Ok(node.data.image.clone())
     }
 
     #[instrument(skip(self))]
-    pub async fn recover(&self, id: Uuid) -> Result<()> {
-        self.send_container_status(id, ContainerStatus::UndefinedContainerStatus)
-            .await;
-
-        let nodes = self.nodes.read().await;
-        let mut node = nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .write()
-            .await;
-        if !node.is_data_valid().await? {
+    pub async fn recover(&self) -> Result<()> {
+        let nodes_lock = self.nodes.read().await;
+        let mut nodes_to_recreate = vec![];
+        for node_lock in nodes_lock.values() {
+            if let Ok(mut node) = node_lock.try_write() {
+                let id = node.id();
+                if node.status() == NodeStatus::Failed
+                    && node.expected_status() != NodeStatus::Failed
+                {
+                    if !node.is_data_valid().await? {
+                        nodes_to_recreate.push(node.data.clone());
+                    } else if let Err(e) = node.recover().await {
+                        error!("Recovery: node with ID `{id}` failed: {e}");
+                    }
+                }
+            }
+        }
+        drop(nodes_lock);
+        for node_data in nodes_to_recreate {
+            let id = node_data.id;
             // If some files are corrupted, the files will be recreated.
             // Some intermediate data could be lost in that case.
-            let node_data = node.data.clone();
             self.fetch_image_data(&node_data.image).await?;
             let new = Node::create(self.pal.clone(), node_data).await?;
             self.nodes.write().await.insert(id, RwLock::new(new));
-            debug!("Node recreated");
+            info!("Recovery: node with ID `{id}` recreated");
         }
-
-        node.recover().await
+        Ok(())
     }
 
     pub async fn node_id_for_name(&self, name: &str) -> Result<Uuid> {
@@ -404,18 +426,11 @@ impl<P: Pal + Debug> Nodes<P> {
 
     /// Synchronizes the keys in the key server with the keys available locally. Returns a
     /// refreshed set of all keys.
-    pub async fn exchange_keys(&self, id: Uuid) -> Result<HashMap<String, Vec<u8>>> {
-        let nodes = self.nodes.read().await;
-        let mut node = nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .write()
-            .await;
-
+    async fn exchange_keys(&self, node: &mut Node<P>) -> Result<HashMap<String, Vec<u8>>> {
         let mut key_service = KeyService::connect(&self.api_config).await?;
 
         let api_keys: HashMap<String, Vec<u8>> = key_service
-            .download_keys(id)
+            .download_keys(node.id())
             .await?
             .into_iter()
             .map(|k| (k.name, k.content))
@@ -454,7 +469,7 @@ impl<P: Pal + Debug> Nodes<P> {
             })
             .collect();
         if !keys2.is_empty() {
-            key_service.upload_keys(id, keys2).await?;
+            key_service.upload_keys(node.id(), keys2).await?;
         }
 
         // Generate keys if we should (and can)
@@ -475,7 +490,7 @@ impl<P: Pal + Debug> Nodes<P> {
                     content: k.content,
                 })
                 .collect();
-            key_service.upload_keys(id, gen_keys.clone()).await?;
+            key_service.upload_keys(node.id(), gen_keys.clone()).await?;
             return Ok(gen_keys.into_iter().map(|k| (k.name, k.content)).collect());
         }
 
