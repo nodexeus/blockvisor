@@ -1,8 +1,6 @@
 use crate::{
     config::{Config, SharedConfig, CONFIG_PATH},
-    hosts,
-    node_data::NodeStatus,
-    node_metrics,
+    hosts, node_metrics,
     nodes::Nodes,
     pal::{CommandsStream, Pal, ServiceConnector},
     self_updater,
@@ -268,31 +266,6 @@ where
         None
     }
 
-    /// Given a list of nodes, returns for each node their metric. It does this concurrently for each
-    /// running node, but queries the different metrics sequentially for a given node. Normally this would not
-    /// be efficient, but since we are dealing with a virtual socket the latency is very low, in the
-    /// hundres of nanoseconds. Furthermore, we require unique access to the node to query a metric, so
-    /// sequentially is easier to program.
-    pub async fn collect_metrics(nodes: Arc<Nodes<P>>) -> node_metrics::Metrics {
-        let nodes_lock = nodes.nodes.read().await;
-        let metrics_fut: Vec<_> = nodes_lock
-            .values()
-            .map(|n| async {
-                let mut node = n.write().await;
-                if node.status() == NodeStatus::Running {
-                    None
-                } else {
-                    Some((
-                        node.id(),
-                        node_metrics::collect_metric(&mut node.babel_engine).await,
-                    ))
-                }
-            })
-            .collect();
-        let metrics: Vec<_> = futures_util::future::join_all(metrics_fut).await;
-        node_metrics::Metrics(metrics.into_iter().flatten().collect())
-    }
-
     /// This task runs every minute to aggregate metrics from every node. It will call into the nodes
     /// query their metrics, then send them to blockvisor-api.
     async fn node_metrics(
@@ -304,7 +277,7 @@ where
         let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
         while run.load() {
             run.select(timer.tick()).await;
-            let metrics = Self::collect_metrics(nodes.clone()).await;
+            let metrics = node_metrics::collect_metrics(nodes.clone()).await;
             let mut client = api::MetricsClient::with_auth(
                 Self::wait_for_channel(run.clone(), endpoint).await?,
                 api::AuthToken(config.read().await.token),
