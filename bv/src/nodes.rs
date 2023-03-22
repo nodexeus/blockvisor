@@ -57,8 +57,8 @@ pub struct Nodes<P: Pal + Debug> {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct CommonData {
-    pub machine_index: u32,
+struct CommonData {
+    machine_index: u32,
 }
 
 impl<P: Pal + Debug> Nodes<P> {
@@ -575,7 +575,7 @@ impl<P: Pal + Debug> Nodes<P> {
         Ok((nodes, node_ids))
     }
 
-    pub async fn save(&self) -> Result<()> {
+    async fn save(&self) -> Result<()> {
         let registry_path = build_registry_filename(self.pal.bv_root());
         // We only save the common data file. The individual node data files save themselves.
         info!(
@@ -590,7 +590,7 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     // Optimistically try to notify API that container is 'Running' or 'Stopped', etc
-    pub async fn send_container_status(&self, id: Uuid, status: ContainerStatus) {
+    async fn send_container_status(&self, id: Uuid, status: ContainerStatus) {
         let update = pb::NodeInfo {
             id: id.to_string(),
             container_status: Some(status.into()),
