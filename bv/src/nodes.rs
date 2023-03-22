@@ -20,7 +20,7 @@ use crate::{
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
     node_metrics, render,
     services::{
-        api::{self, pb, pb::node_info::ContainerStatus, pb::Parameter},
+        api::{pb, pb::Parameter},
         cookbook::CookbookService,
         keyfiles::KeyService,
     },
@@ -100,9 +100,6 @@ impl<P: Pal + Debug> Nodes<P> {
         babel_conf.supervisor.entry_point =
             render_entry_points(babel_conf.supervisor.entry_point, &properties, &conf)?;
 
-        self.send_container_status(id, ContainerStatus::Creating)
-            .await;
-
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
         let node_data = NodeData {
@@ -122,9 +119,6 @@ impl<P: Pal + Debug> Nodes<P> {
         self.node_ids.write().await.insert(name, id);
         debug!("Node with id `{}` created", id);
 
-        self.send_container_status(id, ContainerStatus::Stopped)
-            .await;
-
         Ok(())
     }
 
@@ -133,9 +127,6 @@ impl<P: Pal + Debug> Nodes<P> {
         if image != self.image(id).await? {
             let babel_config = self.fetch_image_data(&image).await?;
             babel_api::check_babel_config(&babel_config)?;
-
-            self.send_container_status(id, ContainerStatus::Upgrading)
-                .await;
 
             let nodes_lock = self.nodes.read().await;
             let mut node = nodes_lock
@@ -168,9 +159,6 @@ impl<P: Pal + Debug> Nodes<P> {
             if need_to_restart {
                 self.node_start(&mut node).await?;
             }
-
-            self.send_container_status(id, ContainerStatus::Upgraded)
-                .await;
         }
         Ok(())
     }
@@ -218,16 +206,9 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     async fn node_start(&self, node: &mut Node<P>) -> Result<()> {
-        let id = node.id();
         if NodeStatus::Running != node.expected_status() {
-            self.send_container_status(id, ContainerStatus::Starting)
-                .await;
-
             node.start().await?;
             debug!("Node started");
-
-            self.send_container_status(id, ContainerStatus::Running)
-                .await;
 
             let secret_keys = match self.exchange_keys(node).await {
                 Ok(secret_keys) => secret_keys,
@@ -344,17 +325,9 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     async fn node_stop(&self, node: &mut Node<P>) -> Result<()> {
-        let id = node.id();
         if NodeStatus::Stopped != node.expected_status() {
-            self.send_container_status(id, ContainerStatus::Stopping)
-                .await;
-
             node.stop().await?;
             debug!("Node stopped");
-
-            self.send_container_status(id, ContainerStatus::Stopped)
-                .await;
-
             node.set_expected_status(NodeStatus::Stopped).await?;
         }
         Ok(())
@@ -586,30 +559,6 @@ impl<P: Pal + Debug> Nodes<P> {
         let config = toml::to_string(&config)?;
         fs::write(&*registry_path, &*config).await?;
 
-        Ok(())
-    }
-
-    // Optimistically try to notify API that container is 'Running' or 'Stopped', etc
-    async fn send_container_status(&self, id: Uuid, status: ContainerStatus) {
-        let update = pb::NodeInfo {
-            id: id.to_string(),
-            container_status: Some(status.into()),
-            ..Default::default()
-        };
-        if let Err(e) = self.send_info_update(update).await {
-            error!("Cannot send container status: {e}");
-        };
-    }
-
-    // Send node info update to API
-    pub async fn send_info_update(&self, update: pb::NodeInfo) -> Result<()> {
-        let mut client = api::NodesService::connect(self.api_config.read().await)
-            .await
-            .with_context(|| "Error connecting to api".to_string())?;
-        client
-            .send_node_update(update)
-            .await
-            .with_context(|| "Cannot send node update".to_string())?;
         Ok(())
     }
 

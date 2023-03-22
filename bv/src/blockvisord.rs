@@ -1,6 +1,8 @@
 use crate::{
     config::{Config, SharedConfig, CONFIG_PATH},
-    hosts, node_metrics,
+    hosts,
+    node_data::NodeStatus,
+    node_metrics,
     nodes::Nodes,
     pal::{CommandsStream, Pal, ServiceConnector},
     self_updater,
@@ -20,6 +22,7 @@ use tokio::{
 };
 use tonic::transport::{Channel, Endpoint, Server};
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
@@ -95,7 +98,8 @@ where
 
         let nodes_recovery_future = Self::nodes_recovery(run.clone(), nodes.clone());
 
-        let node_updates_future = Self::node_updates(run.clone(), nodes.clone());
+        let node_updates_future =
+            Self::node_updates(run.clone(), nodes.clone(), self.config.clone());
 
         let config = self.config.read().await;
         let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
@@ -220,34 +224,46 @@ where
     }
 
     /// This task runs periodically to send important info about nodes to API.
-    async fn node_updates(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
+    async fn node_updates(mut run: RunFlag, nodes: Arc<Nodes<P>>, config: SharedConfig) {
         let mut timer = tokio::time::interval(INFO_UPDATE_INTERVAL);
-        let mut known_addresses: HashMap<String, String> = HashMap::new();
+        let mut known_addresses: HashMap<Uuid, Option<String>> = HashMap::new();
+        let mut known_statuses: HashMap<Uuid, NodeStatus> = HashMap::new();
         while run.load() {
             run.select(timer.tick()).await;
 
             let mut updates = vec![];
             for node in nodes.nodes.read().await.values() {
                 let mut node = node.write().await;
-                if let Ok(address) = node.babel_engine.address().await {
-                    updates.push((node.id().to_string(), address));
-                }
+                let address = node.babel_engine.address().await.ok();
+                updates.push((node.id(), address, node.status()));
             }
 
-            for (node_id, address) in updates {
-                if known_addresses.get(&node_id) == Some(&address) {
+            for (node_id, address, status) in updates {
+                if known_addresses.get(&node_id) == Some(&address)
+                    && known_statuses.get(&node_id) == Some(&status)
+                {
                     continue;
                 }
 
+                let container_status = match status {
+                    NodeStatus::Running => pb::node_info::ContainerStatus::Running,
+                    NodeStatus::Stopped => pb::node_info::ContainerStatus::Stopped,
+                    NodeStatus::Failed => pb::node_info::ContainerStatus::UndefinedContainerStatus,
+                };
                 let update = pb::NodeInfo {
-                    id: node_id.clone(),
-                    address: Some(address.clone()),
+                    id: node_id.to_string(),
+                    address: address.clone(),
+                    container_status: Some(container_status.into()),
                     ..Default::default()
                 };
 
-                if nodes.send_info_update(update).await.is_ok() {
-                    // cache addresses to not send the same address if it has not changed
+                if Self::send_node_info_update(config.clone(), update)
+                    .await
+                    .is_ok()
+                {
+                    // cache to not send the same data if it has not changed
                     known_addresses.entry(node_id).or_insert(address);
+                    known_statuses.entry(node_id).or_insert(status);
                 }
             }
         }
@@ -316,5 +332,17 @@ where
             };
         }
         None
+    }
+
+    // Send node info update to control plane
+    async fn send_node_info_update(config: SharedConfig, update: pb::NodeInfo) -> Result<()> {
+        let mut client = api::NodesService::connect(config.read().await)
+            .await
+            .with_context(|| "Error connecting to api".to_string())?;
+        client
+            .send_node_update(update)
+            .await
+            .with_context(|| "Cannot send node update".to_string())?;
+        Ok(())
     }
 }
