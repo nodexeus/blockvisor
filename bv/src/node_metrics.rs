@@ -43,11 +43,15 @@ pub async fn collect_metrics<P: Pal + Debug + 'static>(nodes: Arc<Nodes<P>>) -> 
     let metrics_fut: Vec<_> = nodes_lock
         .values()
         .map(|n| async {
-            let mut node = n.write().await;
-            if node.status() == NodeStatus::Running {
-                None
-            } else {
-                Some((node.id(), collect_metric(&mut node.babel_engine).await))
+            match n.try_write() {
+                Err(_) => None,
+                Ok(mut node) => {
+                    if node.status() == NodeStatus::Running {
+                        None
+                    } else {
+                        Some((node.id(), collect_metric(&mut node.babel_engine).await))
+                    }
+                }
             }
         })
         .collect();

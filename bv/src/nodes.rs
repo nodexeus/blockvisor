@@ -47,10 +47,24 @@ pub enum ServiceStatus {
     Disabled,
 }
 
+/// Container with some shallow information about the node
+///
+/// This information is [mostly] immutable, and we can cache it for
+/// easier access in case some node is locked and we cannot access
+/// it's actual data right away
+#[derive(Clone, Debug)]
+pub struct NodeDataCache {
+    pub name: String,
+    pub image: NodeImage,
+    pub ip: String,
+    pub gateway: String,
+}
+
 #[derive(Debug)]
 pub struct Nodes<P: Pal + Debug> {
     api_config: SharedConfig,
     pub nodes: RwLock<HashMap<Uuid, RwLock<Node<P>>>>,
+    node_data_cache: RwLock<HashMap<Uuid, NodeDataCache>>,
     node_ids: RwLock<HashMap<String, Uuid>>,
     data: RwLock<CommonData>,
     pal: Arc<P>,
@@ -102,6 +116,13 @@ impl<P: Pal + Debug> Nodes<P> {
 
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
+        let node_data_cache = NodeDataCache {
+            name: name.clone(),
+            image: image.clone(),
+            ip: network_interface.ip().to_string(),
+            gateway: network_interface.gateway().to_string(),
+        };
+
         let node_data = NodeData {
             id,
             name: name.clone(),
@@ -117,6 +138,10 @@ impl<P: Pal + Debug> Nodes<P> {
         let node = Node::create(self.pal.clone(), node_data).await?;
         self.nodes.write().await.insert(id, RwLock::new(node));
         self.node_ids.write().await.insert(name, id);
+        self.node_data_cache
+            .write()
+            .await
+            .insert(id, node_data_cache);
         debug!("Node with id `{}` created", id);
 
         Ok(())
@@ -156,6 +181,11 @@ impl<P: Pal + Debug> Nodes<P> {
             node.upgrade(&image).await?;
             debug!("Node upgraded");
 
+            let mut cache = self.node_data_cache.write().await;
+            cache.entry(id).and_modify(|data| {
+                data.image = image;
+            });
+
             if need_to_restart {
                 self.node_start(&mut node).await?;
             }
@@ -187,6 +217,7 @@ impl<P: Pal + Debug> Nodes<P> {
         if let Some(node_lock) = self.nodes.write().await.remove(&id) {
             let node = node_lock.into_inner();
             self.node_ids.write().await.remove(&node.data.name);
+            self.node_data_cache.write().await.remove(&id);
             node.delete().await?;
             debug!("Node deleted");
         }
@@ -354,6 +385,18 @@ impl<P: Pal + Debug> Nodes<P> {
         Ok(node.data.image.clone())
     }
 
+    pub async fn node_data_cache(&self, id: Uuid) -> Result<NodeDataCache> {
+        let cache = self
+            .node_data_cache
+            .read()
+            .await
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| id_not_found(id))?;
+
+        Ok(cache)
+    }
+
     #[instrument(skip(self))]
     pub async fn recover(&self) -> Result<()> {
         let nodes_lock = self.nodes.read().await;
@@ -481,13 +524,15 @@ impl<P: Pal + Debug> Nodes<P> {
         let pal = Arc::new(pal);
         Ok(if registry_path.exists() {
             let data = Self::load_data(&registry_path).await?;
-            let (nodes, node_ids) = Self::load_nodes(pal.clone(), &registry_dir).await?;
+            let (nodes, node_ids, node_data_cache) =
+                Self::load_nodes(pal.clone(), &registry_dir).await?;
 
             Self {
                 api_config,
                 data: RwLock::new(data),
                 nodes: RwLock::new(nodes),
                 node_ids: RwLock::new(node_ids),
+                node_data_cache: RwLock::new(node_data_cache),
                 pal,
             }
         } else {
@@ -496,6 +541,7 @@ impl<P: Pal + Debug> Nodes<P> {
                 data: RwLock::new(CommonData { machine_index: 0 }),
                 nodes: Default::default(),
                 node_ids: Default::default(),
+                node_data_cache: Default::default(),
                 pal,
             };
             nodes.save().await?;
@@ -517,10 +563,15 @@ impl<P: Pal + Debug> Nodes<P> {
     async fn load_nodes(
         pal: Arc<P>,
         registry_dir: &Path,
-    ) -> Result<(HashMap<Uuid, RwLock<Node<P>>>, HashMap<String, Uuid>)> {
+    ) -> Result<(
+        HashMap<Uuid, RwLock<Node<P>>>,
+        HashMap<String, Uuid>,
+        HashMap<Uuid, NodeDataCache>,
+    )> {
         info!("Reading nodes config dir: {}", registry_dir.display());
         let mut nodes = HashMap::new();
         let mut node_ids = HashMap::new();
+        let mut node_data_cache = HashMap::new();
         let mut dir = read_dir(registry_dir)
             .await
             .context("failed to read nodes registry dir")?;
@@ -535,8 +586,19 @@ impl<P: Pal + Debug> Nodes<P> {
                 .await
             {
                 Ok(node) => {
-                    node_ids.insert(node.data.name.clone(), node.id());
-                    nodes.insert(node.data.id, RwLock::new(node));
+                    let id = node.id();
+                    let name = &node.data.name;
+                    node_ids.insert(name.clone(), id);
+                    node_data_cache.insert(
+                        id,
+                        NodeDataCache {
+                            name: name.clone(),
+                            ip: node.data.network_interface.ip().to_string(),
+                            gateway: node.data.network_interface.gateway().to_string(),
+                            image: node.data.image.clone(),
+                        },
+                    );
+                    nodes.insert(id, RwLock::new(node));
                 }
                 Err(e) => {
                     // blockvisord should not bail on problems with individual node files.
@@ -545,7 +607,7 @@ impl<P: Pal + Debug> Nodes<P> {
                 }
             };
         }
-        Ok((nodes, node_ids))
+        Ok((nodes, node_ids, node_data_cache))
     }
 
     async fn save(&self) -> Result<()> {
