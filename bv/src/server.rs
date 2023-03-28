@@ -182,21 +182,35 @@ where
         status_check().await?;
         let nodes_lock = self.nodes.nodes.read().await;
         let mut nodes = vec![];
-        for node in nodes_lock.values() {
-            let node = node.read().await;
-            let status = match node.status() {
-                NodeStatus::Running => bv_pb::NodeStatus::Running,
-                NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
-                NodeStatus::Failed => bv_pb::NodeStatus::Failed,
-            };
-            let image: bv_pb::NodeImage = node.data.image.clone().into();
-            let n = bv_pb::Node {
-                id: node.data.id.to_string(),
-                name: node.data.name.clone(),
-                image: Some(image),
-                status: status.into(),
-                ip: node.data.network_interface.ip().to_string(),
-                gateway: node.data.network_interface.gateway().to_string(),
+        for (id, node_lock) in nodes_lock.iter() {
+            let n = if let Ok(node) = node_lock.try_read() {
+                let status = match node.status() {
+                    NodeStatus::Running => bv_pb::NodeStatus::Running,
+                    NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
+                    NodeStatus::Failed => bv_pb::NodeStatus::Failed,
+                };
+                bv_pb::Node {
+                    id: node.data.id.to_string(),
+                    name: node.data.name.clone(),
+                    image: Some(node.data.image.clone().into()),
+                    status: status.into(),
+                    ip: node.data.network_interface.ip().to_string(),
+                    gateway: node.data.network_interface.gateway().to_string(),
+                }
+            } else {
+                let cache = self
+                    .nodes
+                    .node_data_cache(*id)
+                    .await
+                    .map_err(|e| Status::unknown(e.to_string()))?;
+                bv_pb::Node {
+                    id: id.to_string(),
+                    name: cache.name,
+                    image: Some(cache.image.into()),
+                    status: bv_pb::NodeStatus::Busy.into(),
+                    ip: cache.ip,
+                    gateway: cache.gateway,
+                }
             };
             nodes.push(n);
         }

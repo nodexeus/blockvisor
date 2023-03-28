@@ -7,6 +7,7 @@ enum NodeStatus {
     Running = 1;
     Stopped = 2;
     Failed = 3;
+    Busy = 4;
 }
 
 message NodeImage {
