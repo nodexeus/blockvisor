@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, SharedConfig, CONFIG_PATH},
-    hosts,
+    hosts::{self, HostMetrics},
     node_data::NodeStatus,
     node_metrics,
     nodes::Nodes,
@@ -317,12 +317,13 @@ where
         let mut timer = tokio::time::interval(hosts::COLLECT_INTERVAL);
         while run.load() {
             run.select(timer.tick()).await;
-            match hosts::get_host_metrics() {
+            match HostMetrics::collect() {
                 Ok(metrics) => {
                     let mut client = api::MetricsClient::with_auth(
                         Self::wait_for_channel(run.clone(), endpoint).await?,
                         api::AuthToken(config.read().await.token),
                     );
+                    metrics.set_all_gauges();
                     let metrics = pb::HostMetricsRequest::new(host_id.clone(), metrics);
                     if let Err(e) = client.host(metrics).await {
                         error!("Could not send host metrics! `{e}`");
