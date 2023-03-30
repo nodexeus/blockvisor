@@ -3,7 +3,7 @@ use blockvisord::config::SharedConfig;
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::{Config, CONFIG_PATH},
-    hosts::{get_host_info, HostMetrics},
+    hosts::{HostInfo, HostMetrics},
     linux_platform::bv_root,
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
@@ -116,23 +116,19 @@ async fn is_running(url: String) -> Result<bool> {
 }
 
 async fn process_host_command(command: HostCommand) -> Result<()> {
+    let to_gb = |n| n as f64 / 1_000_000_000.0;
     match command {
         HostCommand::Info => {
-            let info = get_host_info();
-            let to_gb = |opt: Option<_>| {
-                opt.map(|n| (n as f64 / 1_000_000_000.0).to_string())
-                    .unwrap_or_else(|| "-".to_string())
-            };
-            println!("Hostname:       {:>10}", fmt_opt(info.name));
-            println!("OS name:        {:>10}", fmt_opt(info.os));
-            println!("OS version:     {:>10}", fmt_opt(info.os_version));
-            println!("CPU count:      {:>10}", fmt_opt(info.cpu_count));
+            let info = HostInfo::collect()?;
+            println!("Hostname:       {:>10}", info.name);
+            println!("OS name:        {:>10}", info.os);
+            println!("OS version:     {:>10}", info.os_version);
+            println!("CPU count:      {:>10}", info.cpu_count);
             println!("Total mem:      {:>10.3} GB", to_gb(info.mem_size));
             println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
         }
         HostCommand::Metrics => {
             let metrics = HostMetrics::collect()?;
-            let to_gb = |n| n as f64 / 1_000_000_000.0;
             println!("Used cpu:       {:>10} %", metrics.used_cpu);
             println!("Used mem:       {:>10.3} GB", to_gb(metrics.used_memory));
             println!(

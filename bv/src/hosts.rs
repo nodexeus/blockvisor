@@ -1,5 +1,5 @@
 use crate::services::api::pb;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use metrics::{register_gauge, Gauge};
 use std::collections::HashMap;
 use sysinfo::{CpuExt, DiskExt, NetworkExt, NetworksExt, System, SystemExt};
@@ -22,30 +22,41 @@ lazy_static::lazy_static! {
 
 #[derive(Debug)]
 pub struct HostInfo {
-    pub name: Option<String>,
-    pub cpu_count: Option<i64>, // because postgres does not have unsigned
-    pub mem_size: Option<i64>,
-    pub disk_size: Option<i64>,
-    pub os: Option<String>,
-    pub os_version: Option<String>,
+    pub name: String,
+    pub cpu_count: usize,
+    pub mem_size: u64,
+    pub disk_size: u64,
+    pub os: String,
+    pub os_version: String,
 }
 
-pub fn get_host_info() -> HostInfo {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+impl HostInfo {
+    pub fn collect() -> Result<Self> {
+        let mut sys = System::new_all();
+        sys.refresh_all();
 
-    let disk_size = sys
-        .disks()
-        .iter()
-        .fold(0, |acc, disk| acc + disk.total_space());
+        let disk_size = sys
+            .disks()
+            .iter()
+            .filter(|disk| disk.name() != "overlay")
+            .fold(0, |acc, disk| acc + disk.total_space());
 
-    HostInfo {
-        name: sys.host_name(),
-        cpu_count: sys.physical_core_count().map(|x| x as i64),
-        mem_size: Some(sys.total_memory() as i64),
-        disk_size: Some(disk_size as i64),
-        os: sys.name(),
-        os_version: sys.os_version(),
+        let info = Self {
+            name: sys
+                .host_name()
+                .ok_or_else(|| anyhow!("Cannot get host name"))?,
+            cpu_count: sys
+                .physical_core_count()
+                .ok_or_else(|| anyhow!("Cannot get cpu count"))?,
+            mem_size: sys.total_memory(),
+            disk_size,
+            os: sys.name().ok_or_else(|| anyhow!("Cannot get OS name"))?,
+            os_version: sys
+                .os_version()
+                .ok_or_else(|| anyhow!("Cannot get OS version"))?,
+        };
+
+        Ok(info)
     }
 }
 
@@ -93,9 +104,10 @@ impl HostMetrics {
             used_disk_space: sys
                 .disks()
                 .iter()
-                // TODO: this includes all drives, we need to figure out which drives we should count
+                // TODO: this includes almost all drives, we need to figure out which drives we should count
                 // here and which ones we need to skip. Loopback devices should probably be skipped for
                 // example.
+                .filter(|disk| disk.name() != "overlay")
                 .map(|d| d.total_space() - d.available_space())
                 .sum(),
             load_one: load.one,

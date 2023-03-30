@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use blockvisord::config::SharedConfig;
 use blockvisord::{
-    config, config::Config, hosts::get_host_info, linux_platform::bv_root, self_updater,
+    config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
     services::api::pb,
 };
 use clap::{crate_version, ArgGroup, Parser};
@@ -65,31 +65,19 @@ async fn main() -> Result<()> {
         println!("Provision and init blockvisor configuration");
 
         let ip = get_ip_address(&cmd_args.ifa).with_context(|| "failed to get ip address")?;
-        let host_info = get_host_info();
+        let host_info = HostInfo::collect()?;
 
         let create = pb::ProvisionHostRequest {
             request_id: Uuid::new_v4().to_string(),
             otp: cmd_args.otp.unwrap(),
             status: pb::ConnectionStatus::Online.into(),
-            name: host_info
-                .name
-                .ok_or_else(|| anyhow!("host_info.name is required sadly, sort it out"))?,
+            name: host_info.name,
             version: crate_version!().to_string(),
-            cpu_count: host_info
-                .cpu_count
-                .ok_or_else(|| anyhow!("host_info.cpu_count is required sadly, sort it out"))?,
-            mem_size_bytes: host_info
-                .mem_size
-                .ok_or_else(|| anyhow!("host_info.mem_size is required sadly, sort it out"))?,
-            disk_size_bytes: host_info
-                .disk_size
-                .ok_or_else(|| anyhow!("host_info.disk_size is required sadly, sort it out"))?,
-            os: host_info
-                .os
-                .ok_or_else(|| anyhow!("host_info.os is required sadly, sort it out"))?,
-            os_version: host_info
-                .os_version
-                .ok_or_else(|| anyhow!("host_info.os_version is required sadly, sort it out"))?,
+            cpu_count: host_info.cpu_count as i64,
+            mem_size_bytes: host_info.mem_size as i64,
+            disk_size_bytes: host_info.disk_size as i64,
+            os: host_info.os,
+            os_version: host_info.os_version,
             ip,
         };
 
