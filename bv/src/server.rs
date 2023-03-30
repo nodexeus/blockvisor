@@ -9,6 +9,7 @@ use crate::{
     nodes::Nodes,
     set_bv_status,
 };
+use chrono::Utc;
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -196,6 +197,10 @@ where
                     status: status.into(),
                     ip: node.data.network_interface.ip().to_string(),
                     gateway: node.data.network_interface.gateway().to_string(),
+                    uptime: node
+                        .data
+                        .started_at
+                        .map(|dt| Utc::now().signed_duration_since(dt).num_seconds()),
                 }
             } else {
                 let cache = self
@@ -210,6 +215,9 @@ where
                     status: bv_pb::NodeStatus::Busy.into(),
                     ip: cache.ip,
                     gateway: cache.gateway,
+                    uptime: cache
+                        .started_at
+                        .map(|dt| Utc::now().signed_duration_since(dt).num_seconds()),
                 }
             };
             nodes.push(n);

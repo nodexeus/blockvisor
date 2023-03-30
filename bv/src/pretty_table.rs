@@ -30,6 +30,8 @@ pub struct PrettyTableRow {
     pub status: bv_pb::NodeStatus,
     #[table(title = "IP Address", color = "Yellow")]
     pub ip: String,
+    #[table(title = "Uptime (s)")]
+    pub uptime: String,
 }
 
 /// Converts into a [`cli_table::TableStruct`] table that could be displayed on command line

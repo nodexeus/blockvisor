@@ -10,6 +10,7 @@ use crate::{
 
 use anyhow::{bail, Context, Result};
 use babel_api::config::firewall;
+use chrono::{DateTime, Utc};
 use firec::{config::JailerMode, Machine};
 use std::{
     ffi::OsStr,
@@ -218,6 +219,11 @@ impl<P: Pal + Debug> Node<P> {
 
     pub async fn set_expected_status(&mut self, status: NodeStatus) -> Result<()> {
         self.data.expected_status = status;
+        self.data.save(&self.paths.registry).await
+    }
+
+    pub async fn set_started_at(&mut self, started_at: Option<DateTime<Utc>>) -> Result<()> {
+        self.data.started_at = started_at;
         self.data.save(&self.paths.registry).await
     }
 

@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use babel_api::config::{firewall, Babel, Entrypoint};
+use chrono::{DateTime, Utc};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -58,6 +59,7 @@ pub struct NodeDataCache {
     pub image: NodeImage,
     pub ip: String,
     pub gateway: String,
+    pub started_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug)]
@@ -121,6 +123,7 @@ impl<P: Pal + Debug> Nodes<P> {
             image: image.clone(),
             ip: network_interface.ip().to_string(),
             gateway: network_interface.gateway().to_string(),
+            started_at: None,
         };
 
         let node_data = NodeData {
@@ -128,6 +131,7 @@ impl<P: Pal + Debug> Nodes<P> {
             name: name.clone(),
             image,
             expected_status: NodeStatus::Stopped,
+            started_at: None,
             network_interface,
             babel_conf,
             self_update: false,
@@ -252,6 +256,7 @@ impl<P: Pal + Debug> Nodes<P> {
             node.babel_engine.init(secret_keys).await?;
             // We save the `running` status only after all of the previous steps have succeeded.
             node.set_expected_status(NodeStatus::Running).await?;
+            node.set_started_at(Some(Utc::now())).await?;
         }
         Ok(())
     }
@@ -360,6 +365,7 @@ impl<P: Pal + Debug> Nodes<P> {
             node.stop().await?;
             debug!("Node stopped");
             node.set_expected_status(NodeStatus::Stopped).await?;
+            node.set_started_at(None).await?;
         }
         Ok(())
     }
@@ -596,6 +602,7 @@ impl<P: Pal + Debug> Nodes<P> {
                             ip: node.data.network_interface.ip().to_string(),
                             gateway: node.data.network_interface.gateway().to_string(),
                             image: node.data.image.clone(),
+                            started_at: node.data.started_at,
                         },
                     );
                     nodes.insert(id, RwLock::new(node));
@@ -766,6 +773,7 @@ mod tests {
                 node_version: "".to_string(),
             },
             expected_status: NodeStatus::Stopped,
+            started_at: None,
             network_interface: linux_platform::LinuxNetInterface {
                 name: "".to_string(),
                 ip: IpAddr::from_str("1.1.1.1")?,

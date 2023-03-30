@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use babel_api::config::Babel;
+use chrono::serde::ts_seconds_option;
+use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,8 +41,10 @@ pub struct NodeData<N> {
     pub id: Uuid,
     pub name: String,
     pub expected_status: NodeStatus,
-    /// Whether or not this node should check for updates and then update itself. The default is
-    /// `false`.
+    #[serde(default, with = "ts_seconds_option")]
+    /// Time when node was started, None if node should not be running now
+    pub started_at: Option<DateTime<Utc>>,
+    /// Whether or not this node should check for updates and then update itself
     #[serde(default)]
     pub self_update: bool,
     pub image: NodeImage,
