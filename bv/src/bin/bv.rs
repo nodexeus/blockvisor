@@ -283,6 +283,7 @@ impl NodeClient {
                             image: fmt_opt(node.image),
                             status: bv_pb::NodeStatus::from_i32(node.status).unwrap(),
                             ip: node.ip,
+                            uptime: fmt_opt(node.uptime),
                         })
                     }
                     print_stdout(table.to_pretty_table())?;

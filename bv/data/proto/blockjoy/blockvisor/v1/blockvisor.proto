@@ -23,6 +23,7 @@ message Node {
     string ip = 4;
     string gateway = 5;
     NodeStatus status = 6;
+    optional int64 uptime = 7;
 }
 
 enum ServiceStatus {
