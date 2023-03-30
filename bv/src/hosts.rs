@@ -1,11 +1,24 @@
 use crate::services::api::pb;
 use anyhow::Result;
+use metrics::{register_gauge, Gauge};
 use std::collections::HashMap;
 use sysinfo::{CpuExt, DiskExt, NetworkExt, NetworksExt, System, SystemExt};
 use systemstat::{saturating_sub_bytes, Platform, System as System2};
 
 /// The interval by which we collect metrics from this host.
 pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+lazy_static::lazy_static! {
+    pub static ref SYSTEM_HOST_USED_CPU_GAUGE: Gauge = register_gauge!("system.host.used_cpu");
+    pub static ref SYSTEM_HOST_USED_MEMORY_GAUGE: Gauge = register_gauge!("system.host.used_memory");
+    pub static ref SYSTEM_HOST_USED_DISK_GAUGE: Gauge = register_gauge!("system.host.used_disk_space");
+    pub static ref SYSTEM_HOST_LOAD_ONE_GAUGE: Gauge = register_gauge!("system.host.load_one");
+    pub static ref SYSTEM_HOST_LOAD_FIVE_GAUGE: Gauge = register_gauge!("system.host.load_five");
+    pub static ref SYSTEM_HOST_LOAD_FIFTEEN_GAUGE: Gauge = register_gauge!("system.host.load_fifteen");
+    pub static ref SYSTEM_HOST_NETWORK_RX_GAUGE: Gauge = register_gauge!("system.host.network_received");
+    pub static ref SYSTEM_HOST_NETWORK_TX_GAUGE: Gauge = register_gauge!("system.host.network_sent");
+    pub static ref SYSTEM_HOST_UPTIME_GAUGE: Gauge = register_gauge!("system.host.uptime");
+}
 
 #[derive(Debug)]
 pub struct HostInfo {
@@ -49,40 +62,54 @@ pub struct HostMetrics {
     pub uptime: u64,
 }
 
-pub fn get_host_metrics() -> Result<HostMetrics> {
-    let mut sys = System::new_all();
-    // We need to refresh twice:
-    // https://docs.rs/sysinfo/latest/sysinfo/trait.CpuExt.html#tymethod.cpu_usage
-    sys.refresh_all();
-    sys.refresh_cpu_specifics(sysinfo::CpuRefreshKind::new().with_cpu_usage());
+impl HostMetrics {
+    pub fn set_all_gauges(&self) {
+        SYSTEM_HOST_USED_CPU_GAUGE.set(self.used_cpu as f64);
+        SYSTEM_HOST_USED_MEMORY_GAUGE.set(self.used_memory as f64);
+        SYSTEM_HOST_USED_DISK_GAUGE.set(self.used_disk_space as f64);
+        SYSTEM_HOST_LOAD_ONE_GAUGE.set(self.load_one);
+        SYSTEM_HOST_LOAD_FIVE_GAUGE.set(self.load_five);
+        SYSTEM_HOST_LOAD_FIFTEEN_GAUGE.set(self.load_fifteen);
+        SYSTEM_HOST_NETWORK_RX_GAUGE.set(self.network_received as f64);
+        SYSTEM_HOST_NETWORK_TX_GAUGE.set(self.network_sent as f64);
+        SYSTEM_HOST_UPTIME_GAUGE.set(self.uptime as f64);
+    }
 
-    // sysinfo produced wrong results, so let's try how this crate works
-    let sys2 = System2::new();
-    let mem = sys2.memory()?;
+    pub fn collect() -> Result<Self> {
+        let mut sys = System::new_all();
+        // We need to refresh twice:
+        // https://docs.rs/sysinfo/latest/sysinfo/trait.CpuExt.html#tymethod.cpu_usage
+        sys.refresh_all();
+        sys.refresh_cpu_specifics(sysinfo::CpuRefreshKind::new().with_cpu_usage());
 
-    let load = sys.load_average();
-    Ok(HostMetrics {
-        used_cpu: sys.global_cpu_info().cpu_usage() as u32,
-        used_memory: saturating_sub_bytes(mem.total, mem.free).as_u64(),
-        used_disk_space: sys
-            .disks()
-            .iter()
-            // TODO: this includes all drives, we need to figure out which drives we should count
-            // here and which ones we need to skip. Loopback devices should probably be skipped for
-            // example.
-            .map(|d| d.total_space() - d.available_space())
-            .sum(),
-        load_one: load.one,
-        load_five: load.five,
-        load_fifteen: load.fifteen,
-        network_received: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
-        network_sent: sys
-            .networks()
-            .iter()
-            .map(|(_, n)| n.total_transmitted())
-            .sum(),
-        uptime: sys.uptime(),
-    })
+        // sysinfo produced wrong results, so let's try how this crate works
+        let sys2 = System2::new();
+        let mem = sys2.memory()?;
+
+        let load = sys.load_average();
+        Ok(HostMetrics {
+            used_cpu: sys.global_cpu_info().cpu_usage() as u32,
+            used_memory: saturating_sub_bytes(mem.total, mem.free).as_u64(),
+            used_disk_space: sys
+                .disks()
+                .iter()
+                // TODO: this includes all drives, we need to figure out which drives we should count
+                // here and which ones we need to skip. Loopback devices should probably be skipped for
+                // example.
+                .map(|d| d.total_space() - d.available_space())
+                .sum(),
+            load_one: load.one,
+            load_five: load.five,
+            load_fifteen: load.fifteen,
+            network_received: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
+            network_sent: sys
+                .networks()
+                .iter()
+                .map(|(_, n)| n.total_transmitted())
+                .sum(),
+            uptime: sys.uptime(),
+        })
+    }
 }
 
 impl pb::HostMetricsRequest {
