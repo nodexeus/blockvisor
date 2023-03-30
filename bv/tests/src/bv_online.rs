@@ -30,7 +30,7 @@ fn test_bvup_unknown_otp() {
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Record not found"));
+        .stderr(predicate::str::contains("Missing valid token"));
 }
 
 #[tokio::test]
