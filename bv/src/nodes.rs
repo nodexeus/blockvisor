@@ -13,11 +13,10 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
-use crate::node::build_registry_dir;
 use crate::pal::{NetInterface, Pal};
 use crate::{
     config::SharedConfig,
-    node::Node,
+    node::{build_registry_dir, Node},
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
     node_metrics, render,
     services::{
@@ -403,13 +402,19 @@ impl<P: Pal + Debug> Nodes<P> {
         Ok(cache)
     }
 
+    /// Recovery helps nodes to achieve expected state,
+    /// in case of actual state and expected state do not match.
+    ///
+    /// There are several types of recovery:
+    /// - Node is stopped, but should be running - in that case we try to start the node
+    /// - Node is started, but should be stopped - stop the node
+    /// - Node is created, but data files are corrupted - recreate the node
     #[instrument(skip(self))]
     pub async fn recover(&self) -> Result<()> {
         let nodes_lock = self.nodes.read().await;
         let mut nodes_to_recreate = vec![];
-        for node_lock in nodes_lock.values() {
+        for (id, node_lock) in nodes_lock.iter() {
             if let Ok(mut node) = node_lock.try_write() {
-                let id = node.id();
                 if node.status() == NodeStatus::Failed
                     && node.expected_status() != NodeStatus::Failed
                 {
