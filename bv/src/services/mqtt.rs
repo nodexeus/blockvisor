@@ -67,7 +67,7 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
 
             // subscribe to host topic
             let host_topic = format!("/bv/hosts/{host_id}/#");
-            client.subscribe(host_topic, QoS::AtMostOnce).await?;
+            client.subscribe(host_topic, QoS::AtLeastOnce).await?;
 
             Ok(MqttStream {
                 event_loop: eventloop,
