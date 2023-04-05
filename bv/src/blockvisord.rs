@@ -12,7 +12,9 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
+use metrics::{register_counter, Counter};
 use metrics_exporter_prometheus::PrometheusBuilder;
+use std::time::Instant;
 use std::{collections::HashMap, fmt::Debug, net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::sync::watch::Sender;
 use tokio::{
@@ -27,6 +29,17 @@ use uuid::Uuid;
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const INFO_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
+
+lazy_static::lazy_static! {
+    pub static ref BV_HOST_METRICS_COUNTER: Counter = register_counter!("bv.periodic.host.metrics.calls");
+    pub static ref BV_HOST_METRICS_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.host.metrics.ms");
+    pub static ref BV_NODES_RECOVERY_COUNTER: Counter = register_counter!("bv.periodic.nodes.recovery.calls");
+    pub static ref BV_NODES_RECOVERY_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.nodes.recovery.ms");
+    pub static ref BV_NODES_METRICS_COUNTER: Counter = register_counter!("bv.periodic.nodes.metrics.calls");
+    pub static ref BV_NODES_METRICS_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.nodes.metrics.ms");
+    pub static ref BV_NODES_INFO_COUNTER: Counter = register_counter!("bv.periodic.nodes.info.calls");
+    pub static ref BV_NODES_INFO_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.nodes.info.ms");
+}
 
 pub struct BlockvisorD<P> {
     pal: P,
@@ -219,7 +232,10 @@ where
 
     async fn nodes_recovery(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
         while run.load() {
+            let now = Instant::now();
             let _ = nodes.recover().await;
+            BV_NODES_RECOVERY_COUNTER.increment(1);
+            BV_NODES_RECOVERY_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             run.select(sleep(RECOVERY_CHECK_INTERVAL)).await;
         }
     }
@@ -232,6 +248,7 @@ where
         while run.load() {
             run.select(timer.tick()).await;
 
+            let now = Instant::now();
             let mut updates = vec![];
             for node in nodes.nodes.read().await.values() {
                 if let Ok(mut node) = node.try_write() {
@@ -270,6 +287,8 @@ where
                     known_statuses.entry(node_id).or_insert(status);
                 }
             }
+            BV_NODES_INFO_COUNTER.increment(1);
+            BV_NODES_INFO_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
         }
     }
 
@@ -297,6 +316,7 @@ where
         let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
         while run.load() {
             run.select(timer.tick()).await;
+            let now = Instant::now();
             let metrics = node_metrics::collect_metrics(nodes.clone()).await;
             let mut client = api::MetricsClient::with_auth(
                 Self::wait_for_channel(run.clone(), endpoint).await?,
@@ -306,6 +326,8 @@ where
             if let Err(e) = client.node(metrics).await {
                 error!("Could not send node metrics! `{e}`");
             }
+            BV_NODES_METRICS_COUNTER.increment(1);
+            BV_NODES_METRICS_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
         }
         None
     }
@@ -319,6 +341,7 @@ where
         let mut timer = tokio::time::interval(hosts::COLLECT_INTERVAL);
         while run.load() {
             run.select(timer.tick()).await;
+            let now = Instant::now();
             match HostMetrics::collect() {
                 Ok(metrics) => {
                     let mut client = api::MetricsClient::with_auth(
@@ -335,6 +358,8 @@ where
                     error!("Could not collect host metrics! `{e}`");
                 }
             };
+            BV_HOST_METRICS_COUNTER.increment(1);
+            BV_HOST_METRICS_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
         }
         None
     }
