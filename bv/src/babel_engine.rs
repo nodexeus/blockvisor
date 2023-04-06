@@ -186,6 +186,7 @@ impl BabelEngine {
             })?
             .into_inner();
         value
+            .trim()
             .parse()
             .context(format!("Could not parse {name} response: {value}"))
     }
