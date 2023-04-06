@@ -5,7 +5,7 @@ use metrics::{register_counter, Counter};
 use reqwest::Url;
 use rumqttc::{AsyncClient, Event, EventLoop, Incoming, LastWill, MqttOptions, QoS};
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
 const ONLINE: &[u8] = "online".as_bytes();
 const OFFLINE: &[u8] = "offline".as_bytes();
@@ -87,11 +87,11 @@ impl pal::CommandsStream for MqttStream {
                 Ok(Some(p.payload.to_vec()))
             }
             Ok(Event::Incoming(i)) => {
-                info!("MQTT incoming = {i:?}");
+                debug!("MQTT incoming = {i:?}");
                 Ok(None)
             }
             Ok(Event::Outgoing(o)) => {
-                info!("MQTT outgoing = {o:?}");
+                debug!("MQTT outgoing = {o:?}");
                 Ok(None)
             }
             Err(e) => {
