@@ -171,6 +171,20 @@ async fn test_bv_service_e2e() {
         email.to_string(),
     );
 
+    println!("add blockchain");
+    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
+    let db_query = format!(
+        r#"INSERT INTO blockchains (name, status, supported_node_types) values ('Testing', 'production', '[{{"id": 3, "version": "0.0.3", "properties": [{{"name": "self-hosted", "default": "false", "ui_type": "switch", "disabled": true, "required": true}}]}}]');"#
+    );
+
+    Command::new("docker")
+        .args(&[
+            "compose", "run", "-it", "database", "psql", db_url, "-c", &db_query,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INSERT"));
+
     println!("create host provision");
     let mut client = ui_pb::host_provision_service_client::HostProvisionServiceClient::connect(url)
         .await
