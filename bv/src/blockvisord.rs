@@ -323,16 +323,21 @@ where
             run.select(timer.tick()).await;
             let now = Instant::now();
             let metrics = node_metrics::collect_metrics(nodes.clone()).await;
-            let mut client = api::MetricsClient::with_auth(
-                Self::wait_for_channel(run.clone(), endpoint).await?,
-                api::AuthToken(config.read().await.token),
-            );
-            let metrics: pb::NodeMetricsRequest = metrics.into();
-            if let Err(e) = client.node(metrics).await {
-                error!("Could not send node metrics! `{e}`");
+            // do not bother api with empty updates
+            if metrics.has_some() {
+                let mut client = api::MetricsClient::with_auth(
+                    Self::wait_for_channel(run.clone(), endpoint).await?,
+                    api::AuthToken(config.read().await.token),
+                );
+                let metrics: pb::NodeMetricsRequest = metrics.into();
+                if let Err(e) = client.node(metrics).await {
+                    error!("Could not send node metrics! `{e}`");
+                }
+                BV_NODES_METRICS_COUNTER.increment(1);
+                BV_NODES_METRICS_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
+            } else {
+                info!("No metrics collected");
             }
-            BV_NODES_METRICS_COUNTER.increment(1);
-            BV_NODES_METRICS_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
         }
         None
     }
