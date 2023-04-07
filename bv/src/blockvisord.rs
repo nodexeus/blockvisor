@@ -252,8 +252,13 @@ where
             let mut updates = vec![];
             for node in nodes.nodes.read().await.values() {
                 if let Ok(mut node) = node.try_write() {
-                    let address = node.babel_engine.address().await.ok();
-                    updates.push((node.id(), address, node.status()));
+                    let status = node.status();
+                    let maybe_address = if status == NodeStatus::Running {
+                        node.babel_engine.address().await.ok()
+                    } else {
+                        None
+                    };
+                    updates.push((node.id(), maybe_address, status));
                 }
             }
 
