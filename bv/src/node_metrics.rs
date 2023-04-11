@@ -35,10 +35,6 @@ pub struct Metric {
 
 impl Metrics {
     pub fn has_some(&self) -> bool {
-        if self.0.is_empty() {
-            return false;
-        }
-
         self.0.values().any(|m| {
             m.height.is_some()
                 || m.block_age.is_some()
@@ -147,17 +143,34 @@ impl From<Metrics> for pb::NodeMetricsRequest {
             .into_iter()
             .map(|(k, v)| {
                 let application_status = v.application_status.and_then(|s| {
+                    // TODO: maybe we need to do something smarter here
+                    // to conform with new proto definitions
                     ApplicationStatus::from_str_name(&s)
+                        .or_else(|| {
+                            ApplicationStatus::from_str_name(&format!(
+                                "APPLICATION_STATUS_{}",
+                                s.to_uppercase()
+                            ))
+                        })
                         .ok_or_else(|| warn!("Could not parse `{s}` as application status"))
                         .ok()
                 });
                 let sync_status = v.sync_status.and_then(|s| {
                     SyncStatus::from_str_name(&s)
+                        .or_else(|| {
+                            SyncStatus::from_str_name(&format!("SYNC_STATUS_{}", s.to_uppercase()))
+                        })
                         .ok_or_else(|| warn!("Could not parse `{s}` as sync status"))
                         .ok()
                 });
                 let staking_status = v.staking_status.and_then(|s| {
                     StakingStatus::from_str_name(&s)
+                        .or_else(|| {
+                            StakingStatus::from_str_name(&format!(
+                                "STAKING_STATUS_{}",
+                                s.to_uppercase()
+                            ))
+                        })
                         .ok_or_else(|| warn!("Could not parse `{s}` as staking status"))
                         .ok()
                 });
