@@ -33,6 +33,23 @@ pub struct Metric {
     pub sync_status: Option<String>,
 }
 
+impl Metrics {
+    pub fn has_some(&self) -> bool {
+        if self.0.is_empty() {
+            return false;
+        }
+
+        self.0.values().any(|m| {
+            m.height.is_some()
+                || m.block_age.is_some()
+                || m.staking_status.is_some()
+                || m.consensus.is_some()
+                || m.application_status.is_some()
+                || m.sync_status.is_some()
+        })
+    }
+}
+
 /// Given a list of nodes, returns for each node their metric. It does this concurrently for each
 /// running node, but queries the different metrics sequentially for a given node. Normally this would not
 /// be efficient, but since we are dealing with a virtual socket the latency is very low, in the
