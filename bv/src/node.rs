@@ -231,8 +231,10 @@ impl<P: Pal + Debug> Node<P> {
         with_retry!(babelsup_client.setup_supervisor(supervisor_config.clone()))?;
         Self::check_job_runner(&mut self.babel_engine.node_conn, self.pal.job_runner_path())
             .await?;
+
+        // setup babel
         let babel_client = self.babel_engine.node_conn.babel_client().await?;
-        babel_client
+        match babel_client
             .setup_babel(BabelConfig {
                 data_directory_mount_point: self
                     .data
@@ -242,12 +244,20 @@ impl<P: Pal + Debug> Node<P> {
                     .clone(),
                 log_buffer_capacity_ln: self.data.babel_conf.supervisor.log_buffer_capacity_ln,
             })
-            .await?;
+            .await
+        {
+            Ok(_) => {}
+            Err(e) if e.code() == tonic::Code::AlreadyExists => {}
+            Err(e) => bail!(e),
+        }
+
+        // setup firewall
         let mut firewall_config = self.data.babel_conf.firewall.clone().unwrap_or_default();
         if let Some(mut rules) = self.data.firewall_rules.clone() {
             firewall_config.rules.append(&mut rules);
         }
         with_retry!(babel_client.setup_firewall(firewall_config.clone()))?;
+
         Ok(())
     }
 
