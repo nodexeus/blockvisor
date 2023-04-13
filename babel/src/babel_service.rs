@@ -4,6 +4,7 @@ use babel_api::{
     config::{BabelConfig, JobConfig, JobStatus},
     BlockchainKey,
 };
+use bv_utils::cmd::run_cmd;
 use eyre::{bail, eyre, Report, Result};
 use serde_json::json;
 use std::{
@@ -89,12 +90,24 @@ impl<J, M> Deref for BabelService<J, M> {
 impl<J: JobsManagerClient + Sync + Send + 'static, M: MountDataDrive + Sync + Send + 'static>
     babel_api::babel_server::Babel for BabelService<J, M>
 {
-    async fn setup_babel(&self, request: Request<BabelConfig>) -> Result<Response<()>, Status> {
+    async fn setup_babel(
+        &self,
+        request: Request<(Option<String>, BabelConfig)>,
+    ) -> Result<Response<()>, Status> {
         let mut status = self.status.lock().await;
         if let BabelStatus::Uninitialized(_) = status.deref() {
-            let config = request.into_inner();
+            let (hostname, config) = request.into_inner();
 
             self.save_babel_conf(&config).await?;
+
+            // set hostname
+            if let Some(name) = hostname {
+                run_cmd("hostnamectl", ["set-hostname", &name])
+                    .await
+                    .map_err(|err| {
+                        Status::internal(format!("failed to setup hostname with: {err}"))
+                    })?;
+            }
 
             // mount data drive
             self.mnt
@@ -873,10 +886,13 @@ mod tests {
 
         test_env
             .client
-            .setup_babel(BabelConfig {
-                data_directory_mount_point: "".to_string(),
-                log_buffer_capacity_ln: 10,
-            })
+            .setup_babel((
+                None,
+                BabelConfig {
+                    data_directory_mount_point: "".to_string(),
+                    log_buffer_capacity_ln: 10,
+                },
+            ))
             .await?;
         let logs_tx = test_env.logs_rx.await?;
         logs_tx

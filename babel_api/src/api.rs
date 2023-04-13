@@ -44,8 +44,8 @@ pub enum Binary {
 
 #[tonic_rpc::tonic_rpc(bincode)]
 pub trait Babel {
-    /// Initial Babel setup that must be run on node startup Mount data directory.
-    fn setup_babel(config: BabelConfig);
+    /// Initial Babel and VM setup that must be run on node startup.
+    fn setup_babel(hostname: Option<String>, config: BabelConfig);
     /// Setup firewall according to given configuration.
     fn setup_firewall(config: config::firewall::Config);
     /// Download key files from locations specified in `keys` section of Babel config.

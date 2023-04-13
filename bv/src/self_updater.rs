@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use bv_utils::{cmd::run_cmd, timer::AsyncTimer};
+use bv_utils::timer::AsyncTimer;
 use std::{
     cmp::Ordering,
     env,
@@ -181,7 +181,7 @@ mod tests {
     use super::*;
     use crate::utils::tests::test_channel;
     use assert_fs::TempDir;
-    use bv_utils::timer::MockAsyncTimer;
+    use bv_utils::{cmd::run_cmd, timer::MockAsyncTimer};
     use httpmock::prelude::GET;
     use httpmock::MockServer;
     use mockall::*;
