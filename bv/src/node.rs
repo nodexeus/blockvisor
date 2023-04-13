@@ -4,13 +4,14 @@ use crate::{
     node_data::{NodeData, NodeImage, NodeStatus},
     pal::{NetInterface, Pal},
     services::cookbook::CookbookService,
-    utils::{get_process_pid, run_cmd},
+    utils::get_process_pid,
     with_retry, BV_VAR_PATH,
 };
 use anyhow::{bail, Context, Result};
 use babel_api::config::{
     firewall, BabelConfig, Entrypoint, JobConfig, RestartConfig, RestartPolicy,
 };
+use bv_utils::cmd::run_cmd;
 use chrono::{DateTime, Utc};
 use firec::{config::JailerMode, Machine};
 use std::{

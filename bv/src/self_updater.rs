@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use bv_utils::timer::AsyncTimer;
+use bv_utils::{cmd::run_cmd, timer::AsyncTimer};
 use std::{
     cmp::Ordering,
     env,
@@ -306,7 +306,7 @@ mod tests {
                 .write_all(format!("#!/bin/sh\ntouch {ctrl_file_path}\n").as_bytes())
                 .await?;
 
-            utils::run_cmd(
+            run_cmd(
                 "tar",
                 [
                     OsStr::new("-C"),

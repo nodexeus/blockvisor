@@ -1,4 +1,5 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
+use bv_utils::cmd::run_cmd;
 use semver::Version;
 use std::cmp::Ordering;
 use std::ffi::OsStr;
@@ -7,10 +8,8 @@ use std::time::Duration;
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tokio::time::sleep;
-use tracing::log::warn;
-use tracing::{debug, info};
+use tracing::{debug, warn};
 
 #[macro_export]
 macro_rules! with_retry {
@@ -34,27 +33,6 @@ macro_rules! with_retry {
             }
         }
     }};
-}
-
-/// Runs the specified command and returns error on failure.
-pub async fn run_cmd<I, S>(cmd: &str, args: I) -> Result<()>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let mut cmd = Command::new(cmd);
-    cmd.args(args);
-    info!("Running command: `{:?}`", cmd);
-    match cmd
-        .status()
-        .await
-        .with_context(|| format!("Failed to run command `{cmd:?}`"))?
-        .code()
-    {
-        Some(code) if code != 0 => bail!("Command `{cmd:?}` failed with exit code {code}"),
-        Some(_) => Ok(()),
-        None => bail!("Command `{cmd:?}` failed with no exit code"),
-    }
 }
 
 /// Get the pid of the running VM process knowing its process name and part of command line.

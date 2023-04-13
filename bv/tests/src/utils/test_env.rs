@@ -10,10 +10,9 @@ use blockvisord::{
     config::Config,
     pal::{NetInterface, Pal},
     services::cookbook::IMAGES_DIR,
-    utils::run_cmd,
     BV_VAR_PATH,
 };
-use bv_utils::run_flag::RunFlag;
+use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
 use predicates::prelude::predicate;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;

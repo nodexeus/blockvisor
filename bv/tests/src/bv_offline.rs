@@ -15,7 +15,7 @@ use blockvisord::{
     services::{api, api::pb},
     set_bv_status, utils, BV_VAR_PATH,
 };
-use bv_utils::run_flag::RunFlag;
+use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
 use pb::node::ContainerStatus;
 use serde_json::json;
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -188,7 +188,7 @@ async fn test_bv_cmd_node_recovery() -> Result<()> {
 
     let process_id = utils::get_process_pid(FC_BIN_NAME, vm_id).unwrap();
     println!("impolitely kill node with process id {process_id}");
-    utils::run_cmd("kill", ["-9", &process_id.to_string()])
+    run_cmd("kill", ["-9", &process_id.to_string()])
         .await
         .unwrap();
     // wait until process is actually killed

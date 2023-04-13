@@ -11,8 +11,8 @@ use blockvisord::{
         bv_pb::{self, BlockchainRequestParams, Node, Parameter},
     },
     services::{api::pb, cookbook::CookbookService},
-    utils::run_cmd,
 };
+use bv_utils::cmd::run_cmd;
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
