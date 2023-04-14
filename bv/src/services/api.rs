@@ -102,8 +102,6 @@ impl CommandsService {
         host_id: &str,
         nodes: Arc<Nodes<P>>,
     ) -> Result<()> {
-        info!("Get and process pending commands");
-
         let commands = self.get_pending_commands(host_id).await?;
         self.process_commands(commands, nodes).await
     }
@@ -126,7 +124,7 @@ impl CommandsService {
         commands: Vec<pb::Command>,
         nodes: Arc<Nodes<P>>,
     ) -> Result<()> {
-        info!("Processing commands");
+        info!("Processing {} commands", commands.len());
 
         for command in commands {
             info!("Processing command: {command:?}");
