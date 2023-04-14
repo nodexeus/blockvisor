@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use babel::{
     babel_service,
-    babel_service::{BabelStatus, MountDataDrive, MountError},
+    babel_service::{BabelPal, BabelStatus, MountError},
     jobs::JOBS_DIR,
     jobs_manager, logging,
     logs_service::LogsService,
@@ -45,10 +45,10 @@ async fn main() -> eyre::Result<()> {
     let (client, manager) =
         jobs_manager::create(&JOBS_DIR, job_runner_lock.clone(), &JOB_RUNNER_BIN_PATH)?;
 
-    let mnt = Mnt;
+    let pal = Pal;
     let (logs_tx, logs_rx) = oneshot::channel();
     let status = if let Ok(config) = load_config().await {
-        match mnt
+        match pal
             .mount_data_drive(&config.data_directory_mount_point)
             .await
         {
@@ -70,7 +70,7 @@ async fn main() -> eyre::Result<()> {
         JOB_RUNNER_BIN_PATH.to_path_buf(),
         client,
         BABEL_CONFIG_PATH.to_path_buf(),
-        mnt,
+        pal,
         status,
     )
     .await?;
@@ -101,10 +101,10 @@ async fn main() -> eyre::Result<()> {
     Ok(res?)
 }
 
-struct Mnt;
+struct Pal;
 
 #[async_trait]
-impl babel_service::MountDataDrive for Mnt {
+impl babel_service::BabelPal for Pal {
     async fn mount_data_drive(
         &self,
         data_directory_mount_point: &str,
