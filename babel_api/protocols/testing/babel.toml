@@ -26,7 +26,7 @@ default_out = "allow"  #ufw default allow outgoing
     action = "allow"
     direction = "in"
     protocol = "udp"
-    ip = "192.168.0.1"
+    ips = "192.168.0.1"
     ports = [24567] #ufw allow in proto udp from 192.168.0.1 port 24567
 
 [requirements]
