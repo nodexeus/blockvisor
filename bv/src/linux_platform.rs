@@ -2,9 +2,9 @@ use crate::config::SharedConfig;
 /// Default Platform Abstraction Layer implementation for Linux.
 use crate::pal::{NetInterface, Pal};
 use crate::services;
-use crate::utils::run_cmd;
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
+use bv_utils::cmd::run_cmd;
 use core::fmt;
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};

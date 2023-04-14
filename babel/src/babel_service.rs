@@ -55,10 +55,11 @@ pub enum MountError {
     },
 }
 
-/// Trait that allows to inject custom mount implementation.
+/// Trait that allows to inject custom PAL implementation.
 #[async_trait]
-pub trait MountDataDrive {
+pub trait BabelPal {
     async fn mount_data_drive(&self, data_directory_mount_point: &str) -> Result<(), MountError>;
+    async fn set_hostname(&self, hostname: &str) -> Result<()>;
 }
 
 pub enum BabelStatus {
@@ -66,7 +67,7 @@ pub enum BabelStatus {
     Ready(LogsRx),
 }
 
-pub struct BabelService<J, M> {
+pub struct BabelService<J, P> {
     inner: reqwest::Client,
     status: Arc<Mutex<BabelStatus>>,
     job_runner_lock: JobRunnerLock,
@@ -74,10 +75,10 @@ pub struct BabelService<J, M> {
     /// jobs manager client used to work with jobs
     jobs_manager: J,
     babel_cfg_path: PathBuf,
-    mnt: M,
+    pal: P,
 }
 
-impl<J, M> Deref for BabelService<J, M> {
+impl<J, P> Deref for BabelService<J, P> {
     type Target = reqwest::Client;
 
     fn deref(&self) -> &Self::Target {
@@ -86,18 +87,25 @@ impl<J, M> Deref for BabelService<J, M> {
 }
 
 #[async_trait]
-impl<J: JobsManagerClient + Sync + Send + 'static, M: MountDataDrive + Sync + Send + 'static>
-    babel_api::babel_server::Babel for BabelService<J, M>
+impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + 'static>
+    babel_api::babel_server::Babel for BabelService<J, P>
 {
-    async fn setup_babel(&self, request: Request<BabelConfig>) -> Result<Response<()>, Status> {
+    async fn setup_babel(
+        &self,
+        request: Request<(String, BabelConfig)>,
+    ) -> Result<Response<()>, Status> {
         let mut status = self.status.lock().await;
         if let BabelStatus::Uninitialized(_) = status.deref() {
-            let config = request.into_inner();
+            let (hostname, config) = request.into_inner();
 
             self.save_babel_conf(&config).await?;
 
-            // mount data drive
-            self.mnt
+            self.pal
+                .set_hostname(&hostname)
+                .await
+                .map_err(|err| Status::internal(format!("failed to setup hostname with: {err}")))?;
+
+            self.pal
                 .mount_data_drive(&config.data_directory_mount_point)
                 .await
                 .map_err(|err| match err {
@@ -318,13 +326,13 @@ fn to_blockchain_err(err: eyre::Error) -> Status {
     Status::internal(err.to_string())
 }
 
-impl<J, M> BabelService<J, M> {
+impl<J, P> BabelService<J, P> {
     pub async fn new(
         job_runner_lock: JobRunnerLock,
         job_runner_bin_path: PathBuf,
         jobs_manager: J,
         babel_cfg_path: PathBuf,
-        mnt: M,
+        pal: P,
         status: BabelStatus,
     ) -> Result<Self> {
         let client = reqwest::Client::builder()
@@ -338,7 +346,7 @@ impl<J, M> BabelService<J, M> {
             job_runner_bin_path,
             jobs_manager,
             babel_cfg_path,
-            mnt,
+            pal,
         })
     }
 
@@ -446,13 +454,18 @@ mod tests {
         }
     }
 
-    struct DummyMnt;
+    struct DummyPal;
+
     #[async_trait]
-    impl MountDataDrive for DummyMnt {
+    impl BabelPal for DummyPal {
         async fn mount_data_drive(
             &self,
             _data_directory_mount_point: &str,
         ) -> Result<(), MountError> {
+            Ok(())
+        }
+
+        async fn set_hostname(&self, _hostname: &str) -> eyre::Result<()> {
             Ok(())
         }
     }
@@ -469,7 +482,7 @@ mod tests {
             job_runner_bin_path,
             MockJobsManager::new(),
             babel_cfg_path,
-            DummyMnt,
+            DummyPal,
             setup,
         )
         .await?;
@@ -531,7 +544,7 @@ mod tests {
         })
     }
 
-    async fn build_babel_service_with_defaults() -> Result<BabelService<MockJobsManager, DummyMnt>>
+    async fn build_babel_service_with_defaults() -> Result<BabelService<MockJobsManager, DummyPal>>
     {
         let (_tx, rx) = broadcast::channel(1);
         BabelService::new(
@@ -539,7 +552,7 @@ mod tests {
             Default::default(),
             MockJobsManager::new(),
             Default::default(),
-            DummyMnt,
+            DummyPal,
             BabelStatus::Ready(rx),
         )
         .await
@@ -827,7 +840,7 @@ mod tests {
             job_runner_bin_path,
             MockJobsManager::new(),
             Default::default(),
-            DummyMnt,
+            DummyPal,
             BabelStatus::Ready(rx),
         )
         .await?;
@@ -873,10 +886,13 @@ mod tests {
 
         test_env
             .client
-            .setup_babel(BabelConfig {
-                data_directory_mount_point: "".to_string(),
-                log_buffer_capacity_ln: 10,
-            })
+            .setup_babel((
+                "localhost".to_string(),
+                BabelConfig {
+                    data_directory_mount_point: "".to_string(),
+                    log_buffer_capacity_ln: 10,
+                },
+            ))
             .await?;
         let logs_tx = test_env.logs_rx.await?;
         logs_tx

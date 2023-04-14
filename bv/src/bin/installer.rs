@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use blockvisord::installer;
 use blockvisord::installer::Installer;
 use blockvisord::linux_platform::bv_root;
-use blockvisord::utils::run_cmd;
+use bv_utils::cmd::run_cmd;
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, FmtSubscriber};
 

@@ -181,7 +181,7 @@ mod tests {
     use super::*;
     use crate::utils::tests::test_channel;
     use assert_fs::TempDir;
-    use bv_utils::timer::MockAsyncTimer;
+    use bv_utils::{cmd::run_cmd, timer::MockAsyncTimer};
     use httpmock::prelude::GET;
     use httpmock::MockServer;
     use mockall::*;
@@ -306,7 +306,7 @@ mod tests {
                 .write_all(format!("#!/bin/sh\ntouch {ctrl_file_path}\n").as_bytes())
                 .await?;
 
-            utils::run_cmd(
+            run_cmd(
                 "tar",
                 [
                     OsStr::new("-C"),

@@ -4,13 +4,14 @@ use crate::{
     node_data::{NodeData, NodeImage, NodeStatus},
     pal::{NetInterface, Pal},
     services::cookbook::CookbookService,
-    utils::{get_process_pid, run_cmd},
+    utils::get_process_pid,
     with_retry, BV_VAR_PATH,
 };
 use anyhow::{bail, Context, Result};
 use babel_api::config::{
     firewall, BabelConfig, Entrypoint, JobConfig, RestartConfig, RestartPolicy,
 };
+use bv_utils::cmd::run_cmd;
 use chrono::{DateTime, Utc};
 use firec::{config::JailerMode, Machine};
 use std::{
@@ -212,10 +213,11 @@ impl<P: Pal + Debug> Node<P> {
             self.data.network_interface.remaster().await?;
             self.machine.start().await?;
         }
+        let id = self.id();
         self.babel_engine.node_conn = Self::connect(
             &self.paths.chroot,
             self.pal.babel_path(),
-            self.id(),
+            id,
             NODE_START_TIMEOUT,
         )
         .await?;
@@ -235,15 +237,18 @@ impl<P: Pal + Debug> Node<P> {
         // setup babel
         let babel_client = self.babel_engine.node_conn.babel_client().await?;
         match babel_client
-            .setup_babel(BabelConfig {
-                data_directory_mount_point: self
-                    .data
-                    .babel_conf
-                    .supervisor
-                    .data_directory_mount_point
-                    .clone(),
-                log_buffer_capacity_ln: self.data.babel_conf.supervisor.log_buffer_capacity_ln,
-            })
+            .setup_babel((
+                id.to_string(),
+                BabelConfig {
+                    data_directory_mount_point: self
+                        .data
+                        .babel_conf
+                        .supervisor
+                        .data_directory_mount_point
+                        .clone(),
+                    log_buffer_capacity_ln: self.data.babel_conf.supervisor.log_buffer_capacity_ln,
+                },
+            ))
             .await
         {
             Ok(_) => {}
