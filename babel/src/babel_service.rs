@@ -4,7 +4,6 @@ use babel_api::{
     config::{BabelConfig, JobConfig, JobStatus},
     BlockchainKey,
 };
-use bv_utils::cmd::run_cmd;
 use eyre::{bail, eyre, Report, Result};
 use serde_json::json;
 use std::{
@@ -60,6 +59,7 @@ pub enum MountError {
 #[async_trait]
 pub trait BabelPal {
     async fn mount_data_drive(&self, data_directory_mount_point: &str) -> Result<(), MountError>;
+    async fn set_hostname(&self, hostname: &str) -> Result<()>;
 }
 
 pub enum BabelStatus {
@@ -92,7 +92,7 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
 {
     async fn setup_babel(
         &self,
-        request: Request<(Option<String>, BabelConfig)>,
+        request: Request<(String, BabelConfig)>,
     ) -> Result<Response<()>, Status> {
         let mut status = self.status.lock().await;
         if let BabelStatus::Uninitialized(_) = status.deref() {
@@ -100,16 +100,11 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
 
             self.save_babel_conf(&config).await?;
 
-            // set hostname
-            if let Some(name) = hostname {
-                run_cmd("hostnamectl", ["set-hostname", &name])
-                    .await
-                    .map_err(|err| {
-                        Status::internal(format!("failed to setup hostname with: {err}"))
-                    })?;
-            }
+            self.pal
+                .set_hostname(&hostname)
+                .await
+                .map_err(|err| Status::internal(format!("failed to setup hostname with: {err}")))?;
 
-            // mount data drive
             self.pal
                 .mount_data_drive(&config.data_directory_mount_point)
                 .await
@@ -467,6 +462,10 @@ mod tests {
             &self,
             _data_directory_mount_point: &str,
         ) -> Result<(), MountError> {
+            Ok(())
+        }
+
+        async fn set_hostname(&self, _hostname: &str) -> eyre::Result<()> {
             Ok(())
         }
     }
@@ -888,7 +887,7 @@ mod tests {
         test_env
             .client
             .setup_babel((
-                None,
+                "localhost".to_string(),
                 BabelConfig {
                     data_directory_mount_point: "".to_string(),
                     log_buffer_capacity_ln: 10,

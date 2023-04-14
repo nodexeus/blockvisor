@@ -238,7 +238,7 @@ impl<P: Pal + Debug> Node<P> {
         let babel_client = self.babel_engine.node_conn.babel_client().await?;
         match babel_client
             .setup_babel((
-                Some(id.to_string()),
+                id.to_string(),
                 BabelConfig {
                     data_directory_mount_point: self
                         .data

@@ -8,7 +8,7 @@ use babel::{
     utils, BABEL_LOGS_UDS_PATH,
 };
 use babel_api::config::BabelConfig;
-use bv_utils::run_flag::RunFlag;
+use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
 use eyre::{anyhow, bail, Context};
 use std::{path::Path, sync::Arc};
 use tokio::{
@@ -133,6 +133,13 @@ impl babel_service::BabelPal for Pal {
                 out,
             }),
         }?;
+        Ok(())
+    }
+
+    async fn set_hostname(&self, hostname: &str) -> eyre::Result<()> {
+        run_cmd("hostnamectl", ["set-hostname", hostname])
+            .await
+            .map_err(|err| anyhow!("hostnamectl error: {err}"))?;
         Ok(())
     }
 }
