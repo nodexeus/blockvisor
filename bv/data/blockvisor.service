@@ -11,6 +11,7 @@ Environment="RUST_LOG=info,firec=trace"
 # User=blockvisor
 ExecStart=/usr/bin/blockvisord
 Restart=always
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
