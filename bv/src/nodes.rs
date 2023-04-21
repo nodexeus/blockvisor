@@ -240,7 +240,6 @@ impl<P: Pal + Debug> Nodes<P> {
         self.node_start(&mut node).await
     }
 
-    #[instrument(skip(self))]
     async fn node_start(&self, node: &mut Node<P>) -> Result<()> {
         if NodeStatus::Running != node.expected_status() {
             node.start().await?;
@@ -351,7 +350,6 @@ impl<P: Pal + Debug> Nodes<P> {
         self.node_stop(&mut node).await
     }
 
-    #[instrument(skip(self))]
     async fn node_stop(&self, node: &mut Node<P>) -> Result<()> {
         if NodeStatus::Stopped != node.expected_status() {
             node.stop().await?;
