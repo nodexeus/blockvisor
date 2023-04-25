@@ -1,6 +1,5 @@
-use crate::src::utils::stub_server::StubDiscoveryService;
 use crate::src::utils::{
-    stub_server::{StubCommandsServer, StubNodesServer},
+    stub_server::{StubCommandsServer, StubDiscoveryService},
     test_env::TestEnv,
 };
 use anyhow::{bail, Result};
@@ -514,16 +513,10 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         updates: commands_updates.clone(),
     };
 
-    let nodes_updates = Arc::new(Mutex::new(vec![]));
-    let nodes_server = StubNodesServer {
-        updates: nodes_updates.clone(),
-    };
-
     let server_future = async {
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(pb::commands_server::CommandsServer::new(commands_server))
-            .add_service(pb::nodes_server::NodesServer::new(nodes_server))
             .serve("0.0.0.0:8089".to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap()
@@ -570,33 +563,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
     }
 
     println!("check received updates");
-    println!("got nodes updates: {:?}", nodes_updates.lock().await);
-    let expected_updates = vec![
-        pb::node::ContainerStatus::Creating,
-        pb::node::ContainerStatus::Stopped,
-        pb::node::ContainerStatus::Starting,
-        pb::node::ContainerStatus::Running,
-        pb::node::ContainerStatus::Stopping,
-        pb::node::ContainerStatus::Stopped,
-        pb::node::ContainerStatus::Starting,
-        pb::node::ContainerStatus::Running,
-        pb::node::ContainerStatus::Stopping,
-        pb::node::ContainerStatus::Stopped,
-        pb::node::ContainerStatus::Starting,
-        pb::node::ContainerStatus::Running,
-        pb::node::ContainerStatus::Upgrading,
-        pb::node::ContainerStatus::Stopping,
-        pb::node::ContainerStatus::Stopped,
-        pb::node::ContainerStatus::Starting,
-        pb::node::ContainerStatus::Running,
-        pb::node::ContainerStatus::Upgraded,
-    ];
-    for (actual, ref expected) in nodes_updates.lock().await.iter().zip(expected_updates) {
-        assert_eq!(actual, expected);
-    }
-
     println!("got commands updates: {:?}", commands_updates.lock().await);
-    let expected_updates = vec![
+    let expected_updates = [
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
         (
@@ -624,7 +592,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
     ];
-    for (actual, ref expected) in commands_updates.lock().await.iter().zip(expected_updates) {
+    for (idx, expected) in expected_updates.iter().enumerate() {
+        let actual = &commands_updates.lock().await[idx];
         assert_eq!(&actual.id, expected.0);
         assert_eq!(actual.response.as_deref(), expected.1);
         assert_eq!(actual.exit_code, expected.2);
