@@ -1,5 +1,4 @@
-use blockvisord::services::api::pb::ServicesResponse;
-use blockvisord::services::api::pb::{self, UpdateNodeResponse};
+use blockvisord::services::api::pb::{self, ServicesResponse};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status};
@@ -50,42 +49,6 @@ impl pb::hosts_server::Hosts for StubHostsServer {
     }
 
     async fn create(&self, _: Request<pb::CreateHostRequest>) -> Result<pb::CreateHostResponse> {
-        unimplemented!("Sod off I'm just a test server")
-    }
-}
-
-pub struct StubNodesServer {
-    pub updates: Arc<Mutex<Vec<pb::node::ContainerStatus>>>,
-}
-
-#[tonic::async_trait]
-impl pb::nodes_server::Nodes for StubNodesServer {
-    async fn update(
-        &self,
-        request: Request<pb::UpdateNodeRequest>,
-    ) -> Result<pb::UpdateNodeResponse> {
-        let req = request.into_inner();
-        let status = req.container_status.unwrap();
-        self.updates
-            .lock()
-            .await
-            .push(pb::node::ContainerStatus::from_i32(status).unwrap());
-        Ok(Response::new(UpdateNodeResponse {}))
-    }
-
-    async fn get(&self, _: Request<pb::GetNodeRequest>) -> Result<pb::GetNodeResponse> {
-        unimplemented!("Sod off I'm just a test server")
-    }
-
-    async fn list(&self, _: Request<pb::ListNodesRequest>) -> Result<pb::ListNodesResponse> {
-        unimplemented!("Sod off I'm just a test server")
-    }
-
-    async fn create(&self, _: Request<pb::CreateNodeRequest>) -> Result<pb::CreateNodeResponse> {
-        unimplemented!("Sod off I'm just a test server")
-    }
-
-    async fn delete(&self, _: Request<pb::DeleteNodeRequest>) -> Result<pb::DeleteNodeResponse> {
         unimplemented!("Sod off I'm just a test server")
     }
 }
