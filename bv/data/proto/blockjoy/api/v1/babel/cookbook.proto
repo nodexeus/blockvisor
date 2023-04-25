@@ -114,10 +114,6 @@ service BundleService {
   rpc Retrieve(BundleIdentifier) returns (ArchiveLocation) {}
   /* List all available bundle versions */
   rpc ListBundleVersions(BundleVersionsRequest) returns (BundleVersionsResponse) {}
-  /* Promote/Demote bundle to the desired state */
-  rpc AddStage(BundleIdentifier) returns (google.protobuf.Empty) {}
-  /* Disable bundle in the desired state */
-  rpc RemoveStage(BundleIdentifier) returns (google.protobuf.Empty) {}
   /* Delete bundle from storage */
   rpc Delete(BundleIdentifier) returns (google.protobuf.Empty) {}
 }
