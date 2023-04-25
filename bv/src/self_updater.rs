@@ -205,16 +205,6 @@ mod tests {
                 &self,
                 request: tonic::Request<cb_pb::BundleVersionsRequest>,
             ) -> Result<tonic::Response<cb_pb::BundleVersionsResponse>, tonic::Status>;
-            /// Promote/Demote bundle to the desired state
-            async fn add_stage(
-                &self,
-                request: tonic::Request<cb_pb::BundleIdentifier>,
-            ) -> Result<tonic::Response<()>, tonic::Status>;
-            /// Disable configuration in the desired state
-            async fn remove_stage(
-                &self,
-                request: tonic::Request<cb_pb::BundleIdentifier>,
-            ) -> Result<tonic::Response<()>, tonic::Status>;
             /// Delete bundle from storage
             async fn delete(
                 &self,
