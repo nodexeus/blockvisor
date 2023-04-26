@@ -6,7 +6,6 @@ use crate::{
     nodes::Nodes,
     pal::Pal,
     server::bv_pb,
-    services::api::pb::ServicesResponse,
     {get_bv_status, with_retry},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -14,8 +13,8 @@ use babel_api::metadata::firewall;
 use base64::Engine;
 use metrics::{register_counter, Counter};
 use pb::{
-    commands_client::CommandsClient, discovery_client::DiscoveryClient, metrics_client,
-    node_command::Command, nodes_client,
+    commands_client::CommandsClient, discovery_client::DiscoveryClient, hosts_client::HostsClient,
+    metrics_client, node_command::Command, nodes_client,
 };
 use std::{
     fmt::Debug,
@@ -358,11 +357,42 @@ impl DiscoveryService {
     }
 
     #[instrument(skip(self))]
-    pub async fn get_services(&mut self) -> Result<ServicesResponse> {
+    pub async fn get_services(&mut self) -> Result<pb::ServicesResponse> {
         let request = pb::ServicesRequest {};
         Ok(self
             .client
             .services(with_auth(request, &self.token))
+            .await?
+            .into_inner())
+    }
+}
+
+pub struct HostsService {
+    token: String,
+    client: HostsClient<Channel>,
+}
+
+impl HostsService {
+    pub async fn connect(config: Config) -> Result<Self> {
+        let url = config.blockjoy_api_url;
+        let client = HostsClient::connect(url.clone())
+            .await
+            .with_context(|| format!("Failed to connect to host service at {url}"))?;
+
+        Ok(Self {
+            token: config.token,
+            client,
+        })
+    }
+
+    #[instrument(skip(self))]
+    pub async fn update(
+        &mut self,
+        request: pb::UpdateHostRequest,
+    ) -> Result<pb::UpdateHostResponse> {
+        Ok(self
+            .client
+            .update(with_auth(request, &self.token))
             .await?
             .into_inner())
     }

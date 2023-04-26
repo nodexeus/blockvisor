@@ -191,6 +191,10 @@ pub enum HostCommand {
     #[clap(alias = "i")]
     Info,
 
+    /// Update host system information record in API
+    #[clap(alias = "u")]
+    Update,
+
     /// Collect metrics about the current host
     #[clap(alias = "m")]
     Metrics,
