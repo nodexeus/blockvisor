@@ -495,15 +495,7 @@ impl<P: Pal + Debug> Node<P> {
         self.data.delete(&self.paths.registry).await
     }
 
-    pub async fn update(
-        &mut self,
-        self_update: Option<bool>,
-        rules: Vec<firewall::Rule>,
-    ) -> Result<()> {
-        // If the fields we receive are populated, we update the node data.
-        if let Some(self_update) = self_update {
-            self.data.self_update = self_update;
-        }
+    pub async fn update(&mut self, rules: Vec<firewall::Rule>) -> Result<()> {
         babel_api::metadata::check_firewall_rules(&rules)?;
         let mut firewall = self.metadata.firewall.clone();
         firewall.rules.append(&mut rules.clone());
