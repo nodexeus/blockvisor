@@ -293,11 +293,10 @@ async fn process_node_command<P: Pal + Debug>(
                 API_UPGRADE_COUNTER.increment(1);
                 API_UPGRADE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
-            Command::Update(pb::NodeUpdate { self_update, rules }) => {
+            Command::Update(pb::NodeUpdate { rules, .. }) => {
                 nodes
                     .update(
                         node_id,
-                        self_update,
                         rules
                             .into_iter()
                             .map(|rule| rule.try_into())

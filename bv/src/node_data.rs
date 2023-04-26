@@ -44,9 +44,6 @@ pub struct NodeData<N> {
     #[serde(default, with = "ts_seconds_option")]
     /// Time when node was started, None if node should not be running now
     pub started_at: Option<DateTime<Utc>>,
-    /// Whether or not this node should check for updates and then update itself
-    #[serde(default)]
-    pub self_update: bool,
     #[serde(default)]
     pub initialized: bool,
     pub image: NodeImage,

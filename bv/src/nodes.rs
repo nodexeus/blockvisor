@@ -133,7 +133,6 @@ impl<P: Pal + Debug> Nodes<P> {
             started_at: None,
             network_interface,
             requirements,
-            self_update: false,
             properties: config.properties,
             firewall_rules: config.rules,
             initialized: false,
@@ -266,19 +265,14 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn update(
-        &self,
-        id: Uuid,
-        self_update: Option<bool>,
-        rules: Vec<firewall::Rule>,
-    ) -> Result<()> {
+    pub async fn update(&self, id: Uuid, rules: Vec<firewall::Rule>) -> Result<()> {
         let nodes = self.nodes.read().await;
         let mut node = nodes
             .get(&id)
             .ok_or_else(|| id_not_found(id))?
             .write()
             .await;
-        node.update(self_update, rules).await
+        node.update(rules).await
     }
 
     #[instrument(skip(self))]
