@@ -10,7 +10,7 @@ use blockvisord::{
         bv_pb::blockvisor_client::BlockvisorClient,
         bv_pb::{self, Node, Parameter},
     },
-    services::{api::pb, cookbook::CookbookService},
+    services::cookbook::CookbookService,
 };
 use bv_utils::cmd::run_cmd;
 use clap::Parser;
@@ -37,40 +37,6 @@ async fn main() -> Result<()> {
     let bv_url = format!("http://localhost:{}", config.blockvisor_port);
 
     match args.command {
-        Command::Reset(cmd_args) => {
-            let confirm = ask_confirm(
-                "Are you sure you want to delete all nodes and remove the host from API?",
-                cmd_args.yes,
-            )?;
-
-            if confirm {
-                let mut service_client = BlockvisorClient::connect(bv_url).await?;
-                let nodes = service_client
-                    .get_nodes(bv_pb::GetNodesRequest {})
-                    .await?
-                    .into_inner()
-                    .nodes;
-                for node in nodes {
-                    let id = node.id;
-                    println!("Deleting node with ID `{id}`");
-                    service_client
-                        .delete_node(bv_pb::DeleteNodeRequest { id })
-                        .await?;
-                }
-
-                let url = config.blockjoy_api_url;
-                let host_id = config.id;
-
-                let delete = pb::DeleteHostRequest {
-                    id: host_id.clone(),
-                };
-                let mut client = pb::hosts_client::HostsClient::connect(url.clone()).await?;
-                println!("Deleting host `{host_id}` from API `{url}`");
-                client.delete(delete).await?;
-
-                Config::remove(&bv_root()).await?;
-            }
-        }
         Command::Start(_) => {
             if is_running(bv_url).await? {
                 println!("Service already running");

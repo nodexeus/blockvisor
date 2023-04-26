@@ -34,7 +34,7 @@ fn test_bv_service_restart_with_cli() {
 
 #[tokio::test]
 #[serial]
-async fn test_bvup_and_reset() {
+async fn test_bvup() {
     let server = StubHostsServer {};
 
     let server_future = async {
@@ -74,17 +74,6 @@ async fn test_bvup_and_reset() {
             ));
 
         assert!(Path::new(&config_path).exists());
-
-        println!("bv reset");
-        Command::cargo_bin("bv")
-            .unwrap()
-            .args(["reset", "--yes"])
-            .env("BV_ROOT", tmp_dir.as_os_str())
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Deleting host"));
-
-        assert!(!Path::new(&config_path).exists());
     })
     .await
     .unwrap();
