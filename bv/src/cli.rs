@@ -28,9 +28,6 @@ pub struct StatusArgs {}
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Completelly remove all nodes, configs and unregister the host from the API
-    Reset(ResetArgs),
-
     /// Start blockvisor service
     Start(StartArgs),
 
