@@ -231,6 +231,8 @@ async fn test_bv_service_e2e() {
             similarity: None,
             resource: pb::node_scheduler::ResourceAffinity::LeastResources.into(),
         }),
+        allow_ips: vec![],
+        deny_ips: vec![],
     };
     let resp: pb::CreateNodeResponse = node_client
         .create(with_auth(node_create, &auth_token, &refresh_token))

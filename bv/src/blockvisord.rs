@@ -285,6 +285,9 @@ where
                     address: address.clone(),
                     version: None,
                     self_update: None,
+                    // in current implementation it means do not update ips
+                    allow_ips: vec![],
+                    deny_ips: vec![],
                 };
                 update.set_container_status(container_status);
 
