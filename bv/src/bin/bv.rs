@@ -101,7 +101,6 @@ async fn process_host_command(config: Config, command: HostCommand) -> Result<()
                 id: config.id,
                 name: Some(info.name),
                 version: Some(crate_version!().to_string()),
-                location: None,
                 os: Some(info.os),
                 os_version: Some(info.os_version),
             };
