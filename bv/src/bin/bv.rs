@@ -10,10 +10,13 @@ use blockvisord::{
         bv_pb::blockvisor_client::BlockvisorClient,
         bv_pb::{self, Node, Parameter},
     },
-    services::cookbook::CookbookService,
+    services::{
+        api::{pb, HostsService},
+        cookbook::CookbookService,
+    },
 };
 use bv_utils::cmd::run_cmd;
-use clap::Parser;
+use clap::{crate_version, Parser};
 use cli_table::print_stdout;
 use petname::Petnames;
 use std::{collections::HashMap, io::BufRead};
@@ -59,7 +62,7 @@ async fn main() -> Result<()> {
                 println!("Service stopped");
             }
         }
-        Command::Host { command } => process_host_command(command).await?,
+        Command::Host { command } => process_host_command(config, command).await?,
         Command::Chain { command } => process_chain_command(command).await?,
         Command::Node { command } => {
             NodeClient::new(format!("http://localhost:{}", config.blockvisor_port))
@@ -79,7 +82,7 @@ async fn is_running(url: String) -> Result<bool> {
         .is_ok())
 }
 
-async fn process_host_command(command: HostCommand) -> Result<()> {
+async fn process_host_command(config: Config, command: HostCommand) -> Result<()> {
     let to_gb = |n| n as f64 / 1_000_000_000.0;
     match command {
         HostCommand::Info => {
@@ -90,6 +93,19 @@ async fn process_host_command(command: HostCommand) -> Result<()> {
             println!("CPU count:      {:>10}", info.cpu_count);
             println!("Total mem:      {:>10.3} GB", to_gb(info.mem_size));
             println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
+        }
+        HostCommand::Update => {
+            let info = HostInfo::collect()?;
+            let mut client = HostsService::connect(config.clone()).await?;
+            let update = pb::UpdateHostRequest {
+                id: config.id,
+                name: Some(info.name),
+                version: Some(crate_version!().to_string()),
+                location: None,
+                os: Some(info.os),
+                os_version: Some(info.os_version),
+            };
+            client.update(update).await?;
         }
         HostCommand::Metrics => {
             let metrics = HostMetrics::collect()?;
