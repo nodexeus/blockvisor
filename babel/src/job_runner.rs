@@ -7,8 +7,7 @@ use crate::{
     jobs,
     jobs::{CONFIG_SUBDIR, STATUS_SUBDIR},
     log_buffer::LogBuffer,
-    utils::LimitStatus,
-    utils::{kill_all_processes, Backoff},
+    utils::{self, Backoff, LimitStatus},
 };
 use babel_api::engine::{JobConfig, JobStatus, RestartConfig, RestartPolicy};
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
@@ -128,7 +127,8 @@ impl<T: AsyncTimer> JobRunner<T> {
     pub async fn run(mut self, mut run: RunFlag) {
         // Check if there are no remnant child process after previous run.
         // If so, just kill it.
-        kill_all_processes("sh", &["-c", &self.job_config.body]);
+        let (cmd, args) = utils::bv_shell(&self.job_config.body);
+        utils::kill_all_processes(&cmd, args);
         if let Err(status) = self.try_run_job(run.clone()).await {
             if let Err(err) =
                 jobs::save_status(&status, &self.name, &self.jobs_dir.join(STATUS_SUBDIR))
@@ -143,10 +143,9 @@ impl<T: AsyncTimer> JobRunner<T> {
     /// is stopped explicitly.  
     async fn try_run_job(&mut self, mut run: RunFlag) -> Result<(), JobStatus> {
         let job_name = &self.name;
-        let mut cmd = Command::new("sh");
-        cmd.args(["-c", &self.job_config.body])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        let (cmd, args) = utils::bv_shell(&self.job_config.body);
+        let mut cmd = Command::new(cmd);
+        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
         let mut backoff = JobBackoff::new(&self.timer, run.clone(), &self.job_config.restart);
         while run.load() {
             backoff.start();
