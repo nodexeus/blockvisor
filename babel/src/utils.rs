@@ -20,11 +20,21 @@ use tonic::Status;
 pub fn kill_all_processes(cmd: &str, args: &[&str]) {
     let mut sys = System::new();
     sys.refresh_processes();
-    let remnants = find_processes(cmd, args, sys.processes());
+    let ps = sys.processes();
 
+    let remnants = find_processes(cmd, args, ps);
     for (_, proc) in remnants {
-        proc.kill();
-        proc.wait();
+        kill_process_tree(proc, ps);
+    }
+}
+
+/// Kill process and all its descendents.
+fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>) {
+    let children = ps.iter().filter(|(_, p)| p.parent() == Some(proc.pid()));
+    for (_, child) in children {
+        kill_process_tree(child, ps);
+        child.kill();
+        child.wait();
     }
 }
 
@@ -37,8 +47,11 @@ pub fn find_processes<'a>(
     ps.iter().filter(move |(_, process)| {
         let proc_call = process.cmd();
         if let Some(proc_cmd) = proc_call.first() {
+            // if not a binary, but a script (with shebang) is executed,
+            // then the process looks like: /bin/sh ./lalala.sh
+            // TODO: consider matching not only /bin/sh but other kinds of interpreters
             if proc_cmd == "/bin/sh" {
-                // if first element is shell call, just ignore it and treat second as cmd, rest are arguments
+                // first element is shell, second is cmd, rest are arguments
                 proc_call.len() > 1 && cmd == proc_call[1] && args == proc_call[2..].to_vec()
             } else {
                 // first element is cmd, rest are arguments
