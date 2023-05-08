@@ -108,7 +108,6 @@ impl CookbookService {
             .await?
             .ungzip()
             .await?;
-        // TODO: change ROOT_FS_FILE to 'blockjoy' to skip that
         tokio::fs::rename(folder.join(BABEL_IMAGE_NAME), path).await?;
         debug!("Done downloading image");
 

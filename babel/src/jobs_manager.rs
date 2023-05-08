@@ -69,8 +69,12 @@ fn load_jobs(jobs_dir: &Path, job_runner_bin_path: &Path) -> Result<Jobs> {
             let name = name.to_string_lossy().to_string();
             match jobs::load_config(&path) {
                 Ok(config) => {
-                    let state = if let Some((pid, _)) =
-                        find_processes(&job_runner_bin_path.to_string_lossy(), &[&name], ps).next()
+                    let state = if let Some((pid, _)) = find_processes(
+                        &job_runner_bin_path.to_string_lossy(),
+                        vec![name.to_string()],
+                        ps,
+                    )
+                    .next()
                     {
                         JobState::Active(*pid)
                     } else {
@@ -143,7 +147,7 @@ impl JobsManagerClient for Client {
         if let Some(job) = jobs.get_mut(name) {
             match &mut job.state {
                 JobState::Active(_) => {
-                    kill_all_processes(&self.job_runner_bin_path, &[name]);
+                    kill_all_processes(&self.job_runner_bin_path, vec![name.to_string()]);
                     job.state = JobState::Inactive(JobStatus::Stopped);
                 }
                 JobState::Inactive(status) => {
@@ -444,7 +448,10 @@ mod tests {
         }
 
         fn kill_job(&self, name: &str) {
-            kill_all_processes(&self.test_job_runner_path.to_string_lossy(), &[name]);
+            kill_all_processes(
+                &self.test_job_runner_path.to_string_lossy(),
+                vec![name.to_string()],
+            );
         }
     }
 

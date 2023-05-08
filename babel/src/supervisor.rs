@@ -34,7 +34,7 @@ pub async fn run<T: AsyncTimer>(
     if let Some(supervisor) = wait_for_setup(timer, run.clone(), babel_path, sup_config_rx).await {
         // Check if there are no remnant child processes after previous run.
         // If so, just kill them all.
-        kill_all_processes(&supervisor.babel_path.to_string_lossy(), &[]);
+        kill_all_processes(&supervisor.babel_path.to_string_lossy(), vec![]);
         supervisor.run_babel(run, babel_change_rx).await;
     }
 }

@@ -421,8 +421,8 @@ impl<J, P> BabelService<J, P> {
     async fn handle_sh(&self, request: Request<String>) -> Result<ShResponse> {
         let timeout = extract_timeout(&request);
         let body = request.into_inner();
-        let args = vec!["-c", &body];
-        let cmd_future = tokio::process::Command::new("sh")
+        let (cmd, args) = utils::bv_shell(&body);
+        let cmd_future = tokio::process::Command::new(cmd)
             .kill_on_drop(true)
             .args(args)
             .output();
@@ -825,8 +825,8 @@ mod tests {
             ))
             .await?
             .into_inner();
-        assert_eq!(output.stdout, "make a toast\n");
         assert_eq!(output.stderr, "error\n");
+        assert_eq!(output.stdout, "make a toast\n");
         assert_eq!(output.exit_code, 0);
         Ok(())
     }

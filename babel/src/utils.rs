@@ -16,33 +16,69 @@ use tokio::{
 use tokio_stream::Stream;
 use tonic::Status;
 
+const ENV_BV_USER: &str = "BV_USER";
+
+/// User to run sh commands and long running jobs
+fn bv_user() -> Option<String> {
+    std::env::var(ENV_BV_USER).ok()
+}
+
+/// Build shell command in form of cmd and args, in order to run something in shell
+///
+/// If we want to run as custom user, we will be using `su`, otherwise just `sh`
+pub fn bv_shell(body: &str) -> (String, Vec<String>) {
+    if let Some(user) = bv_user() {
+        (
+            "su".to_owned(),
+            vec!["-".to_owned(), user, "-c".to_owned(), body.to_owned()],
+        )
+    } else {
+        ("sh".to_owned(), vec!["-c".to_owned(), body.to_owned()])
+    }
+}
+
 /// Kill all processes that match `cmd` and passed `args`.
-pub fn kill_all_processes(cmd: &str, args: &[&str]) {
+///
+/// TODO: (maybe) try to use &[&str] instead of Vec<String>
+pub fn kill_all_processes(cmd: &str, args: Vec<String>) {
     let mut sys = System::new();
     sys.refresh_processes();
-    let remnants = find_processes(cmd, args, sys.processes());
+    let ps = sys.processes();
 
+    let remnants = find_processes(cmd, args, ps);
     for (_, proc) in remnants {
-        proc.kill();
-        proc.wait();
+        kill_process_tree(proc, ps);
+    }
+}
+
+/// Kill process and all its descendents.
+fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>) {
+    proc.kill(); // Better to kill parent first, since it may implement some child restart mechanism.
+    proc.wait();
+    let children = ps.iter().filter(|(_, p)| p.parent() == Some(proc.pid()));
+    for (_, child) in children {
+        kill_process_tree(child, ps);
     }
 }
 
 /// Find all processes that match `cmd` and passed `args`.
 pub fn find_processes<'a>(
     cmd: &'a str,
-    args: &'a [&str],
+    args: Vec<String>,
     ps: &'a HashMap<Pid, Process>,
 ) -> impl Iterator<Item = (&'a Pid, &'a Process)> {
     ps.iter().filter(move |(_, process)| {
         let proc_call = process.cmd();
         if let Some(proc_cmd) = proc_call.first() {
+            // if not a binary, but a script (with shebang) is executed,
+            // then the process looks like: /bin/sh ./lalala.sh
+            // TODO: consider matching not only /bin/sh but other kinds of interpreters
             if proc_cmd == "/bin/sh" {
-                // if first element is shell call, just ignore it and treat second as cmd, rest are arguments
-                proc_call.len() > 1 && cmd == proc_call[1] && args == proc_call[2..].to_vec()
+                // first element is shell, second is cmd, rest are arguments
+                proc_call.len() > 1 && cmd == proc_call[1] && args == proc_call[2..]
             } else {
                 // first element is cmd, rest are arguments
-                cmd == proc_cmd && args == proc_call[1..].to_vec()
+                cmd == proc_cmd && args == proc_call[1..]
             }
         } else {
             false
@@ -247,7 +283,10 @@ mod tests {
         let child = cmd.spawn()?;
         let pid = child.id().unwrap();
         wait_for_process(&ctrl_file).await;
-        kill_all_processes(&cmd_path.to_string_lossy(), &["a", "b", "c"]);
+        kill_all_processes(
+            &cmd_path.to_string_lossy(),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()],
+        );
         let is_process_running = |pid| {
             let mut sys = System::new();
             sys.refresh_process_specifics(Pid::from_u32(pid), ProcessRefreshKind::new())
