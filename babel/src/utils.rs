@@ -53,11 +53,11 @@ pub fn kill_all_processes(cmd: &str, args: Vec<String>) {
 
 /// Kill process and all its descendents.
 fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>) {
+    proc.kill(); // Better to kill parent first, since it may implement some child restart mechanism.
+    proc.wait();
     let children = ps.iter().filter(|(_, p)| p.parent() == Some(proc.pid()));
     for (_, child) in children {
         kill_process_tree(child, ps);
-        child.kill();
-        child.wait();
     }
 }
 
