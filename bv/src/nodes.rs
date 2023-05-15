@@ -101,11 +101,11 @@ impl<P: Pal + Debug> Nodes<P> {
         let ip = config
             .ip
             .parse()
-            .with_context(|| format!("invalid ip {} for node {}", config.ip, id))?;
+            .with_context(|| format!("invalid ip `{}`", config.ip))?;
         let gateway = config
             .gateway
             .parse()
-            .with_context(|| format!("invalid gateway {} for node {}", config.gateway, id))?;
+            .with_context(|| format!("invalid gateway `{}`", config.gateway))?;
 
         for n in self.nodes.read().await.values() {
             if n.read().await.data.network_interface.ip() == &ip {

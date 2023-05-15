@@ -368,6 +368,42 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 properties: properties.clone(),
             })),
         })),
+        // create with invalid node ip address
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: Uuid::new_v4().to_string(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                name: "some-new-name".to_string(),
+                image: image.clone(),
+                blockchain: "testing".to_string(),
+                node_type: pb::NodeType::Validator.into(),
+                ip: "invalid_ip".to_string(),
+                gateway: "216.18.214.193".to_string(),
+                self_update: false,
+                rules: rules.clone(),
+                properties: properties.clone(),
+            })),
+        })),
+        // create with invalid gateway ip address
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: Uuid::new_v4().to_string(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                name: "some-new-name".to_string(),
+                image: image.clone(),
+                blockchain: "testing".to_string(),
+                node_type: pb::NodeType::Validator.into(),
+                ip: "216.18.214.195".to_string(),
+                gateway: "invalid_ip".to_string(),
+                self_update: false,
+                rules: rules.clone(),
+                properties: properties.clone(),
+            })),
+        })),
         // stop stopped
         cmd(pb::command::Command::Node(pb::NodeCommand {
             node_id: id.clone(),
@@ -544,6 +580,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             Some("Node with ip address `216.18.214.195` exists"),
             Some(1),
         ),
+        (&command_id, Some("invalid ip `invalid_ip`"), Some(1)),
+        (&command_id, Some("invalid gateway `invalid_ip`"), Some(1)),
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
@@ -553,7 +591,7 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         (&command_id, None, Some(0)),
         (
             &command_id,
-            Some("invalid ip address 'invalid_ip' in firewall rule 'Rule B'"),
+            Some("invalid ip address `invalid_ip` in firewall rule `Rule B`"),
             Some(1),
         ),
         (&command_id, None, Some(0)),

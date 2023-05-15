@@ -19,7 +19,7 @@ pub fn check_firewall_rules(rules: &[firewall::Rule]) -> Result<()> {
     for rule in rules {
         match &rule.ips {
             Some(ip) if !IpCidr::is_ip_cidr(ip) => bail!(
-                "invalid ip address '{}' in firewall rule '{}'",
+                "invalid ip address `{}` in firewall rule `{}`",
                 ip,
                 rule.name
             ),
