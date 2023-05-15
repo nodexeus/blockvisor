@@ -480,6 +480,17 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 }],
             })),
         })),
+        // update with too many rules
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: id.clone(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Update(pb::NodeUpdate {
+                self_update: None,
+                rules: rules.into_iter().cycle().take(129).collect(),
+            })),
+        })),
         // update firewall rules
         cmd(pb::command::Command::Node(pb::NodeCommand {
             node_id: id.clone(),
@@ -592,6 +603,11 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         (
             &command_id,
             Some("invalid ip address `invalid_ip` in firewall rule `Rule B`"),
+            Some(1),
+        ),
+        (
+            &command_id,
+            Some("Can't configure more than 128 rules!"),
             Some(1),
         ),
         (&command_id, None, Some(0)),
