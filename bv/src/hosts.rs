@@ -140,3 +140,18 @@ impl pb::MetricsServiceHostRequest {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_host_info_collect() {
+        assert!(HostInfo::collect().is_ok());
+    }
+
+    #[test]
+    fn test_host_metrics_collect() {
+        assert!(HostMetrics::collect().is_ok());
+    }
+}
