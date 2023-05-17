@@ -332,7 +332,7 @@ where
             let now = Instant::now();
             let metrics = node_metrics::collect_metrics(nodes.clone()).await;
             // do not bother api with empty updates
-            if metrics.has_some() {
+            if metrics.has_any() {
                 let mut client = api::MetricsClient::with_auth(
                     Self::wait_for_channel(run.clone(), endpoint).await?,
                     api::AuthToken(config.read().await.token),

@@ -35,7 +35,7 @@ pub struct Metric {
 }
 
 impl Metrics {
-    pub fn has_some(&self) -> bool {
+    pub fn has_any(&self) -> bool {
         self.0.values().any(|m| {
             m.height.is_some()
                 || m.block_age.is_some()
