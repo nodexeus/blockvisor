@@ -262,6 +262,30 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
     let node_id = Uuid::new_v4().to_string();
     let id = node_id.clone();
     let command_id = Uuid::new_v4().to_string();
+    let rules = vec![pb::Rule {
+        name: "Rule X".to_string(),
+        action: pb::Action::Allow as i32,
+        direction: pb::Direction::In as i32,
+        protocol: Some(pb::Protocol::Tcp as i32),
+        ips: Some("192.167.0.1/24".to_string()),
+        ports: vec![8080, 8000],
+    }];
+    let properties = vec![pb::Parameter {
+        name: "TESTING_PARAM".to_string(),
+        value: "anything".to_string(),
+    }];
+    let image = Some(pb::ContainerImage {
+        protocol: "testing".to_string(),
+        node_type: pb::NodeType::Validator.into(),
+        node_version: "0.0.1".to_string(),
+        status: pb::ContainerImageStatus::Development.into(),
+    });
+    let image_v2 = Some(pb::ContainerImage {
+        protocol: "testing".to_string(),
+        node_type: pb::NodeType::Validator.into(),
+        node_version: "0.0.2".to_string(),
+        status: pb::ContainerImageStatus::Development.into(),
+    });
 
     println!("preparing server");
 
@@ -280,29 +304,14 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             host_id: host_id.clone(),
             command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                 name: node_name.clone(),
-                image: Some(pb::ContainerImage {
-                    protocol: "testing".to_string(),
-                    node_type: pb::NodeType::Validator.into(),
-                    node_version: "0.0.1".to_string(),
-                    status: pb::ContainerImageStatus::Development.into(),
-                }),
+                image: image.clone(),
                 blockchain: "testing".to_string(),
                 node_type: pb::NodeType::Validator.into(),
                 ip: "216.18.214.195".to_string(),
                 gateway: "216.18.214.193".to_string(),
                 self_update: false,
-                rules: vec![pb::Rule {
-                    name: "Rule X".to_string(),
-                    action: pb::Action::Allow as i32,
-                    direction: pb::Direction::In as i32,
-                    protocol: Some(pb::Protocol::Tcp as i32),
-                    ips: Some("192.167.0.1/24".to_string()),
-                    ports: vec![8080, 8000],
-                }],
-                properties: vec![pb::Parameter {
-                    name: "TESTING_PARAM".to_string(),
-                    value: "anything".to_string(),
-                }],
+                rules: rules.clone(),
+                properties: properties.clone(),
             })),
         })),
         // create with same node id
@@ -313,29 +322,14 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             host_id: host_id.clone(),
             command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                 name: "some-new-name".to_string(),
-                image: Some(pb::ContainerImage {
-                    protocol: "testing".to_string(),
-                    node_type: pb::NodeType::Validator.into(),
-                    node_version: "0.0.1".to_string(),
-                    status: pb::ContainerImageStatus::Development.into(),
-                }),
+                image: image.clone(),
                 blockchain: "testing".to_string(),
                 node_type: pb::NodeType::Validator.into(),
                 ip: "216.18.214.196".to_string(),
                 gateway: "216.18.214.193".to_string(),
                 self_update: false,
-                rules: vec![pb::Rule {
-                    name: "Rule X".to_string(),
-                    action: pb::Action::Allow as i32,
-                    direction: pb::Direction::In as i32,
-                    protocol: Some(pb::Protocol::Tcp as i32),
-                    ips: Some("192.167.0.1/24".to_string()),
-                    ports: vec![8080, 8000],
-                }],
-                properties: vec![pb::Parameter {
-                    name: "TESTING_PARAM".to_string(),
-                    value: "anything".to_string(),
-                }],
+                rules: rules.clone(),
+                properties: properties.clone(),
             })),
         })),
         // create with same node name
@@ -346,29 +340,14 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             host_id: host_id.clone(),
             command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                 name: node_name.clone(),
-                image: Some(pb::ContainerImage {
-                    protocol: "testing".to_string(),
-                    node_type: pb::NodeType::Validator.into(),
-                    node_version: "0.0.1".to_string(),
-                    status: 1, // Development
-                }),
+                image: image.clone(),
                 blockchain: "testing".to_string(),
                 node_type: pb::NodeType::Validator.into(),
                 ip: "216.18.214.197".to_string(),
                 gateway: "216.18.214.193".to_string(),
                 self_update: false,
-                rules: vec![pb::Rule {
-                    name: "Rule X".to_string(),
-                    action: pb::Action::Allow as i32,
-                    direction: pb::Direction::In as i32,
-                    protocol: Some(pb::Protocol::Tcp as i32),
-                    ips: Some("192.167.0.1/24".to_string()),
-                    ports: vec![8080, 8000],
-                }],
-                properties: vec![pb::Parameter {
-                    name: "TESTING_PARAM".to_string(),
-                    value: "anything".to_string(),
-                }],
+                rules: rules.clone(),
+                properties: properties.clone(),
             })),
         })),
         // create with same node ip address
@@ -379,29 +358,50 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             host_id: host_id.clone(),
             command: Some(pb::node_command::Command::Create(pb::NodeCreate {
                 name: "some-new-name".to_string(),
-                image: Some(pb::ContainerImage {
-                    protocol: "testing".to_string(),
-                    node_type: pb::NodeType::Validator.into(),
-                    node_version: "0.0.1".to_string(),
-                    status: 1, // Development
-                }),
+                image: image.clone(),
                 blockchain: "testing".to_string(),
                 node_type: pb::NodeType::Validator.into(),
                 ip: "216.18.214.195".to_string(),
                 gateway: "216.18.214.193".to_string(),
                 self_update: false,
-                rules: vec![pb::Rule {
-                    name: "Rule X".to_string(),
-                    action: pb::Action::Allow as i32,
-                    direction: pb::Direction::In as i32,
-                    protocol: Some(pb::Protocol::Tcp as i32),
-                    ips: Some("192.167.0.1/24".to_string()),
-                    ports: vec![8080, 8000],
-                }],
-                properties: vec![pb::Parameter {
-                    name: "TESTING_PARAM".to_string(),
-                    value: "anything".to_string(),
-                }],
+                rules: rules.clone(),
+                properties: properties.clone(),
+            })),
+        })),
+        // create with invalid node ip address
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: Uuid::new_v4().to_string(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                name: "some-new-name".to_string(),
+                image: image.clone(),
+                blockchain: "testing".to_string(),
+                node_type: pb::NodeType::Validator.into(),
+                ip: "invalid_ip".to_string(),
+                gateway: "216.18.214.193".to_string(),
+                self_update: false,
+                rules: rules.clone(),
+                properties: properties.clone(),
+            })),
+        })),
+        // create with invalid gateway ip address
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: Uuid::new_v4().to_string(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Create(pb::NodeCreate {
+                name: "some-new-name".to_string(),
+                image: image.clone(),
+                blockchain: "testing".to_string(),
+                node_type: pb::NodeType::Validator.into(),
+                ip: "216.18.214.195".to_string(),
+                gateway: "invalid_ip".to_string(),
+                self_update: false,
+                rules: rules.clone(),
+                properties: properties.clone(),
             })),
         })),
         // stop stopped
@@ -459,12 +459,7 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             created_at: None,
             host_id: host_id.clone(),
             command: Some(pb::node_command::Command::Upgrade(pb::NodeUpgrade {
-                image: Some(pb::ContainerImage {
-                    protocol: "testing".to_string(),
-                    node_type: pb::NodeType::Validator.into(),
-                    node_version: "0.0.2".to_string(),
-                    status: 1, // Development
-                }),
+                image: image_v2,
             })),
         })),
         // update with invalid rules
@@ -483,6 +478,17 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                     ips: Some("invalid_ip".to_string()),
                     ports: vec![8080],
                 }],
+            })),
+        })),
+        // update with too many rules
+        cmd(pb::command::Command::Node(pb::NodeCommand {
+            node_id: id.clone(),
+            api_command_id: command_id.clone(),
+            created_at: None,
+            host_id: host_id.clone(),
+            command: Some(pb::node_command::Command::Update(pb::NodeUpdate {
+                self_update: None,
+                rules: rules.into_iter().cycle().take(129).collect(),
             })),
         })),
         // update firewall rules
@@ -585,6 +591,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             Some("Node with ip address `216.18.214.195` exists"),
             Some(1),
         ),
+        (&command_id, Some("invalid ip `invalid_ip`"), Some(1)),
+        (&command_id, Some("invalid gateway `invalid_ip`"), Some(1)),
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
         (&command_id, None, Some(0)),
@@ -594,7 +602,12 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         (&command_id, None, Some(0)),
         (
             &command_id,
-            Some("invalid ip address 'invalid_ip' in firewall rule 'Rule B'"),
+            Some("invalid ip address `invalid_ip` in firewall rule `Rule B`"),
+            Some(1),
+        ),
+        (
+            &command_id,
+            Some("Can't configure more than 128 rules!"),
             Some(1),
         ),
         (&command_id, None, Some(0)),
