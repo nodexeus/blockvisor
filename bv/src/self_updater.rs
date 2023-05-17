@@ -392,10 +392,10 @@ mod tests {
             };
             Ok(Response::new(reply))
         });
-        let server_addres = server.address().to_string();
+        let server_address = server.address().to_string();
         bundles_mock.expect_retrieve().once().returning(move |_| {
             let reply = cb_pb::ArchiveLocation {
-                url: format!("http://{server_addres}"),
+                url: format!("http://{server_address}"),
             };
             Ok(Response::new(reply))
         });
@@ -432,10 +432,10 @@ mod tests {
         let server = MockServer::start();
 
         let mut bundles_mock = MockTestBundleService::new();
-        let server_addres = server.address().to_string();
+        let server_address = server.address().to_string();
         bundles_mock.expect_retrieve().once().returning(move |_| {
             let reply = cb_pb::ArchiveLocation {
-                url: format!("http://{server_addres}"),
+                url: format!("http://{server_address}"),
             };
             Ok(Response::new(reply))
         });
@@ -491,14 +491,14 @@ mod tests {
                 };
                 Ok(Response::new(reply))
             });
-        let server_addres = server.address().to_string();
+        let server_address = server.address().to_string();
         bundles_mock
             .expect_retrieve()
             .once()
             .withf(move |req| req.get_ref() == &bundle_id)
             .returning(move |_| {
                 let reply = cb_pb::ArchiveLocation {
-                    url: format!("http://{server_addres}"),
+                    url: format!("http://{server_address}"),
                 };
                 Ok(Response::new(reply))
             });
