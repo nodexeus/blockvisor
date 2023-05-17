@@ -459,17 +459,22 @@ impl TryFrom<Protocol> for firewall::Protocol {
 impl TryFrom<Rule> for firewall::Rule {
     type Error = anyhow::Error;
     fn try_from(rule: Rule) -> Result<Self, Self::Error> {
+        let protocol: Option<firewall::Protocol> = match rule.protocol {
+            Some(p) => Some(
+                Protocol::from_i32(p)
+                    .ok_or_else(|| anyhow!("Invalid Protocol"))?
+                    .try_into()?,
+            ),
+            None => None,
+        };
+
         Ok(Self {
             name: rule.name,
             action: try_action(rule.action)?,
             direction: Direction::from_i32(rule.direction)
                 .ok_or_else(|| anyhow!("Invalid Direction"))?
                 .try_into()?,
-            protocol: Some(
-                Protocol::from_i32(rule.action)
-                    .ok_or_else(|| anyhow!("Invalid Protocol"))?
-                    .try_into()?,
-            ),
+            protocol,
             ips: rule.ips,
             ports: rule.ports.into_iter().map(|p| p as u16).collect(),
         })
