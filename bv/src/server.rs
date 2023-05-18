@@ -92,7 +92,7 @@ where
                 },
             )
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::CreateNodeResponse {};
 
@@ -115,7 +115,7 @@ where
         self.nodes
             .upgrade(id, image)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::UpgradeNodeResponse {};
 
@@ -134,7 +134,7 @@ where
         self.nodes
             .delete(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::DeleteNodeResponse {};
         Ok(Response::new(reply))
@@ -152,7 +152,7 @@ where
         self.nodes
             .start(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::StartNodeResponse {};
 
@@ -171,7 +171,7 @@ where
         self.nodes
             .stop(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::StopNodeResponse {};
 
@@ -210,7 +210,7 @@ where
                     .nodes
                     .node_data_cache(*id)
                     .await
-                    .map_err(|e| Status::unknown(e.to_string()))?;
+                    .map_err(|e| Status::unknown(format!("{e:#}")))?;
                 bv_pb::Node {
                     id: id.to_string(),
                     name: cache.name,
@@ -244,7 +244,7 @@ where
             .nodes
             .status(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
         let status = match status {
             NodeStatus::Running => bv_pb::NodeStatus::Running,
             NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
@@ -271,7 +271,7 @@ where
             .nodes
             .logs(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         Ok(Response::new(bv_pb::GetNodeLogsResponse { logs }))
     }
@@ -289,7 +289,7 @@ where
             .nodes
             .babel_logs(id, request.max_lines)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         Ok(Response::new(bv_pb::GetBabelLogsResponse { logs }))
     }
@@ -307,7 +307,7 @@ where
             .nodes
             .keys(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let names = keys.into_iter().map(|k| k.name).collect();
         Ok(Response::new(bv_pb::GetNodeKeysResponse { names }))
@@ -326,7 +326,7 @@ where
             .nodes
             .node_id_for_name(&name)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::GetNodeIdForNameResponse { id: id.to_string() };
 
@@ -346,7 +346,7 @@ where
             .nodes
             .capabilities(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         Ok(Response::new(bv_pb::ListCapabilitiesResponse {
             capabilities,
@@ -367,7 +367,7 @@ where
             .nodes
             .call_method(id, &request.method, &request.param, true)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         Ok(Response::new(bv_pb::BlockchainResponse { value }))
     }
@@ -385,7 +385,7 @@ where
             .nodes
             .metrics(id)
             .await
-            .map_err(|e| Status::unknown(e.to_string()))?;
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         Ok(Response::new(bv_pb::GetNodeMetricsResponse {
             height: metrics.height,
