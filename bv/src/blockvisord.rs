@@ -54,8 +54,8 @@ where
     <P as Pal>::NetInterface: Send + Sync + Clone,
 {
     pub async fn new(pal: P) -> Result<Self> {
-        let bv_root = pal.bv_root();
-        let config = Config::load(bv_root).await.with_context(|| {
+        let bv_root = pal.bv_root().to_owned();
+        let config = Config::load(&bv_root).await.with_context(|| {
             format!(
                 "failed to load host config from {}",
                 bv_root.join(CONFIG_PATH).display()
@@ -65,7 +65,7 @@ where
         let listener = TcpListener::bind(url).await?;
         Ok(Self {
             pal,
-            config: SharedConfig::new(config),
+            config: SharedConfig::new(config, bv_root),
             listener,
         })
     }
@@ -174,7 +174,7 @@ where
             tokio::select! {
                 _ = cmd_watch_rx.changed() => {
                     debug!("MQTT watch triggerred");
-                    match api::CommandsService::connect(config.read().await).await {
+                    match api::CommandsService::connect(config).await {
                         Ok(mut client) => {
                             if let Err(e) = client.get_and_process_pending_commands(&config.read().await.id, nodes.clone()).await {
                                 error!("Error processing pending commands: {:?}", e);
@@ -291,10 +291,7 @@ where
                 };
                 update.set_container_status(container_status);
 
-                if Self::send_node_info_update(config.clone(), update)
-                    .await
-                    .is_ok()
-                {
+                if Self::send_node_info_update(&config, update).await.is_ok() {
                     // cache to not send the same data if it has not changed
                     known_addresses.entry(node_id).or_insert(address);
                     known_statuses.entry(node_id).or_insert(status);
@@ -318,8 +315,8 @@ where
         None
     }
 
-    /// This task runs every minute to aggregate metrics from every node. It will call into the nodes
-    /// query their metrics, then send them to blockvisor-api.
+    /// This task runs every minute to aggregate metrics from every node. It will call into the
+    /// nodes, query their metrics, then send them to blockvisor-api.
     async fn node_metrics(
         mut run: RunFlag,
         nodes: Arc<Nodes<P>>,
@@ -333,10 +330,21 @@ where
             let metrics = node_metrics::collect_metrics(nodes.clone()).await;
             // do not bother api with empty updates
             if metrics.has_any() {
-                let mut client = api::MetricsClient::with_auth(
-                    Self::wait_for_channel(run.clone(), endpoint).await?,
-                    api::AuthToken(config.read().await.token),
-                );
+                let channel = match Self::wait_for_channel(run.clone(), endpoint).await {
+                    Some(channel) => channel,
+                    None => {
+                        error!("Node metrics could not establish channel");
+                        continue;
+                    }
+                };
+                let token = match config.token().await {
+                    Ok(channel) => channel,
+                    Err(e) => {
+                        error!("Node metrics could not refresh tokens: {e}");
+                        continue;
+                    }
+                };
+                let mut client = api::MetricsClient::with_auth(channel, token);
                 let metrics: pb::MetricsServiceNodeRequest = metrics.into();
                 if let Err(e) = client.node(metrics).await {
                     error!("Could not send node metrics! `{e}`");
@@ -362,10 +370,21 @@ where
             let now = Instant::now();
             match HostMetrics::collect() {
                 Ok(metrics) => {
-                    let mut client = api::MetricsClient::with_auth(
-                        Self::wait_for_channel(run.clone(), endpoint).await?,
-                        api::AuthToken(config.read().await.token),
-                    );
+                    let channel = match Self::wait_for_channel(run.clone(), endpoint).await {
+                        Some(channel) => channel,
+                        None => {
+                            error!("Host metrics could not establish channel");
+                            continue;
+                        }
+                    };
+                    let token = match config.token().await {
+                        Ok(channel) => channel,
+                        Err(e) => {
+                            error!("Host metrics could not refresh tokens: {e}");
+                            continue;
+                        }
+                    };
+                    let mut client = api::MetricsClient::with_auth(channel, token);
                     metrics.set_all_gauges();
                     let metrics = pb::MetricsServiceHostRequest::new(host_id.clone(), metrics);
                     if let Err(e) = client.host(metrics).await {
@@ -384,10 +403,10 @@ where
 
     // Send node info update to control plane
     async fn send_node_info_update(
-        config: SharedConfig,
+        config: &SharedConfig,
         update: pb::NodeServiceUpdateRequest,
     ) -> Result<()> {
-        let mut client = api::NodesService::connect(config.read().await)
+        let mut client = api::NodesService::connect(config)
             .await
             .with_context(|| "Error connecting to api".to_string())?;
         client

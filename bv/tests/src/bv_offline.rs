@@ -1,6 +1,7 @@
 use crate::src::utils::{
     stub_server::{StubCommandsServer, StubDiscoveryService},
     test_env::TestEnv,
+    token::TokenGenerator,
 };
 use anyhow::{bail, Result};
 use assert_cmd::Command;
@@ -11,7 +12,7 @@ use blockvisord::{
     nodes::Nodes,
     server::bv_pb,
     services,
-    services::{api, api::pb},
+    services::{api, api::pb, cookbook},
     set_bv_status, utils, BV_VAR_PATH,
 };
 use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
@@ -539,9 +540,12 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             .unwrap()
     };
     set_bv_status(bv_pb::ServiceStatus::Ok).await;
+    let id = Uuid::new_v4();
     let config = Config {
-        id: Uuid::new_v4().to_string(),
-        token: "any token".to_string(),
+        id: id.to_string(),
+        token: TokenGenerator::create_host(id, "1245456"),
+        refresh_token: "any refresh token".to_string(),
+        cookbook_token: cookbook::COOKBOOK_TOKEN.to_string(),
         blockjoy_api_url: "http://localhost:8089".to_string(),
         blockjoy_keys_url: Some("http://localhost:8089".to_string()),
         blockjoy_registry_url: Some("http://localhost:50059".to_string()),
@@ -549,17 +553,13 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         update_check_interval_secs: None,
         blockvisor_port: 0,
     };
+    let config = SharedConfig::new(config.clone(), "/conf.jason".into());
+    let config_clone = config.clone();
 
-    let nodes = Arc::new(
-        Nodes::load(
-            test_env.build_dummy_platform(),
-            SharedConfig::new(config.clone()),
-        )
-        .await?,
-    );
+    let nodes = Arc::new(Nodes::load(test_env.build_dummy_platform(), config).await?);
 
     let client_future = async {
-        match api::CommandsService::connect(config).await {
+        match api::CommandsService::connect(&config_clone).await {
             Ok(mut client) => {
                 if let Err(e) = client
                     .get_and_process_pending_commands(&host_id, nodes.clone())
@@ -638,9 +638,12 @@ async fn test_discovery_on_connection_error() -> Result<()> {
             .await
             .unwrap()
     };
+    let id = Uuid::new_v4();
     let config = Config {
-        id: Uuid::new_v4().to_string(),
-        token: "any token".to_string(),
+        id: id.to_string(),
+        token: TokenGenerator::create_host(id, "1245456"),
+        refresh_token: "any refresh token".to_string(),
+        cookbook_token: cookbook::COOKBOOK_TOKEN.to_string(),
         blockjoy_api_url: "http://localhost:8091".to_string(),
         blockjoy_keys_url: None,
         blockjoy_registry_url: None,
@@ -648,7 +651,9 @@ async fn test_discovery_on_connection_error() -> Result<()> {
         update_check_interval_secs: None,
         blockvisor_port: 0,
     };
-    let connect_future = services::connect(SharedConfig::new(config.clone()), |config| async {
+    let config = SharedConfig::new(config, "/some/dir/conf.json".into());
+    let connect_future = services::connect(&config, |config| async {
+        let config = config.read().await;
         if config.blockjoy_keys_url.is_none()
             && config.blockjoy_registry_url.is_none()
             && config.blockjoy_mqtt_url.is_none()

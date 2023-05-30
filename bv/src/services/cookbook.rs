@@ -3,10 +3,11 @@ use crate::{
     node::{KERNEL_FILE, ROOT_FS_FILE},
     node_data::NodeImage,
     services,
-    services::api::{AuthToken, AuthenticatedService},
+    services::api::{self, AuthenticatedService},
     utils, with_retry, BV_VAR_PATH,
 };
 use anyhow::{anyhow, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::path::{Path, PathBuf};
 use tokio::{
     fs::{self, DirBuilder, File},
@@ -20,6 +21,10 @@ pub mod cb_pb {
 }
 
 pub const IMAGES_DIR: &str = "images";
+pub const COOKBOOK_TOKEN: &str =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpZCI6ImMzNjFjYTY2LWFmZDMtNGNhNy1iMDgwLWFkYTBhZTMyNmRlO\
+    SIsImV4cCI6MTcxNjA1MDIxNSwidG9rZW5fdHlwZSI6Imhvc3RfYXV0aCIsInJvbGUiOiJzZXJ2aWNlIn0.avtSu_nmQrtw\
+    I-LSFXba3yGHn2PlBVIjBpY4v3kRr9V_eHDdbRqj7-LHH7HH7vOJKSMMFrOhxm6XSIAdbhoSHw";
 const BABEL_ARCHIVE_IMAGE_NAME: &str = "blockjoy.gz";
 const BABEL_IMAGE_NAME: &str = "blockjoy";
 const KERNEL_ARCHIVE_NAME: &str = "kernel.gz";
@@ -31,21 +36,24 @@ pub struct CookbookService {
 }
 
 impl CookbookService {
-    pub async fn connect(bv_root: PathBuf, config: &SharedConfig) -> Result<Self> {
-        services::connect(config.clone(), |config| async {
+    pub async fn connect(config: &SharedConfig) -> Result<Self> {
+        services::connect(config, |config| async {
             let url = config
+                .read()
+                .await
                 .blockjoy_registry_url
                 .ok_or_else(|| anyhow!("missing blockjoy_registry_url"))?;
             let endpoint = Endpoint::from_shared(url.clone())?;
+            let channel = Endpoint::connect(&endpoint)
+                .await
+                .with_context(|| format!("Failed to connect to cookbook service at {url}"))?;
             let client = cb_pb::cook_book_service_client::CookBookServiceClient::with_interceptor(
-                Endpoint::connect(&endpoint)
-                    .await
-                    .context(format!("Failed to connect to cookbook service at {url}"))?,
-                AuthToken(config.token),
+                channel,
+                api::AuthToken(STANDARD.encode(config.read().await.cookbook_token)),
             );
             Ok(Self {
                 client,
-                bv_root: bv_root.clone(),
+                bv_root: config.bv_root.clone(),
             })
         })
         .await
