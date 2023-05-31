@@ -651,7 +651,7 @@ impl<P: Pal + Debug> Nodes<P> {
         &self,
         ip: IpAddr,
         gateway: IpAddr,
-    ) -> Result<<P as Pal>::NetInterface> {
+    ) -> Result<P::NetInterface> {
         let mut data = self.data.write().await;
         data.machine_index += 1;
         let iface = self
