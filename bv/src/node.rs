@@ -64,7 +64,7 @@ pub type BabelEngine = babel_engine::BabelEngine<NodeConnection, RhaiPlugin<babe
 
 #[derive(Debug)]
 pub struct Node<P: Pal> {
-    pub data: NodeData<<P as Pal>::NetInterface>,
+    pub data: NodeData<P::NetInterface>,
     pub babel_engine: BabelEngine,
     metadata: BlockchainMetadata,
     machine: Machine<'static>,
@@ -115,7 +115,7 @@ impl Paths {
 impl<P: Pal + Debug> Node<P> {
     /// Creates a new node according to specs.
     #[instrument(skip(data))]
-    pub async fn create(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Self> {
+    pub async fn create(pal: Arc<P>, data: NodeData<P::NetInterface>) -> Result<Self> {
         info!("Creating node with data: {data:?}");
         let node_id = data.id;
         let paths = Paths::build(pal.bv_root(), node_id);
@@ -149,7 +149,7 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Returns node previously created on this host.
     #[instrument(skip(data))]
-    pub async fn attach(pal: Arc<P>, data: NodeData<<P as Pal>::NetInterface>) -> Result<Self> {
+    pub async fn attach(pal: Arc<P>, data: NodeData<P::NetInterface>) -> Result<Self> {
         info!("Attaching to node with data: {data:?}");
         let paths = Paths::build(pal.bv_root(), data.id);
 
@@ -573,7 +573,7 @@ impl<P: Pal + Debug> Node<P> {
 
     async fn create_config(
         paths: &Paths,
-        data: &NodeData<<P as Pal>::NetInterface>,
+        data: &NodeData<P::NetInterface>,
     ) -> Result<firec::config::Config<'static>> {
         let kernel_args = format!(
             "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \

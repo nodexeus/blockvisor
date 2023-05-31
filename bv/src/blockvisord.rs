@@ -51,7 +51,7 @@ pub struct BlockvisorD<P> {
 impl<P> BlockvisorD<P>
 where
     P: Pal + Send + Sync + Debug + 'static,
-    <P as Pal>::NetInterface: Send + Sync + Clone,
+    P::NetInterface: Send + Sync + Clone,
 {
     pub async fn new(pal: P) -> Result<Self> {
         let bv_root = pal.bv_root().to_owned();
