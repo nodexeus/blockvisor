@@ -85,7 +85,6 @@ struct Paths {
     bv_root: PathBuf,
     chroot: PathBuf,
     data_dir: PathBuf,
-    data: PathBuf,
     plugin_data: PathBuf,
     registry: PathBuf,
 }
@@ -101,7 +100,6 @@ impl Paths {
                 .join(FC_BIN_NAME)
                 .join(id.to_string())
                 .join("root"),
-            data: bv_root.join(BV_VAR_PATH).join(DATA_FILE),
             plugin_data: registry.join(format!("{id}.data")),
             registry,
         }
@@ -592,6 +590,7 @@ impl<P: Pal + Debug> Node<P> {
         let kernel_path =
             CookbookService::get_image_download_folder_path(&paths.bv_root, &data.image)
                 .join(KERNEL_FILE);
+        let data_fs_path = paths.data_dir.join(DATA_FILE);
 
         let config = firec::config::Config::builder(Some(data.id), kernel_path)
             // Jailer configuration.
@@ -610,7 +609,7 @@ impl<P: Pal + Debug> Node<P> {
             .is_root_device(true)
             .build()
             // Add data drive.
-            .add_drive("data", paths.data.clone())
+            .add_drive("data", data_fs_path)
             .build()
             // Network configuration.
             .add_network_interface(iface)
