@@ -274,10 +274,16 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         ips: Some("192.167.0.1/24".to_string()),
         ports: vec![8080, 8000],
     }];
-    let properties = vec![pb::Parameter {
-        name: "TESTING_PARAM".to_string(),
-        value: "anything".to_string(),
-    }];
+    let properties = vec![
+        pb::Parameter {
+            name: "TESTING_PARAM".to_string(),
+            value: "anything".to_string(),
+        },
+        pb::Parameter {
+            name: "network".to_string(),
+            value: "test".to_string(),
+        },
+    ];
     let image = Some(pb::ContainerImage {
         protocol: "testing".to_string(),
         node_type: pb::NodeType::Validator.into(),

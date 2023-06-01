@@ -170,7 +170,7 @@ impl TestEnv {
                 "create",
                 image,
                 "--props",
-                r#"{"TESTING_PARAM":"anything"}"#,
+                r#"{"network": "test", "TESTING_PARAM":"anything"}"#,
                 "--gateway",
                 "216.18.214.193",
                 "--ip",
