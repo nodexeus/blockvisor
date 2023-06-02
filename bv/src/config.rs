@@ -50,7 +50,7 @@ impl SharedConfig {
             let mut write_lock = self.write().await;
             // A concurrent update may have written to the jwt field, check if the token has become
             // unexpired while we have unique access.
-            if AuthToken::expired(&write_lock.token)? {
+            if !AuthToken::expired(&write_lock.token)? {
                 return Ok(write_lock.token.clone());
             }
 
