@@ -96,6 +96,7 @@ impl<P: Pal + Debug> Nodes<P> {
         if self.node_ids.read().await.contains_key(&config.name) {
             bail!("Node with name `{}` exists", config.name);
         }
+
         check_rules_count(config.rules.len())?;
 
         let ip = config
@@ -106,6 +107,12 @@ impl<P: Pal + Debug> Nodes<P> {
             .gateway
             .parse()
             .with_context(|| format!("invalid gateway `{}`", config.gateway))?;
+
+        let properties = config
+            .properties
+            .into_iter()
+            .map(|(k, v)| (k.to_uppercase(), v))
+            .collect();
 
         for n in self.nodes.read().await.values() {
             if n.read().await.data.network_interface.ip() == &ip {
@@ -135,7 +142,7 @@ impl<P: Pal + Debug> Nodes<P> {
             started_at: None,
             network_interface,
             requirements,
-            properties: config.properties,
+            properties,
             firewall_rules: config.rules,
             initialized: false,
         };
