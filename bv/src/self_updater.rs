@@ -12,6 +12,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use bv_utils::timer::AsyncTimer;
 use std::{
     cmp::Ordering,
@@ -50,7 +51,7 @@ impl BundleConnector for DefaultConnector {
                     .connect_timeout(BUNDLES_CONNECT_TIMEOUT)
                     .connect()
                     .await?,
-                config.token().await?,
+                AuthToken(STANDARD.encode(config.read().await.cookbook_token)),
             ))
         })
         .await
