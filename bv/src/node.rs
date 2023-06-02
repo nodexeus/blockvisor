@@ -7,7 +7,7 @@ use crate::{
     utils::{get_process_pid, with_timeout},
     with_retry, BV_VAR_PATH,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use babel_api::{
     babelsup::SupervisorConfig,
     metadata::{firewall, BlockchainMetadata},
@@ -39,6 +39,8 @@ const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const FW_SETUP_TIMEOUT_SEC: u64 = 30;
 const FW_RULE_SETUP_TIMEOUT_SEC: u64 = 1;
 pub const REGISTRY_CONFIG_DIR: &str = "nodes";
+pub const DATA_CACHE_DIR: &str = "blocks";
+const DATA_CACHE_EXPIRATION: Duration = Duration::from_secs(7 * 24 * 3600);
 pub const FC_BIN_NAME: &str = "firecracker";
 const FC_BIN_PATH: &str = "usr/bin/firecracker";
 const FC_SOCKET_PATH: &str = "/firecracker.socket";
@@ -84,6 +86,7 @@ struct RecoveryCounters {
 struct Paths {
     bv_root: PathBuf,
     chroot: PathBuf,
+    data_cache_dir: PathBuf,
     data_dir: PathBuf,
     plugin_data: PathBuf,
     registry: PathBuf,
@@ -95,6 +98,7 @@ impl Paths {
         Self {
             bv_root: bv_root.to_path_buf(),
             chroot: bv_root.join(BV_VAR_PATH),
+            data_cache_dir: bv_root.join(BV_VAR_PATH).join(DATA_CACHE_DIR),
             data_dir: bv_root
                 .join(BV_VAR_PATH)
                 .join(FC_BIN_NAME)
@@ -122,7 +126,7 @@ impl<P: Pal + Debug> Node<P> {
 
         let _ = tokio::fs::remove_dir_all(&paths.data_dir).await;
         let config = Self::create_config(&paths, &data).await?;
-        Self::create_data_image(&paths, data.requirements.disk_size_gb).await?;
+        Self::prepare_data_image(&paths, &data).await?;
         let machine = Machine::create(config).await?;
 
         data.save(&paths.registry).await?;
@@ -539,19 +543,47 @@ impl<P: Pal + Debug> Node<P> {
         Ok(())
     }
 
-    /// Create new data drive in chroot location.
-    async fn create_data_image(paths: &Paths, disk_size_gb: usize) -> Result<()> {
+    /// Create new data drive in chroot location, or copy it from cache
+    async fn prepare_data_image(paths: &Paths, data: &NodeData<P::NetInterface>) -> Result<()> {
         let data_dir = &paths.data_dir;
         DirBuilder::new().recursive(true).create(data_dir).await?;
         let path = data_dir.join(DATA_FILE);
+        let network = data
+            .properties
+            .get("NETWORK")
+            .ok_or_else(|| anyhow!("`NETWORK` property not found"))?;
+        let data_cache_path = paths
+            .data_cache_dir
+            .join(&data.image.protocol)
+            .join(&data.image.node_type)
+            .join(network)
+            .join(DATA_FILE);
+        let disk_size_gb = data.requirements.disk_size_gb;
 
-        let gb = &format!("{disk_size_gb}GB");
-        run_cmd(
-            "fallocate",
-            [OsStr::new("-l"), OsStr::new(gb), path.as_os_str()],
-        )
-        .await?;
-        run_cmd("mkfs.ext4", [path.as_os_str()]).await?;
+        // check local cache
+        if data_cache_path.exists() {
+            let elapsed = data_cache_path.metadata()?.created()?.elapsed()?;
+            if elapsed < DATA_CACHE_EXPIRATION {
+                run_cmd("cp", [data_cache_path.as_os_str(), path.as_os_str()]).await?;
+                // TODO: ask Sean how to better resize images
+                // in case cached image size is different from disk_size_gb
+            } else {
+                // clean up expired cache data
+                fs::remove_file(data_cache_path).await?;
+                // TODO: use cookbook to download new image
+            }
+        }
+
+        // allocate new image on location, if it's not there yet
+        if !path.exists() {
+            let gb = &format!("{disk_size_gb}GB");
+            run_cmd(
+                "fallocate",
+                [OsStr::new("-l"), OsStr::new(gb), path.as_os_str()],
+            )
+            .await?;
+            run_cmd("mkfs.ext4", [path.as_os_str()]).await?;
+        }
 
         Ok(())
     }
