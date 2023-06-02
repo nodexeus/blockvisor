@@ -135,7 +135,10 @@ async fn test_bv_service_e2e() {
     println!("add blockchain");
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
     let db_query =
-        r#"INSERT INTO blockchains (name, status, supported_node_types, version) values ('Testing', 'production', '[{"id": 3, "version": "0.0.1", "properties": [{"name": "self-hosted", "default": "false", "ui_type": "switch", "disabled": true, "required": true}]}]', '0.0.1');"#.to_string();
+        r#"INSERT INTO blockchains (id, name, status) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing', 'production');
+        INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
+        INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'self-hosted', NULL, 'switch', FALSE, FALSE);
+        "#.to_string();
 
     Command::new("docker")
         .args(&[
