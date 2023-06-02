@@ -65,6 +65,7 @@ jobs:
           files: |
             /tmp/bundle.tar.gz
             /tmp/babelsup.tar.gz
+            /tmp/bvup
       - name: Publish bvup
         run: |
           echo {\"tag_name\":\"${{ env.GIT_VERSION }}\",\"name\":\"${{ env.GIT_VERSION }}\",\"target_commitish\":\"main\",\"draft\":false,\"prerelease\":false,\"generate_release_notes\":false,\"body\":\"$$(hexdump -ve '"\\" 1/1 "u%04x"' host_setup_guide.md)\"} > /tmp/body.json
