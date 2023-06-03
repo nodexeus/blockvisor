@@ -42,11 +42,8 @@ impl SharedConfig {
     }
 
     async fn refreshed_token(&self) -> Result<String> {
-        let read_lock = self.read().await;
-        if AuthToken::expired(&read_lock.token)? {
-            // Explicity drop the lock. Note that if we do not drop the lock here, the succeeding
-            // call to `self.write()` will immediately deadlock.
-            drop(read_lock);
+        let token = &self.read().await.token;
+        if AuthToken::expired(token)? {
             let mut write_lock = self.write().await;
             // A concurrent update may have written to the jwt field, check if the token has become
             // unexpired while we have unique access.
@@ -58,14 +55,14 @@ impl SharedConfig {
                 token: write_lock.token.clone(),
                 refresh: Some(write_lock.refresh_token.clone()),
             };
-            let mut service = AuthClient::connect(self).await?;
+            let mut service = AuthClient::connect(&write_lock.blockjoy_api_url).await?;
             let resp = service.refresh(req).await?;
             write_lock.token = resp.token.clone();
             write_lock.refresh_token = resp.refresh;
             write_lock.save(&self.bv_root).await?;
             Ok(resp.token)
         } else {
-            Ok(read_lock.token)
+            Ok(token.clone())
         }
     }
 }

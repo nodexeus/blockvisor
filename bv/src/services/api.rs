@@ -122,8 +122,7 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn connect(config: &SharedConfig) -> Result<Self> {
-        let url = &config.read().await.blockjoy_api_url;
+    pub async fn connect(url: &str) -> Result<Self> {
         let endpoint = Endpoint::from_str(url)?;
         let client = auth_service_client::AuthServiceClient::connect(endpoint).await?;
         Ok(Self { client })
