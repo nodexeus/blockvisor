@@ -80,7 +80,7 @@ impl AuthToken {
 
         #[derive(serde::Deserialize)]
         struct Field {
-            iat: i64,
+            exp: i64,
         }
 
         let unauth = |s| move || Status::unauthenticated(s);
@@ -94,12 +94,12 @@ impl AuthToken {
             .decode(middle)
             .ok()
             .ok_or_else(unauth("Token is not base64"))?;
-        // Json-parse the payload, with only the `iat` field being of interest.
+        // Json-parse the payload, with only the `exp` field being of interest.
         let parsed: Field = serde_json::from_slice(&decoded)
             .ok()
-            .ok_or_else(unauth("Token is not JSON with iat field"))?;
+            .ok_or_else(unauth("Token is not JSON with exp field"))?;
         // Now interpret this timestamp as an utc time.
-        match chrono::Utc.timestamp_opt(parsed.iat, 0) {
+        match chrono::Utc.timestamp_opt(parsed.exp, 0) {
             chrono::LocalResult::None => Err(unauth("Invalid timestamp")()),
             chrono::LocalResult::Single(expiration) => Ok(expiration),
             chrono::LocalResult::Ambiguous(expiration, _) => Ok(expiration),
@@ -122,8 +122,7 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn connect(config: &SharedConfig) -> Result<Self> {
-        let url = &config.read().await.blockjoy_api_url;
+    pub async fn connect(url: &str) -> Result<Self> {
         let endpoint = Endpoint::from_str(url)?;
         let client = auth_service_client::AuthServiceClient::connect(endpoint).await?;
         Ok(Self { client })
