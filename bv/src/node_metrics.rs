@@ -203,7 +203,7 @@ impl From<ApplicationStatus> for pb::NodeStatus {
 impl From<SyncStatus> for pb::SyncStatus {
     fn from(value: SyncStatus) -> Self {
         match value {
-            SyncStatus::Syncing => pb::SyncStatus::Synced,
+            SyncStatus::Syncing => pb::SyncStatus::Syncing,
             SyncStatus::Synced => pb::SyncStatus::Synced,
         }
     }
