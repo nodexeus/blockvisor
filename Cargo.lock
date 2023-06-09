@@ -409,7 +409,6 @@ dependencies = [
  "tonic",
  "tower",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -550,8 +549,6 @@ dependencies = [
  "tonic-build",
  "tower",
  "tracing",
- "tracing-journald",
- "tracing-subscriber",
  "uuid",
 ]
 
@@ -583,6 +580,8 @@ dependencies = [
  "mockall",
  "tokio",
  "tracing",
+ "tracing-journald",
+ "tracing-subscriber",
 ]
 
 [[package]]

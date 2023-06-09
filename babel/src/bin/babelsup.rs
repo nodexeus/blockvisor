@@ -1,7 +1,7 @@
 use babel::babelsup_service::SupervisorStatus;
-use babel::{babelsup_service, utils};
-use babel::{logging, supervisor};
+use babel::{babelsup_service, supervisor, utils};
 use babel_api::babelsup::SupervisorConfig;
+use bv_utils::logging::setup_logging;
 use bv_utils::run_flag::RunFlag;
 use eyre::{anyhow, Context};
 use std::path::Path;
@@ -19,7 +19,7 @@ const VSOCK_SUPERVISOR_PORT: u32 = 41;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    logging::setup_logging()?;
+    setup_logging();
     info!(
         "Starting {} {} ...",
         env!("CARGO_BIN_NAME"),

@@ -11,3 +11,5 @@ ctrlc = "3.2.4"
 mockall = "0.11.3"
 tokio = "1.17.0"
 tracing = "0.1.37"
+tracing-journald = "0.3.0"
+tracing-subscriber = {version = "0.3.16", features = ["env-filter", "fmt", "std"], default-features = false}

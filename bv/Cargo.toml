@@ -60,8 +60,6 @@ tokio-stream = {version = "0.1.9", features = ["sync"]}
 tonic = {version = "0.8.3", features = ["tls-roots"]}
 tower = "0.4.13"
 tracing = "0.1.37"
-tracing-journald = "0.3.0"
-tracing-subscriber = {version = "0.3.16", features = ["env-filter", "fmt", "std"], default-features = false}
 uuid = {version = "1.2.2", features = ["serde", "v4"]}
 
 [build-dependencies]
