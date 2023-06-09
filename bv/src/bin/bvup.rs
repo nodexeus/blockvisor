@@ -129,9 +129,9 @@ async fn main() -> Result<()> {
     if !cmd_args.skip_download {
         println!("Download and install bv bundle");
         let config = match api_config {
-            None => Config::load(&bv_root).await.with_context(|| {
-                "failed to load configuration - need to provision and init first"
-            })?,
+            None => Config::load(&bv_root)
+                .await
+                .with_context(|| "Failed to load host configuration - need to init first")?,
             Some(value) => value,
         };
         let api_config = SharedConfig::new(config, bv_root.clone());

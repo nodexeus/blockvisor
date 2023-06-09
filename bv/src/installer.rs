@@ -75,12 +75,7 @@ pub struct Installer<T, S> {
 
 impl<T: Timer, S: BvService> Installer<T, S> {
     pub async fn new(timer: T, bv_service: S, bv_root: &Path) -> Result<Self> {
-        let config = Config::load(bv_root).await.with_context(|| {
-            format!(
-                "failed to load host config from {}",
-                bv_root.join(CONFIG_PATH).display()
-            )
-        })?;
+        let config = Config::load(bv_root).await?;
 
         Ok(Self::internal_new(
             timer,
