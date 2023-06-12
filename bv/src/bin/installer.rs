@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use blockvisord::installer;
 use blockvisord::installer::Installer;
 use blockvisord::linux_platform::bv_root;
-use bv_utils::cmd::run_cmd;
+use bv_utils::{cmd::run_cmd, timer::SysTimer};
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, FmtSubscriber};
 
@@ -36,11 +36,8 @@ async fn main() -> Result<()> {
         .with(tracing_journald::layer()?)
         .init();
 
-    let res = Installer::new(bv_utils::timer::SysTimer, SystemCtl, &bv_root())
-        .await?
-        .run()
-        .await;
-    if let Err(err) = res {
+    let installer = Installer::new(SysTimer, SystemCtl, &bv_root()).await?;
+    if let Err(err) = installer.run().await {
         error!("{err}");
         Err(err)
     } else {

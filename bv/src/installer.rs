@@ -135,8 +135,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
 
     fn move_bundle_to_install_path(&self, current_exe_path: PathBuf) -> Result<()> {
         let bin_path = fs::canonicalize(current_exe_path)
-            .with_context(|| "non canonical current binary path")?;
-        let bin_dir = bin_path.parent().expect("invalid current binary dir");
+            .with_context(|| "cannot normalise current binary path: {current_exe_path}")?;
+        let bin_dir = bin_path
+            .parent()
+            .expect("invalid parent dir for file: {current_exe_path}");
         if self.paths.this_version != bin_dir {
             info!(
                 "move BV files from {} to install path {}",
@@ -179,9 +181,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     fn is_blacklisted(&self, version: &str) -> Result<bool> {
-        Ok(self.paths.blacklist.exists()
-            && fs::read_to_string(&self.paths.blacklist)
-                .with_context(|| "failed to read blacklist")?
+        let path = &self.paths.blacklist;
+        Ok(path.exists()
+            && fs::read_to_string(path)
+                .with_context(|| "failed to read blacklist from: {path}")?
                 .contains(version))
     }
 
@@ -209,11 +212,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     fn get_running_version(&self) -> Result<Option<String>> {
         if self.paths.current.exists() {
             // get running version if any
-            let current_path_unlinked = self
-                .paths
-                .current
+            let current = &self.paths.current;
+            let current_path_unlinked = current
                 .read_link()
-                .with_context(|| "invalid current version link")?;
+                .with_context(|| "invalid current version link: {current}")?;
             Ok(current_path_unlinked
                 .file_name()
                 .and_then(|v| v.to_str().map(|v| v.to_owned())))
@@ -390,13 +392,14 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     fn blacklist_this_version(&self) -> Result<()> {
+        let path = &self.paths.blacklist;
         let mut file = fs::OpenOptions::new()
             .write(true)
             .append(true)
             .create(true)
-            .open(&self.paths.blacklist)?;
+            .open(path)?;
         writeln!(file, "{THIS_VERSION}")
-            .with_context(|| "install failed, but can't blacklist broken version")
+            .with_context(|| "install failed, but can't write version to blacklist: {path}")
     }
 
     fn cleanup(&self) -> Result<()> {
