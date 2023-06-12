@@ -1,5 +1,5 @@
 use crate::services::api::{pb, AuthClient, AuthToken};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::{
@@ -96,8 +96,12 @@ impl Config {
     pub async fn load(bv_root: &Path) -> Result<Config> {
         let path = bv_root.join(CONFIG_PATH);
         info!("Reading host config: {}", path.display());
-        let config = fs::read_to_string(path).await?;
-        Ok(serde_json::from_str(&config)?)
+        let config = fs::read_to_string(&path)
+            .await
+            .with_context(|| format!("failed to read host config: {}", path.display()))?;
+        let config = serde_json::from_str(&config)
+            .with_context(|| format!("failed to parse host config: {}", path.display()))?;
+        Ok(config)
     }
 
     pub async fn save(&self, bv_root: &Path) -> Result<()> {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, SharedConfig, CONFIG_PATH},
+    config::{Config, SharedConfig},
     hosts::{self, HostMetrics},
     node_data::NodeStatus,
     node_metrics,
@@ -57,12 +57,7 @@ where
 {
     pub async fn new(pal: P) -> Result<Self> {
         let bv_root = pal.bv_root().to_owned();
-        let config = Config::load(&bv_root).await.with_context(|| {
-            format!(
-                "failed to load host config from {}",
-                bv_root.join(CONFIG_PATH).display()
-            )
-        })?;
+        let config = Config::load(&bv_root).await?;
         let url = format!("0.0.0.0:{}", config.blockvisor_port);
         let listener = TcpListener::bind(url).await?;
         Ok(Self {
