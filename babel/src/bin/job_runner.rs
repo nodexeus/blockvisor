@@ -1,5 +1,6 @@
-use babel::{job_runner::JobRunner, jobs, log_buffer::LogBuffer, logging, BABEL_LOGS_UDS_PATH};
+use babel::{job_runner::JobRunner, jobs, log_buffer::LogBuffer, BABEL_LOGS_UDS_PATH};
 use babel_api::babel::logs_collector_client::LogsCollectorClient;
+use bv_utils::logging::setup_logging;
 use bv_utils::run_flag::RunFlag;
 use eyre::{anyhow, bail};
 use std::{env, time::Duration};
@@ -26,7 +27,7 @@ async fn main() -> eyre::Result<()> {
     if args.count() != 0 {
         bail!("Invalid number of arguments! Expected only one argument: unique job name.");
     }
-    logging::setup_logging()?;
+    setup_logging();
     info!(
         "Starting {} {} ...",
         env!("CARGO_BIN_NAME"),

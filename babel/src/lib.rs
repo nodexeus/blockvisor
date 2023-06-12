@@ -5,7 +5,6 @@ pub mod job_runner;
 pub mod jobs;
 pub mod jobs_manager;
 pub mod log_buffer;
-pub mod logging;
 pub mod logs_service;
 pub mod supervisor;
 pub mod ufw_wrapper;

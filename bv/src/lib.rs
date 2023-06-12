@@ -8,7 +8,6 @@ pub mod firecracker_machine;
 pub mod hosts;
 pub mod installer;
 pub mod linux_platform;
-pub mod logging;
 pub mod node;
 pub mod node_connection;
 pub mod node_data;

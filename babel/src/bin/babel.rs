@@ -3,12 +3,12 @@ use babel::{
     babel_service,
     babel_service::{BabelPal, BabelStatus, MountError},
     jobs::JOBS_DIR,
-    jobs_manager, logging,
+    jobs_manager,
     logs_service::LogsService,
     utils, BABEL_LOGS_UDS_PATH,
 };
 use babel_api::metadata::BabelConfig;
-use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
+use bv_utils::{cmd::run_cmd, logging::setup_logging, run_flag::RunFlag};
 use eyre::{anyhow, bail, Context};
 use std::{path::Path, sync::Arc};
 use tokio::{
@@ -29,7 +29,7 @@ const VSOCK_BABEL_PORT: u32 = 42;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
-    logging::setup_logging()?;
+    setup_logging();
     info!(
         "Starting {} {} ...",
         env!("CARGO_BIN_NAME"),
