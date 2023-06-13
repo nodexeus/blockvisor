@@ -309,21 +309,28 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     async fn restart_and_reenable_blockvisor(&self) -> Result<()> {
         self.bv_service.reload().await?;
         self.bv_service.stop().await?;
-        self.migrate_bv_data()
-            .with_context(|| "failed to migrate bv data to new version")?;
+        self.backup_and_migrate_bv_data()?;
         self.bv_service.start().await?;
         self.bv_service.enable().await?;
         Ok(())
     }
 
-    fn migrate_bv_data(&self) -> Result<()> {
-        // backup state/config and migrate to new version
+    fn backup_and_migrate_bv_data(&self) -> Result<()> {
+        if let BackupStatus::Done(_) = self.backup_status {
+            // backup blockvisor config since new version may modify/break it
+            let config_path = self.paths.bv_root.join(CONFIG_PATH);
+            let backup_config_path = self.paths.backup.join(BLOCKVISOR_CONFIG);
+            fs::copy(&config_path, &backup_config_path).with_context(|| {
+                format!(
+                    "failed to copy bv config `{}` to backup location `{}`",
+                    config_path.display(),
+                    backup_config_path.display()
+                )
+            })?;
 
-        // backup blockvisor config since new version may modify/break it
-        fs::copy(
-            self.paths.bv_root.join(CONFIG_PATH),
-            self.paths.current.join(BLOCKVISOR_CONFIG),
-        )?;
+            // migrate config to new format if needed
+        };
+
         Ok(())
     }
 
