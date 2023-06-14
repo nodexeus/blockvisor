@@ -25,7 +25,7 @@ use tonic::transport::Channel;
 use tracing::warn;
 
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-const BUNDLES_REQ_TIMEOUT: Duration = Duration::from_secs(5);
+const BUNDLES_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const DOWNLOADS: &str = "downloads";
 const BUNDLE: &str = "bundle";
@@ -51,7 +51,7 @@ impl BundleConnector for DefaultConnector {
                 .ok_or_else(|| anyhow!("missing blockjoy_registry_url"))?;
             Ok(BundleClient::with_auth(
                 Channel::from_shared(url)?
-                    .timeout(BUNDLES_REQ_TIMEOUT)
+                    .timeout(BUNDLES_REQUEST_TIMEOUT)
                     .connect_timeout(BUNDLES_CONNECT_TIMEOUT)
                     .connect()
                     .await?,
@@ -74,7 +74,7 @@ pub struct SelfUpdater<T, C> {
     download_path: PathBuf,
     check_interval: Option<Duration>,
     bundles: C,
-    latest_downloaded_version: String,
+    latest_installed_version: String,
     sleeper: T,
 }
 
@@ -99,7 +99,7 @@ pub async fn new<T: AsyncTimer>(
         bundles: DefaultConnector {
             config: config.clone(),
         },
-        latest_downloaded_version: CURRENT_VERSION.to_string(),
+        latest_installed_version: CURRENT_VERSION.to_string(),
         sleeper,
     })
 }
@@ -120,11 +120,11 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         if let Some(latest_bundle) = self.get_latest().await? {
             let latest_version = latest_bundle.version.clone();
             if let Ordering::Greater =
-                utils::semver_cmp(&latest_version, &self.latest_downloaded_version)
+                utils::semver_cmp(&latest_version, &self.latest_installed_version)
             {
                 if !self.is_blacklisted(&latest_version).await? {
                     self.download_and_install(latest_bundle).await?;
-                    self.latest_downloaded_version = latest_version;
+                    self.latest_installed_version = latest_version;
                 }
             }
         }
@@ -264,7 +264,7 @@ mod tests {
                     bundles: TestConnector {
                         tmp_root: tmp_root.clone(),
                     },
-                    latest_downloaded_version: CURRENT_VERSION.to_string(),
+                    latest_installed_version: CURRENT_VERSION.to_string(),
                     sleeper: MockAsyncTimer::new(),
                 },
                 blacklist_path,
@@ -489,7 +489,7 @@ mod tests {
 
         // continue if no update installed
         let _ = test_env.updater.check_for_update().await;
-        assert_eq!(CURRENT_VERSION, test_env.updater.latest_downloaded_version);
+        assert_eq!(CURRENT_VERSION, test_env.updater.latest_installed_version);
 
         let server = MockServer::start();
 
@@ -530,7 +530,7 @@ mod tests {
         });
 
         test_env.updater.check_for_update().await?;
-        assert_eq!(bundle_version, test_env.updater.latest_downloaded_version);
+        assert_eq!(bundle_version, test_env.updater.latest_installed_version);
 
         wait_for_ctrl_file(&ctrl_file_path).await;
         assert!(ctrl_file_path.exists());
@@ -562,7 +562,7 @@ mod tests {
         let bundle_server = test_env.start_test_server(bundles_mock);
 
         test_env.updater.check_for_update().await?;
-        assert_eq!(CURRENT_VERSION, test_env.updater.latest_downloaded_version);
+        assert_eq!(CURRENT_VERSION, test_env.updater.latest_installed_version);
         bundle_server.assert().await;
         Ok(())
     }
