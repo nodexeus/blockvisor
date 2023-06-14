@@ -22,6 +22,7 @@ use std::{
 };
 use tokio::{fs, process::Command};
 use tonic::transport::Channel;
+use tracing::warn;
 
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const BUNDLES_REQ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -83,7 +84,8 @@ pub async fn new<T: AsyncTimer>(
     config: &SharedConfig,
 ) -> Result<SelfUpdater<T, DefaultConnector>> {
     let download_path = bv_root.join(BV_VAR_PATH).join(DOWNLOADS);
-    std::fs::create_dir_all(&download_path)?;
+    std::fs::create_dir_all(&download_path)
+        .with_context(|| format!("cannot create dirs: {}", download_path.display()))?;
     Ok(SelfUpdater {
         blacklist_path: bv_root
             .join(installer::INSTALL_PATH)
@@ -106,25 +108,28 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
     pub async fn run(mut self) {
         if let Some(check_interval) = self.check_interval {
             loop {
-                self.check_for_update().await;
+                if let Err(e) = self.check_for_update().await {
+                    warn!("Error executing self update: {e}");
+                }
                 self.sleeper.sleep(check_interval).await;
             }
         }
     }
 
-    async fn check_for_update(&mut self) {
-        if let Ok(Some(latest_bundle)) = self.get_latest().await {
+    async fn check_for_update(&mut self) -> Result<()> {
+        if let Some(latest_bundle) = self.get_latest().await? {
             let latest_version = latest_bundle.version.clone();
             if let Ordering::Greater =
                 utils::semver_cmp(&latest_version, &self.latest_downloaded_version)
             {
-                if !self.is_blacklisted(&latest_version).await.unwrap_or(true)
-                    && self.download_and_install(latest_bundle).await.is_ok()
-                {
+                if !self.is_blacklisted(&latest_version).await? {
+                    self.download_and_install(latest_bundle).await?;
                     self.latest_downloaded_version = latest_version;
                 }
             }
         }
+
+        Ok(())
     }
 
     pub async fn get_latest(&mut self) -> Result<Option<BundleIdentifier>> {
@@ -146,7 +151,12 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         Ok(self.blacklist_path.exists()
             && fs::read_to_string(&self.blacklist_path)
                 .await
-                .with_context(|| "failed to read blacklist")?
+                .with_context(|| {
+                    format!(
+                        "failed to read blacklist: {}",
+                        self.blacklist_path.display()
+                    )
+                })?
                 .contains(version))
     }
 
@@ -162,15 +172,16 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         let bundle_path = self.download_path.join(BUNDLE);
         let _ = fs::remove_dir_all(&bundle_path).await;
 
-        utils::download_archive(&archive.url.clone(), self.download_path.join(BUNDLE_FILE))
+        let url = archive.url.clone();
+        utils::download_archive(&url, self.download_path.join(BUNDLE_FILE))
             .await
-            .with_context(|| "failed to download bundle")?
+            .with_context(|| format!("failed to download bundle from `{url}`"))?
             .ungzip()
             .await
-            .with_context(|| "failed to extract downloaded bundle")?
+            .with_context(|| "failed to ungzip downloaded bundle")?
             .untar()
             .await
-            .with_context(|| "failed to extract downloaded bundle")?;
+            .with_context(|| "failed to untar downloaded bundle")?;
 
         Command::new(bundle_path.join(installer::INSTALLER_BIN)).spawn()?;
         Ok(())
@@ -477,7 +488,7 @@ mod tests {
         };
 
         // continue if no update installed
-        test_env.updater.check_for_update().await;
+        let _ = test_env.updater.check_for_update().await;
         assert_eq!(CURRENT_VERSION, test_env.updater.latest_downloaded_version);
 
         let server = MockServer::start();
@@ -518,7 +529,7 @@ mod tests {
                 .body_from_file(&*test_env.tmp_root.join("bundle.tar.gz").to_string_lossy());
         });
 
-        test_env.updater.check_for_update().await;
+        test_env.updater.check_for_update().await?;
         assert_eq!(bundle_version, test_env.updater.latest_downloaded_version);
 
         wait_for_ctrl_file(&ctrl_file_path).await;
@@ -550,7 +561,7 @@ mod tests {
             });
         let bundle_server = test_env.start_test_server(bundles_mock);
 
-        test_env.updater.check_for_update().await;
+        test_env.updater.check_for_update().await?;
         assert_eq!(CURRENT_VERSION, test_env.updater.latest_downloaded_version);
         bundle_server.assert().await;
         Ok(())
