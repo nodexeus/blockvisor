@@ -26,6 +26,9 @@ use tonic::transport::Channel;
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const BUNDLES_REQ_TIMEOUT: Duration = Duration::from_secs(5);
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+const DOWNLOADS: &str = "downloads";
+const BUNDLE: &str = "bundle";
+const BUNDLE_FILE: &str = "bundle.tar.gz";
 
 #[async_trait]
 pub trait BundleConnector {
@@ -79,7 +82,7 @@ pub async fn new<T: AsyncTimer>(
     bv_root: &Path,
     config: &SharedConfig,
 ) -> Result<SelfUpdater<T, DefaultConnector>> {
-    let download_path = bv_root.join(BV_VAR_PATH).join("downloads");
+    let download_path = bv_root.join(BV_VAR_PATH).join(DOWNLOADS);
     std::fs::create_dir_all(&download_path)?;
     Ok(SelfUpdater {
         blacklist_path: bv_root
@@ -156,21 +159,18 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
             .await?
             .into_inner();
 
-        let bundle_path = self.download_path.join("bundle");
+        let bundle_path = self.download_path.join(BUNDLE);
         let _ = fs::remove_dir_all(&bundle_path).await;
 
-        utils::download_archive(
-            &archive.url.clone(),
-            self.download_path.join("bundle.tar.gz"),
-        )
-        .await
-        .with_context(|| "failed to download bundle")?
-        .ungzip()
-        .await
-        .with_context(|| "failed to extract downloaded bundle")?
-        .untar()
-        .await
-        .with_context(|| "failed to extract downloaded bundle")?;
+        utils::download_archive(&archive.url.clone(), self.download_path.join(BUNDLE_FILE))
+            .await
+            .with_context(|| "failed to download bundle")?
+            .ungzip()
+            .await
+            .with_context(|| "failed to extract downloaded bundle")?
+            .untar()
+            .await
+            .with_context(|| "failed to extract downloaded bundle")?;
 
         Command::new(bundle_path.join(installer::INSTALLER_BIN)).spawn()?;
         Ok(())
