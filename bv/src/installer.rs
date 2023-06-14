@@ -134,8 +134,12 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     fn move_bundle_to_install_path(&self, current_exe_path: PathBuf) -> Result<()> {
-        let bin_path = fs::canonicalize(current_exe_path)
-            .with_context(|| "cannot normalise current binary path: {current_exe_path}")?;
+        let bin_path = fs::canonicalize(&current_exe_path).with_context(|| {
+            format!(
+                "cannot normalise current binary path: {}",
+                current_exe_path.display()
+            )
+        })?;
         let bin_dir = bin_path
             .parent()
             .expect("invalid parent dir for file: {current_exe_path}");
@@ -184,7 +188,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
         let path = &self.paths.blacklist;
         Ok(path.exists()
             && fs::read_to_string(path)
-                .with_context(|| "failed to read blacklist from: {path}")?
+                .with_context(|| format!("failed to read blacklist from: {}", path.display()))?
                 .contains(version))
     }
 
@@ -215,7 +219,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
             let current = &self.paths.current;
             let current_path_unlinked = current
                 .read_link()
-                .with_context(|| "invalid current version link: {current}")?;
+                .with_context(|| format!("invalid current version link: {}", current.display()))?;
             Ok(current_path_unlinked
                 .file_name()
                 .and_then(|v| v.to_str().map(|v| v.to_owned())))
@@ -405,8 +409,12 @@ impl<T: Timer, S: BvService> Installer<T, S> {
             .append(true)
             .create(true)
             .open(path)?;
-        writeln!(file, "{THIS_VERSION}")
-            .with_context(|| "install failed, but can't write version to blacklist: {path}")
+        writeln!(file, "{THIS_VERSION}").with_context(|| {
+            format!(
+                "install failed, but can't write version to blacklist: {}",
+                path.display()
+            )
+        })
     }
 
     fn cleanup(&self) -> Result<()> {
