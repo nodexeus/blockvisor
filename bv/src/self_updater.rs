@@ -111,7 +111,7 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
                 if let Err(e) = self.check_for_update().await {
                     warn!("Error executing self update: {e}");
                 }
-                self.sleeper.sleep(check_interval).await;
+                self.sleeper.sleep(utils::with_jitter(check_interval)).await;
             }
         }
     }

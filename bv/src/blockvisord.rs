@@ -9,6 +9,7 @@ use crate::{
     server::{bv_pb, BlockvisorServer},
     services::{api, api::pb, mqtt},
     try_set_bv_status,
+    utils::with_jitter,
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
@@ -244,11 +245,10 @@ where
 
     /// This task runs periodically to send important info about nodes to API.
     async fn node_updates(mut run: RunFlag, nodes: Arc<Nodes<P>>, config: SharedConfig) {
-        let mut timer = tokio::time::interval(INFO_UPDATE_INTERVAL);
         let mut known_addresses: HashMap<Uuid, Option<String>> = HashMap::new();
         let mut known_statuses: HashMap<Uuid, NodeStatus> = HashMap::new();
         while run.load() {
-            run.select(timer.tick()).await;
+            run.select(sleep(with_jitter(INFO_UPDATE_INTERVAL))).await;
 
             let now = Instant::now();
             let mut updates = vec![];
@@ -327,9 +327,10 @@ where
         endpoint: &Endpoint,
         config: SharedConfig,
     ) -> Option<()> {
-        let mut timer = tokio::time::interval(node_metrics::COLLECT_INTERVAL);
         while run.load() {
-            run.select(timer.tick()).await;
+            run.select(sleep(with_jitter(node_metrics::COLLECT_INTERVAL)))
+                .await;
+
             let now = Instant::now();
             let metrics = node_metrics::collect_metrics(nodes.clone()).await;
             // do not bother api with empty updates
@@ -368,9 +369,10 @@ where
         endpoint: &Endpoint,
         config: SharedConfig,
     ) -> Option<()> {
-        let mut timer = tokio::time::interval(hosts::COLLECT_INTERVAL);
         while run.load() {
-            run.select(timer.tick()).await;
+            run.select(sleep(with_jitter(hosts::COLLECT_INTERVAL)))
+                .await;
+
             let now = Instant::now();
             match HostMetrics::collect() {
                 Ok(metrics) => {
