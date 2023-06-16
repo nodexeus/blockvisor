@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use bv_utils::cmd::run_cmd;
+use rand::Rng;
 use semver::Version;
 use std::cmp::Ordering;
 use std::ffi::OsStr;
@@ -149,6 +150,16 @@ pub fn with_timeout<T>(args: T, timeout: Duration) -> Request<T> {
     let mut req = Request::new(args);
     req.set_timeout(timeout);
     req
+}
+
+/// Take base interval and add random amount of seconds to it
+///
+/// Do not add more than original seconds / 2
+pub fn with_jitter(base: Duration) -> Duration {
+    let mut rng = rand::thread_rng();
+    let jitter_max = base.as_secs() / 2;
+    let jitter = Duration::from_secs(rng.gen_range(0..jitter_max));
+    base + jitter
 }
 
 #[cfg(test)]

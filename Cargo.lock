@@ -534,6 +534,7 @@ dependencies = [
  "predicates",
  "prost",
  "prost-types",
+ "rand",
  "reqwest",
  "rumqttc",
  "semver",
