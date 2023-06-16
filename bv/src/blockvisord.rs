@@ -252,7 +252,7 @@ where
 
             let now = Instant::now();
             let mut updates = vec![];
-            for node in nodes.nodes.read().await.values() {
+            for (id, node) in nodes.nodes.read().await.iter() {
                 if let Ok(mut node) = node.try_write() {
                     let status = node.status();
                     let maybe_address = if status == NodeStatus::Running {
@@ -260,7 +260,10 @@ where
                     } else {
                         None
                     };
+                    debug!("Collected node `{id}` info: s={status}, a={maybe_address:?}");
                     updates.push((node.id(), maybe_address, status));
+                } else {
+                    debug!("Skipping node info collection, node `{id}` busy");
                 }
             }
 
@@ -268,6 +271,7 @@ where
                 if known_addresses.get(&node_id) == Some(&address)
                     && known_statuses.get(&node_id) == Some(&status)
                 {
+                    debug!("Skipping node update: a={known_addresses:?}, s={known_statuses:?}");
                     continue;
                 }
 
@@ -288,10 +292,13 @@ where
                 };
                 update.set_container_status(container_status);
 
-                if Self::send_node_info_update(&config, update).await.is_ok() {
-                    // cache to not send the same data if it has not changed
-                    known_addresses.entry(node_id).or_insert(address);
-                    known_statuses.entry(node_id).or_insert(status);
+                match Self::send_node_info_update(&config, update).await {
+                    Ok(_) => {
+                        // cache to not send the same data if it has not changed
+                        known_addresses.entry(node_id).or_insert(address);
+                        known_statuses.entry(node_id).or_insert(status);
+                    }
+                    Err(e) => warn!("Cannot send node info update: {e:?}"),
                 }
             }
             BV_NODES_INFO_COUNTER.increment(1);
