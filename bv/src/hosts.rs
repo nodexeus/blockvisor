@@ -1,6 +1,7 @@
 use crate::linux_platform::bv_root;
 use crate::services::api::pb;
 use crate::BV_VAR_PATH;
+use crate::{config::SharedConfig, services::api::HostsService};
 use anyhow::{anyhow, Result};
 use metrics::{register_gauge, Gauge};
 use std::cmp::Ordering;
@@ -173,6 +174,21 @@ fn find_bv_var_disk(sys: &System) -> Option<&Disk> {
                 None
             }
         })
+}
+
+pub async fn send_info_update(config: SharedConfig) -> Result<()> {
+    let info = HostInfo::collect()?;
+    let mut client = HostsService::connect(&config).await?;
+    let update = pb::HostServiceUpdateRequest {
+        id: config.read().await.id,
+        name: Some(info.name),
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        os: Some(info.os),
+        os_version: Some(info.os_version),
+    };
+    client.update(update).await?;
+
+    Ok(())
 }
 
 #[cfg(test)]
