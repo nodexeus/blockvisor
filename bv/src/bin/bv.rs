@@ -2,20 +2,17 @@ use anyhow::{bail, Result};
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::{Config, SharedConfig, CONFIG_PATH},
-    hosts::{HostInfo, HostMetrics},
+    hosts::{self, HostInfo, HostMetrics},
     linux_platform::bv_root,
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
         bv_pb::blockvisor_client::BlockvisorClient,
         bv_pb::{self, Node, Parameter},
     },
-    services::{
-        api::{pb, HostsService},
-        cookbook::CookbookService,
-    },
+    services::cookbook::CookbookService,
 };
 use bv_utils::cmd::run_cmd;
-use clap::{crate_version, Parser};
+use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
 use std::{collections::HashMap, io::BufRead};
@@ -62,7 +59,7 @@ async fn main() -> Result<()> {
                 println!("Service stopped");
             }
         }
-        Command::Host { command } => process_host_command(&config, command).await?,
+        Command::Host { command } => process_host_command(config, command).await?,
         Command::Chain { command } => process_chain_command(command).await?,
         Command::Node { command } => {
             NodeClient::new(format!("http://localhost:{port}"))
@@ -82,7 +79,7 @@ async fn is_running(url: String) -> Result<bool> {
         .is_ok())
 }
 
-async fn process_host_command(config: &SharedConfig, command: HostCommand) -> Result<()> {
+async fn process_host_command(config: SharedConfig, command: HostCommand) -> Result<()> {
     let to_gb = |n| n as f64 / 1_000_000_000.0;
     match command {
         HostCommand::Info => {
@@ -95,16 +92,8 @@ async fn process_host_command(config: &SharedConfig, command: HostCommand) -> Re
             println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
         }
         HostCommand::Update => {
-            let info = HostInfo::collect()?;
-            let mut client = HostsService::connect(config).await?;
-            let update = pb::HostServiceUpdateRequest {
-                id: config.read().await.id,
-                name: Some(info.name),
-                version: Some(crate_version!().to_string()),
-                os: Some(info.os),
-                os_version: Some(info.os_version),
-            };
-            client.update(update).await?;
+            hosts::send_info_update(config).await?;
+            println!("Host info update sent");
         }
         HostCommand::Metrics => {
             let metrics = HostMetrics::collect()?;
