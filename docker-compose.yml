@@ -48,6 +48,8 @@ services:
       # cookbook
       COOKBOOK_URL: http://cookbook:50051
       COOKBOOK_TOKEN: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpZCI6ImE2MDdkOTM2LTYyMjgtNGYxMC04MGM1LTk0M2M0MjFiZWQxOSIsImV4cCI6MTcwNDgwNzY3NywidG9rZW5fdHlwZSI6Imhvc3RfYXV0aCIsInJvbGUiOiJzZXJ2aWNlIn0.5sJB8qilPQ4-F44mCS2WsXElBGfBZFrMJ491Sxmmu1BTj--0N6rlIEnTUwoiJdUXOP08CiBTkStFRtUTFyEpGg
+      # key service
+      KEY_SERVICE_URL: http://api:8080
       # mqtt
       MQTT_SERVER_ADDRESS: mqtt
       MQTT_SERVER_PORT: 1883
