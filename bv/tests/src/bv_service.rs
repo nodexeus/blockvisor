@@ -154,7 +154,7 @@ async fn test_bv_service_e2e() {
     println!("add blockchain");
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
     let db_query =
-        r#"INSERT INTO blockchains (id, name, status) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing', 'production');
+        r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'TESTING_PARAM', NULL, 'text', FALSE, FALSE);
         "#.to_string();
