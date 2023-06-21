@@ -201,6 +201,8 @@ async fn test_bv_service_e2e() {
     test_env::bv_run(&["stop"], "blockvisor service stopped successfully", None);
     test_env::bv_run(&["start"], "blockvisor service started successfully", None);
 
+    test_env::bv_run(&["host", "update"], "Host info update sent", None);
+
     println!("get blockchain id");
     let mut client = pb::blockchain_service_client::BlockchainServiceClient::connect(url)
         .await
