@@ -38,19 +38,30 @@ async fn main() -> Result<()> {
 
     match args.command {
         Command::Start(_) => {
-            if is_running(bv_url).await? {
+            if is_running(bv_url.clone()).await? {
                 println!("Service already running");
                 return Ok(());
             }
 
             run_cmd("systemctl", ["start", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_START_TIMEOUT).await;
-            println!("blockvisor service started successfully");
+
+            match is_running(bv_url.clone()).await {
+                Ok(true) => println!("blockvisor service started successfully"),
+                Ok(false) => {
+                    bail!("blockvisor service did not start: cannot connect to `{bv_url}`");
+                }
+                Err(e) => bail!("blockvisor service did not start: {e:?}"),
+            }
         }
         Command::Stop(_) => {
             run_cmd("systemctl", ["stop", "blockvisor.service"]).await?;
             sleep(BLOCKVISOR_STOP_TIMEOUT).await;
-            println!("blockvisor service stopped successfully");
+
+            match is_running(bv_url).await {
+                Ok(true) => bail!("blockvisor service did not stop"),
+                _ => println!("blockvisor service stopped successfully"),
+            }
         }
         Command::Status(_) => {
             if is_running(bv_url).await? {
