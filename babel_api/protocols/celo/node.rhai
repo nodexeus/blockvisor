@@ -49,15 +49,16 @@ const API_HOST = "http://localhost:8545";
 const HOME = "/blockjoy/celo";
 
 fn init(keys) {
-    let net = sanitize_sh_param(node_params().NETWORK);
     debug("Executing startup scripts...");
 
     start_job("download_prerequisites", #{
-        body: `
-        curl ${global::METADATA.nets[net].genesis_url} > ${global::HOME}/genesis.json && \
-        curl ${global::METADATA.nets[net].bootnodes_url} > ${global::HOME}/bootnodes && \
-        curl ${global::METADATA.nets[net].staticnodes_url} > ${global::HOME}/static-nodes.json && \
-        `,
+        job_type: #{ 
+            run_sh: `
+            curl ${global::METADATA.nets[node_params().NETWORK].genesis_url} > ${global::HOME}/genesis.json && \
+            curl ${global::METADATA.nets[node_params().NETWORK].bootnodes_url} > ${global::HOME}/bootnodes && \
+            curl ${global::METADATA.nets[node_params().NETWORK].staticnodes_url} > ${global::HOME}/static-nodes.json && \
+            `,
+        },
        restart: #{
             "always": #{
                 backoff_timeout_ms: 60000,
@@ -68,9 +69,11 @@ fn init(keys) {
     });
 
     start_job("celo", #{
-        body: `
-        /usr/bin/celo --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
-        `,
+        job_type: #{
+            run_sh: `
+            /usr/bin/celo --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
+            `,
+        },
        restart: #{
             "always": #{
                 backoff_timeout_ms: 60000,

@@ -6,7 +6,7 @@ version = "1.7.4-build.1"
 debian_version = "focal"
 rootfs_size = "10G"
 fs_type = "ext4"
-apt_image = []
+apt_image = ["ufw"]
 apt_source = []
 cmds = [
   "ln -s /etc/systemd/system/babelsup.service /etc/systemd/system/multi-user.target.wants/babelsup.service",
