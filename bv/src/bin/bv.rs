@@ -72,12 +72,10 @@ async fn main() -> Result<()> {
         }
         Command::Host { command } => process_host_command(config, command).await?,
         Command::Chain { command } => process_chain_command(command).await?,
-        Command::Node { command } => {
-            NodeClient::new(format!("http://localhost:{port}"))
-                .await?
-                .process_node_command(command)
-                .await?
-        }
+        Command::Node { command } => match NodeClient::new(bv_url).await {
+            Ok(client) => client.process_node_command(command).await?,
+            Err(e) => bail!("service is not running: {e:?}"),
+        },
     }
 
     Ok(())
