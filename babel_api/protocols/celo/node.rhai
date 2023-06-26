@@ -69,7 +69,7 @@ fn init(keys) {
 
     start_job("celo", #{
         body: `
-        /usr/bin/geth --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
+        /usr/bin/celo --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
         `,
        restart: #{
             "always": #{
