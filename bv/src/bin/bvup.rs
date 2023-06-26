@@ -87,8 +87,8 @@ async fn main() -> Result<()> {
                 .cpu_count
                 .try_into()
                 .with_context(|| "Cannot convert cpu count from usize to u64")?,
-            mem_size_bytes: host_info.mem_size,
-            disk_size_bytes: host_info.disk_size,
+            mem_size_bytes: host_info.memory_bytes,
+            disk_size_bytes: host_info.disk_space_bytes,
             os: host_info.os,
             os_version: host_info.os_version,
             ip_addr: ip,
