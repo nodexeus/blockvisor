@@ -20,7 +20,7 @@ const METADATA = #{
     },
 
     babel_config: #{
-        data_directory_mount_point: "/blockjoy/celo/",
+        data_directory_mount_point: "/blockjoy/",
         backoff_timeout_ms: 60000,
         backoff_base_ms: 100,
         log_buffer_capacity_ln: 1000,
@@ -46,21 +46,17 @@ const METADATA = #{
 };
 
 const API_HOST = "http://localhost:8545";
-const HOME = "/blockjoy/celo";
+const HOME = "/blockjoy";
 
 fn init(keys) {
     debug("Executing startup scripts...");
 
     start_job("download_prerequisites", #{
         job_type: #{ 
-            run_sh: `
-            curl ${global::METADATA.nets[node_params().NETWORK].genesis_url} > ${global::HOME}/genesis.json && \
-            curl ${global::METADATA.nets[node_params().NETWORK].bootnodes_url} > ${global::HOME}/bootnodes && \
-            curl ${global::METADATA.nets[node_params().NETWORK].staticnodes_url} > ${global::HOME}/static-nodes.json && \
-            `,
+            run_sh: `mkdir -p /blockjoy/celo && curl ${global::METADATA.nets[node_params().NETWORK].genesis_url} > ${global::HOME}/celo/genesis.json && curl ${global::METADATA.nets[node_params().NETWORK].bootnodes_url} > ${global::HOME}/celo/bootnodes && curl ${global::METADATA.nets[node_params().NETWORK].staticnodes_url} > ${global::HOME}/celo/static-nodes.json`,
         },
        restart: #{
-            "always": #{
+            "on_failure": #{
                 backoff_timeout_ms: 60000,
                 backoff_base_ms: 10000,
             },
@@ -71,7 +67,7 @@ fn init(keys) {
     start_job("celo", #{
         job_type: #{
             run_sh: `
-            /usr/bin/celo --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
+            sleep 30 && /usr/bin/celo --verbosity 3 --syncmode full --http --http.addr 0.0.0.0 --http.api eth,net,web3,debug,admin,personal --light.serve 90 --light.maxpeers 1000 --maxpeers 1100 --datadir ${global::HOME}
             `,
         },
        restart: #{
@@ -80,7 +76,6 @@ fn init(keys) {
                 backoff_base_ms: 10000,
             },
         },
-        needs: ["download_prerequisites"],
     });
 }
 
