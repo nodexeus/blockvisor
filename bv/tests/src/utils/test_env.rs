@@ -79,10 +79,9 @@ impl TestEnv {
             id: "host_id".to_owned(),
             token: "token".to_owned(),
             refresh_token: "fresh boii".to_owned(),
-            cookbook_token: "cookiebookie".to_string(),
             blockjoy_api_url: "http://localhost:8070".to_owned(),
             blockjoy_keys_url: Some("http://localhost:8070".to_owned()),
-            blockjoy_registry_url: Some("http://localhost:50041".to_owned()),
+            blockjoy_registry_url: Some("http://localhost:8070".to_owned()),
             blockjoy_mqtt_url: Some("mqtt://localhost:1873".to_string()),
             update_check_interval_secs: None,
             blockvisor_port: 0, // 0 has special meaning - pick first free port

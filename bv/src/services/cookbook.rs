@@ -1,12 +1,8 @@
 use crate::{
-    config::SharedConfig,
-    node_data::NodeImage,
-    services,
-    services::api::{self, AuthenticatedService},
-    utils, BV_VAR_PATH,
+    config::SharedConfig, node_data::NodeImage, services, services::api::pb,
+    services::api::AuthenticatedService, utils, BV_VAR_PATH,
 };
 use anyhow::{anyhow, Context, Result};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use bv_utils::with_retry;
 use std::path::{Path, PathBuf};
 use tokio::{
@@ -16,15 +12,7 @@ use tokio::{
 use tonic::transport::Endpoint;
 use tracing::{debug, info, instrument};
 
-pub mod cb_pb {
-    tonic::include_proto!("blockjoy.api.v1.babel");
-}
-
 pub const IMAGES_DIR: &str = "images";
-pub const COOKBOOK_TOKEN: &str =
-    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpZCI6ImMzNjFjYTY2LWFmZDMtNGNhNy1iMDgwLWFkYTBhZTMyNmRlO\
-    SIsImV4cCI6MTcxNjA1MDIxNSwidG9rZW5fdHlwZSI6Imhvc3RfYXV0aCIsInJvbGUiOiJzZXJ2aWNlIn0.avtSu_nmQrtw\
-    I-LSFXba3yGHn2PlBVIjBpY4v3kRr9V_eHDdbRqj7-LHH7HH7vOJKSMMFrOhxm6XSIAdbhoSHw";
 const BABEL_ARCHIVE_IMAGE_NAME: &str = "blockjoy.gz";
 const BABEL_IMAGE_NAME: &str = "blockjoy";
 const KERNEL_ARCHIVE_NAME: &str = "kernel.gz";
@@ -34,7 +22,7 @@ pub const KERNEL_FILE: &str = "kernel";
 pub const DATA_FILE: &str = "data.img";
 
 pub struct CookbookService {
-    client: cb_pb::cook_book_service_client::CookBookServiceClient<AuthenticatedService>,
+    client: pb::cookbook_service_client::CookbookServiceClient<AuthenticatedService>,
     bv_root: PathBuf,
 }
 
@@ -50,9 +38,9 @@ impl CookbookService {
             let channel = Endpoint::connect(&endpoint)
                 .await
                 .with_context(|| format!("Failed to connect to cookbook service at {url}"))?;
-            let client = cb_pb::cook_book_service_client::CookBookServiceClient::with_interceptor(
+            let client = pb::cookbook_service_client::CookbookServiceClient::with_interceptor(
                 channel,
-                api::AuthToken(STANDARD.encode(config.read().await.cookbook_token)),
+                config.token().await?,
             );
             Ok(Self {
                 client,
@@ -65,10 +53,9 @@ impl CookbookService {
     #[instrument(skip(self))]
     pub async fn list_versions(&mut self, protocol: &str, node_type: &str) -> Result<Vec<String>> {
         info!("Listing versions...");
-        let req = cb_pb::BabelVersionsRequest {
+        let req = pb::CookbookServiceListBabelVersionsRequest {
             protocol: protocol.to_string(),
             node_type: node_type.to_string(),
-            status: cb_pb::StatusName::Development.into(),
         };
 
         let resp = with_retry!(self.client.list_babel_versions(req.clone()))?.into_inner();
@@ -87,10 +74,14 @@ impl CookbookService {
     #[instrument(skip(self))]
     pub async fn download_babel_plugin(&mut self, image: &NodeImage) -> Result<()> {
         info!("Downloading plugin...");
-        let rhai_content = with_retry!(self
-            .client
-            .retrieve_plugin(tonic::Request::new(image.clone().into())))?
+        let rhai_content = with_retry!(self.client.retrieve_plugin(tonic::Request::new(
+            pb::CookbookServiceRetrievePluginRequest {
+                id: Some(image.clone().into()),
+            }
+        )))?
         .into_inner()
+        .plugin
+        .ok_or_else(|| anyhow!("missing plugin"))?
         .rhai_content;
 
         let folder = Self::get_image_download_folder_path(&self.bv_root, image);
@@ -106,10 +97,14 @@ impl CookbookService {
     #[instrument(skip(self))]
     pub async fn download_image(&mut self, image: &NodeImage) -> Result<()> {
         info!("Downloading image...");
-        let archive: cb_pb::ArchiveLocation = with_retry!(self
-            .client
-            .retrieve_image(tonic::Request::new(image.clone().into())))?
-        .into_inner();
+        let archive: pb::ArchiveLocation = with_retry!(self.client.retrieve_image(
+            tonic::Request::new(pb::CookbookServiceRetrieveImageRequest {
+                id: Some(image.clone().into()),
+            })
+        ))?
+        .into_inner()
+        .location
+        .ok_or_else(|| anyhow!("missing location"))?;
 
         let folder = Self::get_image_download_folder_path(&self.bv_root, image);
         DirBuilder::new().recursive(true).create(&folder).await?;
@@ -128,10 +123,14 @@ impl CookbookService {
     #[instrument(skip(self))]
     pub async fn download_kernel(&mut self, image: &NodeImage) -> Result<()> {
         info!("Downloading kernel...");
-        let archive: cb_pb::ArchiveLocation = with_retry!(self
-            .client
-            .retrieve_kernel(tonic::Request::new(image.clone().into())))?
-        .into_inner();
+        let archive: pb::ArchiveLocation = with_retry!(self.client.retrieve_kernel(
+            tonic::Request::new(pb::CookbookServiceRetrieveKernelRequest {
+                id: Some(image.clone().into()),
+            })
+        ))?
+        .into_inner()
+        .location
+        .ok_or_else(|| anyhow!("missing location"))?;
 
         let folder = Self::get_image_download_folder_path(&self.bv_root, image);
         DirBuilder::new().recursive(true).create(&folder).await?;
@@ -170,13 +169,13 @@ impl CookbookService {
     }
 }
 
-impl From<NodeImage> for cb_pb::ConfigIdentifier {
+impl From<NodeImage> for pb::ConfigIdentifier {
     fn from(image: NodeImage) -> Self {
         Self {
             protocol: image.protocol,
             node_type: image.node_type,
             node_version: image.node_version,
-            status: cb_pb::StatusName::Development.into(),
+            status: pb::StatusName::Development.into(),
         }
     }
 }

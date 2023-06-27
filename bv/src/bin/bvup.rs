@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context, Result};
 use blockvisord::config::SharedConfig;
-use blockvisord::services::cookbook;
 use blockvisord::{
     config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
     services::api::pb,
@@ -111,10 +110,13 @@ async fn main() -> Result<()> {
                 .id,
             token: host.token,
             refresh_token: host.refresh,
-            cookbook_token: cookbook::COOKBOOK_TOKEN.to_string(),
-            blockjoy_api_url: cmd_args.blockjoy_api_url,
+            blockjoy_api_url: cmd_args.blockjoy_api_url.clone(),
             blockjoy_keys_url: cmd_args.blockjoy_keys_url,
-            blockjoy_registry_url: cmd_args.blockjoy_registry_url,
+            blockjoy_registry_url: Some(
+                cmd_args
+                    .blockjoy_registry_url
+                    .unwrap_or(cmd_args.blockjoy_api_url.clone()),
+            ),
             blockjoy_mqtt_url: cmd_args.blockjoy_mqtt_url,
             update_check_interval_secs: None,
             blockvisor_port: cmd_args

@@ -1,18 +1,11 @@
 use crate::{
     config::SharedConfig,
     installer, services,
-    services::{
-        api::{AuthToken, AuthenticatedService},
-        cookbook::{
-            cb_pb,
-            cb_pb::{bundle_service_client::BundleServiceClient, BundleIdentifier},
-        },
-    },
+    services::api::{pb, AuthToken, AuthenticatedService},
     utils, BV_VAR_PATH,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use base64::{engine::general_purpose::STANDARD, Engine};
 use bv_utils::timer::AsyncTimer;
 use std::{
     cmp::Ordering,
@@ -55,18 +48,18 @@ impl BundleConnector for DefaultConnector {
                     .connect_timeout(BUNDLES_CONNECT_TIMEOUT)
                     .connect()
                     .await?,
-                AuthToken(STANDARD.encode(config.read().await.cookbook_token)),
+                config.token().await?,
             ))
         })
         .await
     }
 }
 
-pub type BundleClient = BundleServiceClient<AuthenticatedService>;
+pub type BundleClient = pb::bundle_service_client::BundleServiceClient<AuthenticatedService>;
 
 impl BundleClient {
     pub fn with_auth(channel: Channel, token: AuthToken) -> Self {
-        BundleServiceClient::with_interceptor(channel, token)
+        pb::bundle_service_client::BundleServiceClient::with_interceptor(channel, token)
     }
 }
 pub struct SelfUpdater<T, C> {
@@ -132,13 +125,13 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         Ok(())
     }
 
-    pub async fn get_latest(&mut self) -> Result<Option<BundleIdentifier>> {
-        let mut resp = self
+    pub async fn get_latest(&mut self) -> Result<Option<pb::BundleIdentifier>> {
+        let mut resp: pb::BundleServiceListBundleVersionsResponse = self
             .bundles
             .connect()
             .await?
-            .list_bundle_versions(cb_pb::BundleVersionsRequest {
-                status: cb_pb::StatusName::Development.into(),
+            .list_bundle_versions(pb::BundleServiceListBundleVersionsRequest {
+                status: pb::StatusName::Development.into(),
             })
             .await?
             .into_inner();
@@ -160,14 +153,18 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
                 .contains(version))
     }
 
-    pub async fn download_and_install(&mut self, bundle: BundleIdentifier) -> Result<()> {
+    pub async fn download_and_install(&mut self, bundle: pb::BundleIdentifier) -> Result<()> {
         let archive = self
             .bundles
             .connect()
             .await?
-            .retrieve(bundle)
+            .retrieve(tonic::Request::new(pb::BundleServiceRetrieveRequest {
+                id: Some(bundle),
+            }))
             .await?
-            .into_inner();
+            .into_inner()
+            .location
+            .ok_or_else(|| anyhow!("missing location"))?;
 
         let bundle_path = self.download_path.join(BUNDLE);
         let _ = fs::remove_dir_all(&bundle_path).await;
@@ -206,22 +203,22 @@ mod tests {
         pub TestBundleService {}
 
         #[tonic::async_trait]
-        impl cb_pb::bundle_service_server::BundleService for TestBundleService {
+        impl pb::bundle_service_server::BundleService for TestBundleService {
             /// Retrieve image for specific version and state
             async fn retrieve(
                 &self,
-                request: tonic::Request<cb_pb::BundleIdentifier>,
-            ) -> Result<tonic::Response<cb_pb::ArchiveLocation>, tonic::Status>;
+                request: tonic::Request<pb::BundleServiceRetrieveRequest>,
+            ) -> Result<tonic::Response<pb::BundleServiceRetrieveResponse>, tonic::Status>;
             /// List all available bundle versions
             async fn list_bundle_versions(
                 &self,
-                request: tonic::Request<cb_pb::BundleVersionsRequest>,
-            ) -> Result<tonic::Response<cb_pb::BundleVersionsResponse>, tonic::Status>;
+                request: tonic::Request<pb::BundleServiceListBundleVersionsRequest>,
+            ) -> Result<tonic::Response<pb::BundleServiceListBundleVersionsResponse>, tonic::Status>;
             /// Delete bundle from storage
             async fn delete(
                 &self,
-                request: tonic::Request<cb_pb::BundleIdentifier>,
-            ) -> Result<tonic::Response<()>, tonic::Status>;
+                request: tonic::Request<pb::BundleServiceDeleteRequest>,
+            ) -> Result<tonic::Response<pb::BundleServiceDeleteResponse>, tonic::Status>;
         }
     }
 
@@ -279,7 +276,7 @@ mod tests {
         ) -> utils::tests::TestServer {
             utils::tests::start_test_server(
                 self.tmp_root.join("test_socket"),
-                cb_pb::bundle_service_server::BundleServiceServer::new(bundles_mock),
+                pb::bundle_service_server::BundleServiceServer::new(bundles_mock),
             )
         }
 
@@ -337,7 +334,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_latest() -> Result<()> {
         let mut test_env = TestEnv::new().await?;
-        let bundle_id = BundleIdentifier {
+        let bundle_id = pb::BundleIdentifier {
             version: "3.2.1".to_string(),
         };
 
@@ -349,7 +346,7 @@ mod tests {
             .expect_list_bundle_versions()
             .once()
             .returning(|_| {
-                let reply = cb_pb::BundleVersionsResponse {
+                let reply = pb::BundleServiceListBundleVersionsResponse {
                     identifiers: vec![],
                 };
                 Ok(Response::new(reply))
@@ -359,13 +356,13 @@ mod tests {
             .expect_list_bundle_versions()
             .once()
             .returning(move |_| {
-                let reply = cb_pb::BundleVersionsResponse {
+                let reply = pb::BundleServiceListBundleVersionsResponse {
                     identifiers: vec![
-                        BundleIdentifier {
+                        pb::BundleIdentifier {
                             version: "1.2.3".to_string(),
                         },
                         expected_bundle_id.clone(),
-                        BundleIdentifier {
+                        pb::BundleIdentifier {
                             version: "0.1.2".to_string(),
                         },
                     ],
@@ -386,7 +383,7 @@ mod tests {
     #[tokio::test]
     async fn test_download_failed() -> Result<()> {
         let mut test_env = TestEnv::new().await?;
-        let bundle_id = BundleIdentifier {
+        let bundle_id = pb::BundleIdentifier {
             version: "3.2.1".to_string(),
         };
         let server = MockServer::start();
@@ -400,15 +397,19 @@ mod tests {
 
         let mut bundles_mock = MockTestBundleService::new();
         bundles_mock.expect_retrieve().once().returning(|_| {
-            let reply = cb_pb::ArchiveLocation {
-                url: "invalid_url".to_string(),
+            let reply = pb::BundleServiceRetrieveResponse {
+                location: Some(pb::ArchiveLocation {
+                    url: "invalid_url".to_string(),
+                }),
             };
             Ok(Response::new(reply))
         });
         let server_address = server.address().to_string();
         bundles_mock.expect_retrieve().once().returning(move |_| {
-            let reply = cb_pb::ArchiveLocation {
-                url: format!("http://{server_address}"),
+            let reply = pb::BundleServiceRetrieveResponse {
+                location: Some(pb::ArchiveLocation {
+                    url: format!("http://{server_address}"),
+                }),
             };
             Ok(Response::new(reply))
         });
@@ -439,7 +440,7 @@ mod tests {
     async fn test_download_and_install() -> Result<()> {
         let mut test_env = TestEnv::new().await?;
         let ctrl_file_path = test_env.tmp_root.join("ctrl_file");
-        let bundle_id = BundleIdentifier {
+        let bundle_id = pb::BundleIdentifier {
             version: "3.2.1".to_string(),
         };
         let server = MockServer::start();
@@ -447,8 +448,10 @@ mod tests {
         let mut bundles_mock = MockTestBundleService::new();
         let server_address = server.address().to_string();
         bundles_mock.expect_retrieve().once().returning(move |_| {
-            let reply = cb_pb::ArchiveLocation {
-                url: format!("http://{server_address}"),
+            let reply = pb::BundleServiceRetrieveResponse {
+                location: Some(pb::ArchiveLocation {
+                    url: format!("http://{server_address}"),
+                }),
             };
             Ok(Response::new(reply))
         });
@@ -483,7 +486,7 @@ mod tests {
         let mut test_env = TestEnv::new().await?;
         let ctrl_file_path = test_env.tmp_root.join("ctrl_file");
         let bundle_version = "3.2.1".to_string();
-        let bundle_id = BundleIdentifier {
+        let bundle_id = pb::BundleIdentifier {
             version: bundle_version.clone(),
         };
 
@@ -499,7 +502,7 @@ mod tests {
             .expect_list_bundle_versions()
             .once()
             .returning(move |_| {
-                let reply = cb_pb::BundleVersionsResponse {
+                let reply = pb::BundleServiceListBundleVersionsResponse {
                     identifiers: vec![expected_bundle_id.clone()],
                 };
                 Ok(Response::new(reply))
@@ -508,10 +511,16 @@ mod tests {
         bundles_mock
             .expect_retrieve()
             .once()
-            .withf(move |req| req.get_ref() == &bundle_id)
+            .withf(
+                move |req: &tonic::Request<pb::BundleServiceRetrieveRequest>| {
+                    req.get_ref().id.as_ref().unwrap() == &bundle_id
+                },
+            )
             .returning(move |_| {
-                let reply = cb_pb::ArchiveLocation {
-                    url: format!("http://{server_address}"),
+                let reply = pb::BundleServiceRetrieveResponse {
+                    location: Some(pb::ArchiveLocation {
+                        url: format!("http://{server_address}"),
+                    }),
                 };
                 Ok(Response::new(reply))
             });
@@ -543,7 +552,7 @@ mod tests {
     #[tokio::test]
     async fn test_check_for_update_blacklisted() -> Result<()> {
         let mut test_env = TestEnv::new().await?;
-        let bundle_id = BundleIdentifier {
+        let bundle_id = pb::BundleIdentifier {
             version: "3.2.1".to_string(),
         };
         test_env.blacklist_version(&bundle_id.version).await?;
@@ -554,9 +563,10 @@ mod tests {
             .expect_list_bundle_versions()
             .once()
             .returning(move |_| {
-                let reply = cb_pb::BundleVersionsResponse {
-                    identifiers: vec![expected_bundle_id.clone()],
-                };
+                let reply: pb::BundleServiceListBundleVersionsResponse =
+                    pb::BundleServiceListBundleVersionsResponse {
+                        identifiers: vec![expected_bundle_id.clone()],
+                    };
                 Ok(Response::new(reply))
             });
         let bundle_server = test_env.start_test_server(bundles_mock);
