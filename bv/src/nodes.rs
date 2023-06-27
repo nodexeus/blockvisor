@@ -25,6 +25,7 @@ use crate::pal::{NetInterface, Pal};
 use crate::services::cookbook::BABEL_PLUGIN_NAME;
 use crate::{
     config::SharedConfig,
+    hosts::HostInfo,
     node::{build_registry_dir, Node},
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
     node_metrics,
@@ -131,16 +132,26 @@ impl<P: Pal + Debug> Nodes<P> {
             .map(|(k, v)| (k.to_uppercase(), v))
             .collect();
 
+        let mut allocated_disk_size_gb = 0;
         for n in self.nodes.read().await.values() {
-            if n.read().await.data.network_interface.ip() == &ip {
+            let node = n.read().await;
+            if node.data.network_interface.ip() == &ip {
                 bail!("Node with ip address `{ip}` exists");
             }
+            allocated_disk_size_gb += node.data.requirements.disk_size_gb;
         }
 
         let requirements = self
             .fetch_image_data(&config.image)
             .await
             .with_context(|| "fetch image data failed")?;
+
+        let host_info = HostInfo::collect()?;
+        let total_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
+        if (allocated_disk_size_gb + requirements.disk_size_gb) > total_gb {
+            bail!("Not enough disk space to allocate for new node");
+        }
+
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
         let node_data_cache = NodeDataCache {

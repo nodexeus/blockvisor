@@ -99,8 +99,8 @@ async fn process_host_command(config: SharedConfig, command: HostCommand) -> Res
             println!("OS name:        {:>10}", info.os);
             println!("OS version:     {:>10}", info.os_version);
             println!("CPU count:      {:>10}", info.cpu_count);
-            println!("Total mem:      {:>10.3} GB", to_gb(info.mem_size));
-            println!("Total disk:     {:>10.3} GB", to_gb(info.disk_size));
+            println!("Total mem:      {:>10.3} GB", to_gb(info.memory_bytes));
+            println!("Total disk:     {:>10.3} GB", to_gb(info.disk_space_bytes));
         }
         HostCommand::Update => {
             hosts::send_info_update(config).await?;
@@ -108,21 +108,27 @@ async fn process_host_command(config: SharedConfig, command: HostCommand) -> Res
         }
         HostCommand::Metrics => {
             let metrics = HostMetrics::collect()?;
-            println!("Used cpu:       {:>10} %", metrics.used_cpu);
-            println!("Used mem:       {:>10.3} GB", to_gb(metrics.used_memory));
+            println!("Used cpu:       {:>10} %", metrics.used_cpu_count);
+            println!(
+                "Used mem:       {:>10.3} GB",
+                to_gb(metrics.used_memory_bytes)
+            );
             println!(
                 "Used disk:      {:>10.3} GB",
-                to_gb(metrics.used_disk_space)
+                to_gb(metrics.used_disk_space_bytes)
             );
             println!("Load (1 min):   {:>10}", metrics.load_one);
             println!("Load (5 mins):  {:>10}", metrics.load_five);
             println!("Load (15 mins): {:>10}", metrics.load_fifteen);
             println!(
                 "Network in:     {:>10.3} GB",
-                to_gb(metrics.network_received)
+                to_gb(metrics.network_received_bytes)
             );
-            println!("Network out:    {:>10.3} GB", to_gb(metrics.network_sent));
-            println!("Uptime:         {:>10} seconds", metrics.uptime);
+            println!(
+                "Network out:    {:>10.3} GB",
+                to_gb(metrics.network_sent_bytes)
+            );
+            println!("Uptime:         {:>10} seconds", metrics.uptime_secs);
         }
     }
 

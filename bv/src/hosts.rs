@@ -27,8 +27,8 @@ lazy_static::lazy_static! {
 pub struct HostInfo {
     pub name: String,
     pub cpu_count: usize,
-    pub mem_size: u64,
-    pub disk_size: u64,
+    pub memory_bytes: u64,
+    pub disk_space_bytes: u64,
     pub os: String,
     pub os_version: String,
 }
@@ -43,8 +43,8 @@ impl HostInfo {
                 .host_name()
                 .ok_or_else(|| anyhow!("Cannot get host name"))?,
             cpu_count: sys.cpus().len(),
-            mem_size: sys.total_memory(),
-            disk_size: bv_utils::system::find_disk_by_path(
+            memory_bytes: sys.total_memory(),
+            disk_space_bytes: bv_utils::system::find_disk_by_path(
                 &sys,
                 &bv_root().canonicalize()?.join(BV_VAR_PATH),
             )
@@ -62,28 +62,28 @@ impl HostInfo {
 
 #[derive(Debug)]
 pub struct HostMetrics {
-    pub used_cpu: u32,
-    pub used_memory: u64,
-    pub used_disk_space: u64,
+    pub used_cpu_count: u32,
+    pub used_memory_bytes: u64,
+    pub used_disk_space_bytes: u64,
     pub load_one: f64,
     pub load_five: f64,
     pub load_fifteen: f64,
-    pub network_received: u64,
-    pub network_sent: u64,
-    pub uptime: u64,
+    pub network_received_bytes: u64,
+    pub network_sent_bytes: u64,
+    pub uptime_secs: u64,
 }
 
 impl HostMetrics {
     pub fn set_all_gauges(&self) {
-        SYSTEM_HOST_USED_CPU_GAUGE.set(self.used_cpu as f64);
-        SYSTEM_HOST_USED_MEMORY_GAUGE.set(self.used_memory as f64);
-        SYSTEM_HOST_USED_DISK_GAUGE.set(self.used_disk_space as f64);
+        SYSTEM_HOST_USED_CPU_GAUGE.set(self.used_cpu_count as f64);
+        SYSTEM_HOST_USED_MEMORY_GAUGE.set(self.used_memory_bytes as f64);
+        SYSTEM_HOST_USED_DISK_GAUGE.set(self.used_disk_space_bytes as f64);
         SYSTEM_HOST_LOAD_ONE_GAUGE.set(self.load_one);
         SYSTEM_HOST_LOAD_FIVE_GAUGE.set(self.load_five);
         SYSTEM_HOST_LOAD_FIFTEEN_GAUGE.set(self.load_fifteen);
-        SYSTEM_HOST_NETWORK_RX_GAUGE.set(self.network_received as f64);
-        SYSTEM_HOST_NETWORK_TX_GAUGE.set(self.network_sent as f64);
-        SYSTEM_HOST_UPTIME_GAUGE.set(self.uptime as f64);
+        SYSTEM_HOST_NETWORK_RX_GAUGE.set(self.network_received_bytes as f64);
+        SYSTEM_HOST_NETWORK_TX_GAUGE.set(self.network_sent_bytes as f64);
+        SYSTEM_HOST_UPTIME_GAUGE.set(self.uptime_secs as f64);
     }
 
     pub fn collect() -> Result<Self> {
@@ -99,9 +99,9 @@ impl HostMetrics {
 
         let load = sys.load_average();
         Ok(HostMetrics {
-            used_cpu: sys.global_cpu_info().cpu_usage() as u32,
-            used_memory: saturating_sub_bytes(mem.total, mem.free).as_u64(),
-            used_disk_space: bv_utils::system::find_disk_by_path(
+            used_cpu_count: sys.global_cpu_info().cpu_usage() as u32,
+            used_memory_bytes: saturating_sub_bytes(mem.total, mem.free).as_u64(),
+            used_disk_space_bytes: bv_utils::system::find_disk_by_path(
                 &sys,
                 &bv_root().canonicalize()?.join(BV_VAR_PATH),
             )
@@ -110,13 +110,13 @@ impl HostMetrics {
             load_one: load.one,
             load_five: load.five,
             load_fifteen: load.fifteen,
-            network_received: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
-            network_sent: sys
+            network_received_bytes: sys.networks().iter().map(|(_, n)| n.total_received()).sum(),
+            network_sent_bytes: sys
                 .networks()
                 .iter()
                 .map(|(_, n)| n.total_transmitted())
                 .sum(),
-            uptime: sys.uptime(),
+            uptime_secs: sys.uptime(),
         })
     }
 }
@@ -124,15 +124,15 @@ impl HostMetrics {
 impl pb::MetricsServiceHostRequest {
     pub fn new(host_id: String, metrics: HostMetrics) -> Self {
         let metrics = pb::HostMetrics {
-            used_cpu: Some(metrics.used_cpu),
-            used_memory: Some(metrics.used_memory),
-            used_disk_space: Some(metrics.used_disk_space),
+            used_cpu: Some(metrics.used_cpu_count),
+            used_memory: Some(metrics.used_memory_bytes),
+            used_disk_space: Some(metrics.used_disk_space_bytes),
             load_one: Some(metrics.load_one),
             load_five: Some(metrics.load_five),
             load_fifteen: Some(metrics.load_fifteen),
-            network_received: Some(metrics.network_received),
-            network_sent: Some(metrics.network_sent),
-            uptime: Some(metrics.uptime),
+            network_received: Some(metrics.network_received_bytes),
+            network_sent: Some(metrics.network_sent_bytes),
+            uptime: Some(metrics.uptime_secs),
         };
         Self {
             metrics: HashMap::from([(host_id, metrics)]),
