@@ -6,7 +6,7 @@ const METADATA = #{
     description: "Celo Full Node",
     requirements: #{
         vcpu_count: 4,
-        mem_size_mb: 8192,
+        mem_size_mb: 16384,
         disk_size_gb: 512, 
     },
     nets: #{
@@ -79,22 +79,22 @@ fn init(keys) {
     });
 }
 
-
 fn application_status() {
-    let status = sync_status();
-    if status == "synced" {
-        "processing"
+    let resp = run_jrpc(global::API_HOST, "/");
+    
+    if resp.status_code == 200 {
+        "broadcasting"
     } else {
-        "deliquent"
+        "delinquent"
     }
 }
 
 fn address() {
-    parse_json(run_jrpc(global::API_HOST, "/eth_coinbase")).result.to_string()
+    parse_json(run_jrpc(global::API_HOST, "eth_coinbase")).result.to_string()
 }
 
 fn height() {
-    let resp = run_jrpc(global::API_HOST, "/eth_blockNumber");
+    let resp = run_jrpc(global::API_HOST, "eth_blockNumber");
     if resp.status_code != 200 {
       throw resp;
     }
@@ -103,10 +103,10 @@ fn height() {
 }
 
 fn sync_status() {
-    let resp = run_rest(global::API_HOST, "/network/syncing");
+    let resp = run_jrpc(global::API_HOST, "eth_syncing");
     let data = parse_json(resp.body);
-    let hb = parse_int(sub_string(data.highestBlock,2),16);
-    let cb = parse_int(sub_string(data.lowestBlock,2),16);
+    let hb = parse_int(sub_string(data.result.highestBlock,2),16);
+    let cb = parse_int(sub_string(data.result.currentBlock,2),16);
     let diff = hb-cb;
     debug(resp);
     if resp.status_code != 200 {
