@@ -4,11 +4,10 @@ fn main() {
         .build_client(true)
         .compile(
             &[
-                // Cookbook API
-                "cookbook.proto",
                 // Blockjoy API
                 "blockjoy/v1/auth.proto",
                 "blockjoy/v1/blockchain.proto",
+                "blockjoy/v1/cookbook.proto",
                 "blockjoy/v1/command.proto",
                 "blockjoy/v1/discovery.proto",
                 "blockjoy/v1/host.proto",
@@ -20,11 +19,7 @@ fn main() {
                 // Internal API
                 "blockvisor_service.proto",
             ],
-            &[
-                "proto/",
-                "data/proto/blockjoy/blockvisor/v1",
-                "data/proto/blockjoy/api/v1/babel",
-            ],
+            &["proto/", "data/proto/blockjoy/blockvisor/v1"],
         )
     {
         eprintln!("Building protos failed with:\n{e}");

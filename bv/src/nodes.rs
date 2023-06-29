@@ -238,10 +238,21 @@ impl<P: Pal + Debug> Nodes<P> {
             .await
             .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
         {
-            let mut cookbook_service = CookbookService::connect(&self.api_config).await?;
-            cookbook_service.download_babel_plugin(image).await?;
-            cookbook_service.download_image(image).await?;
-            cookbook_service.download_kernel(image).await?;
+            let mut cookbook_service = CookbookService::connect(&self.api_config)
+                .await
+                .with_context(|| "cannot connect to cookbook service")?;
+            cookbook_service
+                .download_babel_plugin(image)
+                .await
+                .with_context(|| "cannot download babel plugin")?;
+            cookbook_service
+                .download_image(image)
+                .await
+                .with_context(|| "cannot download image")?;
+            cookbook_service
+                .download_kernel(image)
+                .await
+                .with_context(|| "cannot download kernel")?;
         }
         info!("Reading blockchain requirements...");
         let folder = CookbookService::get_image_download_folder_path(self.pal.bv_root(), image);

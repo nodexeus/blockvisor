@@ -1,7 +1,9 @@
 use crate::src::utils::{stub_server::StubHostsServer, test_env, token};
 use assert_cmd::Command;
 use assert_fs::TempDir;
-use blockvisord::services::api::pb;
+use blockvisord::{
+    config::Config, node_data::NodeImage, services::api::pb, services::cookbook::CookbookService,
+};
 use predicates::prelude::*;
 use serial_test::serial;
 use std::{fs, net::ToSocketAddrs, path::Path};
@@ -80,8 +82,6 @@ async fn test_bvup() {
 #[tokio::test]
 #[serial]
 async fn test_bv_service_e2e() {
-    use blockvisord::config::Config;
-
     let url = "http://localhost:8080";
     let email = "user1@example.com";
     let password = "user1pass";
@@ -155,8 +155,8 @@ async fn test_bv_service_e2e() {
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
     let db_query =
         r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
-        INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
-        INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.1', 'validator', 'TESTING_PARAM', NULL, 'text', FALSE, FALSE);
+        INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
+        INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'TESTING_PARAM', NULL, 'text', FALSE, FALSE);
         "#.to_string();
 
     Command::new("docker")
@@ -170,7 +170,7 @@ async fn test_bv_service_e2e() {
     println!("bvup");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
-    let registry = "http://localhost:50051";
+    let registry = "http://localhost:8080";
     let mqtt = "mqtt://localhost:1883";
 
     Command::cargo_bin("bvup")
@@ -201,7 +201,22 @@ async fn test_bv_service_e2e() {
     test_env::bv_run(&["stop"], "blockvisor service stopped successfully", None);
     test_env::bv_run(&["start"], "blockvisor service started successfully", None);
 
+    println!("test host info update");
     test_env::bv_run(&["host", "update"], "Host info update sent", None);
+
+    println!("test chain list query");
+    test_env::bv_run(&["chain", "list", "testing", "validator"], "0.0.3", None);
+
+    println!("removing 0.0.3 image from cache to download it again");
+    let folder = CookbookService::get_image_download_folder_path(
+        Path::new("/"),
+        &NodeImage {
+            protocol: "testing".to_string(),
+            node_type: "validator".to_string(),
+            node_version: "0.0.3".to_string(),
+        },
+    );
+    let _ = tokio::fs::remove_dir_all(&folder).await;
 
     println!("get blockchain id");
     let mut client = pb::blockchain_service_client::BlockchainServiceClient::connect(url)
@@ -224,7 +239,7 @@ async fn test_bv_service_e2e() {
     let node_create = pb::NodeServiceCreateRequest {
         org_id,
         blockchain_id: blockchain.id.to_string(),
-        version: "0.0.1".to_string(),
+        version: "0.0.3".to_string(),
         node_type: 3, // validator
         properties: vec![pb::NodeProperty {
             name: "TESTING_PARAM".to_string(),
@@ -254,7 +269,7 @@ async fn test_bv_service_e2e() {
     let node_id = resp.node.unwrap().id;
 
     println!("list created node, should be auto-started");
-    test_env::wait_for_node_status(&node_id, "Running", Duration::from_secs(60), None).await;
+    test_env::wait_for_node_status(&node_id, "Running", Duration::from_secs(120), None).await;
 
     let mut client = pb::command_service_client::CommandServiceClient::connect(url)
         .await
