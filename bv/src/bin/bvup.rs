@@ -18,14 +18,6 @@ pub struct CmdArgs {
     #[clap(long = "api", default_value = "https://api.dev.blockjoy.com")]
     pub blockjoy_api_url: String,
 
-    /// BlockJoy keys service url
-    #[clap(long = "keys")]
-    pub blockjoy_keys_url: Option<String>,
-
-    /// BlockJoy registry url
-    #[clap(long = "registry")]
-    pub blockjoy_registry_url: Option<String>,
-
     /// BlockJoy MQTT url
     #[clap(long = "mqtt")]
     pub blockjoy_mqtt_url: Option<String>,
@@ -111,12 +103,6 @@ async fn main() -> Result<()> {
             token: host.token,
             refresh_token: host.refresh,
             blockjoy_api_url: cmd_args.blockjoy_api_url.clone(),
-            blockjoy_keys_url: cmd_args.blockjoy_keys_url,
-            blockjoy_registry_url: Some(
-                cmd_args
-                    .blockjoy_registry_url
-                    .unwrap_or(cmd_args.blockjoy_api_url.clone()),
-            ),
             blockjoy_mqtt_url: cmd_args.blockjoy_mqtt_url,
             update_check_interval_secs: None,
             blockvisor_port: cmd_args

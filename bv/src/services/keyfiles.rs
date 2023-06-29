@@ -2,7 +2,7 @@ use crate::{
     services::api::AuthenticatedService,
     {config::SharedConfig, services, services::api::pb},
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use bv_utils::with_retry;
 use tonic::transport::Endpoint;
 use uuid::Uuid;
@@ -14,11 +14,7 @@ pub struct KeyService {
 impl KeyService {
     pub async fn connect(config: &SharedConfig) -> Result<Self> {
         services::connect(config, |config| async {
-            let url = config
-                .read()
-                .await
-                .blockjoy_keys_url
-                .ok_or_else(|| anyhow!("missing blockjoy_keys_url"))?;
+            let url = config.read().await.blockjoy_api_url;
             let endpoint = Endpoint::from_shared(url.clone())?;
             let channel = Endpoint::connect(&endpoint)
                 .await
