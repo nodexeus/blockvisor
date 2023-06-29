@@ -15,7 +15,7 @@ use std::{
 };
 use tokio::{fs, process::Command};
 use tonic::transport::Channel;
-use tracing::warn;
+use tracing::{info, warn};
 
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const BUNDLES_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -102,7 +102,7 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         if let Some(check_interval) = self.check_interval {
             loop {
                 if let Err(e) = self.check_for_update().await {
-                    warn!("Error executing self update: {e}");
+                    warn!("Error executing self update: {e:#}");
                 }
                 self.sleeper.sleep(utils::with_jitter(check_interval)).await;
             }
@@ -110,8 +110,13 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
     }
 
     async fn check_for_update(&mut self) -> Result<()> {
-        if let Some(latest_bundle) = self.get_latest().await? {
+        if let Some(latest_bundle) = self
+            .get_latest()
+            .await
+            .with_context(|| "cannot get latest version")?
+        {
             let latest_version = latest_bundle.version.clone();
+            info!("Latest version of BV is `{latest_version}`");
             if let Ordering::Greater =
                 utils::semver_cmp(&latest_version, &self.latest_installed_version)
             {
@@ -129,11 +134,13 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         let mut resp: pb::BundleServiceListBundleVersionsResponse = self
             .bundles
             .connect()
-            .await?
+            .await
+            .with_context(|| "cannot connect to bundle service")?
             .list_bundle_versions(pb::BundleServiceListBundleVersionsRequest {
                 status: pb::StatusName::Development.into(),
             })
-            .await?
+            .await
+            .with_context(|| "cannot list bundle versions")?
             .into_inner();
         resp.identifiers
             .sort_by(|a, b| utils::semver_cmp(&b.version, &a.version));
