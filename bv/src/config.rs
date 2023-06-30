@@ -77,10 +77,6 @@ pub struct Config {
     pub refresh_token: String,
     /// API endpoint url
     pub blockjoy_api_url: String,
-    /// Url of key service for getting secrets
-    pub blockjoy_keys_url: Option<String>,
-    /// Url of cookbook service for getting fs images, babel configs, kernel files, etc.
-    pub blockjoy_registry_url: Option<String>,
     /// Url for mqtt broker to receive commands and updates from.
     pub blockjoy_mqtt_url: Option<String>,
     /// Self update check interval - how often blockvisor shall check for new version of itself

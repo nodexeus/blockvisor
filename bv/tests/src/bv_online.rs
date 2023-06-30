@@ -15,8 +15,6 @@ fn test_bvup_unknown_provision_token() {
     cmd.args([provision_token, "--skip-download"])
         .args(["--ifa", ifa])
         .args(["--api", url])
-        .args(["--keys", url])
-        .args(["--registry", url])
         .args(["--mqtt", mqtt])
         .args(["--ip-gateway", "216.18.214.193"])
         .args(["--ip-range-from", "216.18.214.195"])

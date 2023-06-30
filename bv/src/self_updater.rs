@@ -37,11 +37,7 @@ pub struct DefaultConnector {
 impl BundleConnector for DefaultConnector {
     async fn connect(&self) -> Result<BundleClient> {
         services::connect(&self.config, |config| async {
-            let url = config
-                .read()
-                .await
-                .blockjoy_registry_url
-                .ok_or_else(|| anyhow!("missing blockjoy_registry_url"))?;
+            let url = config.read().await.blockjoy_api_url;
             Ok(BundleClient::with_auth(
                 Channel::from_shared(url)?
                     .timeout(BUNDLES_REQUEST_TIMEOUT)

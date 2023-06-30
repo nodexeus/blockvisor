@@ -25,7 +25,6 @@ where
         };
         {
             let mut w_lock = config.write().await;
-            w_lock.blockjoy_keys_url = Some(services.key_service_url);
             w_lock.blockjoy_mqtt_url = Some(services.notification_url);
         }
         connector(config).await

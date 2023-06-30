@@ -29,11 +29,7 @@ pub struct CookbookService {
 impl CookbookService {
     pub async fn connect(config: &SharedConfig) -> Result<Self> {
         services::connect(config, |config| async {
-            let url = config
-                .read()
-                .await
-                .blockjoy_registry_url
-                .ok_or_else(|| anyhow!("missing blockjoy_registry_url"))?;
+            let url = config.read().await.blockjoy_api_url;
             let endpoint = Endpoint::from_shared(url.clone())?;
             let channel = Endpoint::connect(&endpoint)
                 .await
