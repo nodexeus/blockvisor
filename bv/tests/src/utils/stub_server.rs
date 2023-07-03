@@ -114,6 +114,13 @@ impl pb::command_service_server::CommandService for StubCommandsServer {
         let resp = pb::CommandServiceUpdateResponse { command: None }; // tests lol
         Ok(Response::new(resp))
     }
+
+    async fn ack(
+        &self,
+        _: Request<pb::CommandServiceAckRequest>,
+    ) -> Result<pb::CommandServiceAckResponse> {
+        unimplemented!()
+    }
 }
 
 pub struct StubDiscoveryService;

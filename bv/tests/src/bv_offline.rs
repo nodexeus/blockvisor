@@ -296,6 +296,7 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
         response: None,
         exit_code: None,
         command: Some(cmd),
+        acked_at: None,
     };
     let commands = vec![
         // create

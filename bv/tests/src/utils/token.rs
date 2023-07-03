@@ -23,53 +23,6 @@ pub struct RefreshClaim {
 pub struct TokenGenerator;
 
 impl TokenGenerator {
-    pub fn create_register(user_id: uuid::Uuid, secret: &str) -> String {
-        let claim = AuthClaim {
-            resource_type: "User".to_string(),
-            resource_id: user_id,
-            iat: 1668022101,
-            exp: 1768022101,
-            endpoints: vec!["AuthConfirm".to_string()],
-            data: Default::default(),
-        };
-
-        match Self::encode(&claim, secret) {
-            Ok(token) => token,
-            Err(_) => String::default(),
-        }
-    }
-
-    pub fn create_auth(user_id: uuid::Uuid, secret: &str) -> String {
-        let claim = AuthClaim {
-            resource_type: "User".to_string(),
-            resource_id: user_id,
-            iat: 1668022101,
-            exp: 1768022101,
-            endpoints: vec![
-                "AuthRefresh".to_string(),
-                "AuthUpdatePassword".to_string(),
-                "BabelAll".to_string(),
-                "BlockchainAll".to_string(),
-                "CommandAll".to_string(),
-                "DiscoveryAll".to_string(),
-                "HostAll".to_string(),
-                "HostProvisionAll".to_string(),
-                "InvitationAll".to_string(),
-                "KeyFileAll".to_string(),
-                "MetricsAll".to_string(),
-                "NodeAll".to_string(),
-                "OrgAll".to_string(),
-                "UserAll".to_string(),
-            ],
-            data: Default::default(),
-        };
-
-        match Self::encode(&claim, secret) {
-            Ok(token) => token,
-            Err(_) => String::default(),
-        }
-    }
-
     pub fn create_host(host_id: uuid::Uuid, secret: &str) -> String {
         let claim = AuthClaim {
             resource_type: "Host".to_string(),

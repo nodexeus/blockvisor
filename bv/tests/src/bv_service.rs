@@ -1,4 +1,4 @@
-use crate::src::utils::{stub_server::StubHostsServer, test_env, token};
+use crate::src::utils::{stub_server::StubHostsServer, test_env};
 use assert_cmd::Command;
 use assert_fs::TempDir;
 use blockvisord::{
@@ -81,36 +81,30 @@ async fn test_bvup() {
 #[serial]
 async fn test_bv_service_e2e() {
     let url = "http://localhost:8080";
-    let email = "user1@example.com";
-    let password = "user1pass";
-
-    let mut client = pb::user_service_client::UserServiceClient::connect(url)
-        .await
-        .unwrap();
+    let email = "tester@blockjoy.com";
+    let password = "ilovemytests";
+    let user_id = "1cff0487-412b-4ca4-a6cd-fdb9957d5d2f";
+    let org_id = "53b28794-fb68-4cd1-8165-b98a51a19c46";
+    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
 
     println!("create user");
-    let create_user = pb::UserServiceCreateRequest {
-        email: email.to_string(),
-        first_name: "first".to_string(),
-        last_name: "last".to_string(),
-        password: password.to_string(),
-    };
-    let resp = client.create(create_user).await.unwrap().into_inner();
-    println!("user created: {resp:?}");
-    let user_id = resp.user.unwrap().id.parse().unwrap();
+    let u_query = r#"INSERT INTO users
+        VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@blockjoy.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00');
+        "#.to_string();
 
-    println!("confirm user");
+    Command::new("docker")
+        .args(&[
+            "compose", "exec", "-T", "database", "psql", db_url, "-c", &u_query,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INSERT"));
+
+    println!("login user");
     let mut client = pb::auth_service_client::AuthServiceClient::connect(url)
         .await
         .unwrap();
-    let confirm_user = pb::AuthServiceConfirmRequest {};
-    let register_token = token::TokenGenerator::create_register(user_id, "1245456");
-    client
-        .confirm(with_auth(confirm_user, &register_token))
-        .await
-        .unwrap();
 
-    println!("login user");
     let login_user = pb::AuthServiceLoginRequest {
         email: email.to_string(),
         password: password.to_string(),
@@ -119,27 +113,28 @@ async fn test_bv_service_e2e() {
     println!("user login: {login:?}");
 
     println!("get user org and token");
-    let mut client = pb::org_service_client::OrgServiceClient::connect(url)
-        .await
-        .unwrap();
-    let orgs = client
-        .list(with_auth(
-            pb::OrgServiceListRequest {
-                member_id: Some(user_id.to_string()),
-            },
-            &login.token,
-        ))
-        .await
-        .unwrap()
-        .into_inner();
-    let org_id = orgs.orgs[0].id.clone();
+    let o_query = r#"INSERT INTO orgs VALUES ('53b28794-fb68-4cd1-8165-b98a51a19c46', 'Personal', TRUE, now(), now(), NULL);
+        INSERT INTO orgs_users VALUES ('53b28794-fb68-4cd1-8165-b98a51a19c46', '1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'owner', now(), now(), 'rgfr4YJZ8dIA');
+        "#.to_string();
 
-    let auth_token = token::TokenGenerator::create_auth(user_id, "1245456");
+    Command::new("docker")
+        .args(&[
+            "compose", "exec", "-T", "database", "psql", db_url, "-c", &o_query,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INSERT"));
+
+    let auth_token = login.token;
 
     let get_token = pb::OrgServiceGetProvisionTokenRequest {
         user_id: user_id.to_string(),
-        org_id: org_id.clone(),
+        org_id: org_id.to_string(),
     };
+
+    let mut client = pb::org_service_client::OrgServiceClient::connect(url)
+        .await
+        .unwrap();
 
     let response = client
         .get_provision_token(with_auth(get_token, &auth_token))
@@ -150,8 +145,7 @@ async fn test_bv_service_e2e() {
     println!("host provision token: {provision_token}");
 
     println!("add blockchain");
-    let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
-    let db_query =
+    let b_query =
         r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'TESTING_PARAM', NULL, 'text', FALSE, FALSE);
@@ -159,7 +153,7 @@ async fn test_bv_service_e2e() {
 
     Command::new("docker")
         .args(&[
-            "compose", "exec", "-T", "database", "psql", db_url, "-c", &db_query,
+            "compose", "exec", "-T", "database", "psql", db_url, "-c", &b_query,
         ])
         .assert()
         .success()
@@ -168,7 +162,6 @@ async fn test_bv_service_e2e() {
     println!("bvup");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
     let url = "http://localhost:8080";
-    let registry = "http://localhost:8080";
     let mqtt = "mqtt://localhost:1883";
 
     Command::cargo_bin("bvup")
@@ -233,7 +226,7 @@ async fn test_bv_service_e2e() {
         .unwrap();
 
     let node_create = pb::NodeServiceCreateRequest {
-        org_id,
+        org_id: org_id.to_string(),
         blockchain_id: blockchain.id.to_string(),
         version: "0.0.3".to_string(),
         node_type: 3, // validator
