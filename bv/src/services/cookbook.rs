@@ -171,7 +171,6 @@ impl From<NodeImage> for pb::ConfigIdentifier {
             protocol: image.protocol,
             node_type: image.node_type,
             node_version: image.node_version,
-            status: pb::StatusName::Development.into(),
         }
     }
 }

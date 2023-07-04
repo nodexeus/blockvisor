@@ -132,9 +132,7 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
             .connect()
             .await
             .with_context(|| "cannot connect to bundle service")?
-            .list_bundle_versions(pb::BundleServiceListBundleVersionsRequest {
-                status: pb::StatusName::Development.into(),
-            })
+            .list_bundle_versions(pb::BundleServiceListBundleVersionsRequest {})
             .await
             .with_context(|| "cannot list bundle versions")?
             .into_inner();
