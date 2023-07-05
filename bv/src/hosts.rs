@@ -9,7 +9,7 @@ use sysinfo::{CpuExt, DiskExt, NetworkExt, NetworksExt, System, SystemExt};
 use systemstat::{saturating_sub_bytes, Platform, System as System2};
 
 /// The interval by which we collect metrics from this host.
-pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 lazy_static::lazy_static! {
     pub static ref SYSTEM_HOST_USED_CPU_GAUGE: Gauge = register_gauge!("system.host.used_cpu");

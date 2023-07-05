@@ -56,7 +56,6 @@ impl pb::host_service_server::HostService for StubHostsServer {
                 os: "os".to_string(),
                 os_version: "20.0".to_string(),
                 ip: "1.1.1.1".to_string(),
-                status: 0,
                 created_at: None,
                 ip_range_from: "1.1.1.3".to_string(),
                 ip_range_to: "1.1.1.4".to_string(),

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 /// The interval by which we collect metrics from each of the nodes.
-pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+pub const COLLECT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 /// The max duration we will wait for a node to return a metric.
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
