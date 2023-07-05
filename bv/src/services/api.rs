@@ -198,6 +198,7 @@ impl CommandsService {
                         self.send_service_status_update(command_id.clone(), service_status)
                             .await?;
                     } else {
+                        self.send_command_ack(command_id.clone()).await?;
                         // process the command
                         match process_node_command(nodes.clone(), node_command).await {
                             Err(error) => {
@@ -220,6 +221,7 @@ impl CommandsService {
                     let msg = "Command type `Host` not supported".to_string();
                     error!("Error processing command: {msg}");
                     let command_id = command.id;
+                    self.send_command_ack(command_id.clone()).await?;
                     self.send_command_update(command_id, Some(STATUS_ERROR), Some(msg))
                         .await?;
                 }
@@ -247,6 +249,13 @@ impl CommandsService {
             exit_code,
         };
         with_retry!(self.client.update(req.clone()))?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn send_command_ack(&mut self, command_id: String) -> Result<()> {
+        let req = pb::CommandServiceAckRequest { id: command_id };
+        with_retry!(self.client.ack(req.clone()))?;
         Ok(())
     }
 
