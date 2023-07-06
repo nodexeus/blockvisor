@@ -79,13 +79,26 @@ where
             env!("CARGO_PKG_VERSION")
         );
 
+        let bv_root = self.pal.bv_root().to_path_buf();
+        let config = self.config.read().await;
+
+        // check for updates on start
+        // this could enable us to update bv that has a critical bug and is crashing on start
+        let mut self_updater =
+            self_updater::new(bv_utils::timer::SysTimer, &bv_root, &self.config).await?;
+        if config.update_check_interval_secs.is_some() {
+            if let Err(e) = self_updater.check_for_update().await {
+                warn!("Cannot run self update: {e:#}");
+            }
+        }
+        let self_updater_future = self_updater.run();
+
         // setup metrics endpoint
         let builder = PrometheusBuilder::new();
         builder
             .install()
             .unwrap_or_else(|e| error!("Cannot create Prometheus endpoint: {e}"));
 
-        let bv_root = self.pal.bv_root().to_path_buf();
         let cmds_connector = self.pal.create_commands_stream_connector(&self.config);
         let nodes = Nodes::load(self.pal, self.config.clone()).await?;
 
@@ -113,17 +126,11 @@ where
         let node_updates_future =
             Self::node_updates(run.clone(), nodes.clone(), self.config.clone());
 
-        let config = self.config.read().await;
         let endpoint = Endpoint::from_str(&config.blockjoy_api_url)?;
         let node_metrics_future =
             Self::node_metrics(run.clone(), nodes.clone(), &endpoint, self.config.clone());
         let host_metrics_future =
             Self::host_metrics(run.clone(), config.id, &endpoint, self.config.clone());
-
-        let self_updater_future =
-            self_updater::new(bv_utils::timer::SysTimer, &bv_root, &self.config)
-                .await?
-                .run();
 
         if std::env::var(ENV_BV_STANDALONE_MODE).is_ok() {
             let _ = internal_api_server_future.await;
