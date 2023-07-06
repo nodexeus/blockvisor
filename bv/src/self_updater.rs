@@ -105,7 +105,7 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
         }
     }
 
-    async fn check_for_update(&mut self) -> Result<()> {
+    pub async fn check_for_update(&mut self) -> Result<()> {
         if let Some(latest_bundle) = self
             .get_latest()
             .await
