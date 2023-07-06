@@ -15,7 +15,7 @@ cmds = [
   "rm /etc/resolv.conf",
   "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
   "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
-  "yes | wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel --disable-telemetry",
+  "wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --disable-telemetry --non-interactive --dont-start-it --disable-cloud --static-only"
 ]
 
 [build_machine]
@@ -31,5 +31,6 @@ build_cmds =  [
 		"sudo apt update",
 		"git clone https://github.com/celo-org/celo-blockchain.git || true && cd {{.YafimHome}}/celo-blockchain && git checkout v1.7.4 && make geth",
 		"mkdir -p {{.YafimHome}}/target/celo/node/mnt/blockjoy/celo",
-		"cp {{.YafimHome}}/celo-blockchain/build/bin/geth {{.YafimHome}}/target/celo/node/mnt/usr/bin/celo"
+		"cp {{.YafimHome}}/celo-blockchain/build/bin/geth {{.YafimHome}}/target/celo/node/mnt/usr/bin/celo",
+		"cp {{.YafimHome}}/blockvisor/babel_api/netdata/stream.conf {{.YafimHome}}/target/celo/node/mnt/opt/netdata/etc/netdata/"
 ]
