@@ -15,7 +15,7 @@ use std::{
 };
 use tokio::{fs, process::Command};
 use tonic::transport::Channel;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 const BUNDLES_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const BUNDLES_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
@@ -112,7 +112,7 @@ impl<T: AsyncTimer, C: BundleConnector> SelfUpdater<T, C> {
             .with_context(|| "cannot get latest version")?
         {
             let latest_version = latest_bundle.version.clone();
-            info!("Latest version of BV is `{latest_version}`");
+            debug!("Latest version of BV is `{latest_version}`");
             if let Ordering::Greater =
                 utils::semver_cmp(&latest_version, &self.latest_installed_version)
             {
