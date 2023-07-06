@@ -24,7 +24,7 @@ git_repo = ""
 git_tag = ""
 build_cmds =  [
                 "cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/celo/node/mnt/usr/bin/",
-		"cp {{.YafimHome}}/babelsup/etc/systemd/system/multi-user.target.wants/babelsup.service {{.YafimHome}}/target/celo/node/mnt/etc/systemd/system/",
+		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/celo/node/mnt/etc/systemd/system/",
 		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/celo/babel.rhai {{.YafimHome}}/target/celo/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/celo/node/mnt",
 		"echo celo > {{.YafimHome}}/target/celo/node/mnt/etc/hostname",
