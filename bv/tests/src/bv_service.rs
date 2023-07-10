@@ -88,17 +88,10 @@ async fn test_bv_service_e2e() {
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
 
     println!("create user");
-    let u_query = r#"INSERT INTO users
+    let user_query = r#"INSERT INTO users
         VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@blockjoy.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00');
-        "#.to_string();
-
-    Command::new("docker")
-        .args(&[
-            "compose", "exec", "-T", "database", "psql", db_url, "-c", &u_query,
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("INSERT"));
+        "#;
+    execute_sql(db_url, user_query);
 
     println!("login user");
     let mut client = pb::auth_service_client::AuthServiceClient::connect(url)
@@ -113,17 +106,10 @@ async fn test_bv_service_e2e() {
     println!("user login: {login:?}");
 
     println!("get user org and token");
-    let o_query = r#"INSERT INTO orgs VALUES ('53b28794-fb68-4cd1-8165-b98a51a19c46', 'Personal', TRUE, now(), now(), NULL);
+    let org_query = r#"INSERT INTO orgs VALUES ('53b28794-fb68-4cd1-8165-b98a51a19c46', 'Personal', TRUE, now(), now(), NULL);
         INSERT INTO orgs_users VALUES ('53b28794-fb68-4cd1-8165-b98a51a19c46', '1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'owner', now(), now(), 'rgfr4YJZ8dIA');
-        "#.to_string();
-
-    Command::new("docker")
-        .args(&[
-            "compose", "exec", "-T", "database", "psql", db_url, "-c", &o_query,
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("INSERT"));
+        "#;
+    execute_sql(db_url, org_query);
 
     let auth_token = login.token;
 
@@ -145,19 +131,11 @@ async fn test_bv_service_e2e() {
     println!("host provision token: {provision_token}");
 
     println!("add blockchain");
-    let b_query =
-        r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
+    let blockchain_query = r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'keystore-file', NULL, 'file_upload', FALSE, FALSE);
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '0.0.3', 'validator', 'TESTING_PARAM', NULL, 'text', FALSE, FALSE);
-        "#.to_string();
-
-    Command::new("docker")
-        .args(&[
-            "compose", "exec", "-T", "database", "psql", db_url, "-c", &b_query,
-        ])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("INSERT"));
+        "#;
+    execute_sql(db_url, blockchain_query);
 
     println!("bvup");
     let (ifa, _ip) = &local_ip_address::list_afinet_netifas().unwrap()[0];
@@ -302,4 +280,21 @@ async fn test_bv_service_e2e() {
             panic!("timeout expired")
         }
     }
+}
+
+fn execute_sql(connection_str: &str, query: &str) {
+    Command::new("docker")
+        .args(&[
+            "compose",
+            "exec",
+            "-T",
+            "database",
+            "psql",
+            connection_str,
+            "-c",
+            query,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("INSERT"));
 }
