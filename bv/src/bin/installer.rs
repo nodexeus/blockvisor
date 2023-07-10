@@ -11,19 +11,23 @@ struct SystemCtl;
 #[async_trait]
 impl installer::BvService for SystemCtl {
     async fn reload(&self) -> Result<()> {
-        run_cmd("systemctl", ["daemon-reload"]).await
+        run_cmd("systemctl", ["daemon-reload"]).await?;
+        Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
-        run_cmd("systemctl", ["stop", "blockvisor.service"]).await
+        run_cmd("systemctl", ["stop", "blockvisor.service"]).await?;
+        Ok(())
     }
 
     async fn start(&self) -> Result<()> {
-        run_cmd("systemctl", ["start", "blockvisor.service"]).await
+        run_cmd("systemctl", ["start", "blockvisor.service"]).await?;
+        Ok(())
     }
 
     async fn enable(&self) -> Result<()> {
-        run_cmd("systemctl", ["enable", "blockvisor.service"]).await
+        run_cmd("systemctl", ["enable", "blockvisor.service"]).await?;
+        Ok(())
     }
 }
 

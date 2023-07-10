@@ -6,7 +6,7 @@ use tracing::info;
 /// Runs the specified command and returns error on failure.
 /// **IMPORTANT**: Whenever you use new CLI tool in BV,
 /// remember to add it to requirements check in `installer::check_cli_dependencies()`.   
-pub async fn run_cmd<I, S>(cmd: &str, args: I) -> Result<()>
+pub async fn run_cmd<I, S>(cmd: &str, args: I) -> Result<String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -14,14 +14,17 @@ where
     let mut cmd = Command::new(cmd);
     cmd.args(args);
     info!("Running command: `{:?}`", cmd);
-    match cmd
+    let status = cmd
         .status()
         .await
-        .with_context(|| format!("Failed to run command `{cmd:?}`"))?
-        .code()
-    {
+        .with_context(|| format!("Failed to run command `{cmd:?}`"))?;
+    match status.code() {
         Some(code) if code != 0 => bail!("Command `{cmd:?}` failed with exit code {code}"),
-        Some(_) => Ok(()),
+        Some(_) => {
+            let output = cmd.output().await?;
+            let stdout = String::from_utf8(output.stdout)?;
+            return Ok(stdout);
+        }
         None => bail!("Command `{cmd:?}` failed with no exit code"),
     }
 }
