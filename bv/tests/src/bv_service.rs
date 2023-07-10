@@ -64,6 +64,7 @@ async fn test_bvup() {
             .args(["--ip-gateway", "216.18.214.193"])
             .args(["--ip-range-from", "216.18.214.195"])
             .args(["--ip-range-to", "216.18.214.206"])
+            .args(["--yes"])
             .env("BV_ROOT", tmp_dir.as_os_str())
             .assert()
             .success()
@@ -173,6 +174,7 @@ async fn test_bv_service_e2e() {
         .args(["--ip-gateway", "216.18.214.193"])
         .args(["--ip-range-from", "216.18.214.195"])
         .args(["--ip-range-to", "216.18.214.206"])
+        .args(["--yes"])
         .assert()
         .success()
         .stdout(predicate::str::contains(

@@ -11,11 +11,11 @@ use blockvisord::{
     },
     services::cookbook::CookbookService,
 };
-use bv_utils::cmd::run_cmd;
+use bv_utils::cmd::{ask_confirm, run_cmd};
 use clap::Parser;
 use cli_table::print_stdout;
 use petname::Petnames;
-use std::{collections::HashMap, fs, io::BufRead};
+use std::{collections::HashMap, fs};
 use tokio::time::{sleep, Duration};
 use tonic::{transport, transport::Channel, Code};
 use uuid::Uuid;
@@ -469,23 +469,6 @@ impl NodeClient {
         }
         Ok(())
     }
-}
-
-/// Requests confirmation from the user, i.e. the user must type `y` to continue.
-///
-/// ### Params
-/// msg:    the message that is displayed to the user to request access. On display this function
-///         will append ` [y/N]` to the message.
-/// dash_y: if this flag is true, requesting user input is skippend and `true` is immediately
-///         returned.
-fn ask_confirm(msg: &str, dash_y: bool) -> Result<bool> {
-    if dash_y {
-        return Ok(true);
-    }
-    println!("{msg} [y/N]:");
-    let mut input = String::new();
-    std::io::stdin().lock().read_line(&mut input)?;
-    Ok(input.trim().to_lowercase() == "y")
 }
 
 fn fmt_opt<T: std::fmt::Display>(opt: Option<T>) -> String {
