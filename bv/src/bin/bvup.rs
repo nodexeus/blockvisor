@@ -15,7 +15,7 @@ pub struct CmdArgs {
     pub provision_token: Option<String>,
 
     /// BlockJoy API url
-    #[clap(long = "api")]
+    #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
     pub blockjoy_api_url: String,
 
     /// BlockJoy MQTT url
