@@ -4,6 +4,7 @@ use blockvisord::{
     config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
     services::api::pb,
 };
+use bv_utils::cmd::ask_confirm;
 use clap::{crate_version, ArgGroup, Parser};
 
 #[derive(Parser, Debug)]
@@ -15,7 +16,7 @@ pub struct CmdArgs {
     pub provision_token: Option<String>,
 
     /// BlockJoy API url
-    #[clap(long = "api")]
+    #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
     pub blockjoy_api_url: String,
 
     /// BlockJoy MQTT url
@@ -48,6 +49,10 @@ pub struct CmdArgs {
     /// Skip download and install phase
     #[clap(long = "skip-download")]
     pub skip_download: bool,
+
+    /// Skip all [y/N] prompts.
+    #[clap(short, long)]
+    yes: bool,
 }
 
 pub fn get_ip_address(ifa_name: &str) -> Result<String> {
@@ -69,15 +74,47 @@ async fn main() -> Result<()> {
 
         let ip = get_ip_address(&cmd_args.ifa).with_context(|| "failed to get ip address")?;
         let host_info = HostInfo::collect()?;
+        let cpu_count = host_info
+            .cpu_count
+            .try_into()
+            .with_context(|| "Cannot convert cpu count from usize to u64")?;
+        let to_gb = |n| n as f64 / 1_000_000_000.0;
+
+        println!("Hostname:            {:>16}", &host_info.name);
+        println!("CPU count:           {:>16}", cpu_count);
+        println!(
+            "Total mem:           {:>16.3} GB",
+            to_gb(host_info.memory_bytes)
+        );
+        println!(
+            "Total disk:          {:>16.3} GB",
+            to_gb(host_info.disk_space_bytes)
+        );
+        println!("OS:                  {:>16}", &host_info.os);
+        println!("OS version:          {:>16}", &host_info.os_version);
+        println!("API url:             {:>16}", &cmd_args.blockjoy_api_url);
+        println!(
+            "MQTT url:            {:>16}",
+            cmd_args
+                .blockjoy_mqtt_url
+                .as_ref()
+                .unwrap_or(&"(auto)".to_string())
+        );
+        println!("IP address:          {:>16}", &ip);
+        println!("Gateway IP address:  {:>16}", &cmd_args.ip_gateway);
+        println!("VM IP range from:    {:>16}", &cmd_args.ip_range_from);
+        println!("VM IP range to:      {:>16}", &cmd_args.ip_range_to);
+
+        let confirm = ask_confirm("Register the host with this configuration?", cmd_args.yes)?;
+        if !confirm {
+            return Ok(());
+        }
 
         let create = pb::HostServiceCreateRequest {
             provision_token: cmd_args.provision_token.unwrap(),
             name: host_info.name,
             version: crate_version!().to_string(),
-            cpu_count: host_info
-                .cpu_count
-                .try_into()
-                .with_context(|| "Cannot convert cpu count from usize to u64")?,
+            cpu_count,
             mem_size_bytes: host_info.memory_bytes,
             disk_size_bytes: host_info.disk_space_bytes,
             os: host_info.os,

@@ -19,6 +19,7 @@ fn test_bvup_unknown_provision_token() {
         .args(["--ip-gateway", "216.18.214.193"])
         .args(["--ip-range-from", "216.18.214.195"])
         .args(["--ip-range-to", "216.18.214.206"])
+        .args(["--yes"])
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()

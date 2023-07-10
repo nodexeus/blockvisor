@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use std::ffi::OsStr;
+use std::{ffi::OsStr, io::BufRead};
 use tokio::process::Command;
 use tracing::info;
 
@@ -24,4 +24,21 @@ where
         Some(_) => Ok(()),
         None => bail!("Command `{cmd:?}` failed with no exit code"),
     }
+}
+
+/// Requests confirmation from the user, i.e. the user must type `y` to continue.
+///
+/// ### Params
+/// msg:    the message that is displayed to the user to request access. On display this function
+///         will append ` [y/N]` to the message.
+/// dash_y: if this flag is true, requesting user input is skippend and `true` is immediately
+///         returned.
+pub fn ask_confirm(msg: &str, dash_y: bool) -> Result<bool> {
+    if dash_y {
+        return Ok(true);
+    }
+    println!("{msg} [y/N]:");
+    let mut input = String::new();
+    std::io::stdin().lock().read_line(&mut input)?;
+    Ok(input.trim().to_lowercase() == "y")
 }
