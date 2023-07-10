@@ -1,17 +1,13 @@
-// TODO
-// fn height() {} 
-// fn address() {} 
-
 const METADATA = #{
     min_babel_version: "0.15.4",
     node_version: "3.16.3",
     protocol: "algorand",
-    node_type: "validator",
+    node_type: "node",
     description: "Algorand node",
     requirements: #{
-      vcpu_count: 32,
-      mem_size_mb: 32768,
-      disk_size_gb: 1500
+      vcpu_count: 4,
+      mem_size_mb: 8096,
+      disk_size_gb: 100
     },
     nets: #{
       mainnet: #{
@@ -26,7 +22,7 @@ const METADATA = #{
     babel_config: #{
       data_directory_mount_point: "/blockjoy/algorand",
       log_buffer_capacity_ln: 1000,
-      swap_size_mb: 393216
+      swap_size_mb: 8192
     },
     firewall: #{
       enabled: true,
@@ -52,12 +48,11 @@ const METADATA = #{
   
     let net = sanitize_sh_param(node_params().NETWORK);
     let metadata = GLOBAL::METADATA.nets[net];
-    let data_directory = GLOBAL::METADATA.babel_config.data_directory_mount_point;
+    let data_directory = global::METADATA.babel_config.data_directory_mount_point;
   
     start_job("Entrypoint for the Algorand validator node", #{
-        job_type: #{ 
-            run_sh:
-            `/usr/bin/algod -d ${data_directory}/data -g ${data_directory}/genesis/${net}/genesis.json -o`
+        job_type: #{
+            run_sh: `/usr/bin/algod -d ${data_directory} -l 0.0.0.0:8080 -g /var/lib/algorand/genesis/${net}/genesis.json -o`
         },
         restart: #{
             "always": #{
@@ -70,14 +65,14 @@ const METADATA = #{
   }
   
   fn application_status() {
-    let status = run_jrpc(global::API_HOST, "health");
-    if parse_json(status.body).result != "OK" {
-        "delinquent"
+    let res = run_jrpc(global::API_HOST, "health");
+    if res.status_code != 200 {
+        "To be fixed"
     } else {
-        "broadcasting"
+        "Broadcasting"
     }
   }
-  
+  //to_check
   fn get_genesis_info() {
     let res = run_jrpc(global::API_HOST, "genesis");
     if res.status_code != 200 {
@@ -87,9 +82,20 @@ const METADATA = #{
   }
   
   fn sync_status() {
-    let res = run_jrpc(global::API_HOST, "ready");
+    let res = run_jrpc(global::API_HOST, "ready"); 
     if res.status_code != 200 {
-        throw res.status_code;
+      "Not fully synced"
+    } else {
+      "Synced"
     }
-    parse_json(res.result)    
+  }
+
+  fn height() {
+    let token = run_sh(`cat ${global::METADATA.babel_config.data_directory_mount_point}/algod.token`).stdout;
+    let res = run_sh(`curl http://localhost:8080/v2/status -H "X-Algo-API-Token:${token}" | jq '.["last-round"]'`);
+    parse_int(res.stdout)
+  }
+  
+  fn address() {
+    run_sh(`cat ${global::METADATA.babel_config.data_directory_mount_point}/algod.token`).stdout
   }
