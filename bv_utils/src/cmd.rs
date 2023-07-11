@@ -23,7 +23,7 @@ where
         Some(_) => {
             let output = cmd.output().await?;
             let stdout = String::from_utf8(output.stdout)?;
-            return Ok(stdout);
+            Ok(stdout)
         }
         None => bail!("Command `{cmd:?}` failed with no exit code"),
     }

@@ -1,11 +1,14 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use blockvisord::config::SharedConfig;
 use blockvisord::{
     config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
     services::api::pb,
 };
-use bv_utils::cmd::ask_confirm;
+use bv_utils::cmd::{ask_confirm, run_cmd};
+use cidr_utils::cidr::Ipv4Cidr;
 use clap::{crate_version, ArgGroup, Parser};
+use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
 
 #[derive(Parser, Debug)]
 #[clap(version, about, long_about = None)]
@@ -29,15 +32,15 @@ pub struct CmdArgs {
 
     /// Network gateway IPv4 address
     #[clap(long = "ip-gateway")]
-    pub ip_gateway: String,
+    pub ip_gateway: Option<String>,
 
     /// Network IP range from IPv4 value
     #[clap(long = "ip-range-from")]
-    pub ip_range_from: String,
+    pub ip_range_from: Option<String>,
 
     /// Network IP range to IPv4 value
     #[clap(long = "ip-range-to")]
-    pub ip_range_to: String,
+    pub ip_range_to: Option<String>,
 
     #[clap(long = "port")]
     pub blockvisor_port: Option<u16>,
@@ -64,6 +67,61 @@ pub fn get_ip_address(ifa_name: &str) -> Result<String> {
     Ok(ip.to_string())
 }
 
+/// Struct to capture output of linux `ip --json route` command
+#[derive(Deserialize, Serialize, Debug)]
+struct IpRoute {
+    pub dst: String,
+    pub gateway: Option<String>,
+    pub dev: String,
+    pub prefsrc: Option<String>,
+}
+
+#[derive(Default, Debug, PartialEq)]
+struct NetParams {
+    pub ip: Option<String>,
+    pub gateway: Option<String>,
+    pub ip_from: Option<String>,
+    pub ip_to: Option<String>,
+}
+
+fn parse_net_params_from_str(ifa_name: &str, routes_json_str: &str) -> Result<NetParams> {
+    let mut routes: Vec<IpRoute> = serde_json::from_str(routes_json_str)?;
+    routes.retain(|r| r.dev == ifa_name);
+    if routes.len() != 2 {
+        bail!("Routes count for `{ifa_name}` not equal to 2");
+    }
+
+    let mut params = NetParams::default();
+    for route in routes {
+        if route.dst == "default" {
+            // Host gateway IP address
+            params.gateway = route.gateway;
+        } else {
+            // IP range available for VMs
+            let cidr = Ipv4Cidr::from_str(&route.dst)
+                .with_context(|| format!("cannot parse {} as cidr", route.dst))?;
+            let mut ips = cidr.iter();
+            if cidr.get_bits() <= 30 {
+                // For routing mask values <= 30, first and last IPs are
+                // base and broadcast addresses and are unusable.
+                ips.next();
+                ips.next_back();
+            }
+            params.ip_from = ips.next().map(|u| Ipv4Addr::from(u).to_string());
+            params.ip_to = ips.next_back().map(|u| Ipv4Addr::from(u).to_string());
+            // Host IP address
+            params.ip = route.prefsrc;
+        }
+    }
+    Ok(params)
+}
+
+async fn discover_net_params(ifa_name: &str) -> Result<NetParams> {
+    let routes = run_cmd("ip", ["--json", "route"]).await?;
+    let params = parse_net_params_from_str(ifa_name, &routes)?;
+    Ok(params)
+}
+
 /// Simple host init tool. It provision host with PROVISION_TOKEN then download and install latest bv bundle.
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -72,7 +130,26 @@ async fn main() -> Result<()> {
     let api_config = if !cmd_args.skip_init {
         println!("Provision and init blockvisor configuration");
 
-        let ip = get_ip_address(&cmd_args.ifa).with_context(|| "failed to get ip address")?;
+        let net = discover_net_params(&cmd_args.ifa).await.unwrap_or_default();
+        // if network params are not provided, try to use auto-discovered values
+        // or fail if both methods do not resolve to useful values
+        let ip = get_ip_address(&cmd_args.ifa)
+            .ok()
+            .or(net.ip)
+            .ok_or_else(|| anyhow!("Failed to resolve `ip` address"))?;
+        let gateway = cmd_args
+            .ip_gateway
+            .or(net.gateway)
+            .ok_or_else(|| anyhow!("Failed to resolve `gateway` address"))?;
+        let range_from = cmd_args
+            .ip_range_from
+            .or(net.ip_from)
+            .ok_or_else(|| anyhow!("Failed to resolve `from` address"))?;
+        let range_to = cmd_args
+            .ip_range_to
+            .or(net.ip_to)
+            .ok_or_else(|| anyhow!("Failed to resolve `to` address"))?;
+
         let host_info = HostInfo::collect()?;
         let cpu_count = host_info
             .cpu_count
@@ -101,9 +178,9 @@ async fn main() -> Result<()> {
                 .unwrap_or(&"(auto)".to_string())
         );
         println!("IP address:          {:>16}", &ip);
-        println!("Gateway IP address:  {:>16}", &cmd_args.ip_gateway);
-        println!("VM IP range from:    {:>16}", &cmd_args.ip_range_from);
-        println!("VM IP range to:      {:>16}", &cmd_args.ip_range_to);
+        println!("Gateway IP address:  {:>16}", &gateway);
+        println!("VM IP range from:    {:>16}", &range_from);
+        println!("VM IP range to:      {:>16}", &range_to);
 
         let confirm = ask_confirm("Register the host with this configuration?", cmd_args.yes)?;
         if !confirm {
@@ -120,9 +197,9 @@ async fn main() -> Result<()> {
             os: host_info.os,
             os_version: host_info.os_version,
             ip_addr: ip,
-            ip_gateway: cmd_args.ip_gateway,
-            ip_range_from: cmd_args.ip_range_from,
-            ip_range_to: cmd_args.ip_range_to,
+            ip_gateway: gateway,
+            ip_range_from: range_from,
+            ip_range_to: range_to,
             org_id: None,
         };
 
@@ -170,4 +247,38 @@ async fn main() -> Result<()> {
         updater.download_and_install(bundle_id).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_net_params_from_str() {
+        let json = r#"[
+            {
+               "dev" : "bvbr0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "192.69.220.81",
+               "protocol" : "static"
+            },
+            {
+               "dev" : "bvbr0",
+               "dst" : "192.69.220.80/28",
+               "flags" : [],
+               "prefsrc" : "192.69.220.82",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]
+         "#;
+        let expected = NetParams {
+            ip: Some("192.69.220.82".to_string()),
+            gateway: Some("192.69.220.81".to_string()),
+            ip_from: Some("192.69.220.81".to_string()),
+            ip_to: Some("192.69.220.94".to_string()),
+        };
+        assert_eq!(parse_net_params_from_str("bvbr0", json).unwrap(), expected);
+    }
 }
