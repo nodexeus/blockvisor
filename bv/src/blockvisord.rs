@@ -305,7 +305,7 @@ where
                         known_addresses.entry(node_id).or_insert(address);
                         known_statuses.entry(node_id).or_insert(status);
                     }
-                    Err(e) => warn!("Cannot send node info update: {e:?}"),
+                    Err(e) => warn!("Cannot send node `{node_id}` info update: {e:?}"),
                 }
             }
             BV_NODES_INFO_COUNTER.increment(1);
