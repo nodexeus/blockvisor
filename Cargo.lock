@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "babel"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "assert_fs",
  "async-trait",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "babel_api"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "cidr-utils",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "blockvisord"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -606,7 +606,7 @@ checksum = "0d261e256854913907f67ed06efbc3338dfe6179796deefc1ff763fc1aee5535"
 
 [[package]]
 name = "bv_utils"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "anyhow",
  "async-trait",
