@@ -170,11 +170,13 @@ async fn remaster(name: &str) -> Result<()> {
     run_cmd("ip", ["link", "set", name, "master", BRIDGE_IFACE])
         // Start the interface.
         .and_then(|_| run_cmd("ip", ["link", "set", name, "up"]))
-        .await
+        .await?;
+    Ok(())
 }
 
 async fn delete(name: &str) -> Result<()> {
-    run_cmd("ip", ["link", "delete", name, "type", "tuntap"]).await
+    run_cmd("ip", ["link", "delete", name, "type", "tuntap"]).await?;
+    Ok(())
 }
 
 impl fmt::Display for LinuxNetInterface {

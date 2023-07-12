@@ -497,7 +497,8 @@ fn check_kernel_requirements() -> Result<()> {
 async fn check_network_setup() -> Result<()> {
     bv_utils::cmd::run_cmd("ip", ["link", "show", BRIDGE_IFACE])
         .await
-        .with_context(|| format!("bridge interface '{BRIDGE_IFACE}' not configured"))
+        .with_context(|| format!("bridge interface '{BRIDGE_IFACE}' not configured"))?;
+    Ok(())
 }
 
 #[cfg(test)]
