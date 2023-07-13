@@ -45,7 +45,7 @@ jobs:
       - name: Build babelsup
         run: >
           make babelsup
-      - name: Build babelsup
+      - name: Build upload_manifest_generator
         run: >
           make upload_manifest_generator
       - name: Upload to R2
