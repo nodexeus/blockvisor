@@ -177,10 +177,10 @@ async fn main() -> Result<()> {
                 .as_ref()
                 .unwrap_or(&"(auto)".to_string())
         );
+        println!("Network IP from:     {:>16}", &range_from);
+        println!("Network IP to:       {:>16}", &range_to);
         println!("IP address:          {:>16}", &ip);
         println!("Gateway IP address:  {:>16}", &gateway);
-        println!("VM IP range from:    {:>16}", &range_from);
-        println!("VM IP range to:      {:>16}", &range_to);
 
         let confirm = ask_confirm("Register the host with this configuration?", cmd_args.yes)?;
         if !confirm {
