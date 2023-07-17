@@ -504,7 +504,6 @@ impl<P: Pal + Debug> Node<P> {
     }
 
     pub async fn update(&mut self, rules: Vec<firewall::Rule>) -> Result<()> {
-        babel_api::metadata::check_firewall_rules(&rules)?;
         let mut firewall = self.metadata.firewall.clone();
         firewall.rules.append(&mut rules.clone());
         let babel_client = self.babel_engine.node_connection.babel_client().await?;
