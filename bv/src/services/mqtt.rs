@@ -66,8 +66,8 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
                 .publish(status_topic, QoS::AtLeastOnce, true, ONLINE)
                 .await?;
 
-            // subscribe to host topic
-            let host_topic = format!("/hosts/{host_id}/#");
+            // subscribe to host commands topic
+            let host_topic = format!("/hosts/{host_id}/commands");
             client.subscribe(host_topic, QoS::AtLeastOnce).await?;
 
             Ok(MqttStream {
