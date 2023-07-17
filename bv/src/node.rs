@@ -84,6 +84,7 @@ struct Paths {
     data_cache_dir: PathBuf,
     data_dir: PathBuf,
     plugin_data: PathBuf,
+    plugin_script: PathBuf,
     registry: PathBuf,
 }
 
@@ -96,12 +97,9 @@ impl Paths {
             data_cache_dir: bv_root.join(BV_VAR_PATH).join(DATA_CACHE_DIR),
             data_dir: pal.build_vm_data_path(id),
             plugin_data: registry.join(format!("{id}.data")),
+            plugin_script: registry.join(format!("{id}.rhai")),
             registry,
         }
-    }
-
-    fn script_file_path(registry_config_dir: &Path, id: Uuid) -> PathBuf {
-        registry_config_dir.join(format!("{id}.rhai"))
     }
 }
 
@@ -117,7 +115,7 @@ impl<P: Pal + Debug> Node<P> {
         let paths = Paths::build(pal.as_ref(), node_id);
         info!("Creating node with ID: {node_id}");
 
-        let (script, metadata) = Self::copy_and_check_plugin(&paths, node_id, &data.image).await?;
+        let (script, metadata) = Self::copy_and_check_plugin(&paths, &data.image).await?;
 
         let _ = tokio::fs::remove_dir_all(&paths.data_dir).await;
         Self::prepare_data_image(&paths, &data).await?;
@@ -159,7 +157,7 @@ impl<P: Pal + Debug> Node<P> {
         let paths = Paths::build(pal.as_ref(), node_id);
         info!("Attaching to node with ID: {node_id}");
 
-        let script = fs::read_to_string(&Paths::script_file_path(&paths.registry, node_id)).await?;
+        let script = fs::read_to_string(&paths.plugin_script).await?;
         let metadata = rhai_plugin::read_metadata(&script)?;
 
         let mut node_conn = pal.create_node_connection(node_id);
@@ -217,8 +215,7 @@ impl<P: Pal + Debug> Node<P> {
 
         self.copy_os_image(image).await?;
 
-        let (script, metadata) =
-            Self::copy_and_check_plugin(&self.paths, self.data.id, &self.data.image).await?;
+        let (script, metadata) = Self::copy_and_check_plugin(&self.paths, &self.data.image).await?;
         self.metadata = metadata;
         self.babel_engine
             .update_plugin(|engine| RhaiPlugin::new(&script, engine))?;
@@ -229,8 +226,7 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Read script content and update plugin with metadata
     pub async fn reload_plugin(&mut self) -> Result<()> {
-        let script =
-            fs::read_to_string(Paths::script_file_path(&self.paths.registry, self.data.id)).await?;
+        let script = fs::read_to_string(&self.paths.plugin_script).await?;
         self.metadata = rhai_plugin::read_metadata(&script)?;
         self.babel_engine
             .update_plugin(|engine| RhaiPlugin::new(&script, engine))
@@ -498,7 +494,7 @@ impl<P: Pal + Debug> Node<P> {
     #[instrument(skip(self))]
     pub async fn delete(self) -> Result<()> {
         self.machine.delete().await?;
-        let _ = fs::remove_file(Paths::script_file_path(&self.paths.registry, self.data.id)).await;
+        let _ = fs::remove_file(&self.paths.plugin_script).await;
         let _ = fs::remove_file(&self.paths.plugin_data).await;
         self.data.delete(&self.paths.registry).await
     }
@@ -588,17 +584,15 @@ impl<P: Pal + Debug> Node<P> {
     /// copy plugin script into nodes registry and read metadata form it
     async fn copy_and_check_plugin(
         paths: &Paths,
-        id: Uuid,
         image: &NodeImage,
     ) -> Result<(String, BlockchainMetadata)> {
-        let script_path = Paths::script_file_path(&paths.registry, id);
         fs::copy(
             CookbookService::get_image_download_folder_path(&paths.bv_root, image)
                 .join(BABEL_PLUGIN_NAME),
-            &script_path,
+            &paths.plugin_script,
         )
         .await?;
-        let script = fs::read_to_string(&script_path).await?;
+        let script = fs::read_to_string(&paths.plugin_script).await?;
         let metadata = rhai_plugin::read_metadata(&script)?;
         Ok((script, metadata))
     }
