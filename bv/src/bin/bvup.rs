@@ -18,6 +18,10 @@ pub struct CmdArgs {
     /// Provision token
     pub provision_token: Option<String>,
 
+    /// Host region
+    #[clap(long = "region")]
+    pub region: Option<String>,
+
     /// BlockJoy API url
     #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
     pub blockjoy_api_url: String,
@@ -158,6 +162,10 @@ async fn main() -> Result<()> {
         let to_gb = |n| n as f64 / 1_000_000_000.0;
 
         println!("Hostname:            {:>16}", &host_info.name);
+        println!(
+            "Region:              {:>16}",
+            cmd_args.region.as_deref().unwrap_or("(not specified)")
+        );
         println!("CPU count:           {:>16}", cpu_count);
         println!(
             "Total mem:           {:>16.3} GB",
@@ -172,10 +180,7 @@ async fn main() -> Result<()> {
         println!("API url:             {:>16}", &cmd_args.blockjoy_api_url);
         println!(
             "MQTT url:            {:>16}",
-            cmd_args
-                .blockjoy_mqtt_url
-                .as_ref()
-                .unwrap_or(&"(auto)".to_string())
+            cmd_args.blockjoy_mqtt_url.as_deref().unwrap_or("(auto)")
         );
         println!("Network IP from:     {:>16}", &range_from);
         println!("Network IP to:       {:>16}", &range_to);
@@ -201,6 +206,7 @@ async fn main() -> Result<()> {
             ip_range_from: range_from,
             ip_range_to: range_to,
             org_id: None,
+            region: cmd_args.region,
         };
 
         let mut client =

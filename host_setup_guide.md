@@ -78,7 +78,7 @@ network:
 Once everything described above is configured, run `bvup` to provision host and install BV: 
 
 ```sh
-./bvup <PROVISION_TOKEN>
+./bvup <PROVISION_TOKEN> [--region REGION]
 ```
 where `<PROVISION_TOKEN>` is token obtained from BlockJoy portal.
 
