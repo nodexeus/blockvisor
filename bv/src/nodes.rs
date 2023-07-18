@@ -116,7 +116,7 @@ impl<P: Pal + Debug> Nodes<P> {
             bail!("Node with name `{}` exists", config.name);
         }
 
-        check_rules_count(config.rules.len())?;
+        check_user_firewall_rules(&config.rules)?;
 
         let ip = config
             .ip
@@ -313,7 +313,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     pub async fn update(&self, id: Uuid, rules: Vec<firewall::Rule>) -> Result<()> {
-        check_rules_count(rules.len())?;
+        check_user_firewall_rules(&rules)?;
         let nodes = self.nodes.read().await;
         let mut node = nodes
             .get(&id)
@@ -733,9 +733,10 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 }
 
-fn check_rules_count(rules_count: usize) -> Result<()> {
-    if rules_count > MAX_SUPPORTED_RULES {
+fn check_user_firewall_rules(rules: &[firewall::Rule]) -> Result<()> {
+    if rules.len() > MAX_SUPPORTED_RULES {
         bail!("Can't configure more than {MAX_SUPPORTED_RULES} rules!");
     }
+    babel_api::metadata::check_firewall_rules(rules)?;
     Ok(())
 }
