@@ -63,6 +63,7 @@ impl pb::host_service_server::HostService for StubHostsServer {
                 org_id: "org".to_string(),
                 org_name: "ORG".to_string(),
                 node_count: 1,
+                region: Some("europe-bosnia-number-1".to_string()),
             }),
             token: "awesome-token".to_string(),
             refresh: "even-more-awesomer-token".to_string(),
@@ -89,6 +90,13 @@ impl pb::host_service_server::HostService for StubHostsServer {
         &self,
         _request: Request<pb::HostServiceRestartRequest>,
     ) -> Result<pb::HostServiceRestartResponse> {
+        unimplemented!()
+    }
+
+    async fn regions(
+        &self,
+        _request: Request<pb::HostServiceRegionsRequest>,
+    ) -> Result<pb::HostServiceRegionsResponse> {
         unimplemented!()
     }
 }

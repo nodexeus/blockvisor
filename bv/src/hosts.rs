@@ -149,6 +149,7 @@ pub async fn send_info_update(config: SharedConfig) -> Result<()> {
         version: Some(env!("CARGO_PKG_VERSION").to_string()),
         os: Some(info.os),
         os_version: Some(info.os_version),
+        region: None,
     };
     client.update(update).await?;
 

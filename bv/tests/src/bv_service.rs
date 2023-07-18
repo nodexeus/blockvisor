@@ -146,6 +146,7 @@ async fn test_bv_service_e2e() {
     Command::cargo_bin("bvup")
         .unwrap()
         .args([&provision_token, "--skip-download"])
+        .args(["--region", "europe-bosnia-number-1"]) // this region will be auto-created in API
         .args(["--ifa", ifa])
         .args(["--api", url])
         .args(["--mqtt", mqtt])
@@ -223,6 +224,7 @@ async fn test_bv_service_e2e() {
                 pb::NodeScheduler {
                     similarity: None,
                     resource: pb::node_scheduler::ResourceAffinity::LeastResources.into(),
+                    region: "europe-bosnia-number-1".to_string(),
                 },
             )),
         }),
