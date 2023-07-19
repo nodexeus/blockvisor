@@ -466,6 +466,47 @@ impl NodeClient {
                 );
                 println!("Sync Status:    {:>10}", fmt_opt(metrics.sync_status));
             }
+            NodeCommand::Check { id_or_name } => {
+                let node_id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let methods = vec![
+                    "height",
+                    "block_age",
+                    "name",
+                    "address",
+                    "consensus",
+                    "staking_status",
+                    "sync_status",
+                    "application_status",
+                ];
+                let mut errors = vec![];
+                println!("Running node checks:");
+                for method in methods {
+                    let req = bv_pb::BlockchainRequest {
+                        method: method.to_string(),
+                        node_id: node_id.clone(),
+                        param: String::from(""),
+                    };
+                    let result = match self.client.blockchain(req).await {
+                        Ok(_) => "ok",
+                        Err(e) => {
+                            if e.code() == Code::NotFound || e.message().contains("not found") {
+                                "not found"
+                            } else {
+                                errors.push(e);
+                                "failed"
+                            }
+                        }
+                    };
+                    println!("{:.<20}{:.>16}", method, result);
+                }
+                if !errors.is_empty() {
+                    eprintln!("\nGot {} errors:", errors.len());
+                    for e in errors.iter() {
+                        eprintln!("{e:#}");
+                    }
+                    bail!("Node check failed");
+                }
+            }
         }
         Ok(())
     }
