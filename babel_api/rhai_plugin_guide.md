@@ -556,3 +556,22 @@ If you want to test how rhai script integrates with BV and running node, it can 
 6. Edit & Save script located in `/var/lib/blockvisor/node/<node_id>.rhai`.
 7. Run function(s) from script, that you want to test, via BV CLI: `bv node run <node_id/node_name> <function_name> [--param='string argument passed to the function']`
 8. Repeat 6-7 until done, then remember to copy script, to safe location, since it will be removed with the node on `bv node delete <node_id/node_name>` call.
+
+## Check functions
+
+You can add special functions starting with `test_`, which will be included into checklist when `bv node check` command is executed.
+
+**Example:**
+```
+fn test_height_value(param) {
+    if height() < 0 {
+        throw "Invalid node height value: " + height();
+    }
+}
+```
+
+These functions could be used to add custom checks that you want to use to validate the image, like:
+- is height value is in accepted range?
+- do we meet s/w requirements?
+- do we have connectivity to external services?
+- etc
