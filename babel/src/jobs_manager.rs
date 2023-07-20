@@ -102,7 +102,7 @@ fn load_jobs(jobs_dir: &Path, job_runner_bin_path: &Path) -> Result<Jobs> {
 
 #[async_trait]
 pub trait JobsManagerClient {
-    async fn list(&self) -> Result<Vec<String>>;
+    async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
     async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
     async fn stop(&self, name: &str) -> Result<()>;
     async fn status(&self, name: &str) -> Result<JobStatus>;
@@ -116,10 +116,21 @@ pub struct Client {
 
 #[async_trait]
 impl JobsManagerClient for Client {
-    async fn list(&self) -> Result<Vec<String>> {
-        let (jobs, _jobs_data) = &mut *self.jobs_registry.lock().await;
-        let jobs = jobs.keys().cloned().collect();
-        Ok(jobs)
+    async fn list(&self) -> Result<Vec<(String, JobStatus)>> {
+        let (jobs, _) = &*self.jobs_registry.lock().await;
+        let res = jobs
+            .iter()
+            .map(|(name, job)| {
+                (
+                    name.clone(),
+                    match &job.state {
+                        JobState::Active(_) => JobStatus::Running,
+                        JobState::Inactive(status) => status.clone(),
+                    },
+                )
+            })
+            .collect();
+        Ok(res)
     }
 
     async fn start(&self, name: &str, config: JobConfig) -> Result<()> {

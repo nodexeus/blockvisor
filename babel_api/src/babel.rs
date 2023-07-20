@@ -27,6 +27,8 @@ pub trait Babel {
     fn stop_job(job_name: String);
     /// Get background job status by unique name.
     fn job_status(job_name: String) -> JobStatus;
+    /// Get jobs list.
+    fn get_jobs() -> Vec<(String, JobStatus)>;
 
     /// Send a Jrpc request to the current blockchain.
     fn run_jrpc(req: JrpcRequest) -> HttpResponse;
@@ -51,9 +53,6 @@ pub trait Babel {
         /// Parameters to be applied on template in form of serialized JSON.
         params: String,
     );
-
-    /// Get jobs list.
-    fn get_jobs() -> Vec<String>;
 
     /// Get logs gathered from jobs.
     #[server_streaming]

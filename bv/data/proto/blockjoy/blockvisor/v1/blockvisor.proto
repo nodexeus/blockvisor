@@ -10,6 +10,21 @@ enum NodeStatus {
     Busy = 4;
 }
 
+enum JobStatus {
+    UndefinedJobStatus = 0;
+    JobPending = 1;
+    JobRunning = 2;
+    JobFinished = 3;
+    JobStopped = 4;
+}
+
+message NodeJob {
+    string name = 1;
+    JobStatus status = 2;
+    optional uint64 exit_code = 3;
+    optional string message = 4;
+}
+
 message NodeImage {
     string protocol = 1;
     string node_type = 2;
@@ -106,7 +121,7 @@ message GetNodeJobsRequest {
 }
 
 message GetNodeJobsResponse {
-    repeated string jobs = 1;
+    repeated NodeJob jobs = 1;
 }
 
 message GetNodeLogsRequest {

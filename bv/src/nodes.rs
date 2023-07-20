@@ -1,5 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use babel_api::{
+    engine::JobStatus,
     metadata::{firewall, Requirements},
     rhai_plugin,
 };
@@ -324,7 +325,7 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn jobs(&self, id: Uuid) -> Result<Vec<String>> {
+    pub async fn jobs(&self, id: Uuid) -> Result<Vec<(String, JobStatus)>> {
         let nodes = self.nodes.read().await;
         let mut node = nodes
             .get(&id)

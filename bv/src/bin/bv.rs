@@ -362,9 +362,25 @@ impl NodeClient {
                 let jobs = self
                     .client
                     .get_node_jobs(bv_pb::GetNodeJobsRequest { id: id.clone() })
-                    .await?;
-                for job in jobs.into_inner().jobs {
-                    println!("{job}");
+                    .await?
+                    .into_inner()
+                    .jobs;
+                if !jobs.is_empty() {
+                    println!("{:<30} STATUS", "NAME");
+                    for job in jobs {
+                        let status_with_code = format!(
+                            "{:?}{}",
+                            bv_pb::JobStatus::from_i32(job.status)
+                                .unwrap_or(bv_pb::JobStatus::UndefinedJobStatus),
+                            job.exit_code.map(|c| format!("({c})")).unwrap_or_default()
+                        );
+                        println!(
+                            "{:<30} {:<20} {}",
+                            job.name,
+                            status_with_code,
+                            job.message.unwrap_or_default()
+                        );
+                    }
                 }
             }
             NodeCommand::Logs { id_or_name } => {
