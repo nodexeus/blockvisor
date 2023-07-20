@@ -194,6 +194,12 @@ pub enum NodeCommand {
         /// The id or name of the node whose metrics should be collected.
         id_or_name: String,
     },
+
+    /// Execute node runtime checks.
+    Check {
+        /// The id or name of the node to check.
+        id_or_name: String,
+    },
 }
 
 #[derive(Subcommand)]

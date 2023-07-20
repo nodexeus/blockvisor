@@ -172,3 +172,9 @@ fn upload(param) {
 fn upload_status(param) {
     job_status("upload").to_string()
 }
+
+fn test_height_value(param) {
+    if height() < 0 {
+        throw "Invalid node height value: " + height();
+    }
+}

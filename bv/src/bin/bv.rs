@@ -178,7 +178,7 @@ impl NodeClient {
             .nodes)
     }
 
-    async fn list_capabilities(&mut self, node_id: Uuid) -> Result<String> {
+    async fn list_capabilities(&mut self, node_id: Uuid) -> Result<Vec<String>> {
         let req = bv_pb::ListCapabilitiesRequest {
             node_id: node_id.to_string(),
         };
@@ -187,10 +187,7 @@ impl NodeClient {
             .list_capabilities(req)
             .await?
             .into_inner()
-            .capabilities
-            .into_iter()
-            .reduce(|msg, cap| msg + "\n" + cap.as_str())
-            .unwrap_or_default();
+            .capabilities;
         Ok(caps)
     }
 
@@ -413,7 +410,9 @@ impl NodeClient {
             NodeCommand::Capabilities { id_or_name } => {
                 let node_id = self.resolve_id_or_name(&id_or_name).await?;
                 let caps = self.list_capabilities(node_id).await?;
-                print!("{caps}");
+                for cap in caps {
+                    println!("{cap}");
+                }
             }
             NodeCommand::Run {
                 id_or_name,
@@ -442,7 +441,12 @@ impl NodeClient {
                     Err(e) => {
                         if e.code() == Code::NotFound {
                             let msg = "Method not found. Options are:";
-                            let caps = self.list_capabilities(node_id).await?;
+                            let caps = self
+                                .list_capabilities(node_id)
+                                .await?
+                                .into_iter()
+                                .reduce(|acc, cap| acc + "\n" + cap.as_str())
+                                .unwrap_or_default();
                             bail!("{msg}\n{caps}");
                         }
                         return Err(anyhow::Error::from(e));
@@ -465,6 +469,60 @@ impl NodeClient {
                     fmt_opt(metrics.application_status)
                 );
                 println!("Sync Status:    {:>10}", fmt_opt(metrics.sync_status));
+            }
+            NodeCommand::Check { id_or_name } => {
+                let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                // prepare list of checks
+                // first go methods which SHALL and SHOULD be implemented
+                let mut methods = vec![
+                    "height",
+                    "block_age",
+                    "name",
+                    "address",
+                    "consensus",
+                    "staking_status",
+                    "sync_status",
+                    "application_status",
+                ];
+                // second go test_* methods
+                let caps = self.list_capabilities(node_id).await?;
+                let tests_iter = caps
+                    .iter()
+                    .filter(|cap| cap.starts_with("test_"))
+                    .map(|cap| cap.as_str());
+                methods.extend(tests_iter);
+
+                let mut errors = vec![];
+                println!("Running node checks:");
+                for method in methods {
+                    let req = bv_pb::BlockchainRequest {
+                        method: method.to_string(),
+                        node_id: node_id.to_string(),
+                        param: String::from(""),
+                    };
+                    let result = match self.client.blockchain(req).await {
+                        Ok(_) => "ok",
+                        Err(e)
+                            if e.code() == Code::NotFound || e.message().contains("not found") =>
+                        {
+                            // this is not considered an error
+                            // and will not influence exit code
+                            "not found"
+                        }
+                        Err(e) => {
+                            errors.push(e);
+                            "failed"
+                        }
+                    };
+                    println!("{:.<30}{:.>16}", method, result);
+                }
+                if !errors.is_empty() {
+                    eprintln!("\nGot {} errors:", errors.len());
+                    for e in errors.iter() {
+                        eprintln!("{e:#}");
+                    }
+                    bail!("Node check failed");
+                }
             }
         }
         Ok(())
