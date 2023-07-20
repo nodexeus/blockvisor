@@ -324,6 +324,17 @@ impl<P: Pal + Debug> Nodes<P> {
     }
 
     #[instrument(skip(self))]
+    pub async fn jobs(&self, id: Uuid) -> Result<Vec<String>> {
+        let nodes = self.nodes.read().await;
+        let mut node = nodes
+            .get(&id)
+            .ok_or_else(|| id_not_found(id))?
+            .write()
+            .await;
+        node.babel_engine.get_jobs().await
+    }
+
+    #[instrument(skip(self))]
     pub async fn logs(&self, id: Uuid) -> Result<Vec<String>> {
         let nodes = self.nodes.read().await;
         let mut node = nodes

@@ -357,6 +357,16 @@ impl NodeClient {
                 self.stop_nodes(&ids).await?;
                 self.start_nodes(&ids).await?;
             }
+            NodeCommand::Jobs { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let jobs = self
+                    .client
+                    .get_node_jobs(bv_pb::GetNodeJobsRequest { id: id.clone() })
+                    .await?;
+                for job in jobs.into_inner().jobs {
+                    println!("{job}");
+                }
+            }
             NodeCommand::Logs { id_or_name } => {
                 let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
                 let logs = self

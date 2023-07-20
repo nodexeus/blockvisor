@@ -264,6 +264,24 @@ where
     }
 
     #[instrument(skip(self))]
+    async fn get_node_jobs(
+        &self,
+        request: Request<bv_pb::GetNodeJobsRequest>,
+    ) -> Result<Response<bv_pb::GetNodeJobsResponse>, Status> {
+        status_check().await?;
+        let request = request.into_inner();
+        let id = helpers::parse_uuid(request.id)?;
+
+        let jobs = self
+            .nodes
+            .jobs(id)
+            .await
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
+
+        Ok(Response::new(bv_pb::GetNodeJobsResponse { jobs }))
+    }
+
+    #[instrument(skip(self))]
     async fn get_node_logs(
         &self,
         request: Request<bv_pb::GetNodeLogsRequest>,

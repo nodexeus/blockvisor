@@ -52,6 +52,9 @@ pub trait Babel {
         params: String,
     );
 
+    /// Get jobs list.
+    fn get_jobs() -> Vec<String>;
+
     /// Get logs gathered from jobs.
     #[server_streaming]
     fn get_logs() -> String;

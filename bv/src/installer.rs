@@ -561,6 +561,10 @@ mod tests {
                 &self,
                 request: tonic::Request<bv_pb::GetNodeStatusRequest>,
             ) -> Result<tonic::Response<bv_pb::GetNodeStatusResponse>, tonic::Status>;
+            async fn get_node_jobs(
+                &self,
+                request: tonic::Request<bv_pb::GetNodeJobsRequest>,
+            ) -> Result<tonic::Response<bv_pb::GetNodeJobsResponse>, tonic::Status>;
             async fn get_node_logs(
                 &self,
                 request: tonic::Request<bv_pb::GetNodeLogsRequest>,

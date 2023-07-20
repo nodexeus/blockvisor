@@ -101,6 +101,14 @@ message GetNodeStatusResponse {
     NodeStatus status = 1;
 }
 
+message GetNodeJobsRequest {
+    string id = 1;
+}
+
+message GetNodeJobsResponse {
+    repeated string jobs = 1;
+}
+
 message GetNodeLogsRequest {
     string id = 1;
 }

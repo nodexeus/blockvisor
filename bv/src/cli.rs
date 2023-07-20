@@ -200,6 +200,12 @@ pub enum NodeCommand {
         /// The id or name of the node to check.
         id_or_name: String,
     },
+
+    /// Show node jobs list.
+    Jobs {
+        /// The id or name of the node to check.
+        id_or_name: String,
+    },
 }
 
 #[derive(Subcommand)]
