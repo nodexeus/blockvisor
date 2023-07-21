@@ -11,6 +11,7 @@ use crate::{
     nodes::Nodes,
     set_bv_status,
 };
+use babel_api::engine::JobStatus;
 use chrono::Utc;
 use std::fmt;
 use std::fmt::Debug;
@@ -261,6 +262,44 @@ where
         };
 
         Ok(Response::new(reply))
+    }
+
+    #[instrument(skip(self))]
+    async fn get_node_jobs(
+        &self,
+        request: Request<bv_pb::GetNodeJobsRequest>,
+    ) -> Result<Response<bv_pb::GetNodeJobsResponse>, Status> {
+        status_check().await?;
+        let request = request.into_inner();
+        let id = helpers::parse_uuid(request.id)?;
+
+        let mut jobs = vec![];
+        for (name, status) in self
+            .nodes
+            .jobs(id)
+            .await
+            .map_err(|e| Status::unknown(format!("{e:#}")))?
+        {
+            let (job_status, exit_code, message) = match status {
+                JobStatus::Pending => (bv_pb::JobStatus::JobPending, None, None),
+                JobStatus::Running => (bv_pb::JobStatus::JobRunning, None, None),
+                JobStatus::Finished { exit_code, message } => (
+                    bv_pb::JobStatus::JobFinished,
+                    exit_code.map(|c| c as u64),
+                    Some(message),
+                ),
+                JobStatus::Stopped => (bv_pb::JobStatus::JobStopped, None, None),
+            };
+            let job = bv_pb::NodeJob {
+                name,
+                status: job_status.into(),
+                exit_code,
+                message,
+            };
+            jobs.push(job);
+        }
+
+        Ok(Response::new(bv_pb::GetNodeJobsResponse { jobs }))
     }
 
     #[instrument(skip(self))]

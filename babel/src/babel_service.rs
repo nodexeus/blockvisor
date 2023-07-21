@@ -283,6 +283,18 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
         Ok(Response::new(status))
     }
 
+    async fn get_jobs(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<Vec<(String, JobStatus)>>, Status> {
+        let jobs = self
+            .jobs_manager
+            .list()
+            .await
+            .map_err(|err| Status::internal(format!("list jobs failed: {err}")))?;
+        Ok(Response::new(jobs))
+    }
+
     async fn run_jrpc(
         &self,
         request: Request<JrpcRequest>,
@@ -521,6 +533,7 @@ mod tests {
 
         #[async_trait]
         impl JobsManagerClient for JobsManager {
+            async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
             async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
             async fn stop(&self, name: &str) -> Result<()>;
             async fn status(&self, name: &str) -> Result<JobStatus>;

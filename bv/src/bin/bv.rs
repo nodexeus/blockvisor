@@ -357,6 +357,32 @@ impl NodeClient {
                 self.stop_nodes(&ids).await?;
                 self.start_nodes(&ids).await?;
             }
+            NodeCommand::Jobs { id_or_name } => {
+                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
+                let jobs = self
+                    .client
+                    .get_node_jobs(bv_pb::GetNodeJobsRequest { id: id.clone() })
+                    .await?
+                    .into_inner()
+                    .jobs;
+                if !jobs.is_empty() {
+                    println!("{:<30} STATUS", "NAME");
+                    for job in jobs {
+                        let status_with_code = format!(
+                            "{:?}{}",
+                            bv_pb::JobStatus::from_i32(job.status)
+                                .unwrap_or(bv_pb::JobStatus::UndefinedJobStatus),
+                            job.exit_code.map(|c| format!("({c})")).unwrap_or_default()
+                        );
+                        println!(
+                            "{:<30} {:<20} {}",
+                            job.name,
+                            status_with_code,
+                            job.message.unwrap_or_default()
+                        );
+                    }
+                }
+            }
             NodeCommand::Logs { id_or_name } => {
                 let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
                 let logs = self

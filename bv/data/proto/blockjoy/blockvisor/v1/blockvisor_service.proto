@@ -14,6 +14,7 @@ service Blockvisor {
     rpc StopNode(StopNodeRequest) returns (StopNodeResponse);
     rpc GetNodes(GetNodesRequest) returns (GetNodesResponse);
     rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
+    rpc GetNodeJobs(GetNodeJobsRequest) returns (GetNodeJobsResponse);
     rpc GetNodeLogs(GetNodeLogsRequest) returns (GetNodeLogsResponse);
     rpc GetBabelLogs(GetBabelLogsRequest) returns (GetBabelLogsResponse);
     rpc GetNodeKeys(GetNodeKeysRequest) returns (GetNodeKeysResponse);

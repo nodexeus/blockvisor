@@ -78,6 +78,22 @@ async fn test_bv_cmd_node_start_and_stop_all() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
+async fn test_bv_cmd_jobs() -> Result<()> {
+    let mut test_env = TestEnv::new().await?;
+    test_env.run_blockvisord(RunFlag::default()).await?;
+    println!("create a node");
+    let (vm_id, _) = &test_env.create_node("testing/validator/0.0.1", "216.18.214.195");
+    println!("create vm_id: {vm_id}");
+
+    println!("start node");
+    test_env.bv_run(&["node", "start", vm_id], "Started node");
+
+    println!("check jobs");
+    test_env.bv_run(&["node", "jobs", vm_id], "echo");
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn test_bv_cmd_logs() -> Result<()> {
     let mut test_env = TestEnv::new().await?;
     test_env.run_blockvisord(RunFlag::default()).await?;
