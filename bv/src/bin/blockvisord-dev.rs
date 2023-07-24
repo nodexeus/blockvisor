@@ -1,11 +1,12 @@
 use anyhow::Result;
 use blockvisord::{
     config::{Config, SharedConfig},
+    internal_server,
     linux_platform::LinuxPlatform,
     nodes::Nodes,
     pal::Pal,
     server::{bv_pb, BlockvisorServer},
-    set_bv_status,
+    set_bv_status, ServiceStatus,
 };
 use bv_utils::{logging::setup_logging, run_flag::RunFlag};
 use std::sync::Arc;
@@ -21,7 +22,7 @@ async fn main() -> Result<()> {
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION")
     );
-    set_bv_status(bv_pb::ServiceStatus::Ok).await;
+    set_bv_status(ServiceStatus::Ok).await;
 
     let mut run = RunFlag::run_until_ctrlc();
     let pal = LinuxPlatform::new()?;
@@ -38,6 +39,9 @@ async fn main() -> Result<()> {
             BlockvisorServer {
                 nodes: Arc::new(nodes),
             },
+        ))
+        .add_service(internal_server::service_server::ServiceServer::new(
+            internal_server::State {},
         ))
         .serve_with_incoming_shutdown(
             tokio_stream::wrappers::TcpListenerStream::new(listener),

@@ -9,7 +9,7 @@ use crate::{
     node_data::{NodeImage, NodeStatus},
     nodes,
     nodes::Nodes,
-    set_bv_status,
+    ServiceStatus,
 };
 use babel_api::engine::JobStatus;
 use chrono::Utc;
@@ -21,14 +21,10 @@ use tracing::instrument;
 
 async fn status_check() -> Result<(), Status> {
     match get_bv_status().await {
-        bv_pb::ServiceStatus::UndefinedServiceStatus => {
-            Err(Status::unavailable("service not ready, try again later"))
-        }
-        bv_pb::ServiceStatus::Updating => {
-            Err(Status::unavailable("pending update, try again later"))
-        }
-        bv_pb::ServiceStatus::Broken => Err(Status::internal("service is broken, call support")),
-        bv_pb::ServiceStatus::Ok => Ok(()),
+        ServiceStatus::Undefined => Err(Status::unavailable("service not ready, try again later")),
+        ServiceStatus::Updating => Err(Status::unavailable("pending update, try again later")),
+        ServiceStatus::Broken => Err(Status::internal("service is broken, call support")),
+        ServiceStatus::Ok => Ok(()),
     }
 }
 
@@ -44,27 +40,6 @@ where
     P::NodeConnection: Send + Sync + 'static,
     P::VirtualMachine: Send + Sync + 'static,
 {
-    #[instrument(skip(self), ret(Debug))]
-    async fn health(
-        &self,
-        _request: Request<bv_pb::HealthRequest>,
-    ) -> Result<Response<bv_pb::HealthResponse>, Status> {
-        let mut reply = bv_pb::HealthResponse { status: 0 };
-        reply.set_status(get_bv_status().await);
-        Ok(Response::new(reply))
-    }
-
-    #[instrument(skip(self), ret(Debug))]
-    async fn start_update(
-        &self,
-        _request: Request<bv_pb::StartUpdateRequest>,
-    ) -> Result<Response<bv_pb::StartUpdateResponse>, Status> {
-        set_bv_status(bv_pb::ServiceStatus::Updating).await;
-        Ok(Response::new(bv_pb::StartUpdateResponse {
-            status: bv_pb::ServiceStatus::Updating.into(),
-        }))
-    }
-
     #[instrument(skip(self), ret(Debug))]
     async fn create_node(
         &self,

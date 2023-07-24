@@ -1,6 +1,7 @@
 use crate::{
     config::{Config, SharedConfig},
     hosts::{self, HostMetrics},
+    internal_server,
     node_data::NodeStatus,
     node_metrics,
     nodes::Nodes,
@@ -10,6 +11,7 @@ use crate::{
     services::{api, api::pb, mqtt},
     try_set_bv_status,
     utils::with_jitter,
+    ServiceStatus,
 };
 use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
@@ -101,7 +103,7 @@ where
         let cmds_connector = self.pal.create_commands_stream_connector(&self.config);
         let nodes = Nodes::load(self.pal, self.config.clone()).await?;
 
-        try_set_bv_status(bv_pb::ServiceStatus::Ok).await;
+        try_set_bv_status(ServiceStatus::Ok).await;
         let nodes = Arc::new(nodes);
 
         let server = BlockvisorServer {
@@ -157,6 +159,9 @@ where
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(server))
+            .add_service(internal_server::service_server::ServiceServer::new(
+                internal_server::State {},
+            ))
             .serve_with_incoming_shutdown(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
                 run.wait(),

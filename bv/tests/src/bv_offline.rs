@@ -10,10 +10,9 @@ use blockvisord::{
     config::{Config, SharedConfig},
     firecracker_machine::FC_BIN_NAME,
     nodes::Nodes,
-    server::bv_pb,
     services,
     services::{api, api::pb},
-    set_bv_status, utils, BV_VAR_PATH,
+    set_bv_status, utils, ServiceStatus, BV_VAR_PATH,
 };
 use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -558,7 +557,7 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
             .await
             .unwrap()
     };
-    set_bv_status(bv_pb::ServiceStatus::Ok).await;
+    set_bv_status(ServiceStatus::Ok).await;
     let id = Uuid::new_v4();
     let config = Config {
         id: id.to_string(),

@@ -41,25 +41,6 @@ message Node {
     optional int64 uptime = 7;
 }
 
-enum ServiceStatus {
-    UndefinedServiceStatus = 0;
-    Ok = 1;
-    Updating = 2;
-    Broken = 3;
-}
-
-message HealthRequest {}
-
-message HealthResponse {
-    ServiceStatus status = 1;
-}
-
-message StartUpdateRequest {}
-
-message StartUpdateResponse {
-    ServiceStatus status = 1;
-}
-
 message Parameter {
     string name = 1;
     string value = 2;
