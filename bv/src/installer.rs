@@ -1,8 +1,8 @@
 use crate::{
     config::{Config, CONFIG_PATH},
+    internal_server,
     linux_platform::BRIDGE_IFACE,
-    server::bv_pb,
-    server::bv_pb::blockvisor_client::BlockvisorClient,
+    ServiceStatus,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use async_trait::async_trait;
@@ -66,7 +66,7 @@ enum BackupStatus {
 
 pub struct Installer<T, S> {
     paths: InstallerPaths,
-    bv_client: BlockvisorClient<Channel>,
+    bv_client: internal_server::service_client::ServiceClient<Channel>,
     backup_status: BackupStatus,
     timer: T,
     bv_service: S,
@@ -125,7 +125,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
                 backup,
                 blacklist,
             },
-            bv_client: BlockvisorClient::new(bv_channel),
+            bv_client: internal_server::service_client::ServiceClient::new(bv_channel),
             backup_status: BackupStatus::NothingToBackup,
             timer,
             bv_service,
@@ -251,13 +251,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
                 duration > PREPARE_FOR_UPDATE_TIMEOUT
             };
             loop {
-                match with_retry!(self
-                    .bv_client
-                    .start_update(bv_pb::StartUpdateRequest::default()))
-                {
+                match with_retry!(self.bv_client.start_update(())) {
                     Ok(resp) => {
-                        let status = resp.into_inner().status();
-                        if status == bv_pb::ServiceStatus::Updating {
+                        let status = resp.into_inner();
+                        if status == ServiceStatus::Updating {
                             break;
                         } else if expired() {
                             bail!("prepare running BV for update failed, BV start_update respond with {status:?}");
@@ -346,10 +343,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
             duration > HEALTH_CHECK_TIMEOUT
         };
         loop {
-            match with_retry!(self.bv_client.health(bv_pb::HealthRequest::default())) {
+            match with_retry!(self.bv_client.health(())) {
                 Ok(resp) => {
-                    let status = resp.into_inner().status();
-                    if status == bv_pb::ServiceStatus::Ok {
+                    let status = resp.into_inner();
+                    if status == ServiceStatus::Ok {
                         break;
                     } else if expired() {
                         bail!(
@@ -504,7 +501,7 @@ async fn check_network_setup() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::bv_pb;
+    use crate::internal_server;
     use crate::utils;
     use crate::utils::tests::test_channel;
     use anyhow::anyhow;
@@ -524,75 +521,15 @@ mod tests {
         pub TestBV {}
 
         #[tonic::async_trait]
-        impl bv_pb::blockvisor_server::Blockvisor for TestBV {
+        impl internal_server::service_server::Service for TestBV {
             async fn health(
                 &self,
-                request: tonic::Request<bv_pb::HealthRequest>,
-            ) -> Result<tonic::Response<bv_pb::HealthResponse>, tonic::Status>;
+                request: tonic::Request<()>,
+            ) -> Result<tonic::Response<ServiceStatus>, tonic::Status>;
             async fn start_update(
                 &self,
-                request: tonic::Request<bv_pb::StartUpdateRequest>,
-            ) -> Result<tonic::Response<bv_pb::StartUpdateResponse>, tonic::Status>;
-            async fn create_node(
-                &self,
-                request: tonic::Request<bv_pb::CreateNodeRequest>,
-            ) -> Result<tonic::Response<bv_pb::CreateNodeResponse>, tonic::Status>;
-            async fn upgrade_node(
-                &self,
-                request: tonic::Request<bv_pb::UpgradeNodeRequest>,
-            ) -> Result<tonic::Response<bv_pb::UpgradeNodeResponse>, tonic::Status>;
-            async fn delete_node(
-                &self,
-                request: tonic::Request<bv_pb::DeleteNodeRequest>,
-            ) -> Result<tonic::Response<bv_pb::DeleteNodeResponse>, tonic::Status>;
-            async fn start_node(
-                &self,
-                request: tonic::Request<bv_pb::StartNodeRequest>,
-            ) -> Result<tonic::Response<bv_pb::StartNodeResponse>, tonic::Status>;
-            async fn stop_node(
-                &self,
-                request: tonic::Request<bv_pb::StopNodeRequest>,
-            ) -> Result<tonic::Response<bv_pb::StopNodeResponse>, tonic::Status>;
-            async fn get_nodes(
-                &self,
-                request: tonic::Request<bv_pb::GetNodesRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodesResponse>, tonic::Status>;
-            async fn get_node_status(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeStatusRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeStatusResponse>, tonic::Status>;
-            async fn get_node_jobs(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeJobsRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeJobsResponse>, tonic::Status>;
-            async fn get_node_logs(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeLogsRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeLogsResponse>, tonic::Status>;
-            async fn get_babel_logs(
-                &self,
-                request: tonic::Request<bv_pb::GetBabelLogsRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetBabelLogsResponse>, tonic::Status>;
-            async fn get_node_keys(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeKeysRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeKeysResponse>, tonic::Status>;
-            async fn get_node_id_for_name(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeIdForNameRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeIdForNameResponse>, tonic::Status>;
-            async fn list_capabilities(
-                &self,
-                request: tonic::Request<bv_pb::ListCapabilitiesRequest>,
-            ) -> Result<tonic::Response<bv_pb::ListCapabilitiesResponse>, tonic::Status>;
-            async fn blockchain(
-                &self,
-                request: tonic::Request<bv_pb::BlockchainRequest>,
-            ) -> Result<tonic::Response<bv_pb::BlockchainResponse>, tonic::Status>;
-            async fn get_node_metrics(
-                &self,
-                request: tonic::Request<bv_pb::GetNodeMetricsRequest>,
-            ) -> Result<tonic::Response<bv_pb::GetNodeMetricsResponse>, tonic::Status>;
+                request: tonic::Request<()>,
+            ) -> Result<tonic::Response<ServiceStatus>, tonic::Status>;
         }
     }
 
@@ -634,7 +571,7 @@ mod tests {
         fn start_test_server(&self, bv_mock: MockTestBV) -> utils::tests::TestServer {
             utils::tests::start_test_server(
                 self.tmp_root.join("test_socket"),
-                bv_pb::blockvisor_server::BlockvisorServer::new(bv_mock),
+                internal_server::service_server::ServiceServer::new(bv_mock),
             )
         }
 
@@ -669,12 +606,10 @@ mod tests {
         let test_env = TestEnv::new()?;
 
         let mut bv_mock = MockTestBV::new();
-        bv_mock.expect_start_update().once().returning(|_| {
-            let reply = bv_pb::StartUpdateResponse {
-                status: bv_pb::ServiceStatus::Updating.into(),
-            };
-            Ok(Response::new(reply))
-        });
+        bv_mock
+            .expect_start_update()
+            .once()
+            .returning(|_| Ok(Response::new(ServiceStatus::Updating)));
         let mut timer_mock = MockTimer::new();
         timer_mock.expect_sleep().returning(|_| ());
         let now = Instant::now();
@@ -694,11 +629,8 @@ mod tests {
         let update_start_called = Arc::new(AtomicBool::new(false));
         let update_start_called_flag = update_start_called.clone();
         bv_mock.expect_start_update().once().returning(move |_| {
-            let reply = bv_pb::StartUpdateResponse {
-                status: bv_pb::ServiceStatus::Ok.into(),
-            };
             update_start_called_flag.store(true, Relaxed);
-            Ok(Response::new(reply))
+            Ok(Response::new(ServiceStatus::Ok))
         });
         let mut timer_mock = MockTimer::new();
         let now = Instant::now();
@@ -728,21 +660,16 @@ mod tests {
         let test_env = TestEnv::new()?;
 
         let mut bv_mock = MockTestBV::new();
-        bv_mock.expect_health().times(2).returning(|_| {
-            let reply = bv_pb::HealthResponse {
-                status: bv_pb::ServiceStatus::Ok.into(),
-            };
-            Ok(Response::new(reply))
-        });
+        bv_mock
+            .expect_health()
+            .times(2)
+            .returning(|_| Ok(Response::new(ServiceStatus::Ok)));
         let mut timer_mock = MockTimer::new();
         timer_mock.expect_now().returning(Instant::now);
         let server = test_env.start_test_server(bv_mock);
-        let mut client = BlockvisorClient::new(test_channel(&test_env.tmp_root));
-        while client
-            .health(bv_pb::HealthRequest::default())
-            .await
-            .is_err()
-        {
+        let mut client =
+            internal_server::service_client::ServiceClient::new(test_channel(&test_env.tmp_root));
+        while client.health(()).await.is_err() {
             sleep(Duration::from_millis(10));
         }
 
@@ -758,12 +685,9 @@ mod tests {
     async fn test_health_check_timeout() -> Result<()> {
         let test_env = TestEnv::new()?;
         let mut bv_mock = MockTestBV::new();
-        bv_mock.expect_health().returning(|_| {
-            let reply = bv_pb::HealthResponse {
-                status: bv_pb::ServiceStatus::Updating.into(),
-            };
-            Ok(Response::new(reply))
-        });
+        bv_mock
+            .expect_health()
+            .returning(|_| Ok(Response::new(ServiceStatus::Updating)));
         let mut timer_mock = MockTimer::new();
         let now = Instant::now();
         timer_mock.expect_now().once().returning(move || now);
@@ -776,12 +700,9 @@ mod tests {
             .once()
             .returning(move || now.add(HEALTH_CHECK_TIMEOUT).add(Duration::from_secs(1)));
         let server = test_env.start_test_server(bv_mock);
-        let mut client = BlockvisorClient::new(test_channel(&test_env.tmp_root));
-        while client
-            .health(bv_pb::HealthRequest::default())
-            .await
-            .is_err()
-        {
+        let mut client =
+            internal_server::service_client::ServiceClient::new(test_channel(&test_env.tmp_root));
+        while client.health(()).await.is_err() {
             sleep(Duration::from_millis(10));
         }
 

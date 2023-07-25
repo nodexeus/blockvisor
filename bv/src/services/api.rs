@@ -5,8 +5,8 @@ use crate::{
     nodes,
     nodes::Nodes,
     pal::Pal,
-    server::bv_pb,
     services::api::pb::{Action, ChecksumType, Direction, Protocol, Rule},
+    ServiceStatus,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use babel_api::{
@@ -200,7 +200,7 @@ impl CommandsService {
                     let command_id = command.id.clone();
                     // check for bv health status
                     let service_status = get_bv_status().await;
-                    if service_status != bv_pb::ServiceStatus::Ok {
+                    if service_status != ServiceStatus::Ok {
                         self.send_service_status_update(command_id.clone(), service_status)
                             .await
                             .with_context(|| "cannot send system status update")?;
@@ -271,10 +271,10 @@ impl CommandsService {
     async fn send_service_status_update(
         &mut self,
         command_id: String,
-        status: bv_pb::ServiceStatus,
+        status: ServiceStatus,
     ) -> Result<()> {
         match status {
-            bv_pb::ServiceStatus::UndefinedServiceStatus => {
+            ServiceStatus::Undefined => {
                 self.send_command_update(
                     command_id,
                     Some(STATUS_ERROR),
@@ -282,7 +282,7 @@ impl CommandsService {
                 )
                 .await
             }
-            bv_pb::ServiceStatus::Updating => {
+            ServiceStatus::Updating => {
                 self.send_command_update(
                     command_id,
                     Some(STATUS_ERROR),
@@ -290,7 +290,7 @@ impl CommandsService {
                 )
                 .await
             }
-            bv_pb::ServiceStatus::Broken => {
+            ServiceStatus::Broken => {
                 self.send_command_update(
                     command_id,
                     Some(STATUS_ERROR),
@@ -298,7 +298,7 @@ impl CommandsService {
                 )
                 .await
             }
-            bv_pb::ServiceStatus::Ok => Ok(()),
+            ServiceStatus::Ok => Ok(()),
         }
     }
 }

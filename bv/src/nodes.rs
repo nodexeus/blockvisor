@@ -49,12 +49,6 @@ pub fn build_registry_filename(bv_root: &Path) -> PathBuf {
     bv_root.join(BV_VAR_PATH).join(REGISTRY_CONFIG_FILENAME)
 }
 
-#[derive(Clone, Debug)]
-pub enum ServiceStatus {
-    Enabled,
-    Disabled,
-}
-
 /// Container with some shallow information about the node
 ///
 /// This information is [mostly] immutable, and we can cache it for

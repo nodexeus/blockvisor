@@ -861,6 +861,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tonic-build",
+ "tonic-rpc",
  "tower",
  "tracing",
  "uuid",
