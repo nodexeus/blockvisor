@@ -10,8 +10,6 @@ service Blockvisor {
     rpc DeleteNode(DeleteNodeRequest) returns (DeleteNodeResponse);
     rpc StartNode(StartNodeRequest) returns (StartNodeResponse);
     rpc StopNode(StopNodeRequest) returns (StopNodeResponse);
-    rpc GetNodes(GetNodesRequest) returns (GetNodesResponse);
-    rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
     rpc GetNodeJobs(GetNodeJobsRequest) returns (GetNodeJobsResponse);
     rpc GetNodeLogs(GetNodeLogsRequest) returns (GetNodeLogsResponse);
     rpc GetBabelLogs(GetBabelLogsRequest) returns (GetBabelLogsResponse);

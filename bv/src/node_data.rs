@@ -20,6 +20,7 @@ pub type NodeProperties = HashMap<String, String>;
 pub enum NodeStatus {
     Running,
     Stopped,
+    Busy,
     Failed,
 }
 
@@ -36,6 +37,17 @@ pub struct NodeImage {
     pub node_version: String,
 }
 
+impl fmt::Display for NodeImage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}",
+            self.protocol, self.node_type, self.node_version
+        )
+    }
+}
+
+// Data that we store in data file
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NodeData<N> {
     pub id: Uuid,
@@ -53,6 +65,18 @@ pub struct NodeData<N> {
     #[serde(default)]
     pub properties: NodeProperties,
     pub network: String,
+}
+
+// Data that we display in cli
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct NodeDisplayInfo {
+    pub id: Uuid,
+    pub name: String,
+    pub status: NodeStatus,
+    pub image: NodeImage,
+    pub ip: String,
+    pub gateway: String,
+    pub uptime: Option<i64>,
 }
 
 impl<N: NetInterface + Serialize + DeserializeOwned> NodeData<N> {

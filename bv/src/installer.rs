@@ -502,6 +502,7 @@ async fn check_network_setup() -> Result<()> {
 mod tests {
     use super::*;
     use crate::internal_server;
+    use crate::node_data::{NodeDisplayInfo, NodeStatus};
     use crate::utils;
     use crate::utils::tests::test_channel;
     use anyhow::anyhow;
@@ -516,6 +517,7 @@ mod tests {
     use std::thread::sleep;
     use std::time::Instant;
     use tonic::Response;
+    use uuid::Uuid;
 
     mock! {
         pub TestBV {}
@@ -530,6 +532,14 @@ mod tests {
                 &self,
                 request: tonic::Request<()>,
             ) -> Result<tonic::Response<ServiceStatus>, tonic::Status>;
+            async fn get_node_status(
+                &self,
+                request: tonic::Request<Uuid>,
+            ) -> Result<tonic::Response<NodeStatus>, tonic::Status>;
+            async fn get_nodes(
+                &self,
+                _request: tonic::Request<()>,
+            ) -> Result<tonic::Response<Vec<NodeDisplayInfo>>, tonic::Status>;
         }
     }
 

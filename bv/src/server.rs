@@ -3,17 +3,9 @@ pub mod bv_pb {
 }
 
 use crate::nodes::BabelError;
-use crate::pal::{NetInterface, Pal};
-use crate::{
-    get_bv_status,
-    node_data::{NodeImage, NodeStatus},
-    nodes,
-    nodes::Nodes,
-    ServiceStatus,
-};
+use crate::pal::Pal;
+use crate::{get_bv_status, node_data::NodeImage, nodes, nodes::Nodes, ServiceStatus};
 use babel_api::engine::JobStatus;
-use chrono::Utc;
-use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
@@ -155,86 +147,6 @@ where
             .map_err(|e| Status::unknown(format!("{e:#}")))?;
 
         let reply = bv_pb::StopNodeResponse {};
-
-        Ok(Response::new(reply))
-    }
-
-    #[instrument(skip(self), ret(Debug))]
-    async fn get_nodes(
-        &self,
-        _request: Request<bv_pb::GetNodesRequest>,
-    ) -> Result<Response<bv_pb::GetNodesResponse>, Status> {
-        status_check().await?;
-        let nodes_lock = self.nodes.nodes.read().await;
-        let mut nodes = vec![];
-        for (id, node_lock) in nodes_lock.iter() {
-            let n = if let Ok(node) = node_lock.try_read() {
-                let status = match node.status() {
-                    NodeStatus::Running => bv_pb::NodeStatus::Running,
-                    NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
-                    NodeStatus::Failed => bv_pb::NodeStatus::Failed,
-                };
-                bv_pb::Node {
-                    id: node.data.id.to_string(),
-                    name: node.data.name.clone(),
-                    image: Some(node.data.image.clone().into()),
-                    status: status.into(),
-                    ip: node.data.network_interface.ip().to_string(),
-                    gateway: node.data.network_interface.gateway().to_string(),
-                    uptime: node
-                        .data
-                        .started_at
-                        .map(|dt| Utc::now().signed_duration_since(dt).num_seconds()),
-                }
-            } else {
-                let cache = self
-                    .nodes
-                    .node_data_cache(*id)
-                    .await
-                    .map_err(|e| Status::unknown(format!("{e:#}")))?;
-                bv_pb::Node {
-                    id: id.to_string(),
-                    name: cache.name,
-                    image: Some(cache.image.into()),
-                    status: bv_pb::NodeStatus::Busy.into(),
-                    ip: cache.ip,
-                    gateway: cache.gateway,
-                    uptime: cache
-                        .started_at
-                        .map(|dt| Utc::now().signed_duration_since(dt).num_seconds()),
-                }
-            };
-            nodes.push(n);
-        }
-
-        let reply = bv_pb::GetNodesResponse { nodes };
-
-        Ok(Response::new(reply))
-    }
-
-    #[instrument(skip(self), ret(Debug))]
-    async fn get_node_status(
-        &self,
-        request: Request<bv_pb::GetNodeStatusRequest>,
-    ) -> Result<Response<bv_pb::GetNodeStatusResponse>, Status> {
-        status_check().await?;
-        let request = request.into_inner();
-        let id = helpers::parse_uuid(request.id)?;
-
-        let status = self
-            .nodes
-            .status(id)
-            .await
-            .map_err(|e| Status::unknown(format!("{e:#}")))?;
-        let status = match status {
-            NodeStatus::Running => bv_pb::NodeStatus::Running,
-            NodeStatus::Stopped => bv_pb::NodeStatus::Stopped,
-            NodeStatus::Failed => bv_pb::NodeStatus::Failed,
-        };
-
-        let reply = bv_pb::GetNodeStatusResponse {
-            status: status.into(),
-        };
 
         Ok(Response::new(reply))
     }
@@ -421,32 +333,6 @@ where
     }
 }
 
-impl fmt::Display for bv_pb::NodeStatus {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl fmt::Display for bv_pb::NodeImage {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}/{}/{}",
-            self.protocol, self.node_type, self.node_version
-        )
-    }
-}
-
-impl From<bv_pb::NodeImage> for NodeImage {
-    fn from(image: bv_pb::NodeImage) -> Self {
-        Self {
-            protocol: image.protocol,
-            node_type: image.node_type,
-            node_version: image.node_version,
-        }
-    }
-}
-
 impl From<NodeImage> for bv_pb::NodeImage {
     fn from(image: NodeImage) -> Self {
         Self {
@@ -462,5 +348,15 @@ mod helpers {
         uuid.as_ref()
             .parse()
             .map_err(|_| tonic::Status::invalid_argument("Unparseable node id"))
+    }
+}
+
+impl From<bv_pb::NodeImage> for NodeImage {
+    fn from(image: bv_pb::NodeImage) -> Self {
+        Self {
+            protocol: image.protocol,
+            node_type: image.node_type,
+            node_version: image.node_version,
+        }
     }
 }

@@ -32,16 +32,19 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.blockvisor_port)).await?;
 
     let nodes = Nodes::load(pal, SharedConfig::new(config, bv_root)).await?;
+    let nodes = Arc::new(nodes);
 
     Server::builder()
         .max_concurrent_streams(1)
         .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(
             BlockvisorServer {
-                nodes: Arc::new(nodes),
+                nodes: nodes.clone(),
             },
         ))
         .add_service(internal_server::service_server::ServiceServer::new(
-            internal_server::State {},
+            internal_server::State {
+                nodes: nodes.clone(),
+            },
         ))
         .serve_with_incoming_shutdown(
             tokio_stream::wrappers::TcpListenerStream::new(listener),
