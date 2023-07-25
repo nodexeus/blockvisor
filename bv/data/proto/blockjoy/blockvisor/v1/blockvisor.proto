@@ -2,14 +2,6 @@ syntax = "proto3";
 
 package blockjoy.blockvisor.v1;
 
-enum NodeStatus {
-    UndefinedNodeStatus = 0;
-    Running = 1;
-    Stopped = 2;
-    Failed = 3;
-    Busy = 4;
-}
-
 enum JobStatus {
     UndefinedJobStatus = 0;
     JobPending = 1;
@@ -29,16 +21,6 @@ message NodeImage {
     string protocol = 1;
     string node_type = 2;
     string node_version = 3;
-}
-
-message Node {
-    string id = 1;
-    string name = 2;
-    NodeImage image = 3;
-    string ip = 4;
-    string gateway = 5;
-    NodeStatus status = 6;
-    optional int64 uptime = 7;
 }
 
 message Parameter {
@@ -82,20 +64,6 @@ message StopNodeRequest {
 }
 
 message StopNodeResponse {}
-
-message GetNodesRequest {}
-
-message GetNodesResponse {
-    repeated Node nodes = 1;
-}
-
-message GetNodeStatusRequest {
-    string id = 1;   
-}
-
-message GetNodeStatusResponse {
-    NodeStatus status = 1;
-}
 
 message GetNodeJobsRequest {
     string id = 1;

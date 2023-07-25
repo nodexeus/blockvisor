@@ -6,15 +6,14 @@ use cli_table::{
     ColorChoice, Style, Table, TableStruct, WithTitle,
 };
 
-use crate::server::bv_pb;
+use crate::node_data::NodeStatus;
 
-fn style_node_status(cell: CellStruct, value: &bv_pb::NodeStatus) -> CellStruct {
+fn style_node_status(cell: CellStruct, value: &NodeStatus) -> CellStruct {
     match value {
-        bv_pb::NodeStatus::UndefinedNodeStatus => cell.foreground_color(Some(Yellow)),
-        bv_pb::NodeStatus::Busy => cell.foreground_color(Some(Yellow)),
-        bv_pb::NodeStatus::Running => cell.foreground_color(Some(Green)),
-        bv_pb::NodeStatus::Stopped => cell.foreground_color(Some(Yellow)),
-        bv_pb::NodeStatus::Failed => cell.foreground_color(Some(Red)),
+        NodeStatus::Busy => cell.foreground_color(Some(Yellow)),
+        NodeStatus::Running => cell.foreground_color(Some(Green)),
+        NodeStatus::Stopped => cell.foreground_color(Some(Yellow)),
+        NodeStatus::Failed => cell.foreground_color(Some(Red)),
     }
 }
 
@@ -27,7 +26,7 @@ pub struct PrettyTableRow {
     #[table(title = "Image", color = "Blue")]
     pub image: String,
     #[table(title = "State", customize_fn = "style_node_status")]
-    pub status: bv_pb::NodeStatus,
+    pub status: NodeStatus,
     #[table(title = "IP Address", color = "Yellow")]
     pub ip: String,
     #[table(title = "Uptime (s)")]

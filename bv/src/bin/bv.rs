@@ -3,11 +3,13 @@ use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::{Config, SharedConfig, CONFIG_PATH},
     hosts::{self, HostInfo, HostMetrics},
+    internal_server,
     linux_platform::bv_root,
+    node_data::{NodeDisplayInfo, NodeStatus},
     pretty_table::{PrettyTable, PrettyTableRow},
     server::{
         bv_pb::blockvisor_client::BlockvisorClient,
-        bv_pb::{self, Node, Parameter},
+        bv_pb::{self, Parameter},
     },
     services::cookbook::CookbookService,
 };
@@ -160,22 +162,19 @@ async fn process_chain_command(command: ChainCommand) -> Result<()> {
 
 struct NodeClient {
     client: BlockvisorClient<Channel>,
+    internal_client: internal_server::service_client::ServiceClient<Channel>, // temporary
 }
 
 impl NodeClient {
     async fn new(url: String) -> Result<Self> {
         Ok(Self {
-            client: BlockvisorClient::connect(url).await?,
+            client: BlockvisorClient::connect(url.clone()).await?,
+            internal_client: internal_server::service_client::ServiceClient::connect(url).await?,
         })
     }
 
-    async fn fetch_nodes(&mut self) -> Result<Vec<Node>> {
-        Ok(self
-            .client
-            .get_nodes(bv_pb::GetNodesRequest {})
-            .await?
-            .into_inner()
-            .nodes)
+    async fn fetch_nodes(&mut self) -> Result<Vec<NodeDisplayInfo>> {
+        Ok(self.internal_client.get_nodes(()).await?.into_inner())
     }
 
     async fn list_capabilities(&mut self, node_id: Uuid) -> Result<Vec<String>> {
@@ -214,7 +213,7 @@ impl NodeClient {
         let mut ids: Vec<String> = Default::default();
         if id_or_names.is_empty() {
             for node in self.fetch_nodes().await? {
-                ids.push(node.id);
+                ids.push(node.id.to_string());
             }
         } else {
             for id_or_name in id_or_names {
@@ -250,17 +249,16 @@ impl NodeClient {
                 let nodes = self.fetch_nodes().await?;
                 let mut nodes = nodes
                     .iter()
-                    .filter(|n| (!running || (n.status() == bv_pb::NodeStatus::Running)))
+                    .filter(|n| (!running || (n.status == NodeStatus::Running)))
                     .peekable();
                 if nodes.peek().is_some() {
                     let mut table = vec![];
                     for node in nodes.cloned() {
-                        let status = node.status();
                         table.push(PrettyTableRow {
-                            id: node.id,
+                            id: node.id.to_string(),
                             name: node.name,
-                            image: fmt_opt(node.image),
-                            status,
+                            image: node.image.to_string(),
+                            status: node.status,
                             ip: node.ip,
                             uptime: fmt_opt(node.uptime),
                         })
@@ -339,7 +337,7 @@ impl NodeClient {
                     self.fetch_nodes()
                         .await?
                         .into_iter()
-                        .map(|n| n.id)
+                        .map(|n| n.id.to_string())
                         .collect()
                 } else {
                     id_or_names
@@ -411,16 +409,10 @@ impl NodeClient {
             }
             NodeCommand::Status { id_or_names } => {
                 for id_or_name in id_or_names {
-                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                    let status = self
-                        .client
-                        .get_node_status(bv_pb::GetNodeStatusRequest { id })
-                        .await?;
-                    let status = status.into_inner().status;
-                    match bv_pb::NodeStatus::from_i32(status) {
-                        Some(status) => println!("{status}"),
-                        None => eprintln!("Invalid status {status}"),
-                    }
+                    let id = self.resolve_id_or_name(&id_or_name).await?;
+                    let status = self.internal_client.get_node_status(id).await?;
+                    let status = status.into_inner();
+                    println!("{status}");
                 }
             }
             NodeCommand::Keys { id_or_name } => {

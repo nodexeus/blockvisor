@@ -106,11 +106,8 @@ where
         try_set_bv_status(ServiceStatus::Ok).await;
         let nodes = Arc::new(nodes);
 
-        let server = BlockvisorServer {
-            nodes: nodes.clone(),
-        };
         let internal_api_server_future =
-            Self::create_internal_api_server(run.clone(), self.listener, server);
+            Self::create_internal_api_server(run.clone(), self.listener, nodes.clone());
 
         let (cmd_watch_tx, cmd_watch_rx) = watch::channel(());
         let external_api_client_future = Self::create_external_api_listener(
@@ -154,13 +151,19 @@ where
     async fn create_internal_api_server(
         mut run: RunFlag,
         listener: TcpListener,
-        server: BlockvisorServer<P>,
+        nodes: Arc<Nodes<P>>,
     ) -> Result<()> {
         Server::builder()
             .max_concurrent_streams(1)
-            .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(server))
+            .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(
+                BlockvisorServer {
+                    nodes: nodes.clone(),
+                },
+            ))
             .add_service(internal_server::service_server::ServiceServer::new(
-                internal_server::State {},
+                internal_server::State {
+                    nodes: nodes.clone(),
+                },
             ))
             .serve_with_incoming_shutdown(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
@@ -285,6 +288,7 @@ where
                     NodeStatus::Running => pb::ContainerStatus::Running,
                     NodeStatus::Stopped => pb::ContainerStatus::Stopped,
                     NodeStatus::Failed => pb::ContainerStatus::Unspecified,
+                    NodeStatus::Busy => pb::ContainerStatus::Unspecified,
                 };
                 let mut update = pb::NodeServiceUpdateStatusRequest {
                     id: node_id.to_string(),

@@ -344,6 +344,7 @@ impl<P: Pal + Debug> Node<P> {
             NodeStatus::Failed => {
                 warn!("Recovery: node with ID `{id}` cannot be recovered");
             }
+            NodeStatus::Busy => unreachable!(),
         }
         Ok(())
     }
