@@ -16,10 +16,8 @@ fn main() {
                 "blockjoy/v1/mqtt.proto",
                 "blockjoy/v1/user.proto",
                 "blockjoy/v1/org.proto",
-                // Internal API
-                "blockvisor_service.proto",
             ],
-            &["proto/", "data/proto/blockjoy/blockvisor/v1"],
+            &["proto/"],
         )
     {
         eprintln!("Building protos failed with:\n{e}");

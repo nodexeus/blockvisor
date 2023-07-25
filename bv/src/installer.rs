@@ -502,7 +502,9 @@ async fn check_network_setup() -> Result<()> {
 mod tests {
     use super::*;
     use crate::internal_server;
-    use crate::node_data::{NodeDisplayInfo, NodeStatus};
+    use crate::node_data::{NodeDisplayInfo, NodeImage, NodeStatus};
+    use crate::node_metrics;
+    use crate::nodes;
     use crate::utils;
     use crate::utils::tests::test_channel;
     use anyhow::anyhow;
@@ -511,8 +513,7 @@ mod tests {
     use mockall::*;
     use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
-    use std::sync::atomic::AtomicBool;
-    use std::sync::atomic::Ordering::Relaxed;
+    use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
     use std::sync::Arc;
     use std::thread::sleep;
     use std::time::Instant;
@@ -540,6 +541,43 @@ mod tests {
                 &self,
                 _request: tonic::Request<()>,
             ) -> Result<tonic::Response<Vec<NodeDisplayInfo>>, tonic::Status>;
+            async fn create_node(
+                &self,
+                request: tonic::Request<(Uuid, nodes::NodeConfig)>,
+            ) -> Result<tonic::Response<()>, tonic::Status>;
+            async fn upgrade_node(
+                &self,
+                request: tonic::Request<(Uuid, NodeImage)>,
+            ) -> Result<tonic::Response<()>, tonic::Status>;
+            async fn delete_node(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<()>, tonic::Status>;
+            async fn start_node(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<()>, tonic::Status>;
+            async fn stop_node(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<()>, tonic::Status>;
+            async fn get_node_jobs(
+                &self,
+                request: tonic::Request<Uuid>,
+            ) -> Result<tonic::Response<Vec<(String, babel_api::engine::JobStatus)>>, tonic::Status>;
+            async fn get_node_logs(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
+            async fn get_babel_logs(
+                &self,
+                request: tonic::Request<(Uuid, u32)>,
+            ) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
+            async fn get_node_keys(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
+            async fn get_node_id_for_name(
+                &self,
+                request: tonic::Request<String>,
+            ) -> Result<tonic::Response<String>, tonic::Status>;
+            async fn list_capabilities(
+                &self,
+                request: tonic::Request<Uuid>,
+            ) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
+            async fn run(
+                &self,
+                request: tonic::Request<(Uuid, String, String)>,
+            ) -> Result<tonic::Response<String>, tonic::Status>;
+            async fn get_node_metrics(
+                &self,
+                request: tonic::Request<Uuid>,
+            ) -> Result<tonic::Response<node_metrics::Metric>, tonic::Status>;
         }
     }
 
