@@ -6,6 +6,7 @@ use crate::nodes::Nodes;
 use crate::pal::{NodeConnection, Pal};
 use crate::services::api::pb;
 use babel_api::plugin::{ApplicationStatus, StakingStatus, SyncStatus};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -20,11 +21,11 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 type NodeId = uuid::Uuid;
 
 /// The metrics for a group of nodes.
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 pub struct Metrics(HashMap<NodeId, Metric>);
 
 /// The metrics for a single node.
-#[derive(serde::Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Metric {
     pub height: Option<u64>,
     pub block_age: Option<u64>,

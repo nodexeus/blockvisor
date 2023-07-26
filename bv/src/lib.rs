@@ -17,7 +17,6 @@ pub mod nodes;
 pub mod pal;
 pub mod pretty_table;
 pub mod self_updater;
-pub mod server;
 pub mod services;
 pub mod utils;
 use serde::{Deserialize, Serialize};

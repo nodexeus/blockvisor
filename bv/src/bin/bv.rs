@@ -1,16 +1,14 @@
 use anyhow::{bail, Result};
+use babel_api::engine::JobStatus;
 use blockvisord::{
     cli::{App, ChainCommand, Command, HostCommand, NodeCommand},
     config::{Config, SharedConfig, CONFIG_PATH},
     hosts::{self, HostInfo, HostMetrics},
     internal_server,
     linux_platform::bv_root,
-    node_data::{NodeDisplayInfo, NodeStatus},
+    node_data::{NodeDisplayInfo, NodeImage, NodeStatus},
+    nodes::NodeConfig,
     pretty_table::{PrettyTable, PrettyTableRow},
-    server::{
-        bv_pb::blockvisor_client::BlockvisorClient,
-        bv_pb::{self, Parameter},
-    },
     services::cookbook::CookbookService,
 };
 use bv_utils::cmd::{ask_confirm, run_cmd};
@@ -161,83 +159,65 @@ async fn process_chain_command(command: ChainCommand) -> Result<()> {
 }
 
 struct NodeClient {
-    client: BlockvisorClient<Channel>,
-    internal_client: internal_server::service_client::ServiceClient<Channel>, // temporary
+    client: internal_server::service_client::ServiceClient<Channel>,
 }
 
 impl NodeClient {
     async fn new(url: String) -> Result<Self> {
         Ok(Self {
-            client: BlockvisorClient::connect(url.clone()).await?,
-            internal_client: internal_server::service_client::ServiceClient::connect(url).await?,
+            client: internal_server::service_client::ServiceClient::connect(url).await?,
         })
     }
 
     async fn fetch_nodes(&mut self) -> Result<Vec<NodeDisplayInfo>> {
-        Ok(self.internal_client.get_nodes(()).await?.into_inner())
+        Ok(self.client.get_nodes(()).await?.into_inner())
     }
 
     async fn list_capabilities(&mut self, node_id: Uuid) -> Result<Vec<String>> {
-        let req = bv_pb::ListCapabilitiesRequest {
-            node_id: node_id.to_string(),
-        };
-        let caps = self
-            .client
-            .list_capabilities(req)
-            .await?
-            .into_inner()
-            .capabilities;
-        Ok(caps)
+        Ok(self.client.list_capabilities(node_id).await?.into_inner())
     }
 
     async fn resolve_id_or_name(&mut self, id_or_name: &str) -> Result<Uuid> {
         let uuid = match Uuid::parse_str(id_or_name) {
             Ok(v) => v,
             Err(_) => {
-                let uuid = self
+                let id = self
                     .client
-                    .get_node_id_for_name(bv_pb::GetNodeIdForNameRequest {
-                        name: id_or_name.to_string(),
-                    })
+                    .get_node_id_for_name(id_or_name.to_string())
                     .await?
-                    .into_inner()
-                    .id;
-                Uuid::parse_str(&uuid)?
+                    .into_inner();
+                Uuid::parse_str(&id)?
             }
         };
-
         Ok(uuid)
     }
 
-    async fn get_node_ids(&mut self, id_or_names: Vec<String>) -> Result<Vec<String>> {
-        let mut ids: Vec<String> = Default::default();
+    async fn get_node_ids(&mut self, id_or_names: Vec<String>) -> Result<Vec<Uuid>> {
+        let mut ids: Vec<Uuid> = Default::default();
         if id_or_names.is_empty() {
             for node in self.fetch_nodes().await? {
-                ids.push(node.id.to_string());
+                ids.push(node.id);
             }
         } else {
             for id_or_name in id_or_names {
-                ids.push(self.resolve_id_or_name(&id_or_name).await?.to_string());
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                ids.push(id);
             }
         };
         Ok(ids)
     }
 
-    async fn start_nodes(&mut self, ids: &Vec<String>) -> Result<()> {
+    async fn start_nodes(&mut self, ids: &[Uuid]) -> Result<()> {
         for id in ids {
-            self.client
-                .start_node(bv_pb::StartNodeRequest { id: id.clone() })
-                .await?;
+            self.client.start_node(*id).await?;
             println!("Started node `{id}`");
         }
         Ok(())
     }
 
-    async fn stop_nodes(&mut self, ids: &Vec<String>) -> Result<()> {
+    async fn stop_nodes(&mut self, ids: &[Uuid]) -> Result<()> {
         for id in ids {
-            self.client
-                .stop_node(bv_pb::StopNodeRequest { id: id.clone() })
-                .await?;
+            self.client.stop_node(*id).await?;
             println!("Stopped node `{id}`");
         }
         Ok(())
@@ -277,7 +257,7 @@ impl NodeClient {
             } => {
                 let id = Uuid::new_v4();
                 let name = Petnames::default().generate_one(3, "_");
-                let node_image = parse_image(&image)?;
+                let image = parse_image(&image)?;
                 let props: HashMap<String, String> = props
                     .as_deref()
                     .map(serde_json::from_str)
@@ -285,31 +265,25 @@ impl NodeClient {
                     .unwrap_or_default();
                 let properties = props
                     .into_iter()
-                    .map(|(name, value)| Parameter { name, value })
+                    .chain([("network".to_string(), network.clone())])
                     .collect();
-                self.client
-                    .create_node(bv_pb::CreateNodeRequest {
-                        id: id.to_string(),
-                        name: name.clone(),
-                        image: Some(node_image),
-                        ip,
-                        gateway,
-                        properties,
-                        network,
-                    })
-                    .await?;
+                let config = NodeConfig {
+                    name: name.clone(),
+                    image: image.clone(),
+                    ip,
+                    gateway,
+                    properties,
+                    network,
+                    rules: vec![],
+                };
+                self.client.create_node((id, config)).await?;
                 println!("Created new node from `{image}` image with ID `{id}` and name `{name}`");
             }
             NodeCommand::Upgrade { id_or_names, image } => {
-                let node_image = parse_image(&image)?;
+                let image = parse_image(&image)?;
                 for id_or_name in id_or_names {
-                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                    self.client
-                        .upgrade_node(bv_pb::UpgradeNodeRequest {
-                            id: id.clone(),
-                            image: Some(node_image.clone()),
-                        })
-                        .await?;
+                    let id = self.resolve_id_or_name(&id_or_name).await?;
+                    self.client.upgrade_node((id, image.clone())).await?;
                     println!("Upgraded node `{id}` to `{image}` image");
                 }
             }
@@ -343,10 +317,8 @@ impl NodeClient {
                     id_or_names
                 };
                 for id_or_name in id_or_names {
-                    let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                    self.client
-                        .delete_node(bv_pb::DeleteNodeRequest { id })
-                        .await?;
+                    let id = self.resolve_id_or_name(&id_or_name).await?;
+                    self.client.delete_node(id).await?;
                     println!("Deleted node `{id_or_name}`");
                 }
             }
@@ -356,38 +328,37 @@ impl NodeClient {
                 self.start_nodes(&ids).await?;
             }
             NodeCommand::Jobs { id_or_name } => {
-                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                let jobs = self
-                    .client
-                    .get_node_jobs(bv_pb::GetNodeJobsRequest { id: id.clone() })
-                    .await?
-                    .into_inner()
-                    .jobs;
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let jobs = self.client.get_node_jobs(id).await?.into_inner();
                 if !jobs.is_empty() {
                     println!("{:<30} STATUS", "NAME");
-                    for job in jobs {
+                    for (name, status) in jobs {
+                        let (exit_code, message) = match &status {
+                            JobStatus::Pending => (None, None),
+                            JobStatus::Running => (None, None),
+                            JobStatus::Finished { exit_code, message } => {
+                                (exit_code.map(|c| c as u64), Some(message.clone()))
+                            }
+                            JobStatus::Stopped => (None, None),
+                        };
                         let status_with_code = format!(
                             "{:?}{}",
-                            bv_pb::JobStatus::from_i32(job.status)
-                                .unwrap_or(bv_pb::JobStatus::UndefinedJobStatus),
-                            job.exit_code.map(|c| format!("({c})")).unwrap_or_default()
+                            status,
+                            exit_code.map(|c| format!("({c})")).unwrap_or_default()
                         );
                         println!(
                             "{:<30} {:<20} {}",
-                            job.name,
+                            name,
                             status_with_code,
-                            job.message.unwrap_or_default()
+                            message.unwrap_or_default()
                         );
                     }
                 }
             }
             NodeCommand::Logs { id_or_name } => {
-                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                let logs = self
-                    .client
-                    .get_node_logs(bv_pb::GetNodeLogsRequest { id: id.clone() })
-                    .await?;
-                for log in logs.into_inner().logs {
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let logs = self.client.get_node_logs(id).await?;
+                for log in logs.into_inner() {
                     print!("{log}");
                 }
             }
@@ -395,39 +366,30 @@ impl NodeClient {
                 id_or_name,
                 max_lines,
             } => {
-                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                let logs = self
-                    .client
-                    .get_babel_logs(bv_pb::GetBabelLogsRequest {
-                        id: id.clone(),
-                        max_lines,
-                    })
-                    .await?;
-                for log in logs.into_inner().logs {
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let logs = self.client.get_babel_logs((id, max_lines)).await?;
+                for log in logs.into_inner() {
                     print!("{log}");
                 }
             }
             NodeCommand::Status { id_or_names } => {
                 for id_or_name in id_or_names {
                     let id = self.resolve_id_or_name(&id_or_name).await?;
-                    let status = self.internal_client.get_node_status(id).await?;
+                    let status = self.client.get_node_status(id).await?;
                     let status = status.into_inner();
                     println!("{status}");
                 }
             }
             NodeCommand::Keys { id_or_name } => {
-                let id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                let keys = self
-                    .client
-                    .get_node_keys(bv_pb::GetNodeKeysRequest { id })
-                    .await?;
-                for name in keys.into_inner().names {
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let keys = self.client.get_node_keys(id).await?;
+                for name in keys.into_inner() {
                     println!("{name}");
                 }
             }
             NodeCommand::Capabilities { id_or_name } => {
-                let node_id = self.resolve_id_or_name(&id_or_name).await?;
-                let caps = self.list_capabilities(node_id).await?;
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let caps = self.list_capabilities(id).await?;
                 for cap in caps {
                     println!("{cap}");
                 }
@@ -438,7 +400,7 @@ impl NodeClient {
                 param,
                 param_file,
             } => {
-                let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                let id = self.resolve_id_or_name(&id_or_name).await?;
                 let param = match param {
                     Some(param) => param,
                     None => {
@@ -449,18 +411,13 @@ impl NodeClient {
                         }
                     }
                 };
-                let req = bv_pb::BlockchainRequest {
-                    method,
-                    node_id: node_id.to_string(),
-                    param,
-                };
-                match self.client.blockchain(req).await {
-                    Ok(result) => println!("{}", result.into_inner().value),
+                match self.client.run((id, method, param)).await {
+                    Ok(result) => println!("{}", result.into_inner()),
                     Err(e) => {
                         if e.code() == Code::NotFound {
                             let msg = "Method not found. Options are:";
                             let caps = self
-                                .list_capabilities(node_id)
+                                .list_capabilities(id)
                                 .await?
                                 .into_iter()
                                 .reduce(|acc, cap| acc + "\n" + cap.as_str())
@@ -472,12 +429,8 @@ impl NodeClient {
                 }
             }
             NodeCommand::Metrics { id_or_name } => {
-                let node_id = self.resolve_id_or_name(&id_or_name).await?.to_string();
-                let metrics = self
-                    .client
-                    .get_node_metrics(bv_pb::GetNodeMetricsRequest { node_id })
-                    .await?
-                    .into_inner();
+                let id = self.resolve_id_or_name(&id_or_name).await?;
+                let metrics = self.client.get_node_metrics(id).await?.into_inner();
                 println!("Block height:   {:>10}", fmt_opt(metrics.height));
                 println!("Block age:      {:>10}", fmt_opt(metrics.block_age));
                 println!("Staking Status: {:>10}", fmt_opt(metrics.staking_status));
@@ -489,7 +442,7 @@ impl NodeClient {
                 println!("Sync Status:    {:>10}", fmt_opt(metrics.sync_status));
             }
             NodeCommand::Check { id_or_name } => {
-                let node_id = self.resolve_id_or_name(&id_or_name).await?;
+                let id = self.resolve_id_or_name(&id_or_name).await?;
                 // prepare list of checks
                 // first go methods which SHALL and SHOULD be implemented
                 let mut methods = vec![
@@ -503,7 +456,7 @@ impl NodeClient {
                     "application_status",
                 ];
                 // second go test_* methods
-                let caps = self.list_capabilities(node_id).await?;
+                let caps = self.list_capabilities(id).await?;
                 let tests_iter = caps
                     .iter()
                     .filter(|cap| cap.starts_with("test_"))
@@ -513,12 +466,11 @@ impl NodeClient {
                 let mut errors = vec![];
                 println!("Running node checks:");
                 for method in methods {
-                    let req = bv_pb::BlockchainRequest {
-                        method: method.to_string(),
-                        node_id: node_id.to_string(),
-                        param: String::from(""),
-                    };
-                    let result = match self.client.blockchain(req).await {
+                    let result = match self
+                        .client
+                        .run((id, method.to_string(), String::from("")))
+                        .await
+                    {
                         Ok(_) => "ok",
                         Err(e)
                             if e.code() == Code::NotFound || e.message().contains("not found") =>
@@ -547,17 +499,17 @@ impl NodeClient {
     }
 }
 
-fn fmt_opt<T: std::fmt::Display>(opt: Option<T>) -> String {
-    opt.map(|t| t.to_string())
+fn fmt_opt<T: std::fmt::Debug>(opt: Option<T>) -> String {
+    opt.map(|t| format!("{t:?}"))
         .unwrap_or_else(|| "-".to_string())
 }
 
-fn parse_image(image: &str) -> Result<bv_pb::NodeImage> {
+fn parse_image(image: &str) -> Result<NodeImage> {
     let image_vec: Vec<&str> = image.split('/').collect();
     if image_vec.len() != 3 {
         bail!("Wrong number of components in image: {image:?}");
     }
-    Ok(bv_pb::NodeImage {
+    Ok(NodeImage {
         protocol: image_vec[0].to_string(),
         node_type: image_vec[1].to_string(),
         node_version: image_vec[2].to_string(),

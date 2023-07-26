@@ -7,7 +7,6 @@ use crate::{
     nodes::Nodes,
     pal::{CommandsStream, Pal, ServiceConnector},
     self_updater,
-    server::{bv_pb, BlockvisorServer},
     services::{api, api::pb, mqtt},
     try_set_bv_status,
     utils::with_jitter,
@@ -102,9 +101,9 @@ where
 
         let cmds_connector = self.pal.create_commands_stream_connector(&self.config);
         let nodes = Nodes::load(self.pal, self.config.clone()).await?;
+        let nodes = Arc::new(nodes);
 
         try_set_bv_status(ServiceStatus::Ok).await;
-        let nodes = Arc::new(nodes);
 
         let internal_api_server_future =
             Self::create_internal_api_server(run.clone(), self.listener, nodes.clone());
@@ -155,11 +154,6 @@ where
     ) -> Result<()> {
         Server::builder()
             .max_concurrent_streams(1)
-            .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(
-                BlockvisorServer {
-                    nodes: nodes.clone(),
-                },
-            ))
             .add_service(internal_server::service_server::ServiceServer::new(
                 internal_server::State {
                     nodes: nodes.clone(),

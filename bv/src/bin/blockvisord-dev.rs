@@ -5,7 +5,6 @@ use blockvisord::{
     linux_platform::LinuxPlatform,
     nodes::Nodes,
     pal::Pal,
-    server::{bv_pb, BlockvisorServer},
     set_bv_status, ServiceStatus,
 };
 use bv_utils::{logging::setup_logging, run_flag::RunFlag};
@@ -36,15 +35,8 @@ async fn main() -> Result<()> {
 
     Server::builder()
         .max_concurrent_streams(1)
-        .add_service(bv_pb::blockvisor_server::BlockvisorServer::new(
-            BlockvisorServer {
-                nodes: nodes.clone(),
-            },
-        ))
         .add_service(internal_server::service_server::ServiceServer::new(
-            internal_server::State {
-                nodes: nodes.clone(),
-            },
+            internal_server::State { nodes },
         ))
         .serve_with_incoming_shutdown(
             tokio_stream::wrappers::TcpListenerStream::new(listener),

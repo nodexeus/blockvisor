@@ -73,7 +73,7 @@ pub struct Nodes<P: Pal + Debug> {
     pal: Arc<P>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct NodeConfig {
     pub name: String,
     pub image: NodeImage,
