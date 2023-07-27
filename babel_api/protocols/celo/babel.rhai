@@ -49,6 +49,8 @@ const API_HOST = "http://localhost:9154";
 const HOME = "/blockjoy";
 
 fn init(keys) {
+    run_sh("cp /opt/netdata/usr/lib/netdata/system/systemd/netdata.service /etc/systemd/system/");
+    run_sh("cd /etc/systemd/system/multi-user.target.wants && ln -s ../netdata.service && systemctl enable netdata && systemctl start netdata");
     debug("Executing startup scripts...");
 
     start_job("download_prerequisites", #{

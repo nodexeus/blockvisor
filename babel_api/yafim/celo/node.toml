@@ -1,6 +1,6 @@
 application_name = "celo"
 node_type = "node"
-version = "1.7.4-build.2"
+version = "1.7.4-build.3"
 
 [image]
 debian_version = "focal"
@@ -15,11 +15,11 @@ cmds = [
   "rm /etc/resolv.conf",
   "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
   "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
-  "wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --disable-telemetry --non-interactive --dont-start-it --disable-cloud --static-only",
+  "wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --disable-telemetry --non-interactive --disable-cloud --static-only",
   "echo 'TERM=xterm-256color' >> /root/.bashrc",
-  "echo PS1='${GREEN}blockjoy${RESET}>' >> /root/.bashrc",
   "echo 'stty cols 200' >> /root/.bashrc",
-  "echo 'stty rows 50' >> /root/.bashrc"
+  "echo 'stty rows 50' >> /root/.bashrc",
+  "echo 'reset' >> /root/.bashrc"
 ]
 
 [build_machine]
