@@ -29,6 +29,11 @@ impl installer::BvService for SystemCtl {
         run_cmd("systemctl", ["enable", "blockvisor.service"]).await?;
         Ok(())
     }
+
+    async fn ensure_active(&self) -> Result<()> {
+        run_cmd("systemctl", ["is-active", "blockvisor.service"]).await?;
+        Ok(())
+    }
 }
 
 #[tokio::main]

@@ -55,6 +55,7 @@ pub trait BvService {
     async fn stop(&self) -> Result<()>;
     async fn start(&self) -> Result<()>;
     async fn enable(&self) -> Result<()>;
+    async fn ensure_active(&self) -> Result<()>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -242,6 +243,10 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     async fn prepare_running(&mut self) -> Result<()> {
+        if self.bv_service.ensure_active().await.is_err() {
+            return Ok(());
+        }
+
         if let BackupStatus::Done(_) = self.backup_status {
             info!("prepare running BV for update");
             let timestamp = self.timer.now();
@@ -590,6 +595,7 @@ mod tests {
             async fn stop(&self) -> Result<()>;
             async fn start(&self) -> Result<()>;
             async fn enable(&self) -> Result<()>;
+            async fn ensure_active(&self) -> Result<()>;
         }
     }
 
@@ -641,7 +647,12 @@ mod tests {
     async fn test_prepare_running_none() -> Result<()> {
         let test_env = TestEnv::new()?;
 
-        let mut installer = test_env.build_installer(MockTimer::new(), MockTestBvService::new());
+        let mut service_mock = MockTestBvService::new();
+        service_mock
+            .expect_ensure_active()
+            .times(2)
+            .returning(|| Ok(()));
+        let mut installer = test_env.build_installer(MockTimer::new(), service_mock);
         installer.backup_status = BackupStatus::NothingToBackup;
         installer.prepare_running().await?;
         installer.backup_status = BackupStatus::ThisIsRollback;
@@ -663,7 +674,9 @@ mod tests {
         let now = Instant::now();
         timer_mock.expect_now().returning(move || now);
         let server = test_env.start_test_server(bv_mock);
-        let mut installer = test_env.build_installer(timer_mock, MockTestBvService::new());
+        let mut service_mock = MockTestBvService::new();
+        service_mock.expect_ensure_active().return_once(|| Ok(()));
+        let mut installer = test_env.build_installer(timer_mock, service_mock);
         installer.backup_status = BackupStatus::Done(THIS_VERSION.to_owned());
         installer.prepare_running().await?;
         server.assert().await;
@@ -696,7 +709,9 @@ mod tests {
             }
         });
         let server = test_env.start_test_server(bv_mock);
-        let mut installer = test_env.build_installer(timer_mock, MockTestBvService::new());
+        let mut service_mock = MockTestBvService::new();
+        service_mock.expect_ensure_active().return_once(|| Ok(()));
+        let mut installer = test_env.build_installer(timer_mock, service_mock);
         installer.backup_status = BackupStatus::Done(THIS_VERSION.to_owned());
         installer.prepare_running().await.unwrap_err();
         server.assert().await;
