@@ -24,6 +24,12 @@ const METADATA = #{
         data_directory_mount_point: "/blockjoy/miner/data",
         log_buffer_capacity_ln: 1024,
         swap_size_mb: 512,
+        ramdisks: [
+            #{
+                ram_disk_mount_point: "/mnt/ramdisk",
+                ram_disk_size_mb: 512,
+            },
+        ]
     },
     firewall: #{
         enabled: true,

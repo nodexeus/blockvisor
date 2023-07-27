@@ -62,6 +62,16 @@ pub struct BabelConfig {
     pub log_buffer_capacity_ln: usize,
     /// Size of swap file created on the node, in MB.
     pub swap_size_mb: usize,
+    /// RAM disks configuration
+    pub ramdisks: Option<Vec<RamdiskConfiguration>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct RamdiskConfiguration {
+    /// Path to mount RAM disk to.
+    pub ram_disk_mount_point: String,
+    /// RAM disk size, in MB.
+    pub ram_disk_size_mb: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

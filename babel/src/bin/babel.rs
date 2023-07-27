@@ -7,7 +7,7 @@ use babel::{
     logs_service::LogsService,
     utils, BABEL_LOGS_UDS_PATH,
 };
-use babel_api::metadata::BabelConfig;
+use babel_api::metadata::{BabelConfig, RamdiskConfiguration};
 use bv_utils::{cmd::run_cmd, logging::setup_logging, run_flag::RunFlag};
 use eyre::{anyhow, bail, Context};
 use std::{path::Path, sync::Arc};
@@ -175,6 +175,34 @@ impl babel_service::BabelPal for Pal {
         run_cmd("sysctl", [&format!("vm.vfs_cache_pressure={pressure}")])
             .await
             .map_err(|err| anyhow!("sysctl error: {err}"))?;
+        Ok(())
+    }
+
+    /// Set RAM disks inside VM
+    ///
+    /// Should be doing something like that
+    /// > mkdir -p /mnt/ramdisk
+    /// > mount -t tmpfs -o rw,size=512M tmpfs /mnt/ramdisk
+    async fn set_ram_disks(&self, ramdisks: Option<Vec<RamdiskConfiguration>>) -> eyre::Result<()> {
+        let ramdisks = ramdisks.unwrap_or_default();
+        for disk in ramdisks {
+            run_cmd("mkdir", ["-p", &disk.ram_disk_mount_point])
+                .await
+                .map_err(|err| anyhow!("mkdir error: {err}"))?;
+            run_cmd(
+                "mount",
+                [
+                    "-t",
+                    "tmpfs",
+                    "-o",
+                    &format!("rw,size={}M", disk.ram_disk_size_mb),
+                    "tmpfs",
+                    &disk.ram_disk_mount_point,
+                ],
+            )
+            .await
+            .map_err(|err| anyhow!("mount error: {err}"))?;
+        }
         Ok(())
     }
 }
