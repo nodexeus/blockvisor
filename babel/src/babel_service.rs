@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use babel_api::{
     babel::BlockchainKey,
     engine::{HttpResponse, JobConfig, JobStatus, JrpcRequest, RestRequest, ShResponse},
-    metadata::{firewall, BabelConfig, KeysConfig},
+    metadata::{firewall, BabelConfig, KeysConfig, RamdiskConfiguration},
 };
 use eyre::{bail, eyre, Context, ContextCompat, Report, Result};
 use reqwest::RequestBuilder;
@@ -64,6 +64,7 @@ pub trait BabelPal {
     async fn mount_data_drive(&self, data_directory_mount_point: &str) -> Result<(), MountError>;
     async fn set_hostname(&self, hostname: &str) -> Result<()>;
     async fn set_swap_file(&self, swap_size_mb: usize) -> Result<()>;
+    async fn set_ram_disks(&self, ramdisks: Option<Vec<RamdiskConfiguration>>) -> Result<()>;
 }
 
 pub enum BabelStatus {
@@ -114,6 +115,13 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
             self.pal.set_hostname(&hostname).await.map_err(|err| {
                 Status::internal(format!("failed to setup hostname with: {err:#}"))
             })?;
+
+            self.pal
+                .set_ram_disks(config.ramdisks)
+                .await
+                .map_err(|err| {
+                    Status::internal(format!("failed to add ram disks with: {err:#}"))
+                })?;
 
             self.pal
                 .mount_data_drive(&config.data_directory_mount_point)
@@ -557,6 +565,13 @@ mod tests {
         }
 
         async fn set_swap_file(&self, _swap_size_mb: usize) -> eyre::Result<()> {
+            Ok(())
+        }
+
+        async fn set_ram_disks(
+            &self,
+            ramdisks: Option<Vec<RamdiskConfiguration>>,
+        ) -> eyre::Result<()> {
             Ok(())
         }
     }
@@ -1043,6 +1058,7 @@ mod tests {
                     data_directory_mount_point: "".to_string(),
                     log_buffer_capacity_ln: 10,
                     swap_size_mb: 16,
+                    ramdisks: None,
                 },
             ))
             .await?;
