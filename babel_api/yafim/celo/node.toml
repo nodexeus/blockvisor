@@ -1,6 +1,6 @@
 application_name = "celo"
 node_type = "node"
-version = "1.7.4-build.1"
+version = "1.7.4-build.3"
 
 [image]
 debian_version = "focal"
@@ -15,7 +15,11 @@ cmds = [
   "rm /etc/resolv.conf",
   "echo 'nameserver 8.8.8.8' > /etc/resolv.conf",
   "echo 'nameserver 1.1.1.1' >> /etc/resolv.conf",
-  "wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --disable-telemetry --non-interactive --dont-start-it --disable-cloud --static-only"
+  "wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --disable-telemetry --non-interactive --disable-cloud --static-only",
+  "echo 'TERM=xterm-256color' >> /root/.bashrc",
+  "echo 'stty cols 200' >> /root/.bashrc",
+  "echo 'stty rows 50' >> /root/.bashrc",
+  "echo 'reset' >> /root/.bashrc"
 ]
 
 [build_machine]
@@ -25,12 +29,12 @@ git_tag = ""
 build_cmds =  [
                 "cp {{.YafimHome}}/babelsup/usr/bin/babelsup {{.YafimHome}}/target/celo/node/mnt/usr/bin/",
 		"cp {{.YafimHome}}/babelsup/etc/systemd/system/babelsup.service {{.YafimHome}}/target/celo/node/mnt/etc/systemd/system/",
-		"cp {{.YafimHome}}/blockvisor/babel_api/protocols/celo/babel.rhai {{.YafimHome}}/target/celo/node/mnt/etc/babel.conf",
 		"echo 'root:f&IS_rwh' | chpasswd -R {{.YafimHome}}/target/celo/node/mnt",
 		"echo celo > {{.YafimHome}}/target/celo/node/mnt/etc/hostname",
 		"sudo apt update",
 		"git clone https://github.com/celo-org/celo-blockchain.git || true && cd {{.YafimHome}}/celo-blockchain && git checkout v1.7.4 && make geth",
 		"mkdir -p {{.YafimHome}}/target/celo/node/mnt/blockjoy/celo",
 		"cp {{.YafimHome}}/celo-blockchain/build/bin/geth {{.YafimHome}}/target/celo/node/mnt/usr/bin/celo",
+		"mkdir -p {{.YafimHome}}/target/celo/node/mnt/opt/netdata/etc/netdata/",
 		"cp {{.YafimHome}}/blockvisor/babel_api/netdata/stream.conf {{.YafimHome}}/target/celo/node/mnt/opt/netdata/etc/netdata/"
 ]
