@@ -570,7 +570,7 @@ mod tests {
 
         async fn set_ram_disks(
             &self,
-            ramdisks: Option<Vec<RamdiskConfiguration>>,
+            _ramdisks: Option<Vec<RamdiskConfiguration>>,
         ) -> eyre::Result<()> {
             Ok(())
         }

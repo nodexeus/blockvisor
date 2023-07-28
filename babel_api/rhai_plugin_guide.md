@@ -85,6 +85,17 @@ const METADATA = #{
         
         // Size of swap file created on the node, in MB.
         swap_size_mb: 512,
+
+        // Set RAM disks inside VM
+        ramdisks: [
+            #{
+                // Path to mount RAM disk to.
+                ram_disk_mount_point: "/mnt/ramdisk",
+                // RAM disk size, in MB.
+                ram_disk_size_mb: 512,
+            },
+        ]
+
     },
     
     // Node firewall configuration.
