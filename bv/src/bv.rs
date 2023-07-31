@@ -374,6 +374,19 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
 
 pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Result<()> {
     match command {
+        ImageCommand::Create {
+            destination_image_id,
+            version,
+            size,
+        } => {
+            let destination_image = parse_image(&destination_image_id)?;
+            let images_dir = build_bv_var_path().join(IMAGES_DIR);
+            let destination_image_path = images_dir.join(destination_image_id);
+            fs::create_dir_all(&destination_image_path)?;
+            bootstrap_os_image(&destination_image_path, &destination_image, &version, size).await?;
+            update_babelsup(&destination_image_path, &destination_image).await?;
+            let _ = workspace::set_active_image(&std::env::current_dir()?, destination_image);
+        }
         ImageCommand::Clone {
             source_image_id,
             destination_image_id,
@@ -686,6 +699,77 @@ fn image_id_with_fallback(image: Option<String>) -> Result<String> {
         }
         Some(image_id) => image_id,
     })
+}
+
+async fn bootstrap_os_image(
+    image_path: &Path,
+    image: &NodeImage,
+    debian_version: &str,
+    rootfs_size_gb: usize,
+) -> Result<()> {
+    let os_img_path = image_path.join(ROOT_FS_FILE);
+
+    println!("Creating the disk image with fallocate");
+    let gb = &format!("{rootfs_size_gb}GB");
+    run_cmd(
+        "fallocate",
+        [OsStr::new("-l"), OsStr::new(gb), os_img_path.as_os_str()],
+    )
+    .await?;
+
+    println!("Creating the file system on this disk image");
+    run_cmd("mkfs.ext4", [os_img_path.as_os_str()]).await?;
+
+    let mount_point = std::env::temp_dir().join(format!(
+        "{}_{}_{}_rootfs",
+        image.protocol, image.node_type, image.node_version
+    ));
+    fs::create_dir_all(&mount_point)?;
+
+    println!("Mounting disk image into `{}`", mount_point.display());
+    run_cmd("mount", [os_img_path.as_os_str(), mount_point.as_os_str()]).await?;
+
+    let result = install_os_and_packages(debian_version, &mount_point).await;
+
+    println!("Unmounting disk image from `{}`", mount_point.display());
+    run_cmd("umount", [mount_point.as_os_str()]).await?;
+
+    result
+}
+
+async fn install_os_and_packages(debian_version: &str, mount_point: &Path) -> Result<()> {
+    println!("Debootstrapping `{debian_version}`");
+    run_cmd(
+        "debootstrap",
+        [OsStr::new(debian_version), mount_point.as_os_str()],
+    )
+    .await?;
+
+    println!("Updating OS packages in chroot");
+    run_cmd(
+        "chroot",
+        [
+            mount_point.as_os_str(),
+            OsStr::new("bash"),
+            OsStr::new("-c"),
+            OsStr::new("apt update -y"),
+        ],
+    )
+    .await?;
+
+    println!("Installing some basics in chroot");
+    run_cmd(
+        "chroot",
+        [
+            mount_point.as_os_str(),
+            OsStr::new("bash"),
+            OsStr::new("-c"),
+            OsStr::new("apt install -y build-essential libssl-dev wget curl jq ufw"),
+        ],
+    )
+    .await?;
+
+    Ok(())
 }
 
 async fn update_babelsup(image_path: &Path, image: &NodeImage) -> Result<()> {
