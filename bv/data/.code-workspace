@@ -107,7 +107,7 @@
 				"type": "f5anything"
 			},
 			{
-				"command": "bv node run --param=\"${input:PARAM_ID}\" ${selectedText}",
+				"command": "bv node run --param='${input:PARAM_ID}' ${selectedText}",
 				"name": "node run selected with param",
 				"request": "launch",
 				"type": "f5anything"
@@ -125,7 +125,7 @@
 				"type": "f5anything"
 			},
 			{
-				"command": "export AWS_ACCESS_KEY=${input:AWS_ACCESS_KEY_ID} && export AWS_SECRET_ACCESS_KEY=${input:AWS_SECRET_ACCESS_KEY_ID} && bv image upload",
+				"command": "export AWS_ACCESS_KEY_ID=${input:AWS_ACCESS_KEY_ID} && export AWS_SECRET_ACCESS_KEY=${input:AWS_SECRET_ACCESS_KEY_ID} && bv image upload",
 				"name": "image upload",
 				"request": "launch",
 				"type": "f5anything"
