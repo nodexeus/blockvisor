@@ -384,6 +384,7 @@ pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Res
             let destination_image_path = images_dir.join(destination_image_id);
             fs::create_dir_all(&destination_image_path)?;
             bootstrap_os_image(&destination_image_path, &destination_image, &version, size).await?;
+            render_rhai_file(&destination_image_path, &destination_image).await?;
             update_babelsup(&destination_image_path, &destination_image).await?;
             let _ = workspace::set_active_image(&std::env::current_dir()?, destination_image);
         }
@@ -768,6 +769,21 @@ async fn install_os_and_packages(debian_version: &str, mount_point: &Path) -> Re
         ],
     )
     .await?;
+
+    Ok(())
+}
+
+async fn render_rhai_file(image_path: &Path, image: &NodeImage) -> Result<()> {
+    let mut context = tera::Context::new();
+    context.insert("node_version", &image.node_version);
+    context.insert("protocol", &image.protocol);
+    context.insert("node_type", &image.node_type);
+    let mut tera = tera::Tera::default();
+    let template = include_str!("../data/babel.rhai.template");
+    tera.add_raw_template("template", template)?;
+    let rhai_file_path = image_path.join(BABEL_PLUGIN_NAME);
+    let out_file = std::fs::File::create(rhai_file_path)?;
+    tera.render_to("template", &context, out_file)?;
 
     Ok(())
 }
