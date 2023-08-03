@@ -375,15 +375,21 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
 pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Result<()> {
     match command {
         ImageCommand::Create {
-            destination_image_id,
-            version,
-            size,
+            image_id,
+            debian_version,
+            rootfs_size,
         } => {
-            let destination_image = parse_image(&destination_image_id)?;
+            let destination_image = parse_image(&image_id)?;
             let images_dir = build_bv_var_path().join(IMAGES_DIR);
-            let destination_image_path = images_dir.join(destination_image_id);
+            let destination_image_path = images_dir.join(image_id);
             fs::create_dir_all(&destination_image_path)?;
-            bootstrap_os_image(&destination_image_path, &destination_image, &version, size).await?;
+            bootstrap_os_image(
+                &destination_image_path,
+                &destination_image,
+                &debian_version,
+                rootfs_size,
+            )
+            .await?;
             render_rhai_file(&destination_image_path, &destination_image).await?;
             update_babelsup(&destination_image_path, &destination_image).await?;
             let _ = workspace::set_active_image(&std::env::current_dir()?, destination_image);
