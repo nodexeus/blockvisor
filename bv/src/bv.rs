@@ -746,26 +746,37 @@ async fn install_os_and_packages(debian_version: &str, mount_point: &Path) -> Re
     )
     .await?;
 
-    println!("Updating OS packages in chroot");
-    run_cmd(
-        "chroot",
-        [
-            mount_point.as_os_str(),
-            OsStr::new("bash"),
-            OsStr::new("-c"),
-            OsStr::new("apt update -y"),
-        ],
+    println!("Installing some basics in chroot");
+    run_in_chroot(
+        mount_point,
+        "apt install -y software-properties-common wget curl uuid-runtime",
     )
     .await?;
 
-    println!("Installing some basics in chroot");
+    println!("Adding repositories in chroot");
+    run_in_chroot(mount_point, "add-apt-repository -y universe").await?;
+
+    println!("Updating OS packages in chroot");
+    run_in_chroot(mount_point, "apt update -y").await?;
+
+    println!("Installing some important pacckages");
+    run_in_chroot(
+        mount_point,
+        "apt install -y build-essential libssl-dev jq ufw",
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn run_in_chroot(mount_point: &Path, cmd: &str) -> Result<()> {
     run_cmd(
         "chroot",
         [
             mount_point.as_os_str(),
             OsStr::new("bash"),
             OsStr::new("-c"),
-            OsStr::new("apt install -y build-essential libssl-dev wget curl jq ufw"),
+            OsStr::new(cmd),
         ],
     )
     .await?;
