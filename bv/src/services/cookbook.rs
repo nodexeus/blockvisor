@@ -26,6 +26,70 @@ pub struct CookbookService {
     bv_root: PathBuf,
 }
 
+pub struct KernelService {
+    client: pb::kernel_service_client::KernelServiceClient<AuthenticatedService>,
+    bv_root: PathBuf,
+}
+
+impl KernelService {
+    pub async fn connect(config: &SharedConfig) -> Result<Self> {
+        services::connect(config, |config| async {
+            let url = config.read().await.blockjoy_api_url;
+            let endpoint = Endpoint::from_shared(url.clone())?;
+            let channel = Endpoint::connect(&endpoint)
+                .await
+                .with_context(|| format!("Failed to connect to kernel service at {url}"))?;
+            let client = pb::kernel_service_client::KernelServiceClient::with_interceptor(
+                channel,
+                config.token().await?,
+            );
+            Ok(Self {
+                client,
+                bv_root: config.bv_root.clone(),
+            })
+        })
+        .await
+    }
+
+    #[instrument(skip(self))]
+    pub async fn list_versions(&mut self, protocol: &str, node_type: &str) -> Result<Vec<String>> {
+        info!("Listing versions...");
+        let req = pb::KernelServiceListKernelVersionsRequest {};
+        let resp = with_retry!(self.client.list_kernel_versions(req.clone()))?.into_inner();
+        let mut versions: Vec<String> = resp.identifiers.into_iter().map(|id| id.version).collect();
+        // sort desc
+        versions.sort_by(|a, b| utils::semver_cmp(b, a));
+
+        Ok(versions)
+    }
+
+    #[instrument(skip(self))]
+    pub async fn download_kernel(&mut self, image: &NodeImage, version: &str) -> Result<()> {
+        info!("Downloading kernel...");
+        let archive: pb::ArchiveLocation = with_retry!(self.client.retrieve(tonic::Request::new(
+            pb::KernelServiceRetrieveRequest {
+                id: Some(pb::KernelIdentifier {
+                    version: version.to_string()
+                }),
+            }
+        )))?
+        .into_inner()
+        .location
+        .ok_or_else(|| anyhow!("missing location"))?;
+
+        let folder = CookbookService::get_image_download_folder_path(&self.bv_root, image);
+        DirBuilder::new().recursive(true).create(&folder).await?;
+        let gz = folder.join(KERNEL_ARCHIVE_NAME);
+        utils::download_archive_with_retry(&archive.url, gz)
+            .await?
+            .ungzip()
+            .await?;
+        debug!("Done downloading kernel");
+
+        Ok(())
+    }
+}
+
 impl CookbookService {
     pub async fn connect(config: &SharedConfig) -> Result<Self> {
         services::connect(config, |config| async {
@@ -150,7 +214,7 @@ impl CookbookService {
     }
 
     pub async fn is_image_cache_valid(bv_root: &Path, image: &NodeImage) -> Result<bool> {
-        let folder = CookbookService::get_image_download_folder_path(bv_root, image);
+        let folder = Self::get_image_download_folder_path(bv_root, image);
 
         let root = folder.join(ROOT_FS_FILE);
         let kernel = folder.join(KERNEL_FILE);
