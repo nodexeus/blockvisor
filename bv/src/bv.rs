@@ -792,7 +792,6 @@ async fn run_in_chroot(mount_point: &Path, cmd: &str) -> Result<()> {
 
 async fn render_rhai_file(image_path: &Path, image: &NodeImage) -> Result<()> {
     let mut context = tera::Context::new();
-    context.insert("node_version", &image.node_version);
     context.insert("protocol", &image.protocol);
     context.insert("node_type", &image.node_type);
     let mut tera = tera::Tera::default();
