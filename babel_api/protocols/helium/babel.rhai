@@ -1,6 +1,7 @@
 const METADATA = #{
     // comments are allowed
     min_babel_version: "0.13.0",
+    kernel: "5.10.174-build.1+fc.ufw",
     node_version: "1.17.2",
     protocol: "helium",
     node_type: "validator",

@@ -30,7 +30,11 @@ use crate::{
     node::{build_registry_dir, Node},
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
     node_metrics,
-    services::{api::pb, cookbook::CookbookService, keyfiles::KeyService},
+    services::{
+        api::pb,
+        cookbook::{CookbookService, KernelService},
+        keyfiles::KeyService,
+    },
     BV_VAR_PATH,
 };
 
@@ -231,7 +235,10 @@ impl<P: Pal + Debug> Nodes<P> {
 
     #[instrument(skip(self))]
     async fn fetch_image_data(&self, image: &NodeImage) -> Result<Requirements> {
-        if !CookbookService::is_image_cache_valid(self.pal.bv_root(), image)
+        let folder = CookbookService::get_image_download_folder_path(self.pal.bv_root(), image);
+        let rhai_path = folder.join(BABEL_PLUGIN_NAME);
+
+        let script = if !CookbookService::is_image_cache_valid(self.pal.bv_root(), image)
             .await
             .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
         {
@@ -246,15 +253,23 @@ impl<P: Pal + Debug> Nodes<P> {
                 .download_image(image)
                 .await
                 .with_context(|| "cannot download image")?;
-            cookbook_service
-                .download_kernel(image)
+
+            let script = fs::read_to_string(rhai_path).await?;
+            let kernel_version = rhai_plugin::read_metadata(&script)?.kernel;
+            let mut kernel_service = KernelService::connect(&self.api_config)
+                .await
+                .with_context(|| "cannot connect to kernel service")?;
+            kernel_service
+                .download_kernel(image, &kernel_version)
                 .await
                 .with_context(|| "cannot download kernel")?;
-        }
+
+            script
+        } else {
+            fs::read_to_string(rhai_path).await?
+        };
+
         info!("Reading blockchain requirements...");
-        let folder = CookbookService::get_image_download_folder_path(self.pal.bv_root(), image);
-        let path = folder.join(BABEL_PLUGIN_NAME);
-        let script = fs::read_to_string(path).await?;
         Ok(rhai_plugin::read_metadata(&script)?.requirements)
     }
 

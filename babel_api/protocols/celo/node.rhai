@@ -1,5 +1,6 @@
 const METADATA = #{
     min_babel_version: "0.15.4",
+    kernel: "5.10.174-build.1+fc.ufw",
     node_version: "1.7.4",
     protocol: "celo",
     node_type: "node",

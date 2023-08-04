@@ -31,6 +31,8 @@ pub fn check_firewall_rules(rules: &[firewall::Rule]) -> Result<()> {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlockchainMetadata {
+    /// Version of Linux kernel to use in VM.
+    pub kernel: String,
     /// A semver version of the blockchain node program.
     pub node_version: String,
     /// Name of the blockchain protocol.
