@@ -288,10 +288,25 @@ pub enum WorkspaceCommand {
 
 #[derive(Subcommand)]
 pub enum ImageCommand {
+    /// Create new node image from scratch
+    Create {
+        /// New node image identifier in the following format: protocol/type/version
+        image_id: String,
+
+        /// Debian version
+        #[clap(long, default_value = "focal")]
+        debian_version: String,
+
+        /// Size of image disk for image, in GB
+        #[clap(long, default_value = "10")]
+        rootfs_size: usize,
+    },
+
     /// Create new node image from existing one
     Clone {
         /// Source image identifier
         source_image_id: String,
+
         /// New node image identifier
         destination_image_id: String,
     },

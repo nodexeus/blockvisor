@@ -30,7 +30,10 @@ const METADATA = #{
     // A semver version of the babel program, indicating the minimum version of the babel
     // program that a babel script is compatible with.
     min_babel_version: "0.0.9",
-    
+
+    /// Version of Linux kernel to use in VM.
+    kernel: "5.10.174-build.1+fc.ufw",
+
     // A semver version of the blockchain node program.
     node_version: "1.15.9",
     

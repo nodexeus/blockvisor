@@ -1,5 +1,6 @@
 const METADATA = #{
   min_babel_version: "0.15.4",
+  kernel: "5.10.174-build.1+fc.ufw",
   node_version: "3.16.3",
   protocol: "algorand",
   node_type: "node",

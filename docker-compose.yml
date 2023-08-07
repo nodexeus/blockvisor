@@ -51,6 +51,7 @@ services:
       AWS_REGION: us-east-1
       R2_URL: https://19afdffb308beea3e9c1ef3a95085d3b.r2.cloudflarestorage.com
       R2_BUNDLE_BUCKET: bundle-dev
+      R2_KERNEL_BUCKET: kernel-dev
       R2_BUCKET: cookbook-dev
       DIR_CHAINS_PREFIX: chains
       PRESIGNED_URL_EXPIRATION: 1h

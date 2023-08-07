@@ -857,6 +857,7 @@ dependencies = [
  "serial_test",
  "sysinfo 0.29.2",
  "systemstat",
+ "tera",
  "thiserror",
  "tokio",
  "tokio-stream",

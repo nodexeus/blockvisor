@@ -690,6 +690,7 @@ mod tests {
         let meta_rhai = r#"
 const METADATA = #{
     // comments are allowed
+    kernel: "5.10.174-build.1+fc.ufw",
     min_babel_version: "0.0.9",
     node_version: "node_v",
     protocol: "proto",
@@ -762,6 +763,7 @@ const METADATA = #{
 fn any_function() {}
 "#;
         let meta_rust = BlockchainMetadata {
+            kernel: "5.10.174-build.1+fc.ufw".to_string(),
             node_version: "node_v".to_string(),
             protocol: "proto".to_string(),
             node_type: "n_type".to_string(),

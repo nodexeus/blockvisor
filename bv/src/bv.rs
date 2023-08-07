@@ -9,13 +9,13 @@ use crate::{
     nodes::NodeConfig,
     pretty_table::{PrettyTable, PrettyTableRow},
     services::cookbook::{
-        CookbookService, BABEL_ARCHIVE_IMAGE_NAME, BABEL_PLUGIN_NAME, IMAGES_DIR,
+        CookbookService, KernelService, BABEL_ARCHIVE_IMAGE_NAME, BABEL_PLUGIN_NAME, IMAGES_DIR,
         KERNEL_ARCHIVE_NAME, KERNEL_FILE, ROOT_FS_FILE,
     },
     workspace, BV_VAR_PATH,
 };
 use anyhow::{bail, Context, Result};
-use babel_api::engine::JobStatus;
+use babel_api::{engine::JobStatus, rhai_plugin};
 use bv_utils::cmd::{ask_confirm, run_cmd};
 use cli_table::print_stdout;
 use petname::Petnames;
@@ -374,7 +374,33 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
 }
 
 pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Result<()> {
+    let bv_root = bv_root();
+    let config = SharedConfig::new(Config::load(&bv_root).await?, bv_root);
+
     match command {
+        ImageCommand::Create {
+            image_id,
+            debian_version,
+            rootfs_size,
+        } => {
+            let destination_image = parse_image(&image_id)?;
+            let images_dir = build_bv_var_path().join(IMAGES_DIR);
+            let destination_image_path = images_dir.join(image_id);
+            fs::create_dir_all(&destination_image_path)?;
+            let script = render_rhai_file(&destination_image_path, &destination_image).await?;
+            let kernel_version = rhai_plugin::read_metadata(&script)?.kernel;
+            download_kernel_file(&config, &destination_image, &kernel_version).await?;
+            bootstrap_os_image(
+                &destination_image_path,
+                &destination_image,
+                &debian_version,
+                rootfs_size,
+            )
+            .await?;
+            // TODO: consider refactoring to avoid extra mount/umount
+            update_babelsup(&destination_image_path, &destination_image).await?;
+            let _ = workspace::set_active_image(&std::env::current_dir()?, destination_image);
+        }
         ImageCommand::Clone {
             source_image_id,
             destination_image_id,
@@ -705,6 +731,119 @@ fn image_id_with_fallback(image: Option<String>) -> Result<String> {
         }
         Some(image_id) => image_id,
     })
+}
+
+async fn bootstrap_os_image(
+    image_path: &Path,
+    image: &NodeImage,
+    debian_version: &str,
+    rootfs_size_gb: usize,
+) -> Result<()> {
+    let os_img_path = image_path.join(ROOT_FS_FILE);
+
+    println!("Creating the disk image with fallocate");
+    let gb = &format!("{rootfs_size_gb}GB");
+    run_cmd(
+        "fallocate",
+        [OsStr::new("-l"), OsStr::new(gb), os_img_path.as_os_str()],
+    )
+    .await?;
+
+    println!("Creating the file system on this disk image");
+    run_cmd("mkfs.ext4", [os_img_path.as_os_str()]).await?;
+
+    let mount_point = std::env::temp_dir().join(format!(
+        "{}_{}_{}_rootfs",
+        image.protocol, image.node_type, image.node_version
+    ));
+    fs::create_dir_all(&mount_point)?;
+
+    println!("Mounting disk image into `{}`", mount_point.display());
+    run_cmd("mount", [os_img_path.as_os_str(), mount_point.as_os_str()]).await?;
+
+    let result = install_os_and_packages(debian_version, &mount_point).await;
+
+    println!("Unmounting disk image from `{}`", mount_point.display());
+    run_cmd("umount", [mount_point.as_os_str()]).await?;
+
+    result
+}
+
+async fn install_os_and_packages(debian_version: &str, mount_point: &Path) -> Result<()> {
+    println!("Debootstrapping `{debian_version}`");
+    run_cmd(
+        "debootstrap",
+        [OsStr::new(debian_version), mount_point.as_os_str()],
+    )
+    .await?;
+
+    println!("Installing some basics in chroot");
+    run_in_chroot(
+        mount_point,
+        "apt install -y software-properties-common wget curl uuid-runtime",
+    )
+    .await?;
+
+    println!("Adding repositories in chroot");
+    run_in_chroot(mount_point, "add-apt-repository -y universe").await?;
+
+    println!("Updating OS packages in chroot");
+    run_in_chroot(mount_point, "apt update -y").await?;
+
+    println!("Installing some important pacckages");
+    run_in_chroot(
+        mount_point,
+        "apt install -y build-essential libssl-dev jq ufw",
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn run_in_chroot(mount_point: &Path, cmd: &str) -> Result<()> {
+    run_cmd(
+        "chroot",
+        [
+            mount_point.as_os_str(),
+            OsStr::new("bash"),
+            OsStr::new("-c"),
+            OsStr::new(cmd),
+        ],
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn render_rhai_file(image_path: &Path, image: &NodeImage) -> Result<String> {
+    let mut context = tera::Context::new();
+    context.insert("protocol", &image.protocol);
+    context.insert("node_type", &image.node_type);
+    let mut tera = tera::Tera::default();
+    let template = include_str!("../data/babel.rhai.template");
+    tera.add_raw_template("template", template)?;
+    let rhai_file_path = image_path.join(BABEL_PLUGIN_NAME);
+    println!("Render rhai file at `{}`", rhai_file_path.display());
+    let out_file = std::fs::File::create(rhai_file_path)?;
+    tera.render_to("template", &context, out_file)?;
+    // return as string
+    Ok(tera.render("template", &context)?)
+}
+
+async fn download_kernel_file(
+    config: &SharedConfig,
+    image: &NodeImage,
+    kernel_version: &str,
+) -> Result<()> {
+    println!("Fetching kernel version `{kernel_version}`");
+    let mut kernel_service = KernelService::connect(config)
+        .await
+        .with_context(|| "cannot connect to kernel service")?;
+    kernel_service
+        .download_kernel(image, kernel_version)
+        .await
+        .with_context(|| "cannot download kernel")?;
+    Ok(())
 }
 
 async fn update_babelsup(image_path: &Path, image: &NodeImage) -> Result<()> {
