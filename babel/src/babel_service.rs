@@ -99,39 +99,35 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
         &self,
         request: Request<(String, BabelConfig)>,
     ) -> Result<Response<()>, Status> {
-        let mut status = self.status.lock().await;
-        if let BabelStatus::Uninitialized(_) = status.deref() {
-            let (hostname, config) = request.into_inner();
+        let (hostname, config) = request.into_inner();
+        self.pal
+            .set_swap_file(config.swap_size_mb)
+            .await
+            .map_err(|err| Status::internal(format!("failed to add swap file with: {err:#}")))?;
 
-            self.save_babel_conf(&config).await?;
+        self.pal
+            .set_hostname(&hostname)
+            .await
+            .map_err(|err| Status::internal(format!("failed to setup hostname with: {err:#}")))?;
 
-            self.pal
-                .set_swap_file(config.swap_size_mb)
-                .await
-                .map_err(|err| {
-                    Status::internal(format!("failed to add swap file with: {err:#}"))
-                })?;
+        self.pal
+            .set_ram_disks(config.clone().ramdisks)
+            .await
+            .map_err(|err| Status::internal(format!("failed to add ram disks with: {err:#}")))?;
 
-            self.pal.set_hostname(&hostname).await.map_err(|err| {
-                Status::internal(format!("failed to setup hostname with: {err:#}"))
+        self.pal
+            .mount_data_drive(&config.data_directory_mount_point)
+            .await
+            .map_err(|err| match err {
+                MountError::AlreadyMounted { .. } => {
+                    Status::already_exists(eyre!("{err}").to_string())
+                }
+                _ => Status::internal(eyre!("{err}").to_string()),
             })?;
 
-            self.pal
-                .set_ram_disks(config.ramdisks)
-                .await
-                .map_err(|err| {
-                    Status::internal(format!("failed to add ram disks with: {err:#}"))
-                })?;
-
-            self.pal
-                .mount_data_drive(&config.data_directory_mount_point)
-                .await
-                .map_err(|err| match err {
-                    MountError::AlreadyMounted { .. } => {
-                        Status::already_exists(eyre!("{err}").to_string())
-                    }
-                    _ => Status::internal(eyre!("{err}").to_string()),
-                })?;
+        let mut status = self.status.lock().await;
+        if let BabelStatus::Uninitialized(_) = status.deref() {
+            self.save_babel_conf(&config).await?;
 
             // setup logs_server
             let (logs_broadcast_tx, logs_rx) = broadcast::channel(config.log_buffer_capacity_ln);

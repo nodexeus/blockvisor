@@ -5,6 +5,7 @@ fn main() {
         .compile(
             &[
                 // Blockjoy API
+                "blockjoy/common/v1/currency.proto",
                 "blockjoy/v1/auth.proto",
                 "blockjoy/v1/blockchain.proto",
                 "blockjoy/v1/cookbook.proto",
