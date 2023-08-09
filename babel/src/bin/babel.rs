@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use babel::{
     babel_service,
-    babel_service::{BabelPal, BabelStatus, MountError},
+    babel_service::{BabelStatus, MountError},
     jobs::JOBS_DIR,
     jobs_manager,
     logs_service::LogsService,
@@ -9,7 +9,7 @@ use babel::{
 };
 use babel_api::metadata::{BabelConfig, RamdiskConfiguration};
 use bv_utils::{cmd::run_cmd, logging::setup_logging, run_flag::RunFlag};
-use eyre::{anyhow, bail, Context};
+use eyre::{anyhow, Context};
 use std::{path::Path, sync::Arc};
 use tokio::{
     fs,
@@ -48,14 +48,6 @@ async fn main() -> eyre::Result<()> {
     let pal = Pal;
     let (logs_tx, logs_rx) = oneshot::channel();
     let status = if let Ok(config) = load_config().await {
-        match pal
-            .mount_data_drive(&config.data_directory_mount_point)
-            .await
-        {
-            // it is ok if data drive is already mounted - it means that babel was restarted e.g. during self-update
-            Ok(()) | Err(MountError::AlreadyMounted { .. }) => {}
-            Err(err) => bail!(err),
-        }
         let (logs_broadcast_tx, logs_rx) = broadcast::channel(config.log_buffer_capacity_ln);
         logs_tx
             .send(logs_broadcast_tx)
