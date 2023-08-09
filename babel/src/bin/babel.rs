@@ -153,7 +153,7 @@ impl babel_service::BabelPal for Pal {
     /// https://www.digitalocean.com/community/tutorials/how-to-add-swap-space-on-ubuntu-20-04
     async fn set_swap_file(&self, swap_size_mb: usize) -> eyre::Result<()> {
         let path = "/swapfile";
-        let swappiness = 10;
+        let swappiness = 1;
         let pressure = 50;
         let _ = run_cmd("swapoff", [path]).await;
         let _ = tokio::fs::remove_file(path).await;
