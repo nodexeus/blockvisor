@@ -207,6 +207,7 @@ async fn main() -> Result<()> {
             ip_range_to: range_to,
             org_id: None,
             region: cmd_args.region,
+            billing_amount: None,
         };
 
         let mut client =

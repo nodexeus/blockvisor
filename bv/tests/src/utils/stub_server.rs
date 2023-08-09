@@ -64,6 +64,7 @@ impl pb::host_service_server::HostService for StubHostsServer {
                 org_name: "ORG".to_string(),
                 node_count: 1,
                 region: Some("europe-bosnia-number-1".to_string()),
+                billing_amount: None,
             }),
             token: "awesome-token".to_string(),
             refresh: "even-more-awesomer-token".to_string(),

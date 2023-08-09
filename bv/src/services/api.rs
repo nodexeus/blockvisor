@@ -41,6 +41,14 @@ pub mod pb {
     tonic::include_proto!("blockjoy.v1");
 }
 
+pub mod common {
+    tonic::include_proto!("blockjoy.common.v1");
+
+    pub mod v1 {
+        pub use super::*;
+    }
+}
+
 const STATUS_OK: i32 = 0;
 const STATUS_ERROR: i32 = 1;
 
