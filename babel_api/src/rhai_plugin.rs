@@ -284,6 +284,7 @@ mod tests {
     };
     use anyhow::bail;
     use mockall::*;
+    use serde_json::json;
     use std::path::PathBuf;
 
     mock! {
@@ -443,7 +444,7 @@ mod tests {
         stop_job("test_job_name");
         out += "|" + job_status("test_job_name");
         out += "|" + run_jrpc(#{host: "host", method: "method", headers: #{"custom_header": "header value"}}).body;
-        out += "|" + run_jrpc(#{host: "host", method: "method"}, 1).body;
+        out += "|" + run_jrpc(#{host: "host", method: "method", params: #{"chain": "x"}}, 1).body;
         let http_out = run_rest(#{url: "url"});
         out += "|" + http_out.body;
         out += "|" + http_out.status_code;
@@ -525,6 +526,7 @@ mod tests {
                 predicate::eq(JrpcRequest {
                     host: "host".to_string(),
                     method: "method".to_string(),
+                    params: None,
                     headers: Some(HashMap::from_iter([(
                         "custom_header".to_string(),
                         "header value".to_string(),
@@ -544,6 +546,7 @@ mod tests {
                 predicate::eq(JrpcRequest {
                     host: "host".to_string(),
                     method: "method".to_string(),
+                    params: Some(json!({"chain": "x"})),
                     headers: None,
                 }),
                 predicate::eq(Some(Duration::from_secs(1))),

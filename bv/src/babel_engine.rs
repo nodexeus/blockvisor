@@ -808,6 +808,7 @@ mod tests {
                 JrpcRequest {
                     host: name.to_string(),
                     method: param.to_string(),
+                    params: None,
                     headers: Some(HashMap::from_iter([(param.to_string(), name.to_string())])),
                 },
                 None,
