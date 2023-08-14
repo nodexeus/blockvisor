@@ -68,6 +68,9 @@ services:
       CF_DNS_BASE: n0des.xyz
       CF_TTL: 300
       CF_TOKEN: 9QjEiXC4B26tgshHZjuZ57kJcjaChSSsDfzUvfYQ
+      # logs
+      LOG_ENVIRONMENT: dev
+      OPENTELEMETRY_ENDPOINT: http://api:8080
 
     depends_on:
       database:
