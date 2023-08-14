@@ -434,13 +434,14 @@ impl<J, P> BabelService<J, P> {
     async fn handle_jrpc(&self, request: Request<JrpcRequest>) -> Result<HttpResponse> {
         let timeout = extract_timeout(&request);
         let req = request.into_inner();
-        send_http_request(
-            self.post(&req.host)
-                .json(&json!({ "jsonrpc": "2.0", "id": 0, "method": req.method })),
-            req.headers,
-            timeout,
-        )
-        .await
+        let json = match req.params {
+            None => json!({ "jsonrpc": "2.0", "id": 0, "method": req.method }),
+            Some(p) => {
+                let params: serde_json::Value = serde_json::from_str(&p)?;
+                json!({ "jsonrpc": "2.0", "id": 0, "method": req.method, "params": params })
+            }
+        };
+        send_http_request(self.post(&req.host).json(&json), req.headers, timeout).await
     }
 
     async fn handle_rest(&self, request: Request<RestRequest>) -> Result<HttpResponse> {
@@ -817,6 +818,7 @@ mod tests {
             .run_jrpc(Request::new(JrpcRequest {
                 host: format!("http://{}", server.address()),
                 method: "info_get".to_string(),
+                params: None,
                 headers: Some(HashMap::from_iter([(
                     "custom_header".to_string(),
                     "some value".to_string(),

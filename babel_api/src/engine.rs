@@ -202,6 +202,8 @@ pub struct JrpcRequest {
     pub host: String,
     /// The name of the jRPC method that we are going to call into.
     pub method: String,
+    /// Optional params structure as JSON string.
+    pub params: Option<String>,
     /// Extra HTTP headers to be added to the request.
     pub headers: Option<HashMap<String, String>>,
 }
