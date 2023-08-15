@@ -243,8 +243,8 @@ To make implementation of Babel Plugin interface possible, BV provides following
   host: String,
   // The name of the jRPC method that we are going to call into.
   method: String,
-  // [optional] Params structure.
-  params: Map or Array,
+  // [optional] Params structure in form of serialized JSON.
+  params: String,
   // [optional] Extra HTTP headers to be added to request.
   headers: Map
 }
@@ -446,7 +446,7 @@ that can be used to add params to the request.
 ```rust
 let data = #{host: "localhost:8154",
              method: "getBlockByNumber",
-             params: #{"chain": "x"},
+             params: #{"chain": "x"}.to_json(),
              headers: #{"content-type": "application/json"}
             };
 run_jrpc(data);

@@ -202,9 +202,9 @@ pub struct JrpcRequest {
     pub host: String,
     /// The name of the jRPC method that we are going to call into.
     pub method: String,
-    /// Optional params structure.
+    /// Optional params structure in form of serialized JSON.
     /// In jPRC it could be either Array (for positional parameters), or Object (for named ones)
-    pub params: Option<serde_json::Value>,
+    pub params: Option<String>,
     /// Extra HTTP headers to be added to the request.
     pub headers: Option<HashMap<String, String>>,
 }
