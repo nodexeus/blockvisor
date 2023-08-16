@@ -37,7 +37,7 @@ use tokio::{
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
-const NODE_START_TIMEOUT: Duration = Duration::from_secs(60);
+const NODE_START_TIMEOUT: Duration = Duration::from_secs(120);
 const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
