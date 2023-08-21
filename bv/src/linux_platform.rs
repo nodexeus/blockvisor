@@ -166,6 +166,9 @@ impl NetInterface for LinuxNetInterface {
 }
 
 async fn remaster(name: &str) -> Result<()> {
+    // Try to create interface if it's not present (possibly after host reboot)
+    let _ = run_cmd("ip", ["tuntap", "add", name, "mode", "tap"]).await;
+
     // Set bridge as the interface's master.
     run_cmd("ip", ["link", "set", name, "master", BRIDGE_IFACE])
         // Start the interface.
