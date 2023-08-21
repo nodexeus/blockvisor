@@ -97,8 +97,11 @@ async fn create_config(
     if kernel_args.len() > MAX_KERNEL_ARGS_LEN {
         bail!("too long kernel_args {kernel_args}")
     }
-    let iface =
-        firec::config::network::Interface::new(data.network_interface.name().clone(), "eth0");
+    let iface = firec::config::network::Interface::new(
+        data.network_interface.name().clone(),
+        "eth0",
+        None::<&str>,
+    );
     let root_fs_path =
         CookbookService::get_image_download_folder_path(bv_root, &data.image).join(ROOT_FS_FILE);
     let kernel_path = KernelService::get_kernel_path(bv_root, &data.kernel);
