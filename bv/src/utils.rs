@@ -4,6 +4,7 @@ use rand::Rng;
 use semver::Version;
 use std::cmp::Ordering;
 use std::ffi::OsStr;
+use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::time::Duration;
 use sysinfo::{PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
@@ -135,6 +136,19 @@ pub fn with_jitter(base: Duration) -> Duration {
     base + jitter
 }
 
+/// Create a MAC address based on the provided IP
+///
+/// Our prefix it CA:92, rest is IPv4 bytes
+///
+/// Inspired by https://github.com/firecracker-microvm/firecracker/blob/main/tests/host_tools/network.py#L122
+pub fn ip_to_mac(ip: &Ipv4Addr) -> String {
+    let octets = ip.octets();
+    format!(
+        "CA:92:{:02X}:{:02X}:{:02X}:{:02X}",
+        octets[0], octets[1], octets[2], octets[3]
+    )
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -152,6 +166,14 @@ pub mod tests {
     use tonic::body::BoxBody;
     use tonic::codegen::Service;
     use tonic::transport::{Channel, Endpoint, NamedService, Server, Uri};
+
+    #[test]
+    pub fn test_ip_to_mac() {
+        assert_eq!(
+            ip_to_mac(&"192.168.241.2".parse().unwrap()),
+            "CA:92:C0:A8:F1:02".to_string()
+        );
+    }
 
     #[test]
     pub fn test_semver_sort() {
