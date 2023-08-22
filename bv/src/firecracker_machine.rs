@@ -3,12 +3,13 @@ use crate::{
     node_data::NodeData,
     pal,
     services::cookbook::{CookbookService, DATA_FILE, ROOT_FS_FILE},
-    utils::get_process_pid,
+    utils::{get_process_pid, ip_to_mac},
     BV_VAR_PATH,
 };
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use firec::{config::JailerMode, Machine, MachineState};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -88,17 +89,24 @@ async fn create_config(
     bv_root: &Path,
     data: &NodeData<impl pal::NetInterface>,
 ) -> Result<firec::config::Config<'static>> {
+    let ip = data.network_interface.ip();
+    let gw = data.network_interface.gateway();
     let kernel_args = format!(
         "console=ttyS0 reboot=k panic=1 pci=off random.trust_cpu=on \
-            ip={}::{}:255.255.255.240::eth0:on",
-        data.network_interface.ip(),
-        data.network_interface.gateway(),
+            ip={ip}::{gw}:255.255.255.240::eth0:on",
     );
     if kernel_args.len() > MAX_KERNEL_ARGS_LEN {
         bail!("too long kernel_args {kernel_args}")
     }
-    let iface =
-        firec::config::network::Interface::new(data.network_interface.name().clone(), "eth0");
+    let mac = match ip {
+        IpAddr::V4(ipv4) => ip_to_mac(ipv4),
+        IpAddr::V6(_) => unreachable!(),
+    };
+    let iface = firec::config::network::Interface::new(
+        data.network_interface.name().clone(),
+        "eth0",
+        Some(mac),
+    );
     let root_fs_path =
         CookbookService::get_image_download_folder_path(bv_root, &data.image).join(ROOT_FS_FILE);
     let kernel_path = KernelService::get_kernel_path(bv_root, &data.kernel);

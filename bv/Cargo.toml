@@ -42,7 +42,7 @@ clap = {version = "4.2.4", features = ["derive", "cargo"]}
 cli-table = "0.4"
 crc = "3.0.0"
 chrono = {version = "0.4.24", features = ["serde"]}
-firec = {git = "https://github.com/blockjoy/firec.git", rev = "4dbc4fa5"}
+firec = {git = "https://github.com/blockjoy/firec.git", rev = "9e488cd"}
 fs_extra = "1.2.0"
 futures-util = "0.3"
 lazy_static = "1.4.0"
