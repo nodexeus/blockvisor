@@ -845,6 +845,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "mockall",
+ "nu-glob",
  "petname",
  "predicates",
  "prost",
@@ -2502,6 +2503,12 @@ dependencies = [
  "overload",
  "winapi",
 ]
+
+[[package]]
+name = "nu-glob"
+version = "0.83.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74907416b631a85a38d2aa582516807ef1896d144d610bdee02f5a1fb0a5275b"
 
 [[package]]
 name = "num-bigint"
