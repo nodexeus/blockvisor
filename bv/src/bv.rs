@@ -444,7 +444,9 @@ pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Res
                     .join(ROOT_FS_FILE),
                 image_dir.join(ROOT_FS_FILE),
             )?;
-            cleanup_rootfs(&image_dir, &node.image).await?;
+            cleanup_rootfs(&image_dir, &node.image)
+                .await
+                .with_context(|| "failed to cleanup rootfs")?;
         }
         ImageCommand::Upload {
             image_id,
@@ -840,11 +842,33 @@ async fn cleanup_rootfs(image_path: &Path, image: &NodeImage) -> Result<()> {
     on_rootfs(image_path, image, |mount_point| async move {
         let babel_dir = mount_point.join("var/lib/babel");
         if babel_dir.exists() {
-            fs::remove_dir_all(babel_dir).with_context(|| "failed to cleanup rootfs")?;
+            fs::remove_dir_all(babel_dir)?;
         }
-        Ok(())
+        cleanup_ignored(&mount_point)
     })
     .await
+}
+
+fn cleanup_ignored(bv_root: &Path) -> Result<()> {
+    let bv_ignore_path = bv_root.join("etc/bvignore");
+    if bv_ignore_path.exists() {
+        for pattern in fs::read_to_string(bv_ignore_path)?
+            .split('\n')
+            .filter(|pattern| !pattern.is_empty())
+        {
+            for entry in nu_glob::glob(&bv_root.join(pattern).to_string_lossy())? {
+                let path = entry?;
+                if path.exists() {
+                    if path.is_dir() {
+                        fs::remove_dir_all(&path).ok();
+                    } else if path.is_file() {
+                        fs::remove_file(&path).ok();
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn on_rootfs<C: FnOnce(PathBuf) -> F, F: Future<Output = Result<()>>>(
