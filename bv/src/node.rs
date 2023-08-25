@@ -216,13 +216,17 @@ impl<P: Pal + Debug> Node<P> {
 
         self.copy_os_image(image).await?;
 
-        let (script, metadata) = Self::copy_and_check_plugin(&self.paths, &self.data.image).await?;
+        let (script, metadata) = Self::copy_and_check_plugin(&self.paths, image).await?;
         self.metadata = metadata;
         self.babel_engine
             .update_plugin(|engine| RhaiPlugin::new(&script, engine))?;
 
         self.data.image = image.clone();
-        self.data.save(&self.paths.registry).await
+        self.data.requirements = self.metadata.requirements.clone();
+        self.data.save(&self.paths.registry).await?;
+        self.machine = self.pal.attach_vm(&self.data).await?;
+
+        Ok(())
     }
 
     /// Read script content and update plugin with metadata

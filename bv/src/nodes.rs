@@ -144,7 +144,8 @@ impl<P: Pal + Debug> Nodes<P> {
             .await
             .with_context(|| "fetch image data failed")?;
 
-        self.check_node_requirements(&meta.requirements).await?;
+        self.check_node_requirements(&meta.requirements, None)
+            .await?;
 
         let network_interface = self.create_network_interface(ip, gateway).await?;
 
@@ -190,6 +191,30 @@ impl<P: Pal + Debug> Nodes<P> {
             let new_meta = self.fetch_image_data(&image).await?;
 
             let nodes_lock = self.nodes.read().await;
+            let data = nodes_lock
+                .get(&id)
+                .ok_or_else(|| id_not_found(id))?
+                .read()
+                .await
+                .data
+                .clone();
+
+            if image.protocol != data.image.protocol {
+                bail!("Cannot upgrade protocol to `{}`", image.protocol);
+            }
+            if image.node_type != data.image.node_type {
+                bail!("Cannot upgrade node type to `{}`", image.node_type);
+            }
+            if data.kernel != new_meta.kernel {
+                bail!("Cannot upgrade kernel");
+            }
+            if data.requirements.disk_size_gb != new_meta.requirements.disk_size_gb {
+                bail!("Cannot upgrade disk requirements");
+            }
+
+            self.check_node_requirements(&new_meta.requirements, Some(&data.requirements))
+                .await?;
+
             let mut node = nodes_lock
                 .get(&id)
                 .ok_or_else(|| id_not_found(id))?
@@ -198,21 +223,6 @@ impl<P: Pal + Debug> Nodes<P> {
 
             let need_to_restart = node.status() == NodeStatus::Running;
             self.node_stop(&mut node, false).await?;
-
-            let data = &node.data;
-            if image.protocol != data.image.protocol {
-                bail!("Cannot upgrade protocol to `{}`", image.protocol);
-            }
-            if image.node_type != data.image.node_type {
-                bail!("Cannot upgrade node type to `{}`", image.node_type);
-            }
-            if data.requirements.vcpu_count != new_meta.requirements.vcpu_count
-                || data.requirements.mem_size_mb != new_meta.requirements.mem_size_mb
-                || data.requirements.disk_size_gb != new_meta.requirements.disk_size_gb
-                || data.kernel != new_meta.kernel
-            {
-                bail!("Cannot upgrade node requirements or kernel");
-            }
 
             node.upgrade(&image).await?;
             debug!("Node upgraded");
@@ -229,9 +239,16 @@ impl<P: Pal + Debug> Nodes<P> {
         Ok(())
     }
 
-    /// check if we have enough resources on the host to create/upgrade the node
+    /// Check if we have enough resources on the host to create/upgrade the node
+    ///
+    /// Optinal tolerance parameter is useful if we want to allow some overbooking.
+    /// It also can be used if we want to upgrade the node that exists.
     #[instrument(skip(self))]
-    async fn check_node_requirements(&self, requirements: &Requirements) -> Result<()> {
+    async fn check_node_requirements(
+        &self,
+        requirements: &Requirements,
+        tolerance: Option<&Requirements>,
+    ) -> Result<()> {
         let host_info = HostInfo::collect()?;
 
         let mut allocated_disk_size_gb = 0;
@@ -244,15 +261,21 @@ impl<P: Pal + Debug> Nodes<P> {
             allocated_vcpu_count += node.data.requirements.vcpu_count;
         }
 
-        let total_disk_size_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
+        let mut total_disk_size_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
+        let mut total_mem_size_mb = host_info.memory_bytes as usize / 1_000_000;
+        let mut total_vcpu_count = host_info.cpu_count;
+        if let Some(tol) = tolerance {
+            total_disk_size_gb += tol.disk_size_gb;
+            total_mem_size_mb += tol.mem_size_mb;
+            total_vcpu_count += tol.vcpu_count;
+        }
+
         if (allocated_disk_size_gb + requirements.disk_size_gb) > total_disk_size_gb {
             bail!("Not enough disk space to allocate for the node");
         }
-        let total_mem_size_mb = host_info.memory_bytes as usize / 1_000_000;
         if (allocated_mem_size_mb + requirements.mem_size_mb) > total_mem_size_mb {
             bail!("Not enough memory to allocate for the node");
         }
-        let total_vcpu_count = host_info.cpu_count;
         if (allocated_vcpu_count + requirements.vcpu_count) > total_vcpu_count {
             bail!("Not enough vcpu to allocate for the node");
         }
@@ -299,7 +322,7 @@ impl<P: Pal + Debug> Nodes<P> {
                 .with_context(|| "cannot download kernel")?;
         }
 
-        info!("Reading blockchain requirements...");
+        info!("Reading blockchain requirements: {:?}", &meta.requirements);
         Ok(meta)
     }
 
