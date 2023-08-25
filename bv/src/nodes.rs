@@ -260,6 +260,11 @@ impl<P: Pal + Debug> Nodes<P> {
             allocated_mem_size_mb += node.data.requirements.mem_size_mb;
             allocated_vcpu_count += node.data.requirements.vcpu_count;
         }
+        if let Some(tol) = tolerance {
+            allocated_disk_size_gb -= tol.disk_size_gb;
+            allocated_mem_size_mb -= tol.mem_size_mb;
+            allocated_vcpu_count -= tol.vcpu_count;
+        }
 
         let mut total_disk_size_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
         let mut total_mem_size_mb = host_info.memory_bytes as usize / 1_000_000;
