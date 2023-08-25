@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::{fs, sync::RwLockWriteGuard};
-use tracing::info;
+use tracing::{debug, info};
 
 pub const CONFIG_PATH: &str = "etc/blockvisor.json";
 
@@ -98,7 +98,7 @@ impl Config {
     pub async fn save(&self, bv_root: &Path) -> Result<()> {
         let path = bv_root.join(CONFIG_PATH);
         let parent = path.parent().unwrap();
-        info!("Ensuring config dir is present: {}", parent.display());
+        debug!("Ensuring config dir is present: {}", parent.display());
         fs::create_dir_all(parent).await?;
         info!("Writing host config: {}", path.display());
         let config = serde_json::to_string(&self)?;

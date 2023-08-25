@@ -133,12 +133,16 @@ impl<P: Pal + Debug> Nodes<P> {
             .collect();
 
         let mut allocated_disk_size_gb = 0;
+        let mut allocated_mem_size_mb = 0;
+        let mut allocated_vcpu_count = 0;
         for n in self.nodes.read().await.values() {
             let node = n.read().await;
             if node.data.network_interface.ip() == &ip {
                 bail!("Node with ip address `{ip}` exists");
             }
             allocated_disk_size_gb += node.data.requirements.disk_size_gb;
+            allocated_mem_size_mb += node.data.requirements.mem_size_mb;
+            allocated_vcpu_count += node.data.requirements.vcpu_count;
         }
 
         let meta = self
@@ -146,10 +150,19 @@ impl<P: Pal + Debug> Nodes<P> {
             .await
             .with_context(|| "fetch image data failed")?;
 
+        // check if we have enough resources to create the node
         let host_info = HostInfo::collect()?;
-        let total_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
-        if (allocated_disk_size_gb + meta.requirements.disk_size_gb) > total_gb {
-            bail!("Not enough disk space to allocate for new node");
+        let total_disk_size_gb = host_info.disk_space_bytes as usize / 1_000_000_000;
+        if (allocated_disk_size_gb + meta.requirements.disk_size_gb) > total_disk_size_gb {
+            bail!("Not enough disk space to allocate for the node");
+        }
+        let total_mem_size_mb = host_info.memory_bytes as usize / 1_000_000;
+        if (allocated_mem_size_mb + meta.requirements.mem_size_mb) > total_mem_size_mb {
+            bail!("Not enough memory to allocate for the node");
+        }
+        let total_vcpu_count = host_info.cpu_count;
+        if (allocated_vcpu_count + meta.requirements.vcpu_count) > total_vcpu_count {
+            bail!("Not enough vcpu to allocate for the node");
         }
 
         let network_interface = self.create_network_interface(ip, gateway).await?;
