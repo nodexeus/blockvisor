@@ -42,7 +42,7 @@ impl<T: AsyncTimer + Send> RunShJob<T> {
         // Check if there are no remnant child process after previous run.
         // If so, just kill it.
         let (cmd, args) = utils::bv_shell(&self.sh_body);
-        utils::kill_all_processes(&cmd, args);
+        utils::kill_all_processes(&cmd, args, true);
         <Self as JobRunner>::run(self, run, name, jobs_dir).await;
     }
 }

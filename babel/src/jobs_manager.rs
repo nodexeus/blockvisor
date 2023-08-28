@@ -170,7 +170,7 @@ impl JobsManagerClient for Client {
         if let Some(job) = jobs.get_mut(name) {
             match &mut job.state {
                 JobState::Active(_) => {
-                    kill_all_processes(&self.job_runner_bin_path, vec![name.to_string()]);
+                    kill_all_processes(&self.job_runner_bin_path, vec![name.to_string()], false);
                     job.state = JobState::Inactive(JobStatus::Stopped);
                 }
                 JobState::Inactive(status) => {
@@ -481,6 +481,7 @@ mod tests {
             kill_all_processes(
                 &self.test_job_runner_path.to_string_lossy(),
                 vec![name.to_string()],
+                false,
             );
         }
     }
