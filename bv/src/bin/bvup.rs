@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use blockvisord::config::SharedConfig;
 use blockvisord::{
     config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
-    services::api::pb,
+    services::api::pb, BV_VAR_PATH,
 };
 use bv_utils::cmd::{ask_confirm, run_cmd};
 use cidr_utils::cidr::Ipv4Cidr;
@@ -208,6 +208,7 @@ async fn main() -> Result<()> {
             org_id: None,
             region: cmd_args.region,
             billing_amount: None,
+            vmm_mountpoint: Some(format!("{}", bv_root.join(BV_VAR_PATH).to_string_lossy())),
         };
 
         let mut client =
