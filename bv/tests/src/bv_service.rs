@@ -210,6 +210,7 @@ async fn test_bv_service_e2e() {
         node_type: 3, // validator
         properties: vec![pb::NodeProperty {
             name: "TESTING_PARAM".to_string(),
+            display_name: "TESTING_PARAM".to_string(),
             ui_type: pb::UiType::Text.into(),
             disabled: false,
             required: true,
