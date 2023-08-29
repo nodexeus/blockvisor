@@ -1,6 +1,14 @@
 use std::cmp::Ordering;
 use std::path::Path;
-use sysinfo::{Disk, DiskExt, System, SystemExt};
+use sysinfo::{Disk, DiskExt, Pid, PidExt, ProcessExt, ProcessRefreshKind, System, SystemExt};
+
+pub fn is_process_running(pid: u32) -> bool {
+    let mut sys = System::new();
+    sys.refresh_process_specifics(Pid::from_u32(pid), ProcessRefreshKind::new())
+        .then(|| sys.process(Pid::from_u32(pid)).map(|proc| proc.status()))
+        .flatten()
+        .map_or(false, |status| status != sysinfo::ProcessStatus::Zombie)
+}
 
 /// Find drive that depth of canonical mount point path is the biggest and at the same time
 /// given `path` starts with it.

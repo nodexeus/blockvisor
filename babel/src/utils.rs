@@ -1,4 +1,4 @@
-use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
+use bv_utils::{run_flag::RunFlag, system::is_process_running, timer::AsyncTimer};
 use eyre::{bail, Context, ContextCompat};
 use futures::StreamExt;
 use std::{
@@ -8,7 +8,7 @@ use std::{
     process::Output,
     time::{Duration, Instant},
 };
-use sysinfo::{Pid, Process, ProcessExt, System, SystemExt};
+use sysinfo::{Pid, PidExt, Process, ProcessExt, Signal, System, SystemExt};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
@@ -17,6 +17,8 @@ use tokio_stream::Stream;
 use tonic::Status;
 
 const ENV_BV_USER: &str = "BV_USER";
+const PROCESS_INTERRUPT_TIMEOUT: Duration = Duration::from_secs(30);
+const PROCESS_INTERRUPT_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 /// User to run sh commands and long running jobs
 fn bv_user() -> Option<String> {
@@ -40,24 +42,40 @@ pub fn bv_shell(body: &str) -> (String, Vec<String>) {
 /// Kill all processes that match `cmd` and passed `args`.
 ///
 /// TODO: (maybe) try to use &[&str] instead of Vec<String>
-pub fn kill_all_processes(cmd: &str, args: Vec<String>) {
+pub fn kill_all_processes(cmd: &str, args: Vec<String>, force: bool) {
     let mut sys = System::new();
     sys.refresh_processes();
     let ps = sys.processes();
 
     let remnants = find_processes(cmd, args, ps);
     for (_, proc) in remnants {
-        kill_process_tree(proc, ps);
+        kill_process_tree(proc, ps, force);
     }
 }
 
 /// Kill process and all its descendents.
-fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>) {
-    proc.kill(); // Better to kill parent first, since it may implement some child restart mechanism.
-    proc.wait();
+fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>, force: bool) {
+    // Better to kill parent first, since it may implement some child restart mechanism.
+    if force {
+        // Just kill the process
+        proc.kill();
+        proc.wait();
+    } else {
+        // Try to interrupt the process, and kill it after timeout in case it did not finish
+        proc.kill_with(Signal::Interrupt);
+        let now = std::time::Instant::now();
+        while is_process_running(proc.pid().as_u32()) {
+            if now.elapsed() < PROCESS_INTERRUPT_TIMEOUT {
+                std::thread::sleep(PROCESS_INTERRUPT_RETRY_INTERVAL)
+            } else {
+                proc.kill();
+                proc.wait();
+            }
+        }
+    }
     let children = ps.iter().filter(|(_, p)| p.parent() == Some(proc.pid()));
     for (_, child) in children {
-        kill_process_tree(child, ps);
+        kill_process_tree(child, ps, force);
     }
 }
 
@@ -246,7 +264,7 @@ mod tests {
     use assert_fs::TempDir;
     use eyre::Result;
     use std::{fs, io::Write, os::unix::fs::OpenOptionsExt};
-    use sysinfo::{PidExt, ProcessRefreshKind, System, SystemExt};
+    use sysinfo::SystemExt;
     use tokio::process::Command;
 
     async fn wait_for_process(control_file: &Path) {
@@ -285,14 +303,8 @@ mod tests {
         kill_all_processes(
             &cmd_path.to_string_lossy(),
             vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            true,
         );
-        let is_process_running = |pid| {
-            let mut sys = System::new();
-            sys.refresh_process_specifics(Pid::from_u32(pid), ProcessRefreshKind::new())
-                .then(|| sys.process(Pid::from_u32(pid)).map(|proc| proc.status()))
-                .flatten()
-                .map_or(false, |status| status != sysinfo::ProcessStatus::Zombie)
-        };
         tokio::time::timeout(Duration::from_secs(60), async {
             while is_process_running(pid) {
                 tokio::time::sleep(Duration::from_millis(100)).await;

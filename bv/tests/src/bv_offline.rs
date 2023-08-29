@@ -14,9 +14,8 @@ use blockvisord::{
     services::{api, api::pb},
     set_bv_status, utils, ServiceStatus, BV_VAR_PATH,
 };
-use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
+use bv_utils::{cmd::run_cmd, run_flag::RunFlag, system::is_process_running};
 use std::{net::ToSocketAddrs, sync::Arc};
-use sysinfo::{Pid, PidExt, ProcessExt, ProcessRefreshKind, System, SystemExt};
 use tokio::{
     sync::Mutex,
     time::{sleep, Duration},
@@ -217,13 +216,6 @@ async fn test_bv_cmd_node_recovery() -> Result<()> {
         .await
         .unwrap();
     // wait until process is actually killed
-    let is_process_running = |pid| {
-        let mut sys = System::new();
-        sys.refresh_process_specifics(Pid::from_u32(pid), ProcessRefreshKind::new())
-            .then(|| sys.process(Pid::from_u32(pid)).map(|proc| proc.status()))
-            .flatten()
-            .map_or(false, |status| status != sysinfo::ProcessStatus::Zombie)
-    };
     while is_process_running(process_id) {
         sleep(Duration::from_millis(10)).await;
     }
