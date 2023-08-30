@@ -17,7 +17,7 @@ use tokio_stream::Stream;
 use tonic::Status;
 
 const ENV_BV_USER: &str = "BV_USER";
-const PROCESS_SIGNAL_TIMEOUT: Duration = Duration::from_secs(30);
+const PROCESS_SIGNAL_TIMEOUT: Duration = Duration::from_secs(60);
 const PROCESS_SIGNAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 /// User to run sh commands and long running jobs
