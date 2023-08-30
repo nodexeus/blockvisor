@@ -17,8 +17,8 @@ use tokio_stream::Stream;
 use tonic::Status;
 
 const ENV_BV_USER: &str = "BV_USER";
-const PROCESS_INTERRUPT_TIMEOUT: Duration = Duration::from_secs(30);
-const PROCESS_INTERRUPT_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+const PROCESS_SIGNAL_TIMEOUT: Duration = Duration::from_secs(60);
+const PROCESS_SIGNAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 /// User to run sh commands and long running jobs
 fn bv_user() -> Option<String> {
@@ -62,11 +62,11 @@ fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>, force: bool) {
         proc.wait();
     } else {
         // Try to interrupt the process, and kill it after timeout in case it did not finish
-        proc.kill_with(Signal::Interrupt);
+        proc.kill_with(Signal::Term);
         let now = std::time::Instant::now();
         while is_process_running(proc.pid().as_u32()) {
-            if now.elapsed() < PROCESS_INTERRUPT_TIMEOUT {
-                std::thread::sleep(PROCESS_INTERRUPT_RETRY_INTERVAL)
+            if now.elapsed() < PROCESS_SIGNAL_TIMEOUT {
+                std::thread::sleep(PROCESS_SIGNAL_RETRY_INTERVAL)
             } else {
                 proc.kill();
                 proc.wait();
