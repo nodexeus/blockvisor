@@ -117,6 +117,7 @@ fn load_jobs(jobs_dir: &Path, job_runner_bin_path: &Path) -> Result<Jobs> {
 #[async_trait]
 pub trait JobsManagerClient {
     async fn startup(&self) -> Result<()>;
+    async fn active_jobs_shutdown_timeout(&self) -> Duration;
     async fn shutdown(&self) -> Result<()>;
     async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
     async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
@@ -137,9 +138,24 @@ impl JobsManagerClient for Client {
         Ok(())
     }
 
+    async fn active_jobs_shutdown_timeout(&self) -> Duration {
+        let (jobs, _) = &*self.jobs_registry.lock().await;
+        jobs.iter().fold(Duration::default(), |acc, (_, job)| {
+            if let JobState::Active(_) = job.state {
+                acc + Duration::from_secs(
+                    job.config
+                        .shutdown_timeout_secs
+                        .unwrap_or(DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS),
+                )
+            } else {
+                acc
+            }
+        })
+    }
+
     async fn shutdown(&self) -> Result<()> {
-        self.jobs_manager_state_tx
-            .send(JobsManagerState::Shutdown)?;
+        // ignore send error since jobs_manager may be already stopped
+        let _ = self.jobs_manager_state_tx.send(JobsManagerState::Shutdown);
         let (jobs, _) = &mut *self.jobs_registry.lock().await;
         for (name, job) in jobs {
             if let JobState::Active(pid) = &mut job.state {

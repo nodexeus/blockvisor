@@ -682,6 +682,10 @@ mod tests {
                 &self,
                 request: Request<(String, BabelConfig)>,
             ) -> Result<Response<()>, Status>;
+            async fn get_babel_shutdown_timeout(
+                &self,
+                request: Request<()>,
+            ) -> Result<Response<Duration>, Status>;
             async fn shutdown_babel(
                 &self,
                 request: Request<()>,

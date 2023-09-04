@@ -29,6 +29,7 @@ use tonic::{Request, Response, Status, Streaming};
 
 const WILDCARD_KEY_NAME: &str = "*";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+const BABEL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Lock used to avoid reading job runner binary while it is modified.
 /// It stores CRC32 checksum of the binary file.
@@ -100,6 +101,15 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
             .await
             .map_err(|err| Status::internal(format!("failed to startup jobs_manger: {err:#}")))?;
         Ok(Response::new(()))
+    }
+
+    async fn get_babel_shutdown_timeout(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<Duration>, Status> {
+        Ok(Response::new(
+            self.jobs_manager.active_jobs_shutdown_timeout().await + BABEL_SHUTDOWN_TIMEOUT,
+        ))
     }
 
     async fn shutdown_babel(&self, _request: Request<()>) -> Result<Response<()>, Status> {
@@ -518,6 +528,7 @@ mod tests {
         #[async_trait]
         impl JobsManagerClient for JobsManager {
             async fn startup(&self) -> Result<()>;
+            async fn active_jobs_shutdown_timeout(&self) -> Duration;
             async fn shutdown(&self) -> Result<()>;
             async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
             async fn start(&self, name: &str, config: JobConfig) -> Result<()>;

@@ -5,11 +5,14 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[tonic_rpc::tonic_rpc(bincode)]
 pub trait Babel {
     /// Initial Babel setup that must be run on node startup Mount data directory.
     fn setup_babel(hostname: String, config: BabelConfig);
+    /// Get maximum time it may take to gracefully shutdown babel with all running jobs.
+    fn get_babel_shutdown_timeout() -> Duration;
     /// Try gracefully shutdown babel before node stop/restart. In particular it gracefully shutdown all jobs.
     /// All `Running` jobs will be shutdown and won't start again until node is started again.
     fn shutdown_babel();

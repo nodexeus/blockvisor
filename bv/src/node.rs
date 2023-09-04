@@ -1,3 +1,4 @@
+use crate::node_connection::RPC_REQUEST_TIMEOUT;
 use crate::{
     babel_engine,
     babel_engine::NodeInfo,
@@ -40,7 +41,6 @@ use uuid::Uuid;
 
 const NODE_START_TIMEOUT: Duration = Duration::from_secs(120);
 const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const BABEL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(900); // graceful jobs shutdown may take several minutes, so we need long enough timeout to handle also edge cases
 const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const FW_SETUP_TIMEOUT_SEC: u64 = 30;
@@ -429,7 +429,7 @@ impl<P: Pal + Debug> Node<P> {
                 info!("Recovery: restart broken node with ID `{id}`");
 
                 self.recovery_counters.stop += 1;
-                if let Err(e) = self.stop(false).await {
+                if let Err(e) = self.stop(true).await {
                     warn!("Recovery: stopping node with ID `{id}` failed: {e}");
                     if self.recovery_counters.stop >= MAX_STOP_TRIES {
                         error!("Recovery: retries count exceeded, mark as failed");
@@ -463,10 +463,10 @@ impl<P: Pal + Debug> Node<P> {
     pub async fn stop(&mut self, force: bool) -> Result<()> {
         if !force {
             let babel_client = self.babel_engine.node_connection.babel_client().await?;
-            // TODO get timeout value from babel
-            if let Err(err) =
-                with_retry!(babel_client.shutdown_babel(with_timeout((), BABEL_SHUTDOWN_TIMEOUT)))
-            {
+            let timeout = with_retry!(babel_client.get_babel_shutdown_timeout(()))?.into_inner();
+            if let Err(err) = with_retry!(
+                babel_client.shutdown_babel(with_timeout((), timeout + RPC_REQUEST_TIMEOUT))
+            ) {
                 bail!("Failed to gracefully shutdown babel and background jobs: {err:#}");
             }
         }
