@@ -1,24 +1,24 @@
-use crate::{jobs_manager::JobsManagerClient, ufw_wrapper::apply_firewall_config, utils};
+use crate::{
+    apply_babel_config, jobs_manager::JobsManagerClient, load_config,
+    ufw_wrapper::apply_firewall_config, utils, BabelPal,
+};
 use async_trait::async_trait;
 use babel_api::{
     babel::BlockchainKey,
     engine::{HttpResponse, JobConfig, JobStatus, JrpcRequest, RestRequest, ShResponse},
-    metadata::{firewall, BabelConfig, KeysConfig, RamdiskConfiguration},
+    metadata::{firewall, BabelConfig, KeysConfig},
 };
-use eyre::{bail, eyre, Context, ContextCompat, Report, Result};
+use eyre::{bail, eyre, Context, ContextCompat, Result};
 use reqwest::RequestBuilder;
 use serde_json::json;
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     mem,
     ops::{Deref, DerefMut},
-    path::Path,
-    path::PathBuf,
-    process::Output,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
-use thiserror::Error;
 use tokio::{
     fs,
     fs::File,
@@ -37,44 +37,14 @@ pub type JobRunnerLock = Arc<RwLock<Option<u32>>>;
 pub type LogsTx = oneshot::Sender<broadcast::Sender<String>>;
 pub type LogsRx = broadcast::Receiver<String>;
 
-#[derive(Error, Debug)]
-pub enum MountError {
-    #[error("drive {data_drive_path} already mounted into {data_directory_mount_point}")]
-    AlreadyMounted {
-        data_drive_path: String,
-        data_directory_mount_point: String,
-    },
-    #[error("failed to mount {data_drive_path} into {data_directory_mount_point} with: {out:?}")]
-    MountFailed {
-        data_drive_path: String,
-        data_directory_mount_point: String,
-        out: Output,
-    },
-    #[error("failed to mount {data_drive_path} into {data_directory_mount_point} with: {err}")]
-    Internal {
-        data_drive_path: String,
-        data_directory_mount_point: String,
-        err: Report,
-    },
-}
-
-/// Trait that allows to inject custom PAL implementation.
-#[async_trait]
-pub trait BabelPal {
-    async fn mount_data_drive(&self, data_directory_mount_point: &str) -> Result<(), MountError>;
-    async fn set_hostname(&self, hostname: &str) -> Result<()>;
-    async fn set_swap_file(&self, swap_size_mb: usize) -> Result<()>;
-    async fn set_ram_disks(&self, ramdisks: Option<Vec<RamdiskConfiguration>>) -> Result<()>;
-}
-
-pub enum BabelStatus {
-    Uninitialized(LogsTx),
+pub enum BabelServiceState {
+    NotReady(LogsTx),
     Ready(LogsRx),
 }
 
 pub struct BabelService<J, P> {
     inner: reqwest::Client,
-    status: Arc<Mutex<BabelStatus>>,
+    state: Arc<Mutex<BabelServiceState>>,
     job_runner_lock: JobRunnerLock,
     job_runner_bin_path: PathBuf,
     /// jobs manager client used to work with jobs
@@ -101,38 +71,22 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
     ) -> Result<Response<()>, Status> {
         let (hostname, config) = request.into_inner();
         self.pal
-            .set_swap_file(config.swap_size_mb)
-            .await
-            .map_err(|err| Status::internal(format!("failed to add swap file with: {err:#}")))?;
-
-        self.pal
             .set_hostname(&hostname)
             .await
             .map_err(|err| Status::internal(format!("failed to setup hostname with: {err:#}")))?;
 
-        self.pal
-            .set_ram_disks(config.clone().ramdisks)
+        apply_babel_config(&self.pal, &config)
             .await
-            .map_err(|err| Status::internal(format!("failed to add ram disks with: {err:#}")))?;
+            .map_err(|err| Status::internal(eyre!("{err}").to_string()))?;
 
-        self.pal
-            .mount_data_drive(&config.data_directory_mount_point)
-            .await
-            .map_err(|err| match err {
-                MountError::AlreadyMounted { .. } => {
-                    Status::already_exists(eyre!("{err}").to_string())
-                }
-                _ => Status::internal(eyre!("{err}").to_string()),
-            })?;
-
-        let mut status = self.status.lock().await;
-        if let BabelStatus::Uninitialized(_) = status.deref() {
+        let mut state = self.state.lock().await;
+        if let BabelServiceState::NotReady(_) = state.deref() {
             self.save_babel_conf(&config).await?;
 
             // setup logs_server
             let (logs_broadcast_tx, logs_rx) = broadcast::channel(config.log_buffer_capacity_ln);
-            if let BabelStatus::Uninitialized(logs_tx) =
-                mem::replace(status.deref_mut(), BabelStatus::Ready(logs_rx))
+            if let BabelServiceState::NotReady(logs_tx) =
+                mem::replace(state.deref_mut(), BabelServiceState::Ready(logs_rx))
             {
                 logs_tx
                     .send(logs_broadcast_tx)
@@ -141,6 +95,28 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
                 unreachable!()
             }
         }
+        self.jobs_manager
+            .startup()
+            .await
+            .map_err(|err| Status::internal(format!("failed to startup jobs_manger: {err:#}")))?;
+        Ok(Response::new(()))
+    }
+
+    async fn shutdown_babel(&self, _request: Request<()>) -> Result<Response<()>, Status> {
+        self.jobs_manager
+            .shutdown()
+            .await
+            .map_err(|err| Status::internal(format!("failed to shutdown jobs_manger: {err:#}")))?;
+
+        if let Ok(config) = load_config(&self.babel_cfg_path).await {
+            self.pal
+                .umount_data_drive(&config.data_directory_mount_point)
+                .await
+                .map_err(|err| {
+                    Status::internal(eyre!("failed to umount data drive: {err:#}").to_string())
+                })?;
+        }
+
         Ok(Response::new(()))
     }
 
@@ -351,7 +327,7 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
         _request: Request<()>,
     ) -> Result<Response<Self::GetLogsStream>, Status> {
         let mut logs = Vec::default();
-        if let BabelStatus::Ready(rx) = self.status.lock().await.deref_mut() {
+        if let BabelServiceState::Ready(rx) = self.state.lock().await.deref_mut() {
             loop {
                 match rx.try_recv() {
                     Ok(log) => logs.push(Ok(log)),
@@ -397,7 +373,7 @@ impl<J, P> BabelService<J, P> {
         jobs_manager: J,
         babel_cfg_path: PathBuf,
         pal: P,
-        status: BabelStatus,
+        state: BabelServiceState,
     ) -> Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(REQUEST_TIMEOUT)
@@ -405,7 +381,7 @@ impl<J, P> BabelService<J, P> {
 
         Ok(Self {
             inner: client,
-            status: Arc::new(Mutex::new(status)),
+            state: Arc::new(Mutex::new(state)),
             job_runner_lock,
             job_runner_bin_path,
             jobs_manager,
@@ -525,6 +501,7 @@ mod tests {
     use super::*;
     use assert_fs::TempDir;
     use babel_api::babel::{babel_client::BabelClient, babel_server::Babel};
+    use babel_api::metadata::RamdiskConfiguration;
     use futures::StreamExt;
     use httpmock::prelude::*;
     use mockall::*;
@@ -540,6 +517,8 @@ mod tests {
 
         #[async_trait]
         impl JobsManagerClient for JobsManager {
+            async fn startup(&self) -> Result<()>;
+            async fn shutdown(&self) -> Result<()>;
             async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
             async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
             async fn stop(&self, name: &str) -> Result<()>;
@@ -551,11 +530,16 @@ mod tests {
 
     #[async_trait]
     impl BabelPal for DummyPal {
-        async fn mount_data_drive(
-            &self,
-            _data_directory_mount_point: &str,
-        ) -> Result<(), MountError> {
+        async fn mount_data_drive(&self, _data_directory_mount_point: &str) -> Result<()> {
             Ok(())
+        }
+
+        async fn umount_data_drive(&self, _data_directory_mount_point: &str) -> Result<()> {
+            Ok(())
+        }
+
+        async fn is_data_drive_mounted(&self, _data_directory_mount_point: &str) -> Result<bool> {
+            Ok(false)
         }
 
         async fn set_hostname(&self, _hostname: &str) -> eyre::Result<()> {
@@ -566,11 +550,22 @@ mod tests {
             Ok(())
         }
 
+        async fn is_swap_file_set(&self, _swap_size_mb: usize) -> Result<bool> {
+            Ok(false)
+        }
+
         async fn set_ram_disks(
             &self,
-            _ramdisks: Option<Vec<RamdiskConfiguration>>,
+            _ram_disks: Option<Vec<RamdiskConfiguration>>,
         ) -> eyre::Result<()> {
             Ok(())
+        }
+
+        async fn is_ram_disks_set(
+            &self,
+            _ram_disks: Option<Vec<RamdiskConfiguration>>,
+        ) -> Result<bool> {
+            Ok(false)
         }
     }
 
@@ -579,12 +574,14 @@ mod tests {
         job_runner_bin_path: PathBuf,
         uds_stream: UnixListenerStream,
         babel_cfg_path: PathBuf,
-        setup: BabelStatus,
+        setup: BabelServiceState,
     ) -> Result<()> {
+        let mut jobs_manager_mock = MockJobsManager::new();
+        jobs_manager_mock.expect_startup().returning(|| Ok(()));
         let babel_service = BabelService::new(
             job_runner_lock,
             job_runner_bin_path,
-            MockJobsManager::new(),
+            jobs_manager_mock,
             babel_cfg_path,
             DummyPal,
             setup,
@@ -637,7 +634,7 @@ mod tests {
                 job_runner_path,
                 uds_stream,
                 babel_cfg_path,
-                BabelStatus::Uninitialized(logs_tx),
+                BabelServiceState::NotReady(logs_tx),
             )
             .await
         });
@@ -659,7 +656,7 @@ mod tests {
             MockJobsManager::new(),
             Default::default(),
             DummyPal,
-            BabelStatus::Ready(rx),
+            BabelServiceState::Ready(rx),
         )
         .await
     }
@@ -939,7 +936,7 @@ mod tests {
             MockJobsManager::new(),
             Default::default(),
             DummyPal,
-            BabelStatus::Ready(rx),
+            BabelServiceState::Ready(rx),
         )
         .await?;
 

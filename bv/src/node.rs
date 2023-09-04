@@ -40,6 +40,7 @@ use uuid::Uuid;
 
 const NODE_START_TIMEOUT: Duration = Duration::from_secs(120);
 const NODE_RECONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const BABEL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(900); // graceful jobs shutdown may take several minutes, so we need long enough timeout to handle also edge cases
 const NODE_STOP_TIMEOUT: Duration = Duration::from_secs(60);
 const NODE_STOPPED_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const FW_SETUP_TIMEOUT_SEC: u64 = 30;
@@ -268,14 +269,9 @@ impl<P: Pal + Debug> Node<P> {
 
         // setup babel
         let babel_client = self.babel_engine.node_connection.babel_client().await?;
-        match babel_client
+        babel_client
             .setup_babel((id.to_string(), self.metadata.babel_config.clone()))
-            .await
-        {
-            Ok(_) => {}
-            Err(e) if e.code() == tonic::Code::AlreadyExists => {}
-            Err(e) => bail!(e),
-        }
+            .await?;
 
         if !self.data.initialized {
             // setup firewall, but only once
@@ -336,7 +332,7 @@ impl<P: Pal + Debug> Node<P> {
             NodeStatus::Stopped => {
                 self.recovery_counters.stop += 1;
                 info!("Recovery: stopping node with ID `{id}`");
-                if let Err(e) = self.stop().await {
+                if let Err(e) = self.stop(false).await {
                     warn!("Recovery: stopping node with ID `{id}` failed: {e}");
                     if self.recovery_counters.stop >= MAX_STOP_TRIES {
                         error!("Recovery: retries count exceeded, mark as failed");
@@ -433,7 +429,7 @@ impl<P: Pal + Debug> Node<P> {
                 info!("Recovery: restart broken node with ID `{id}`");
 
                 self.recovery_counters.stop += 1;
-                if let Err(e) = self.stop().await {
+                if let Err(e) = self.stop(false).await {
                     warn!("Recovery: stopping node with ID `{id}` failed: {e}");
                     if self.recovery_counters.stop >= MAX_STOP_TRIES {
                         error!("Recovery: retries count exceeded, mark as failed");
@@ -464,7 +460,16 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Stops the running node.
     #[instrument(skip(self))]
-    pub async fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self, force: bool) -> Result<()> {
+        if !force {
+            let babel_client = self.babel_engine.node_connection.babel_client().await?;
+            // TODO get timeout value from babel
+            if let Err(err) =
+                with_retry!(babel_client.shutdown_babel(with_timeout((), BABEL_SHUTDOWN_TIMEOUT)))
+            {
+                bail!("Failed to gracefully shutdown babel and background jobs: {err:#}");
+            }
+        }
         match self.machine.state() {
             pal::VmState::SHUTOFF => {}
             pal::VmState::RUNNING => {

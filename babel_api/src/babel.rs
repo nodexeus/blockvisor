@@ -10,6 +10,9 @@ use std::path::PathBuf;
 pub trait Babel {
     /// Initial Babel setup that must be run on node startup Mount data directory.
     fn setup_babel(hostname: String, config: BabelConfig);
+    /// Try gracefully shutdown babel before node stop/restart. In particular it gracefully shutdown all jobs.
+    /// All `Running` jobs will be shutdown and won't start again until node is started again.
+    fn shutdown_babel();
     /// Setup firewall according to given configuration.
     fn setup_firewall(config: firewall::Config);
     /// Download key files from locations specified in `keys` section of Babel config.

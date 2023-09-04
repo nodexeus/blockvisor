@@ -523,6 +523,7 @@ mod tests {
                         backoff_base_ms: 500,
                         max_retries: Some(3),
                     }),
+                    shutdown_timeout_secs: None,
                     needs: Some(vec!["needed".to_string()]),
                 }),
             )
@@ -537,6 +538,7 @@ mod tests {
                         destination: PathBuf::from("destination/path/for/blockchain_data"),
                     },
                     restart: RestartPolicy::Never,
+                    shutdown_timeout_secs: None,
                     needs: None,
                 }),
             )
