@@ -493,7 +493,7 @@ mod tests {
         let tmp_dir = TempDir::new()?.to_path_buf();
         dummy_sources(&tmp_dir)?;
         let server = MockServer::start();
-        let upload_progress_path = tmp_dir.join("upload.progress");
+        let upload_progress_path = tmp_dir.join("upload.parts");
         Ok(TestEnv {
             tmp_dir,
             server,

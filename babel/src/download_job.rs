@@ -565,7 +565,7 @@ mod tests {
         let tmp_dir = TempDir::new()?.to_path_buf();
         fs::create_dir_all(&tmp_dir)?;
         let server = MockServer::start();
-        let download_progress_path = tmp_dir.join("download.progress");
+        let download_progress_path = tmp_dir.join("download.parts");
         Ok(TestEnv {
             tmp_dir,
             server,
