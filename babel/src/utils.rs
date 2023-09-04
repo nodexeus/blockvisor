@@ -3,12 +3,10 @@ use eyre::{bail, Context, ContextCompat};
 use futures::StreamExt;
 use std::{
     collections::HashMap,
-    fs,
     path::Path,
-    process::Output,
     time::{Duration, Instant},
 };
-use sysinfo::{Pid, PidExt, Process, ProcessExt, Signal, System, SystemExt};
+use sysinfo::{Pid, PidExt, Process, ProcessExt, ProcessRefreshKind, Signal, System, SystemExt};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
@@ -17,8 +15,7 @@ use tokio_stream::Stream;
 use tonic::Status;
 
 const ENV_BV_USER: &str = "BV_USER";
-const PROCESS_SIGNAL_TIMEOUT: Duration = Duration::from_secs(60);
-const PROCESS_SIGNAL_RETRY_INTERVAL: Duration = Duration::from_secs(1);
+const PROCESS_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 /// User to run sh commands and long running jobs
 fn bv_user() -> Option<String> {
@@ -42,41 +39,71 @@ pub fn bv_shell(body: &str) -> (String, Vec<String>) {
 /// Kill all processes that match `cmd` and passed `args`.
 ///
 /// TODO: (maybe) try to use &[&str] instead of Vec<String>
-pub fn kill_all_processes(cmd: &str, args: Vec<String>, force: bool) {
+pub fn kill_all_processes(cmd: &str, args: Vec<String>, timeout: Option<Duration>) {
     let mut sys = System::new();
     sys.refresh_processes();
     let ps = sys.processes();
 
-    let remnants = find_processes(cmd, args, ps);
-    for (_, proc) in remnants {
-        kill_process_tree(proc, ps, force);
+    let procs = find_processes(cmd, args, ps);
+    let now = Instant::now();
+    for (_, proc) in procs {
+        kill_process_tree(proc, ps, now, timeout);
     }
 }
 
 /// Kill process and all its descendents.
-fn kill_process_tree(proc: &Process, ps: &HashMap<Pid, Process>, force: bool) {
+pub fn kill_process_tree(
+    proc: &Process,
+    ps: &HashMap<Pid, Process>,
+    now: Instant,
+    timeout: Option<Duration>,
+) {
     // Better to kill parent first, since it may implement some child restart mechanism.
-    if force {
-        // Just kill the process
-        proc.kill();
-        proc.wait();
-    } else {
-        // Try to interrupt the process, and kill it after timeout in case it did not finish
-        proc.kill_with(Signal::Term);
-        let now = std::time::Instant::now();
-        while is_process_running(proc.pid().as_u32()) {
-            if now.elapsed() < PROCESS_SIGNAL_TIMEOUT {
-                std::thread::sleep(PROCESS_SIGNAL_RETRY_INTERVAL)
-            } else {
+    // Try to interrupt the process, and kill it after timeout in case it has not finished.
+    proc.kill_with(Signal::Term);
+    while is_process_running(proc.pid().as_u32()) {
+        if let Some(timeout) = timeout {
+            if now.elapsed() > timeout {
                 proc.kill();
                 proc.wait();
+                break;
             }
         }
+        std::thread::sleep(PROCESS_CHECK_INTERVAL)
     }
     let children = ps.iter().filter(|(_, p)| p.parent() == Some(proc.pid()));
     for (_, child) in children {
-        kill_process_tree(child, ps, force);
+        kill_process_tree(child, ps, now, timeout);
     }
+}
+
+/// Kill process by name and args.
+pub fn kill_process_by_name(cmd: &str, args: Vec<String>) {
+    let mut sys = System::new();
+    sys.refresh_processes();
+    let ps = sys.processes();
+    if let Some((_, proc)) = find_processes(cmd, args, ps).next() {
+        proc.kill();
+    };
+}
+
+pub fn gracefully_terminate_process(pid: &Pid, timeout: Duration) -> bool {
+    let mut sys = System::new();
+    if !sys.refresh_process_specifics(*pid, ProcessRefreshKind::new()) {
+        return true;
+    }
+    if let Some(proc) = sys.process(*pid) {
+        proc.kill_with(Signal::Term);
+        let now = std::time::Instant::now();
+        while is_process_running(pid.as_u32()) {
+            if now.elapsed() < timeout {
+                std::thread::sleep(Duration::from_secs(1))
+            } else {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// Find all processes that match `cmd` and passed `args`.
@@ -249,22 +276,12 @@ pub async fn save_bin_stream<S: Stream<Item = Result<babel_api::utils::Binary, S
     Ok(checksum)
 }
 
-pub async fn mount_drive(drive: &str, dir: &str) -> eyre::Result<Output> {
-    fs::create_dir_all(dir)?;
-    tokio::process::Command::new("mount")
-        .args([drive, dir])
-        .output()
-        .await
-        .with_context(|| "failed to mount drive")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_fs::TempDir;
     use eyre::Result;
     use std::{fs, io::Write, os::unix::fs::OpenOptionsExt};
-    use sysinfo::SystemExt;
     use tokio::process::Command;
 
     async fn wait_for_process(control_file: &Path) {
@@ -279,7 +296,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_kill_remnants() -> Result<()> {
+    async fn test_kill_all_processes() -> Result<()> {
         let tmp_root = TempDir::new()?.to_path_buf();
         fs::create_dir_all(&tmp_root)?;
         let ctrl_file = tmp_root.join("cmd_started");
@@ -303,7 +320,7 @@ mod tests {
         kill_all_processes(
             &cmd_path.to_string_lossy(),
             vec!["a".to_string(), "b".to_string(), "c".to_string()],
-            true,
+            Some(Duration::from_secs(3)),
         );
         tokio::time::timeout(Duration::from_secs(60), async {
             while is_process_running(pid) {

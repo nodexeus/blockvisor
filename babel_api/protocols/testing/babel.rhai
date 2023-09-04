@@ -177,6 +177,7 @@ fn download(param) {
                 max_retries: 1,
             },
         },
+        shutdown_timeout_secs: 3000
     });
     "Download started!"
 }

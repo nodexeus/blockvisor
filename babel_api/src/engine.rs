@@ -7,6 +7,8 @@ use std::{
 };
 use tracing::log::Level;
 
+pub const DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS: u64 = 60;
+
 /// Plugin engin must implement this interface, so it can be used by babel plugins.
 pub trait Engine {
     /// Start background job with unique name.
@@ -225,6 +227,10 @@ pub struct JobConfig {
     pub job_type: JobType,
     /// Job restart policy.
     pub restart: RestartPolicy,
+    /// Job shutdown timeout - how long it may take to gracefully shutdown the job.
+    /// After given time job won't be killed, but babel will rise the error.
+    /// If not set default to 60s.
+    pub shutdown_timeout_secs: Option<u64>,
     /// List of job names that this job needs to be finished before start.
     pub needs: Option<Vec<String>>,
 }

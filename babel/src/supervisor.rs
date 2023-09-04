@@ -1,7 +1,7 @@
 /// This module implements supervisor for node entry points. It spawn child processes as defined in
 /// given config and watch them. Stopped child (whatever reason) is respawned with exponential backoff
 /// timeout. Backoff timeout is reset after child stays alive for at least `backoff_timeout_ms`.
-use crate::utils::{kill_all_processes, Backoff};
+use crate::utils::{kill_process_by_name, Backoff};
 use babel_api::babelsup::SupervisorConfig;
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
 use std::path::PathBuf;
@@ -32,9 +32,10 @@ pub async fn run<T: AsyncTimer>(
 ) {
     let babel_change_rx = wait_for_babel_bin(run.clone(), babel_change_rx).await;
     if let Some(supervisor) = wait_for_setup(timer, run.clone(), babel_path, sup_config_rx).await {
-        // Check if there are no remnant child processes after previous run.
-        // If so, just kill them all.
-        kill_all_processes(&supervisor.babel_path.to_string_lossy(), vec![], true);
+        // Check if there are no babel after previous run.
+        // If so, just kill it.
+        kill_process_by_name(&supervisor.babel_path.to_string_lossy(), vec![]);
+
         supervisor.run_babel(run, babel_change_rx).await;
     }
 }

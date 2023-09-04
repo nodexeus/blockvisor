@@ -1,3 +1,4 @@
+use crate::utils::gracefully_terminate_process;
 /// Jobs Manager consists of two parts:
 /// .1 Client - allow asynchronous operations on jobs: start, stop and get status
 /// .2 Monitor - background worker that monitor job runners and take proper actions when some job runner ends
@@ -7,14 +8,14 @@ use crate::{
     babel_service::JobRunnerLock,
     jobs,
     jobs::{Job, JobState, Jobs, JobsData, JobsRegistry, CONFIG_SUBDIR, STATUS_SUBDIR},
-    utils::{find_processes, kill_all_processes},
+    utils::find_processes,
 };
 use async_trait::async_trait;
-use babel_api::engine::{JobConfig, JobStatus, RestartPolicy};
+use babel_api::engine::{JobConfig, JobStatus, RestartPolicy, DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS};
 use bv_utils::run_flag::RunFlag;
 use eyre::{bail, Context, ContextCompat, Report, Result};
 use futures::{stream::FuturesUnordered, StreamExt};
-use std::{collections::HashMap, fs, fs::read_dir, path::Path, sync::Arc};
+use std::{collections::HashMap, fs, fs::read_dir, path::Path, sync::Arc, time::Duration};
 use sysinfo::{Pid, PidExt, Process, System, SystemExt};
 use tokio::{
     select,
@@ -22,10 +23,18 @@ use tokio::{
 };
 use tracing::{debug, error, info};
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum JobsManagerState {
+    NotReady,
+    Ready,
+    Shutdown,
+}
+
 pub fn create(
     jobs_dir: &Path,
     job_runner_lock: JobRunnerLock,
     job_runner_bin_path: &Path,
+    state: JobsManagerState,
 ) -> Result<(Client, Manager)> {
     let jobs_config_dir = jobs_dir.join(CONFIG_SUBDIR);
     if !jobs_config_dir.exists() {
@@ -37,17 +46,20 @@ pub fn create(
     }
     let jobs_registry = Arc::new(Mutex::new(load_jobs(jobs_dir, job_runner_bin_path)?));
     let (job_added_tx, job_added_rx) = watch::channel(());
+    let (jobs_manager_state_tx, jobs_manager_state_rx) = watch::channel(state);
+
     Ok((
         Client {
             jobs_registry: jobs_registry.clone(),
-            job_runner_bin_path: job_runner_bin_path.to_string_lossy().to_string(),
             job_added_tx,
+            jobs_manager_state_tx,
         },
         Manager {
             jobs_registry,
             job_runner_lock,
             job_runner_bin_path: job_runner_bin_path.to_string_lossy().to_string(),
             job_added_rx,
+            jobs_manager_state_rx,
         },
     ))
 }
@@ -104,6 +116,9 @@ fn load_jobs(jobs_dir: &Path, job_runner_bin_path: &Path) -> Result<Jobs> {
 
 #[async_trait]
 pub trait JobsManagerClient {
+    async fn startup(&self) -> Result<()>;
+    async fn active_jobs_shutdown_timeout(&self) -> Duration;
+    async fn shutdown(&self) -> Result<()>;
     async fn list(&self) -> Result<Vec<(String, JobStatus)>>;
     async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
     async fn stop(&self, name: &str) -> Result<()>;
@@ -112,12 +127,46 @@ pub trait JobsManagerClient {
 
 pub struct Client {
     jobs_registry: JobsRegistry,
-    job_runner_bin_path: String,
     job_added_tx: watch::Sender<()>,
+    jobs_manager_state_tx: watch::Sender<JobsManagerState>,
 }
 
 #[async_trait]
 impl JobsManagerClient for Client {
+    async fn startup(&self) -> Result<()> {
+        self.jobs_manager_state_tx.send(JobsManagerState::Ready)?;
+        Ok(())
+    }
+
+    async fn active_jobs_shutdown_timeout(&self) -> Duration {
+        let (jobs, _) = &*self.jobs_registry.lock().await;
+        jobs.iter().fold(Duration::default(), |acc, (_, job)| {
+            if let JobState::Active(_) = job.state {
+                acc + Duration::from_secs(
+                    job.config
+                        .shutdown_timeout_secs
+                        .unwrap_or(DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS),
+                )
+            } else {
+                acc
+            }
+        })
+    }
+
+    async fn shutdown(&self) -> Result<()> {
+        // ignore send error since jobs_manager may be already stopped
+        let _ = self.jobs_manager_state_tx.send(JobsManagerState::Shutdown);
+        let (jobs, _) = &mut *self.jobs_registry.lock().await;
+        for (name, job) in jobs {
+            if let JobState::Active(pid) = &mut job.state {
+                terminate_job(name, pid, &job.config)?;
+                // job_runner process has been stopped, but job should be restarted on next jobs manager startup
+                job.state = JobState::Inactive(JobStatus::Running);
+            }
+        }
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<(String, JobStatus)>> {
         let (jobs, _) = &*self.jobs_registry.lock().await;
         let res = jobs
@@ -169,8 +218,8 @@ impl JobsManagerClient for Client {
         let (jobs, jobs_data) = &mut *self.jobs_registry.lock().await;
         if let Some(job) = jobs.get_mut(name) {
             match &mut job.state {
-                JobState::Active(_) => {
-                    kill_all_processes(&self.job_runner_bin_path, vec![name.to_string()], false);
+                JobState::Active(pid) => {
+                    terminate_job(name, pid, &job.config)?;
                     job.state = JobState::Inactive(JobStatus::Stopped);
                 }
                 JobState::Inactive(status) => {
@@ -202,28 +251,50 @@ impl JobsManagerClient for Client {
     }
 }
 
+fn terminate_job(name: &str, pid: &Pid, config: &JobConfig) -> Result<()> {
+    let shutdown_timeout = Duration::from_secs(
+        config
+            .shutdown_timeout_secs
+            .unwrap_or(DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS),
+    );
+    if !gracefully_terminate_process(pid, shutdown_timeout) {
+        bail!("Failed to terminate job_runner for '{name}' job (pid {pid}), timeout expired!");
+    }
+    Ok(())
+}
+
 pub struct Manager {
     jobs_registry: JobsRegistry,
     job_runner_lock: JobRunnerLock,
     job_runner_bin_path: String,
     job_added_rx: watch::Receiver<()>,
+    jobs_manager_state_rx: watch::Receiver<JobsManagerState>,
 }
 
 impl Manager {
     pub async fn run(mut self, mut run: RunFlag) {
         let mut sys = System::new();
-        while run.load() {
+        // do not start any job until jobs manager is ready
+        while run.load() && *self.jobs_manager_state_rx.borrow() == JobsManagerState::NotReady {
+            run.select(self.jobs_manager_state_rx.changed()).await;
+        }
+        while run.load() && *self.jobs_manager_state_rx.borrow() == JobsManagerState::Ready {
             sys.refresh_processes();
             if let Ok(async_pids) = self.update_jobs(sys.processes()).await {
                 if async_pids.is_empty() {
                     // no jobs :( - just wait for job to be added
-                    run.select(self.job_added_rx.changed()).await;
+                    select!(
+                        _ = self.job_added_rx.changed() => {}
+                        _ = self.jobs_manager_state_rx.changed() => {}
+                        _ = run.wait() => {}
+                    );
                 } else {
                     let mut futures: FuturesUnordered<_> =
                         async_pids.iter().map(|a| a.watch()).collect();
                     select!(
                         _ = futures.next() => {}
                         _ = self.job_added_rx.changed() => {}
+                        _ = self.jobs_manager_state_rx.changed() => {}
                         _ = run.wait() => {}
                     );
                 }
@@ -403,6 +474,7 @@ fn deps_finished(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::kill_process_by_name;
     use assert_fs::TempDir;
     use babel_api::engine::{JobType, RestartConfig};
     use std::io::Write;
@@ -437,6 +509,7 @@ mod tests {
                 &jobs_dir,
                 Arc::new(RwLock::new(Some(0))),
                 &test_job_runner_path,
+                JobsManagerState::Ready,
             )?;
             Ok(Self {
                 ctrl_file,
@@ -466,23 +539,22 @@ mod tests {
             Ok(())
         }
 
-        async fn wait_for_job_runner(&self) {
+        async fn wait_for_job_runner(&self) -> Result<()> {
             // asynchronously wait for dummy job_runner to start
-            tokio::time::timeout(Duration::from_secs(3), async {
+            tokio::time::timeout(Duration::from_secs(1), async {
                 while !self.ctrl_file.exists() {
                     tokio::time::sleep(Duration::from_millis(10)).await;
                 }
             })
-            .await
-            .unwrap();
+            .await?;
+            Ok(())
         }
 
         fn kill_job(&self, name: &str) {
-            kill_all_processes(
-                &self.test_job_runner_path.to_string_lossy(),
+            kill_process_by_name(
+                &self.test_job_runner_path.to_owned().to_string_lossy(),
                 vec![name.to_string()],
-                false,
-            );
+            )
         }
     }
 
@@ -490,6 +562,7 @@ mod tests {
         JobConfig {
             job_type: JobType::RunSh("".to_string()),
             restart: RestartPolicy::Never,
+            shutdown_timeout_secs: None,
             needs: None,
         }
     }
@@ -546,6 +619,7 @@ mod tests {
                 JobConfig {
                     job_type: JobType::RunSh("different".to_string()),
                     restart: RestartPolicy::Never,
+                    shutdown_timeout_secs: None,
                     needs: Some(vec![]),
                 },
             )
@@ -621,7 +695,7 @@ mod tests {
         let mut job = Command::new(&test_env.test_job_runner_path)
             .args(["active_job"])
             .spawn()?;
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
         let invalid_config_path = test_env.jobs_config_dir.join("invalid.cfg");
         {
             // create invalid config file to make sure it won't crash load and is removed after
@@ -668,6 +742,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_monitor_job_shutdown() -> Result<()> {
+        let mut test_env = TestEnv::setup()?;
+        test_env
+            .client
+            .start("test_job", dummy_job_config())
+            .await?;
+        test_env.create_infinite_job_runner()?;
+
+        test_env
+            .client
+            .jobs_manager_state_tx
+            .send(JobsManagerState::NotReady)?;
+        let monitor_handle = test_env.spawn_monitor();
+
+        assert_eq!(
+            JobStatus::Pending,
+            test_env.client.status("test_job").await?
+        );
+
+        let _ = test_env.wait_for_job_runner().await.unwrap_err();
+        test_env.client.startup().await?;
+        test_env.wait_for_job_runner().await?;
+
+        assert_eq!(
+            JobStatus::Running,
+            test_env.client.status("test_job").await?
+        );
+        test_env.client.shutdown().await?;
+
+        monitor_handle.await?;
+
+        let mut sys = System::new();
+        sys.refresh_processes();
+        let ps = sys.processes();
+        assert!(find_processes(
+            &test_env.test_job_runner_path.to_string_lossy(),
+            vec!["test_job".to_string()],
+            ps
+        )
+        .next()
+        .is_none());
+        assert_eq!(
+            JobStatus::Running,
+            test_env.client.status("test_job").await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_monitor_missing_job_runner() -> Result<()> {
         let mut test_env = TestEnv::setup()?;
         test_env
@@ -707,6 +831,7 @@ mod tests {
                 JobConfig {
                     job_type: JobType::RunSh("".to_string()),
                     restart: RestartPolicy::Never,
+                    shutdown_timeout_secs: None,
                     needs: Some(vec!["invalid_dependency".to_string()]),
                 },
             )
@@ -722,13 +847,14 @@ mod tests {
                 JobConfig {
                     job_type: JobType::RunSh("".to_string()),
                     restart: RestartPolicy::Never,
+                    shutdown_timeout_secs: None,
                     needs: Some(vec!["test_job".to_string()]),
                 },
             )
             .await?;
 
         let monitor_handle = test_env.spawn_monitor();
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Finished {
@@ -758,7 +884,7 @@ mod tests {
         fs::remove_file(&test_env.ctrl_file)?;
         test_env.kill_job("test_job");
 
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Finished {
@@ -795,6 +921,7 @@ mod tests {
                 JobConfig {
                     job_type: JobType::RunSh("".to_string()),
                     restart: RestartPolicy::Never,
+                    shutdown_timeout_secs: None,
                     needs: Some(vec!["failed_job".to_string()]),
                 },
             )
@@ -817,7 +944,7 @@ mod tests {
         );
 
         let monitor_handle = test_env.spawn_monitor();
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Finished {
@@ -850,7 +977,7 @@ mod tests {
             .client
             .start("test_job", dummy_job_config())
             .await?;
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Running,
@@ -870,11 +997,12 @@ mod tests {
                         backoff_base_ms: 0,
                         max_retries: None,
                     }),
+                    shutdown_timeout_secs: None,
                     needs: None,
                 },
             )
             .await?;
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Finished {
@@ -891,7 +1019,7 @@ mod tests {
 
         fs::remove_file(&test_env.ctrl_file)?;
         test_env.kill_job("test_restarting_job");
-        test_env.wait_for_job_runner().await;
+        test_env.wait_for_job_runner().await?;
 
         assert_eq!(
             JobStatus::Running,

@@ -1,3 +1,4 @@
+use crate::node_connection::RPC_REQUEST_TIMEOUT;
 use crate::{
     babel_engine,
     babel_engine::NodeInfo,
@@ -268,14 +269,9 @@ impl<P: Pal + Debug> Node<P> {
 
         // setup babel
         let babel_client = self.babel_engine.node_connection.babel_client().await?;
-        match babel_client
+        babel_client
             .setup_babel((id.to_string(), self.metadata.babel_config.clone()))
-            .await
-        {
-            Ok(_) => {}
-            Err(e) if e.code() == tonic::Code::AlreadyExists => {}
-            Err(e) => bail!(e),
-        }
+            .await?;
 
         if !self.data.initialized {
             // setup firewall, but only once
@@ -336,7 +332,7 @@ impl<P: Pal + Debug> Node<P> {
             NodeStatus::Stopped => {
                 self.recovery_counters.stop += 1;
                 info!("Recovery: stopping node with ID `{id}`");
-                if let Err(e) = self.stop().await {
+                if let Err(e) = self.stop(false).await {
                     warn!("Recovery: stopping node with ID `{id}` failed: {e}");
                     if self.recovery_counters.stop >= MAX_STOP_TRIES {
                         error!("Recovery: retries count exceeded, mark as failed");
@@ -433,7 +429,7 @@ impl<P: Pal + Debug> Node<P> {
                 info!("Recovery: restart broken node with ID `{id}`");
 
                 self.recovery_counters.stop += 1;
-                if let Err(e) = self.stop().await {
+                if let Err(e) = self.stop(true).await {
                     warn!("Recovery: stopping node with ID `{id}` failed: {e}");
                     if self.recovery_counters.stop >= MAX_STOP_TRIES {
                         error!("Recovery: retries count exceeded, mark as failed");
@@ -464,7 +460,16 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Stops the running node.
     #[instrument(skip(self))]
-    pub async fn stop(&mut self) -> Result<()> {
+    pub async fn stop(&mut self, force: bool) -> Result<()> {
+        if !force {
+            let babel_client = self.babel_engine.node_connection.babel_client().await?;
+            let timeout = with_retry!(babel_client.get_babel_shutdown_timeout(()))?.into_inner();
+            if let Err(err) = with_retry!(
+                babel_client.shutdown_babel(with_timeout((), timeout + RPC_REQUEST_TIMEOUT))
+            ) {
+                bail!("Failed to gracefully shutdown babel and background jobs: {err:#}");
+            }
+        }
         match self.machine.state() {
             pal::VmState::SHUTOFF => {}
             pal::VmState::RUNNING => {

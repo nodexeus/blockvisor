@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use babel_api::engine::{JobStatus, RestartPolicy};
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
 use eyre::Result;
+use std::time::Duration;
 use std::{path::Path, process::Stdio};
 use tokio::process::Command;
 use tracing::info;
@@ -19,6 +20,7 @@ use tracing::info;
 pub struct RunShJob<T> {
     sh_body: String,
     restart_policy: RestartPolicy,
+    shutdown_timeout: Duration,
     timer: T,
     log_buffer: LogBuffer,
 }
@@ -28,11 +30,13 @@ impl<T: AsyncTimer + Send> RunShJob<T> {
         timer: T,
         sh_body: String,
         restart_policy: RestartPolicy,
+        shutdown_timeout: Duration,
         log_buffer: LogBuffer,
     ) -> Result<Self> {
         Ok(Self {
             sh_body,
             restart_policy,
+            shutdown_timeout,
             timer,
             log_buffer,
         })
@@ -42,7 +46,7 @@ impl<T: AsyncTimer + Send> RunShJob<T> {
         // Check if there are no remnant child process after previous run.
         // If so, just kill it.
         let (cmd, args) = utils::bv_shell(&self.sh_body);
-        utils::kill_all_processes(&cmd, args, true);
+        utils::kill_all_processes(&cmd, args, Some(self.shutdown_timeout));
         <Self as JobRunner>::run(self, run, name, jobs_dir).await;
     }
 }
@@ -52,9 +56,11 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for RunShJob<T> {
     /// Run and restart job child process until `backoff.stopped` return `JobStatus` or job runner
     /// is stopped explicitly.  
     async fn try_run_job(self, mut run: RunFlag, name: &str) -> Result<(), JobStatus> {
-        let (cmd, args) = utils::bv_shell(&self.sh_body);
-        let mut cmd = Command::new(cmd);
-        cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+        let (cmd_name, args) = utils::bv_shell(&self.sh_body);
+        let mut cmd = Command::new(cmd_name.clone());
+        cmd.args(args.clone())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         let mut backoff = JobBackoff::new(self.timer, run.clone(), &self.restart_policy);
         while run.load() {
             backoff.start();
@@ -70,7 +76,7 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for RunShJob<T> {
                             .await?;
                     } else {
                         info!("Job runner requested to stop, killing job '{name}'");
-                        let _ = child.kill().await;
+                        utils::kill_all_processes(&cmd_name, args.clone(), None);
                     }
                 }
                 Err(err) => {
@@ -128,6 +134,7 @@ mod tests {
                 backoff_base_ms: 100,
                 max_retries: Some(3),
             }),
+            Duration::from_secs(3),
             log_buffer,
         )?
         .run(test_run, &job_name, &jobs_dir)

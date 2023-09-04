@@ -509,7 +509,7 @@ impl<P: Pal + Debug> Nodes<P> {
 
     async fn node_stop(&self, node: &mut Node<P>, force: bool) -> Result<()> {
         if NodeStatus::Stopped != node.expected_status() || force {
-            node.stop().await?;
+            node.stop(force).await?;
             debug!("Node stopped");
             node.set_expected_status(NodeStatus::Stopped).await?;
             node.set_started_at(None).await?;
