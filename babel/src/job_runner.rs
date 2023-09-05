@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use babel_api::engine::{JobStatus, RestartConfig, RestartPolicy};
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_json::json;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -52,11 +53,12 @@ pub struct TransferConfig {
     pub max_buffer_size: usize,
     pub max_retries: u32,
     pub backoff_base_ms: u64,
+    pub parts_file_path: PathBuf,
     pub progress_file_path: PathBuf,
 }
 
 impl TransferConfig {
-    pub fn new(progress_file_path: PathBuf) -> eyre::Result<Self> {
+    pub fn new(parts_file_path: PathBuf, progress_file_path: PathBuf) -> eyre::Result<Self> {
         let max_opened_files = usize::try_from(rlimit::increase_nofile_limit(MAX_OPENED_FILES)?)?;
         Ok(Self {
             max_opened_files,
@@ -64,14 +66,15 @@ impl TransferConfig {
             max_buffer_size: MAX_BUFFER_SIZE,
             max_retries: MAX_RETRIES,
             backoff_base_ms: BACKOFF_BASE_MS,
+            parts_file_path,
             progress_file_path,
         })
     }
 }
 
-pub fn read_progress_data<T: DeserializeOwned + Default>(progress_file_path: &Path) -> T {
-    if progress_file_path.exists() {
-        fs::read_to_string(progress_file_path)
+pub fn read_parts_data<T: DeserializeOwned + Default>(parts_file_path: &Path) -> T {
+    if parts_file_path.exists() {
+        fs::read_to_string(parts_file_path)
             .and_then(|json| Ok(serde_json::from_str(&json)?))
             .unwrap_or_default()
     } else {
@@ -79,14 +82,28 @@ pub fn read_progress_data<T: DeserializeOwned + Default>(progress_file_path: &Pa
     }
 }
 
-pub fn write_progress_data<T: Serialize>(
+pub fn write_parts_data<T: Serialize>(parts_file_path: &Path, parts_data: &T) -> eyre::Result<()> {
+    Ok(fs::write(
+        parts_file_path,
+        serde_json::to_string(parts_data)?,
+    )?)
+}
+
+pub fn write_progress_data(
     progress_file_path: &Path,
-    progress_data: &T,
+    total: usize,
+    current: usize,
 ) -> eyre::Result<()> {
     Ok(fs::write(
         progress_file_path,
-        serde_json::to_string(progress_data)?,
+        json!({"total": total, "current": current}).to_string(),
     )?)
+}
+
+pub fn cleanup_parts_data(parts_file_path: &Path) {
+    if let Err(err) = fs::remove_file(parts_file_path) {
+        warn!("failed to remove parts metadata file, after finished data transfer: {err:#}");
+    }
 }
 
 pub fn cleanup_progress_data(progress_file_path: &Path) {

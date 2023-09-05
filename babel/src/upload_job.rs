@@ -3,8 +3,8 @@
 /// `RestartPolicy`, with exponential backoff timeout and max retries (if configured).
 /// Backoff timeout and retry count are reset if upload continue without errors for at least `backoff_timeout_ms`.
 use crate::job_runner::{
-    cleanup_progress_data, read_progress_data, write_progress_data, JobBackoff, JobRunner,
-    JobRunnerImpl, TransferConfig,
+    cleanup_parts_data, read_parts_data, write_parts_data, JobBackoff, JobRunner, JobRunnerImpl,
+    TransferConfig,
 };
 use async_trait::async_trait;
 use babel_api::engine::{
@@ -56,7 +56,7 @@ impl<T: AsyncTimer + Send> UploadJob<T> {
     }
 
     pub async fn run(self, run: RunFlag, name: &str, jobs_dir: &Path) -> JobStatus {
-        let progress_file_path = self.uploader.config.progress_file_path.clone();
+        let parts_file_path = self.uploader.config.parts_file_path.clone();
         let job_status = <Self as JobRunner>::run(self, run, name, jobs_dir).await;
         match &job_status {
             JobStatus::Finished {
@@ -68,7 +68,7 @@ impl<T: AsyncTimer + Send> UploadJob<T> {
             }
             JobStatus::Finished { .. } | JobStatus::Stopped => {
                 // job failed or manually stopped - remove both progress metadata
-                cleanup_progress_data(&progress_file_path);
+                cleanup_parts_data(&parts_file_path);
             }
         }
         job_status
@@ -107,12 +107,11 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for UploadJob<T> {
 
 impl Uploader {
     async fn upload(&mut self, mut run: RunFlag) -> Result<()> {
-        let mut manifest =
-            if let Some(manifest) = read_progress_data(&self.config.progress_file_path) {
-                manifest
-            } else {
-                self.prepare_blueprint()?
-            };
+        let mut manifest = if let Some(manifest) = read_parts_data(&self.config.parts_file_path) {
+            manifest
+        } else {
+            self.prepare_blueprint()?
+        };
         let mut parallel_uploaders_run = run.child_flag();
         let mut uploaders = ParallelChunkUploaders::new(
             parallel_uploaders_run.clone(),
@@ -138,7 +137,7 @@ impl Uploader {
                         bail!("internal error - finished upload of chunk that doesn't exists in manifest");
                     };
                     *blueprint = chunk;
-                    write_progress_data(&self.config.progress_file_path, &Some(&manifest))?;
+                    write_parts_data(&self.config.parts_file_path, &Some(&manifest))?;
                 }
                 None => break,
             }
@@ -171,7 +170,7 @@ impl Uploader {
             )
         );
 
-        cleanup_progress_data(&self.config.progress_file_path);
+        cleanup_parts_data(&self.config.parts_file_path);
         Ok(())
     }
 
@@ -485,6 +484,7 @@ mod tests {
 
     struct TestEnv {
         tmp_dir: PathBuf,
+        upload_parts_path: PathBuf,
         upload_progress_path: PathBuf,
         server: MockServer,
     }
@@ -493,10 +493,12 @@ mod tests {
         let tmp_dir = TempDir::new()?.to_path_buf();
         dummy_sources(&tmp_dir)?;
         let server = MockServer::start();
-        let upload_progress_path = tmp_dir.join("upload.parts");
+        let upload_parts_path = tmp_dir.join("upload.parts");
+        let upload_progress_path = tmp_dir.join("upload.progress");
         Ok(TestEnv {
             tmp_dir,
             server,
+            upload_parts_path,
             upload_progress_path,
         })
     }
@@ -523,6 +525,7 @@ mod tests {
                         max_buffer_size: 50,
                         max_retries: 0,
                         backoff_base_ms: 1,
+                        parts_file_path: self.upload_parts_path.clone(),
                         progress_file_path: self.upload_progress_path.clone(),
                     },
                 },
@@ -723,7 +726,7 @@ mod tests {
             4, 20, 229, 205, 55, 90, 194, 137, 167, 103, 54, 187, 43,
         ]);
         chunk_b.url.clear();
-        write_progress_data(&job.uploader.config.progress_file_path, &Some(&progress))?;
+        write_parts_data(&job.uploader.config.parts_file_path, &Some(&progress))?;
 
         assert_eq!(
             JobStatus::Finished {
@@ -732,7 +735,7 @@ mod tests {
             },
             job.run(RunFlag::default(), "name", &test_env.tmp_dir).await
         );
-        assert!(!test_env.upload_progress_path.exists());
+        assert!(!test_env.upload_parts_path.exists());
         Ok(())
     }
 
@@ -780,7 +783,7 @@ mod tests {
                 url: "url.m".to_string(),
             },
         };
-        fs::write(&test_env.upload_progress_path, r#"["key"]"#)?;
+        fs::write(&test_env.upload_parts_path, r#"["key"]"#)?;
         assert_eq!(
             JobStatus::Finished {
                 exit_code: Some(-1),
@@ -793,7 +796,7 @@ mod tests {
                 .run(RunFlag::default(), "name", &test_env.tmp_dir)
                 .await
         );
-        assert!(!test_env.upload_progress_path.exists());
+        assert!(!test_env.upload_parts_path.exists());
         Ok(())
     }
 
