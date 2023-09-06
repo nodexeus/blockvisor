@@ -6,12 +6,15 @@ use crate::utils::gracefully_terminate_process;
 use crate::{
     async_pid_watch::AsyncPidWatch,
     babel_service::JobRunnerLock,
+    job_runner::read_progress_data,
     jobs,
     jobs::{Job, JobState, Jobs, JobsData, JobsRegistry, CONFIG_SUBDIR, STATUS_SUBDIR},
     utils::find_processes,
 };
 use async_trait::async_trait;
-use babel_api::engine::{JobConfig, JobStatus, RestartPolicy, DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS};
+use babel_api::engine::{
+    JobConfig, JobProgress, JobStatus, RestartPolicy, DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS,
+};
 use bv_utils::run_flag::RunFlag;
 use eyre::{bail, Context, ContextCompat, Report, Result};
 use futures::{stream::FuturesUnordered, StreamExt};
@@ -123,6 +126,7 @@ pub trait JobsManagerClient {
     async fn start(&self, name: &str, config: JobConfig) -> Result<()>;
     async fn stop(&self, name: &str) -> Result<()>;
     async fn status(&self, name: &str) -> Result<JobStatus>;
+    async fn progress(&self, name: &str) -> Result<JobProgress>;
 }
 
 pub struct Client {
@@ -255,6 +259,16 @@ impl JobsManagerClient for Client {
                 JobStatus::Running
             },
         )
+    }
+
+    async fn progress(&self, name: &str) -> Result<JobProgress> {
+        let (jobs, jobs_data) = &*self.jobs_registry.lock().await;
+        let progress = if jobs.contains_key(name) {
+            read_progress_data(&jobs_data.jobs_status_dir)
+        } else {
+            bail!("unknown progress, job '{name}' not found")
+        };
+        Ok(progress)
     }
 }
 

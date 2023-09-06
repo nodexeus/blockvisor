@@ -3,10 +3,9 @@ use crate::{
     utils::{Backoff, LimitStatus},
 };
 use async_trait::async_trait;
-use babel_api::engine::{JobStatus, RestartConfig, RestartPolicy};
+use babel_api::engine::{JobProgress, JobStatus, RestartConfig, RestartPolicy};
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::json;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -82,6 +81,15 @@ pub fn read_parts_data<T: DeserializeOwned + Default>(parts_file_path: &Path) ->
     }
 }
 
+pub fn read_progress_data(progress_file_path: &Path) -> JobProgress {
+    if progress_file_path.exists() {
+        fs::read_to_string(progress_file_path)
+            .and_then(|json| Ok(serde_json::from_str(&json)?))
+            .unwrap_or_default()
+    } else {
+        Default::default()
+    }
+}
 pub fn write_parts_data<T: Serialize>(parts_file_path: &Path, parts_data: &T) -> eyre::Result<()> {
     Ok(fs::write(
         parts_file_path,
@@ -89,14 +97,10 @@ pub fn write_parts_data<T: Serialize>(parts_file_path: &Path, parts_data: &T) ->
     )?)
 }
 
-pub fn write_progress_data(
-    progress_file_path: &Path,
-    total: usize,
-    current: usize,
-) -> eyre::Result<()> {
+pub fn write_progress_data(progress_file_path: &Path, progress: &JobProgress) -> eyre::Result<()> {
     Ok(fs::write(
         progress_file_path,
-        json!({"total": total, "current": current}).to_string(),
+        serde_json::to_string(progress)?,
     )?)
 }
 

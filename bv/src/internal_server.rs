@@ -26,6 +26,7 @@ trait Service {
     fn delete_node(id: Uuid);
     fn get_node_jobs(id: Uuid) -> Vec<(String, babel_api::engine::JobStatus)>;
     fn get_node_job_status(id: Uuid, job_name: String) -> babel_api::engine::JobStatus;
+    fn get_node_job_progress(id: Uuid, job_name: String) -> babel_api::engine::JobProgress;
     fn stop_node_job(id: Uuid, job_name: String);
     fn get_node_logs(id: Uuid) -> Vec<String>;
     fn get_babel_logs(id: Uuid, max_lines: u32) -> Vec<String>;
@@ -206,6 +207,21 @@ where
             .await
             .map_err(|e| Status::unknown(format!("{e:#}")))?;
         Ok(Response::new(status))
+    }
+
+    #[instrument(skip(self))]
+    async fn get_node_job_progress(
+        &self,
+        request: Request<(Uuid, String)>,
+    ) -> Result<Response<babel_api::engine::JobProgress>, Status> {
+        status_check().await?;
+        let (id, job_name) = request.into_inner();
+        let progress = self
+            .nodes
+            .job_progress(id, &job_name)
+            .await
+            .map_err(|e| Status::unknown(format!("{e:#}")))?;
+        Ok(Response::new(progress))
     }
 
     #[instrument(skip(self))]

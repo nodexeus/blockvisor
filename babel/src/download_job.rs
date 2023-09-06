@@ -11,7 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use babel_api::engine::{
-    Checksum, Chunk, DownloadManifest, FileLocation, JobStatus, RestartPolicy,
+    Checksum, Chunk, DownloadManifest, FileLocation, JobProgress, JobStatus, RestartPolicy,
 };
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer, with_retry};
 use eyre::{anyhow, bail, ensure, Context, Result};
@@ -520,8 +520,11 @@ impl Writer {
                 write_parts_data(&self.parts_file_path, &self.downloaded_chunks)?;
                 write_progress_data(
                     &self.progress_file_path,
-                    self.total_chunks_count,
-                    self.downloaded_chunks.len(),
+                    &JobProgress {
+                        total: self.total_chunks_count,
+                        current: self.downloaded_chunks.len(),
+                        message: "".to_string(),
+                    },
                 )?;
             }
         }

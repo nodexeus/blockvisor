@@ -9,7 +9,7 @@ use tracing::log::Level;
 
 pub const DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS: u64 = 60;
 
-/// Plugin engin must implement this interface, so it can be used by babel plugins.
+/// Plugin engine must implement this interface, so it can be used by babel plugins.
 pub trait Engine {
     /// Start background job with unique name.
     fn start_job(&self, job_name: &str, job_config: JobConfig) -> Result<()>;
@@ -276,6 +276,16 @@ pub enum JobStatus {
     },
     /// Job was explicitly stopped.
     Stopped,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct JobProgress {
+    /// Total amount of units of work to process
+    pub total: usize,
+    /// Amount of currently processed units of work
+    pub current: usize,
+    /// Free form progress message to report to the user
+    pub message: String,
 }
 
 /// Http response.
