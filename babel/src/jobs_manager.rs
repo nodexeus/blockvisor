@@ -264,7 +264,7 @@ impl JobsManagerClient for Client {
     async fn progress(&self, name: &str) -> Result<JobProgress> {
         let (jobs, jobs_data) = &*self.jobs_registry.lock().await;
         let progress = if jobs.contains_key(name) {
-            read_progress_data(&jobs_data.jobs_status_dir)
+            read_progress_data(&jobs_data.jobs_status_dir.join(format!("{name}.progress")))
         } else {
             bail!("unknown progress, job '{name}' not found")
         };
