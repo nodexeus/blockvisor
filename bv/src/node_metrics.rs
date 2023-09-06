@@ -33,6 +33,9 @@ pub struct Metric {
     pub consensus: Option<bool>,
     pub application_status: Option<ApplicationStatus>,
     pub sync_status: Option<SyncStatus>,
+    pub data_sync_progress_total: Option<u32>,
+    pub data_sync_progress_current: Option<u32>,
+    pub data_sync_progress_message: Option<String>,
 }
 
 impl Metrics {
@@ -97,6 +100,7 @@ pub async fn collect_metric<N: NodeConnection>(babel_engine: &mut BabelEngine<N>
         true => timeout(babel_engine.sync_status()).await.ok(),
         false => None,
     };
+    let progress = timeout(babel_engine.job_progress("download")).await.ok();
 
     Metric {
         // these could be optional
@@ -107,6 +111,10 @@ pub async fn collect_metric<N: NodeConnection>(babel_engine: &mut BabelEngine<N>
         sync_status,
         // these are expected in every chain
         application_status: timeout(babel_engine.application_status()).await.ok(),
+        // this could be used to keep track of long download job progress
+        data_sync_progress_total: progress.as_ref().map(|p| p.total as u32),
+        data_sync_progress_current: progress.as_ref().map(|p| p.current as u32),
+        data_sync_progress_message: progress.map(|p| p.message),
     }
 }
 
@@ -143,8 +151,11 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                 let mut metrics = pb::NodeMetrics {
                     height: v.height,
                     block_age: v.block_age,
-                    staking_status: None,
                     consensus: v.consensus,
+                    data_sync_progress_total: v.data_sync_progress_total,
+                    data_sync_progress_current: v.data_sync_progress_current,
+                    data_sync_progress_message: v.data_sync_progress_message,
+                    staking_status: None,
                     application_status: None,
                     sync_status: None,
                 };
