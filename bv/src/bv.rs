@@ -318,15 +318,21 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                 .resolve_id_or_name(&node_id_with_fallback(id_or_name)?)
                 .await?;
             let metrics = client.get_node_metrics(id).await?.into_inner();
-            println!("Block height:   {:>10}", fmt_opt(metrics.height));
-            println!("Block age:      {:>10}", fmt_opt(metrics.block_age));
-            println!("Staking Status: {:>10}", fmt_opt(metrics.staking_status));
-            println!("In consensus:   {:>10}", fmt_opt(metrics.consensus));
+            println!("Block height:   {:>12}", fmt_opt(metrics.height));
+            println!("Block age:      {:>12}", fmt_opt(metrics.block_age));
+            println!("Staking Status: {:>12}", fmt_opt(metrics.staking_status));
+            println!("In consensus:   {:>12}", fmt_opt(metrics.consensus));
             println!(
-                "App Status:     {:>10}",
+                "App Status:     {:>12}",
                 fmt_opt(metrics.application_status)
             );
-            println!("Sync Status:    {:>10}", fmt_opt(metrics.sync_status));
+            println!("Sync Status:    {:>12}", fmt_opt(metrics.sync_status));
+            let progress = format!(
+                "{}/{}",
+                fmt_opt(metrics.data_sync_progress_current),
+                fmt_opt(metrics.data_sync_progress_total)
+            );
+            println!("Data Sync:      {:>12}", progress);
         }
         NodeCommand::Check { id_or_name } => {
             let id = client

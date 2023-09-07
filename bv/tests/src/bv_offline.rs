@@ -148,7 +148,7 @@ async fn test_bv_cmd_node_lifecycle() -> Result<()> {
     test_env.bv_run(&["node", "start", vm_id], "Started node");
 
     println!("query metrics");
-    test_env.bv_run(&["node", "metrics", vm_id], "In consensus:        false");
+    test_env.bv_run(&["node", "metrics", vm_id], "In consensus:          false");
 
     println!("list running node before service restart");
     test_env.bv_run(&["node", "status", vm_id], "Running");
