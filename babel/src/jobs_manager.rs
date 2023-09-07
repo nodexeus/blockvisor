@@ -6,7 +6,6 @@ use crate::utils::gracefully_terminate_process;
 use crate::{
     async_pid_watch::AsyncPidWatch,
     babel_service::JobRunnerLock,
-    job_runner::read_progress_data,
     jobs,
     jobs::{Job, JobState, Jobs, JobsData, JobsRegistry, CONFIG_SUBDIR, STATUS_SUBDIR},
     utils::find_processes,
@@ -264,7 +263,7 @@ impl JobsManagerClient for Client {
     async fn progress(&self, name: &str) -> Result<JobProgress> {
         let (jobs, jobs_data) = &*self.jobs_registry.lock().await;
         let progress = if jobs.contains_key(name) {
-            read_progress_data(&jobs_data.jobs_status_dir.join(format!("{name}.progress")))
+            jobs_data.load_progress(name)
         } else {
             bail!("unknown progress, job '{name}' not found")
         };

@@ -112,8 +112,8 @@ pub async fn collect_metric<N: NodeConnection>(babel_engine: &mut BabelEngine<N>
         // these are expected in every chain
         application_status: timeout(babel_engine.application_status()).await.ok(),
         // this could be used to keep track of long download job progress
-        data_sync_progress_total: progress.as_ref().map(|p| p.total as u32),
-        data_sync_progress_current: progress.as_ref().map(|p| p.current as u32),
+        data_sync_progress_total: progress.as_ref().map(|p| p.total),
+        data_sync_progress_current: progress.as_ref().map(|p| p.current),
         data_sync_progress_message: progress.map(|p| p.message),
     }
 }

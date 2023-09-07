@@ -281,9 +281,9 @@ pub enum JobStatus {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct JobProgress {
     /// Total amount of units of work to process
-    pub total: usize,
+    pub total: u32,
     /// Amount of currently processed units of work
-    pub current: usize,
+    pub current: u32,
     /// Free form progress message to report to the user
     pub message: String,
 }

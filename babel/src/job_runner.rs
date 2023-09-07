@@ -3,7 +3,7 @@ use crate::{
     utils::{Backoff, LimitStatus},
 };
 use async_trait::async_trait;
-use babel_api::engine::{JobProgress, JobStatus, RestartConfig, RestartPolicy};
+use babel_api::engine::{JobStatus, RestartConfig, RestartPolicy};
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -71,9 +71,9 @@ impl TransferConfig {
     }
 }
 
-pub fn read_parts_data<T: DeserializeOwned + Default>(parts_file_path: &Path) -> T {
-    if parts_file_path.exists() {
-        fs::read_to_string(parts_file_path)
+pub fn load_job_data<T: DeserializeOwned + Default>(file_path: &Path) -> T {
+    if file_path.exists() {
+        fs::read_to_string(file_path)
             .and_then(|json| Ok(serde_json::from_str(&json)?))
             .unwrap_or_default()
     } else {
@@ -81,38 +81,16 @@ pub fn read_parts_data<T: DeserializeOwned + Default>(parts_file_path: &Path) ->
     }
 }
 
-pub fn read_progress_data(progress_file_path: &Path) -> JobProgress {
-    if progress_file_path.exists() {
-        fs::read_to_string(progress_file_path)
-            .and_then(|json| Ok(serde_json::from_str(&json)?))
-            .unwrap_or_default()
-    } else {
-        Default::default()
-    }
-}
-pub fn write_parts_data<T: Serialize>(parts_file_path: &Path, parts_data: &T) -> eyre::Result<()> {
-    Ok(fs::write(
-        parts_file_path,
-        serde_json::to_string(parts_data)?,
-    )?)
+pub fn save_job_data<T: Serialize>(file_path: &Path, data: &T) -> eyre::Result<()> {
+    Ok(fs::write(file_path, serde_json::to_string(data)?)?)
 }
 
-pub fn write_progress_data(progress_file_path: &Path, progress: &JobProgress) -> eyre::Result<()> {
-    Ok(fs::write(
-        progress_file_path,
-        serde_json::to_string(progress)?,
-    )?)
-}
-
-pub fn cleanup_parts_data(parts_file_path: &Path) {
-    if let Err(err) = fs::remove_file(parts_file_path) {
-        warn!("failed to remove parts metadata file, after finished data transfer: {err:#}");
-    }
-}
-
-pub fn cleanup_progress_data(progress_file_path: &Path) {
-    if let Err(err) = fs::remove_file(progress_file_path) {
-        warn!("failed to remove progress metadata file, after finished data transfer: {err:#}");
+pub fn cleanup_job_data(file_path: &Path) {
+    if let Err(err) = fs::remove_file(file_path) {
+        warn!(
+            "failed to remove `{}` metadata file, after finished data transfer: {err:#}",
+            file_path.display()
+        );
     }
 }
 

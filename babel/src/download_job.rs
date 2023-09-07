@@ -5,8 +5,8 @@
 use crate::{
     checksum,
     job_runner::{
-        cleanup_parts_data, cleanup_progress_data, read_parts_data, write_parts_data,
-        write_progress_data, JobBackoff, JobRunner, JobRunnerImpl, TransferConfig,
+        cleanup_job_data, load_job_data, save_job_data, JobBackoff, JobRunner, JobRunnerImpl,
+        TransferConfig,
     },
 };
 use async_trait::async_trait;
@@ -67,7 +67,6 @@ impl<T: AsyncTimer + Send> DownloadJob<T> {
     }
 
     pub async fn run(self, run: RunFlag, name: &str, jobs_dir: &Path) -> JobStatus {
-        let progress_file_path = self.downloader.config.progress_file_path.clone();
         let parts_file_path = self.downloader.config.parts_file_path.clone();
         let destination_dir = self.downloader.destination_dir.clone();
         let chunks = self.downloader.manifest.chunks.clone();
@@ -81,9 +80,8 @@ impl<T: AsyncTimer + Send> DownloadJob<T> {
                 // job finished successfully or is going to be continued after restart, so do nothing
             }
             JobStatus::Finished { .. } | JobStatus::Stopped => {
-                // job failed or manually stopped - remove both progress metadata and partially downloaded files
-                cleanup_parts_data(&parts_file_path);
-                cleanup_progress_data(&progress_file_path);
+                // job failed or manually stopped - remove both parts metadata and partially downloaded files
+                cleanup_job_data(&parts_file_path);
                 for chunk in chunks {
                     for destination in chunk.destinations {
                         let _ = fs::remove_file(destination_dir.join(destination.path));
@@ -127,7 +125,7 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for DownloadJob<T> {
 
 impl Downloader {
     async fn download(&mut self, mut run: RunFlag) -> Result<()> {
-        let downloaded_chunks: HashSet<String> = read_parts_data(&self.config.parts_file_path);
+        let downloaded_chunks: HashSet<String> = load_job_data(&self.config.parts_file_path);
         self.check_disk_space(&downloaded_chunks)?;
         let (tx, rx) = mpsc::channel(self.config.max_runners);
         let mut parallel_downloaders_run = run.child_flag();
@@ -165,8 +163,7 @@ impl Downloader {
         if !run.load() {
             bail!("download interrupted");
         }
-        cleanup_parts_data(&self.config.parts_file_path);
-        cleanup_progress_data(&self.config.progress_file_path);
+        cleanup_job_data(&self.config.parts_file_path);
         Ok(())
     }
 
@@ -517,12 +514,12 @@ impl Writer {
             }
             ChunkData::EndOfChunk { key } => {
                 self.downloaded_chunks.insert(key);
-                write_parts_data(&self.parts_file_path, &self.downloaded_chunks)?;
-                write_progress_data(
+                save_job_data(&self.parts_file_path, &self.downloaded_chunks)?;
+                save_job_data(
                     &self.progress_file_path,
                     &JobProgress {
-                        total: self.total_chunks_count,
-                        current: self.downloaded_chunks.len(),
+                        total: u32::try_from(self.total_chunks_count)?,
+                        current: u32::try_from(self.downloaded_chunks.len())?,
                         message: "".to_string(),
                     },
                 )?;

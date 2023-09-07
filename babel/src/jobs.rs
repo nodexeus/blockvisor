@@ -1,4 +1,5 @@
-use babel_api::engine::{JobConfig, JobStatus};
+use crate::job_runner::load_job_data;
+use babel_api::engine::{JobConfig, JobProgress, JobStatus};
 use eyre::{Context, Result};
 use std::{
     collections::HashMap,
@@ -23,8 +24,8 @@ pub type Jobs = (HashMap<String, Job>, JobsData);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct JobsData {
-    pub jobs_config_dir: PathBuf,
-    pub jobs_status_dir: PathBuf,
+    jobs_config_dir: PathBuf,
+    jobs_status_dir: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -79,6 +80,11 @@ pub fn status_file_path(name: &str, jobs_status_dir: &Path) -> PathBuf {
     jobs_status_dir.join(filename)
 }
 
+pub fn progress_file_path(name: &str, jobs_status_dir: &Path) -> PathBuf {
+    let filename = format!("{}.progress", name);
+    jobs_status_dir.join(filename)
+}
+
 impl JobsData {
     pub fn new(jobs_dir: &Path) -> Self {
         Self {
@@ -101,5 +107,9 @@ impl JobsData {
 
     pub fn load_status(&self, name: &str) -> Result<JobStatus> {
         load_status(&status_file_path(name, &self.jobs_status_dir))
+    }
+
+    pub fn load_progress(&self, name: &str) -> JobProgress {
+        load_job_data(&progress_file_path(name, &self.jobs_status_dir))
     }
 }

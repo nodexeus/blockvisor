@@ -3,7 +3,7 @@
 /// `RestartPolicy`, with exponential backoff timeout and max retries (if configured).
 /// Backoff timeout and retry count are reset if upload continue without errors for at least `backoff_timeout_ms`.
 use crate::job_runner::{
-    cleanup_parts_data, read_parts_data, write_parts_data, JobBackoff, JobRunner, JobRunnerImpl,
+    cleanup_job_data, load_job_data, save_job_data, JobBackoff, JobRunner, JobRunnerImpl,
     TransferConfig,
 };
 use async_trait::async_trait;
@@ -68,7 +68,7 @@ impl<T: AsyncTimer + Send> UploadJob<T> {
             }
             JobStatus::Finished { .. } | JobStatus::Stopped => {
                 // job failed or manually stopped - remove both progress metadata
-                cleanup_parts_data(&parts_file_path);
+                cleanup_job_data(&parts_file_path);
             }
         }
         job_status
@@ -107,7 +107,7 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for UploadJob<T> {
 
 impl Uploader {
     async fn upload(&mut self, mut run: RunFlag) -> Result<()> {
-        let mut manifest = if let Some(manifest) = read_parts_data(&self.config.parts_file_path) {
+        let mut manifest = if let Some(manifest) = load_job_data(&self.config.parts_file_path) {
             manifest
         } else {
             self.prepare_blueprint()?
@@ -137,7 +137,7 @@ impl Uploader {
                         bail!("internal error - finished upload of chunk that doesn't exists in manifest");
                     };
                     *blueprint = chunk;
-                    write_parts_data(&self.config.parts_file_path, &Some(&manifest))?;
+                    save_job_data(&self.config.parts_file_path, &Some(&manifest))?;
                 }
                 None => break,
             }
@@ -170,7 +170,7 @@ impl Uploader {
             )
         );
 
-        cleanup_parts_data(&self.config.parts_file_path);
+        cleanup_job_data(&self.config.parts_file_path);
         Ok(())
     }
 
@@ -726,7 +726,7 @@ mod tests {
             4, 20, 229, 205, 55, 90, 194, 137, 167, 103, 54, 187, 43,
         ]);
         chunk_b.url.clear();
-        write_parts_data(&job.uploader.config.parts_file_path, &Some(&progress))?;
+        save_job_data(&job.uploader.config.parts_file_path, &Some(&progress))?;
 
         assert_eq!(
             JobStatus::Finished {
