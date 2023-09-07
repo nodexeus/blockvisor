@@ -18,7 +18,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Error, Result};
 use babel_api::{
-    engine::{HttpResponse, JobConfig, JobStatus, JobType, JrpcRequest, RestRequest, ShResponse},
+    engine::{
+        HttpResponse, JobConfig, JobProgress, JobStatus, JobType, JrpcRequest, RestRequest,
+        ShResponse,
+    },
     metadata::KeysConfig,
     plugin::{ApplicationStatus, Plugin, StakingStatus, SyncStatus},
 };
@@ -255,6 +258,13 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         let babel_client = self.node_connection.babel_client().await?;
         let status = with_retry!(babel_client.job_status(name.to_owned()))?.into_inner();
         Ok(status)
+    }
+
+    /// Returns progress of single job.
+    pub async fn job_progress(&mut self, name: &str) -> Result<JobProgress> {
+        let babel_client = self.node_connection.babel_client().await?;
+        let progress = with_retry!(babel_client.job_progress(name.to_owned()))?.into_inner();
+        Ok(progress)
     }
 
     /// Request to stop given job.
@@ -730,6 +740,7 @@ mod tests {
             ) -> Result<Response<()>, Status>;
             async fn stop_job(&self, request: Request<String>) -> Result<Response<()>, Status>;
             async fn job_status(&self, request: Request<String>) -> Result<Response<JobStatus>, Status>;
+            async fn job_progress(&self, request: Request<String>) -> Result<Response<JobProgress>, Status>;
             async fn get_jobs(&self, request: Request<()>) -> Result<Response<Vec<(String, JobStatus)>>, Status>;
             async fn run_jrpc(
                 &self,

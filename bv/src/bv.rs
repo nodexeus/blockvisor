@@ -223,6 +223,10 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                     let status = client.get_node_job_status((id, name)).await?.into_inner();
                     println!("{status:?}");
                 }
+                JobCommand::Progress { name } => {
+                    let progress = client.get_node_job_progress((id, name)).await?.into_inner();
+                    println!("{progress:?}");
+                }
             }
         }
         NodeCommand::Logs { id_or_name } => {

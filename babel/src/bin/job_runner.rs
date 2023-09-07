@@ -73,6 +73,9 @@ async fn main() -> eyre::Result<()> {
                     jobs::JOBS_DIR
                         .join(jobs::STATUS_SUBDIR)
                         .join(&format!("{job_name}.parts")),
+                    jobs::JOBS_DIR
+                        .join(jobs::STATUS_SUBDIR)
+                        .join(&format!("{job_name}.progress")),
                 )?,
             )?
             .run(run, &job_name, &jobs::JOBS_DIR)
@@ -88,6 +91,9 @@ async fn main() -> eyre::Result<()> {
                     jobs::JOBS_DIR
                         .join(jobs::STATUS_SUBDIR)
                         .join(&format!("{job_name}.parts")),
+                    jobs::JOBS_DIR
+                        .join(jobs::STATUS_SUBDIR)
+                        .join(&format!("{job_name}.progress")),
                 )?,
             )?
             .run(run, &job_name, &jobs::JOBS_DIR)

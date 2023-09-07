@@ -255,6 +255,12 @@ pub enum JobCommand {
         /// Job name.
         name: String,
     },
+
+    /// Get job progress.
+    Progress {
+        /// Job name.
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]

@@ -5,13 +5,13 @@
 use crate::{
     checksum,
     job_runner::{
-        cleanup_progress_data, read_progress_data, write_progress_data, JobBackoff, JobRunner,
-        JobRunnerImpl, TransferConfig,
+        cleanup_job_data, load_job_data, save_job_data, JobBackoff, JobRunner, JobRunnerImpl,
+        TransferConfig,
     },
 };
 use async_trait::async_trait;
 use babel_api::engine::{
-    Checksum, Chunk, DownloadManifest, FileLocation, JobStatus, RestartPolicy,
+    Checksum, Chunk, DownloadManifest, FileLocation, JobProgress, JobStatus, RestartPolicy,
 };
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer, with_retry};
 use eyre::{anyhow, bail, ensure, Context, Result};
@@ -67,7 +67,7 @@ impl<T: AsyncTimer + Send> DownloadJob<T> {
     }
 
     pub async fn run(self, run: RunFlag, name: &str, jobs_dir: &Path) -> JobStatus {
-        let progress_file_path = self.downloader.config.progress_file_path.clone();
+        let parts_file_path = self.downloader.config.parts_file_path.clone();
         let destination_dir = self.downloader.destination_dir.clone();
         let chunks = self.downloader.manifest.chunks.clone();
         let job_status = <Self as JobRunner>::run(self, run, name, jobs_dir).await;
@@ -80,8 +80,8 @@ impl<T: AsyncTimer + Send> DownloadJob<T> {
                 // job finished successfully or is going to be continued after restart, so do nothing
             }
             JobStatus::Finished { .. } | JobStatus::Stopped => {
-                // job failed or manually stopped - remove both progress metadata and partially downloaded files
-                cleanup_progress_data(&progress_file_path);
+                // job failed or manually stopped - remove both parts metadata and partially downloaded files
+                cleanup_job_data(&parts_file_path);
                 for chunk in chunks {
                     for destination in chunk.destinations {
                         let _ = fs::remove_file(destination_dir.join(destination.path));
@@ -125,8 +125,7 @@ impl<T: AsyncTimer + Send> JobRunnerImpl for DownloadJob<T> {
 
 impl Downloader {
     async fn download(&mut self, mut run: RunFlag) -> Result<()> {
-        let downloaded_chunks: HashSet<String> =
-            read_progress_data(&self.config.progress_file_path);
+        let downloaded_chunks: HashSet<String> = load_job_data(&self.config.parts_file_path);
         self.check_disk_space(&downloaded_chunks)?;
         let (tx, rx) = mpsc::channel(self.config.max_runners);
         let mut parallel_downloaders_run = run.child_flag();
@@ -164,7 +163,7 @@ impl Downloader {
         if !run.load() {
             bail!("download interrupted");
         }
-        cleanup_progress_data(&self.config.progress_file_path);
+        cleanup_job_data(&self.config.parts_file_path);
         Ok(())
     }
 
@@ -202,6 +201,8 @@ impl Downloader {
             self.destination_dir.clone(),
             self.config.max_opened_files,
             self.config.progress_file_path.clone(),
+            self.config.parts_file_path.clone(),
+            self.manifest.chunks.len(),
             downloaded_chunks,
         );
         tokio::spawn(writer.run(run.clone()))
@@ -465,6 +466,8 @@ struct Writer {
     rx: mpsc::Receiver<ChunkData>,
     max_opened_files: usize,
     progress_file_path: PathBuf,
+    parts_file_path: PathBuf,
+    total_chunks_count: usize,
     downloaded_chunks: HashSet<String>,
 }
 
@@ -474,6 +477,8 @@ impl Writer {
         destination_dir: PathBuf,
         max_opened_files: usize,
         progress_file_path: PathBuf,
+        parts_file_path: PathBuf,
+        total_chunks_count: usize,
         downloaded_chunks: HashSet<String>,
     ) -> Self {
         Self {
@@ -482,6 +487,8 @@ impl Writer {
             rx,
             max_opened_files,
             progress_file_path,
+            parts_file_path,
+            total_chunks_count,
             downloaded_chunks,
         }
     }
@@ -507,7 +514,15 @@ impl Writer {
             }
             ChunkData::EndOfChunk { key } => {
                 self.downloaded_chunks.insert(key);
-                write_progress_data(&self.progress_file_path, &self.downloaded_chunks)?;
+                save_job_data(&self.parts_file_path, &self.downloaded_chunks)?;
+                save_job_data(
+                    &self.progress_file_path,
+                    &JobProgress {
+                        total: u32::try_from(self.total_chunks_count)?,
+                        current: u32::try_from(self.downloaded_chunks.len())?,
+                        message: "".to_string(),
+                    },
+                )?;
             }
         }
         Ok(())
@@ -569,6 +584,7 @@ mod tests {
 
     struct TestEnv {
         tmp_dir: PathBuf,
+        download_parts_path: PathBuf,
         download_progress_path: PathBuf,
         server: MockServer,
     }
@@ -577,10 +593,12 @@ mod tests {
         let tmp_dir = TempDir::new()?.to_path_buf();
         fs::create_dir_all(&tmp_dir)?;
         let server = MockServer::start();
-        let download_progress_path = tmp_dir.join("download.parts");
+        let download_parts_path = tmp_dir.join("download.parts");
+        let download_progress_path = tmp_dir.join("download.progress");
         Ok(TestEnv {
             tmp_dir,
             server,
+            download_parts_path,
             download_progress_path,
         })
     }
@@ -597,6 +615,7 @@ mod tests {
                         max_buffer_size: 150,
                         max_retries: 0,
                         backoff_base_ms: 1,
+                        parts_file_path: self.download_parts_path.clone(),
                         progress_file_path: self.download_progress_path.clone(),
                     },
                 },
@@ -741,7 +760,8 @@ mod tests {
             [vec![2u8; 300], vec![3u8; 324]].concat(),
             fs::read(test_env.tmp_dir.join("second.file"))?
         );
-        assert!(!test_env.download_progress_path.exists());
+        assert!(!test_env.download_parts_path.exists());
+        assert!(test_env.download_progress_path.exists());
         Ok(())
     }
 
@@ -991,11 +1011,11 @@ mod tests {
         });
 
         // mark first file as downloaded
-        let mut progress = HashSet::new();
-        progress.insert("first_chunk");
+        let mut parts = HashSet::new();
+        parts.insert("first_chunk");
         fs::write(
-            &test_env.download_progress_path,
-            serde_json::to_string(&progress)?,
+            &test_env.download_parts_path,
+            serde_json::to_string(&parts)?,
         )?;
         // partially downloaded second file
         fs::write(&test_env.tmp_dir.join("second.file"), vec![1u8; 55])?;
@@ -1205,22 +1225,25 @@ mod tests {
                 .header("content-type", "application/octet-stream")
                 .body(vec![3u8; 24]);
         });
+
+        let mut job = test_env.download_job(manifest);
+        job.downloader.config.max_runners = 1;
         assert_eq!(
             JobStatus::Finished {
                 exit_code: Some(-1),
                 message: "download_job 'name' failed with: chunk 'second_chunk' download failed: chunk checksum mismatch - expected [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], actual [223, 133, 134, 120, 124, 112, 193, 150, 43, 123, 78, 114, 164, 121, 55, 99, 61, 88, 63, 101]".to_string()
             },
-            test_env
-                .download_job(manifest)
-                .run(RunFlag::default(), "name", &test_env.tmp_dir)
-                .await
+            job.run(RunFlag::default(), "name", &test_env.tmp_dir).await
         );
 
         assert!(!test_env.tmp_dir.join("zero.file").exists());
         assert!(!test_env.tmp_dir.join("first.file").exists());
         assert!(!test_env.tmp_dir.join("second.file").exists());
         assert!(!test_env.tmp_dir.join("third.file").exists());
-        assert!(!test_env.download_progress_path.exists());
+        assert!(!test_env.download_parts_path.exists());
+        assert!(test_env.download_progress_path.exists());
+        let progress = fs::read_to_string(&test_env.download_progress_path).unwrap();
+        assert_eq!(&progress, r#"{"total":2,"current":1,"message":""}"#);
         Ok(())
     }
 }

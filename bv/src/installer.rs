@@ -569,6 +569,10 @@ mod tests {
                 &self,
                 request: tonic::Request<(Uuid, String)>,
             ) -> Result<tonic::Response<babel_api::engine::JobStatus>, tonic::Status>;
+            async fn get_node_job_progress(
+                &self,
+                request: tonic::Request<(Uuid, String)>,
+            ) -> Result<tonic::Response<babel_api::engine::JobProgress>, tonic::Status>;
             async fn stop_node_job(
                 &self,
                 request: tonic::Request<(Uuid, String)>,
