@@ -302,6 +302,12 @@ async fn test_bv_service_e2e() {
         "024262e7a10be0426cda667a29266b46d04a11fc",
         None,
     );
+    println!("check download progress");
+    test_env::bv_run(
+        &["node", "job", &node_id, "progress", "download"],
+        "total: 9, current: 9",
+        None,
+    );
 
     let node_stop = pb::NodeServiceStopRequest {
         id: node_id.clone(),

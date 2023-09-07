@@ -761,6 +761,7 @@ mod tests {
             fs::read(test_env.tmp_dir.join("second.file"))?
         );
         assert!(!test_env.download_parts_path.exists());
+        assert!(test_env.download_progress_path.exists());
         Ok(())
     }
 
@@ -1010,11 +1011,11 @@ mod tests {
         });
 
         // mark first file as downloaded
-        let mut progress = HashSet::new();
-        progress.insert("first_chunk");
+        let mut parts = HashSet::new();
+        parts.insert("first_chunk");
         fs::write(
             &test_env.download_parts_path,
-            serde_json::to_string(&progress)?,
+            serde_json::to_string(&parts)?,
         )?;
         // partially downloaded second file
         fs::write(&test_env.tmp_dir.join("second.file"), vec![1u8; 55])?;
@@ -1224,15 +1225,15 @@ mod tests {
                 .header("content-type", "application/octet-stream")
                 .body(vec![3u8; 24]);
         });
+
+        let mut job = test_env.download_job(manifest);
+        job.downloader.config.max_runners = 1;
         assert_eq!(
             JobStatus::Finished {
                 exit_code: Some(-1),
                 message: "download_job 'name' failed with: chunk 'second_chunk' download failed: chunk checksum mismatch - expected [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], actual [223, 133, 134, 120, 124, 112, 193, 150, 43, 123, 78, 114, 164, 121, 55, 99, 61, 88, 63, 101]".to_string()
             },
-            test_env
-                .download_job(manifest)
-                .run(RunFlag::default(), "name", &test_env.tmp_dir)
-                .await
+            job.run(RunFlag::default(), "name", &test_env.tmp_dir).await
         );
 
         assert!(!test_env.tmp_dir.join("zero.file").exists());
@@ -1240,6 +1241,9 @@ mod tests {
         assert!(!test_env.tmp_dir.join("second.file").exists());
         assert!(!test_env.tmp_dir.join("third.file").exists());
         assert!(!test_env.download_parts_path.exists());
+        assert!(test_env.download_progress_path.exists());
+        let progress = fs::read_to_string(&test_env.download_progress_path).unwrap();
+        assert_eq!(&progress, r#"{"total":2,"current":1,"message":""}"#);
         Ok(())
     }
 }
