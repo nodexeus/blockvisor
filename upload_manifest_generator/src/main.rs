@@ -25,7 +25,7 @@ pub struct CmdArgs {
     #[clap(long, default_value = "us-east-1")]
     pub s3_region: String,
     /// S3 bucket
-    #[clap(long, default_value = "cookbook-dev")]
+    #[clap(long, default_value = "archive")]
     pub s3_bucket: String,
     /// Presigned urls expire time (in seconds).
     #[clap(default_value = "86400")]
