@@ -1,4 +1,4 @@
-use crate::linux_platform::BRIDGE_IFACE;
+use crate::linux_platform::DEFAULT_BRIDGE_IFACE;
 use crate::services::api::{pb, AuthClient, AuthToken};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ pub fn default_blockvisor_port() -> u16 {
 }
 
 pub fn default_iface() -> String {
-    BRIDGE_IFACE.to_string()
+    DEFAULT_BRIDGE_IFACE.to_string()
 }
 
 #[derive(Debug, Clone)]
