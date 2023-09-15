@@ -65,6 +65,7 @@ async fn main() -> Result<()> {
             bv::process_workspace_command(bv_url.clone(), command).await?
         }
         Command::Image { command } => bv::process_image_command(bv_url, command).await?,
+        Command::Cluster { command } => bv::process_cluster_command(bv_url, command).await?,
     }
 
     Ok(())

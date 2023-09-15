@@ -599,6 +599,10 @@ mod tests {
                 &self,
                 request: tonic::Request<Uuid>,
             ) -> Result<tonic::Response<node_metrics::Metric>, tonic::Status>;
+            async fn get_cluster_status(
+                &self,
+                request: tonic::Request<()>,
+            ) -> Result<tonic::Response<String>, tonic::Status>;
         }
     }
 

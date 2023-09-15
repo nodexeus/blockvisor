@@ -1,4 +1,5 @@
 use crate::{
+    cluster,
     config::{Config, SharedConfig},
     hosts::{self, HostMetrics},
     internal_server,
@@ -53,6 +54,7 @@ pub struct BlockvisorD<P> {
     pal: P,
     config: SharedConfig,
     listener: TcpListener,
+    cluster: Option<cluster::ClusterData>,
 }
 
 impl<P> BlockvisorD<P>
@@ -67,10 +69,13 @@ where
         let config = Config::load(&bv_root).await?;
         let url = format!("0.0.0.0:{}", config.blockvisor_port);
         let listener = TcpListener::bind(url).await?;
+        let maybe_cluster = cluster::start_server(&config).await?;
+
         Ok(Self {
             pal,
             config: SharedConfig::new(config, bv_root),
             listener,
+            cluster: maybe_cluster,
         })
     }
 
@@ -111,8 +116,12 @@ where
 
         try_set_bv_status(ServiceStatus::Ok).await;
 
-        let internal_api_server_future =
-            Self::create_internal_api_server(run.clone(), self.listener, nodes.clone());
+        let internal_api_server_future = Self::create_internal_api_server(
+            run.clone(),
+            self.listener,
+            nodes.clone(),
+            self.cluster,
+        );
 
         let (cmd_watch_tx, cmd_watch_rx) = watch::channel(());
         let external_api_client_future = Self::create_external_api_listener(
@@ -158,12 +167,14 @@ where
         mut run: RunFlag,
         listener: TcpListener,
         nodes: Arc<Nodes<P>>,
+        cluster: Option<cluster::ClusterData>,
     ) -> Result<()> {
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(internal_server::service_server::ServiceServer::new(
                 internal_server::State {
                     nodes: nodes.clone(),
+                    cluster,
                 },
             ))
             .serve_with_incoming_shutdown(

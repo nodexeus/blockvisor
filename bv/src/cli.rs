@@ -65,6 +65,13 @@ pub enum Command {
         #[clap(subcommand)]
         command: ImageCommand,
     },
+
+    /// Manage host cluster connections
+    #[clap(alias = "p2p")]
+    Cluster {
+        #[clap(subcommand)]
+        command: ClusterCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -367,6 +374,13 @@ pub enum ImageCommand {
         #[clap(long, default_value = "chains")]
         s3_prefix: String,
     },
+}
+
+#[derive(Subcommand)]
+pub enum ClusterCommand {
+    /// Show host cluster information
+    #[clap(alias = "s")]
+    Status {},
 }
 
 #[derive(ValueEnum, PartialEq, Eq, Clone)]

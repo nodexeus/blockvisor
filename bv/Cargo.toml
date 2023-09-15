@@ -37,6 +37,7 @@ async-trait = "0.1.60"
 babel_api = {version = "*", path = "../babel_api"}
 base64 = "0.21.0"
 cidr-utils = "0.5.10"
+chitchat = {git = "https://github.com/quickwit-oss/chitchat.git", rev = "c939d19"}
 clap = {version = "4.2.4", features = ["derive", "cargo"]}
 cli-table = "0.4"
 crc = "3.0.0"
@@ -46,7 +47,6 @@ firec = {git = "https://github.com/blockjoy/firec.git", rev = "9e488cd"}
 fs_extra = "1.2.0"
 futures-util = "0.3"
 lazy_static = "1.4.0"
-local-ip-address = "0.5.1"
 metrics = "0.20"
 metrics-exporter-prometheus = "0.11.0"
 nu-glob = "0.83.0"
@@ -80,6 +80,7 @@ assert_cmd = "2"
 assert_fs = "1"
 mockito = "1.2.0"
 jsonwebtoken = "8.2.0"
+local-ip-address = "0.5.1"
 mockall = "0.11.3"
 predicates = "2.1.5"
 serial_test = "1"

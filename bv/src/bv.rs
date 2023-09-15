@@ -1,6 +1,6 @@
 use crate::cli::JobCommand;
 use crate::{
-    cli::{ChainCommand, HostCommand, ImageCommand, NodeCommand, WorkspaceCommand},
+    cli::{ChainCommand, ClusterCommand, HostCommand, ImageCommand, NodeCommand, WorkspaceCommand},
     config::{Config, SharedConfig},
     hosts::{self, HostInfo, HostMetrics},
     internal_server,
@@ -538,6 +538,20 @@ pub async fn process_workspace_command(bv_url: String, command: WorkspaceCommand
             workspace::set_active_image(&current_dir, parse_image(&image_id)?)?;
         }
     }
+    Ok(())
+}
+
+pub async fn process_cluster_command(bv_url: String, command: ClusterCommand) -> Result<()> {
+    let mut client = NodeClient::new(bv_url).await?;
+
+    match command {
+        ClusterCommand::Status {} => {
+            let status = client.get_cluster_status(()).await?.into_inner();
+            // TODO: this just is a POC
+            println!("{status}");
+        }
+    }
+
     Ok(())
 }
 

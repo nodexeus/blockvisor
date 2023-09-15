@@ -8,6 +8,7 @@ rust-version.workspace = true
 async-trait = "0.1.60"
 ctrlc = { version = "3.2.4", features = ["termination"] }
 eyre = "0.6.8"
+local-ip-address = "0.5.5"
 mockall = "0.11.3"
 sysinfo = "0.29.2"
 tokio = {version = "1.0", features = ["full"]}
