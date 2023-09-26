@@ -181,6 +181,7 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
             for id_or_name in id_or_names {
                 let id = client.resolve_id_or_name(&id_or_name).await?;
                 client.delete_node(id).await?;
+                let _ = workspace::unset_active_node(&std::env::current_dir()?, id);
                 println!("Deleted node `{id_or_name}`");
             }
         }
