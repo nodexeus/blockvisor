@@ -58,6 +58,21 @@ pub fn set_active_node(path: &Path, id: Uuid, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Unset active node in workspace if it was active previously
+pub fn unset_active_node(path: &Path, id: Uuid) -> Result<()> {
+    let ws_path = path.join(BV_WORKSPACE_FILENAME);
+    let mut workspace: Workspace = serde_json::from_str(&fs::read_to_string(&ws_path)?)?;
+    if let Some(active_node) = workspace.active_node {
+        if active_node.id == id {
+            workspace.active_node = None;
+            fs::write(ws_path, serde_json::to_string(&workspace)?)?;
+            let plugin_link_path = path.join(BABEL_PLUGIN_NAME);
+            let _ = fs::remove_file(plugin_link_path);
+        }
+    }
+    Ok(())
+}
+
 pub fn set_active_image(path: &Path, image: NodeImage) -> Result<()> {
     let ws_path = path.join(BV_WORKSPACE_FILENAME);
     let mut workspace: Workspace = serde_json::from_str(&fs::read_to_string(&ws_path)?)?;
