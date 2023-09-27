@@ -378,7 +378,7 @@ where
         &self,
         id: Uuid,
         node_lock: &RwLock<Node<P>>,
-    ) -> anyhow::Result<NodeDisplayInfo> {
+    ) -> eyre::Result<NodeDisplayInfo> {
         Ok(if let Ok(node) = node_lock.try_read() {
             let status = node.status();
             NodeDisplayInfo {

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use assert_cmd::assert::AssertResult;
 use assert_cmd::Command;
 use async_trait::async_trait;
@@ -13,6 +12,7 @@ use blockvisord::{
     BV_VAR_PATH,
 };
 use bv_utils::{cmd::run_cmd, run_flag::RunFlag};
+use eyre::Result;
 use predicates::prelude::predicate;
 use serde::{Deserialize, Serialize};
 use std::{

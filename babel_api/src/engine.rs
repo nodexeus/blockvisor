@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,

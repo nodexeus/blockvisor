@@ -1,4 +1,3 @@
-use anyhow::Result;
 use blockvisord::{
     config::{Config, SharedConfig},
     internal_server,
@@ -8,6 +7,7 @@ use blockvisord::{
     set_bv_status, ServiceStatus,
 };
 use bv_utils::{logging::setup_logging, run_flag::RunFlag};
+use eyre::Result;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tonic::transport::Server;

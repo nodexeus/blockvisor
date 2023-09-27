@@ -16,7 +16,6 @@ use crate::{
     services::api::ManifestService,
     utils::with_timeout,
 };
-use anyhow::{anyhow, bail, Context, Error, Result};
 use babel_api::{
     engine::{
         HttpResponse, JobConfig, JobProgress, JobStatus, JobType, JrpcRequest, RestRequest,
@@ -26,6 +25,7 @@ use babel_api::{
     plugin::{ApplicationStatus, Plugin, StakingStatus, SyncStatus},
 };
 use bv_utils::{run_flag::RunFlag, with_retry};
+use eyre::{anyhow, bail, Context, Error, Result};
 use futures_util::StreamExt;
 use std::{
     collections::{hash_map::Entry, HashMap},

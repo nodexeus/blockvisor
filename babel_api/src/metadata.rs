@@ -1,5 +1,5 @@
-use anyhow::{bail, Result};
 use cidr_utils::cidr::IpCidr;
+use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

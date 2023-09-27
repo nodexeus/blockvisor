@@ -1,6 +1,6 @@
 use crate::{config::SharedConfig, pal, services};
-use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
+use eyre::{anyhow, bail, Result};
 use metrics::{register_counter, Counter};
 use reqwest::Url;
 use rumqttc::{AsyncClient, Event, EventLoop, Incoming, LastWill, MqttOptions, QoS};

@@ -4,8 +4,8 @@
 /// It defines `Pal` trait which is top level abstraction that contains definitions of sub layers.
 ///
 use crate::{config::SharedConfig, node_data::NodeData};
-use anyhow::Result;
 use async_trait::async_trait;
+use eyre::Result;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt::Debug,

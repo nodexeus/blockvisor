@@ -6,10 +6,10 @@ use crate::{
     pal::{NetInterface, Pal},
     services, BV_VAR_PATH,
 };
-use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use bv_utils::cmd::run_cmd;
 use core::fmt;
+use eyre::{anyhow, bail, Context, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -40,7 +40,7 @@ impl LinuxPlatform {
         )
         .with_context(|| "non canonical current binary path")?
         .parent()
-        .with_context(|| "invalid current binary dir - has no parent")?
+        .ok_or_else(|| anyhow!("invalid current binary dir - has no parent"))?
         .join("../../babel/bin");
         let babel_path = babel_dir.join("babel");
         if !babel_path.exists() {

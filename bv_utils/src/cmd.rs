@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use eyre::{bail, Context, Result};
 use std::{ffi::OsStr, io::BufRead};
 use tokio::process::Command;
 use tracing::info;

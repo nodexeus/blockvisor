@@ -1,6 +1,6 @@
 use crate::linux_platform::DEFAULT_BRIDGE_IFACE;
 use crate::services::api::{pb, AuthClient, AuthToken};
-use anyhow::{Context, Result};
+use eyre::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::{fs, sync::RwLockWriteGuard};

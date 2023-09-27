@@ -3,7 +3,6 @@ use crate::src::utils::{
     test_env::TestEnv,
     token::TokenGenerator,
 };
-use anyhow::{bail, Result};
 use assert_cmd::Command;
 use assert_fs::TempDir;
 use blockvisord::{
@@ -15,6 +14,7 @@ use blockvisord::{
     set_bv_status, utils, ServiceStatus, BV_VAR_PATH,
 };
 use bv_utils::{cmd::run_cmd, run_flag::RunFlag, system::is_process_running};
+use eyre::{bail, Result};
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::{
     sync::Mutex,
@@ -31,7 +31,9 @@ fn test_bv_cli_start_without_init() {
         .env("BV_ROOT", tmp_dir.as_os_str())
         .assert()
         .failure()
-        .stderr("Error: Host is not registered, please run `bvup` first\n");
+        .stderr(predicates::str::contains(
+            "Error: Host is not registered, please run `bvup` first",
+        ));
 }
 
 #[tokio::test]
@@ -635,7 +637,12 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
     for (idx, expected) in expected_updates.iter().enumerate() {
         let actual = &commands_updates.lock().await[idx];
         assert_eq!(&actual.id, expected.0);
-        assert_eq!(actual.response.as_deref(), expected.1);
+        let is_response_ok = match (actual.response.as_deref(), expected.1) {
+            (None, None) => true,
+            (Some(a), Some(e)) => a.contains(e),
+            _ => false,
+        };
+        assert!(is_response_ok);
         assert_eq!(actual.exit_code, expected.2);
     }
     Ok(())

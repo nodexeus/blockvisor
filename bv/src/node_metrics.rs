@@ -6,6 +6,7 @@ use crate::nodes::Nodes;
 use crate::pal::{NodeConnection, Pal};
 use crate::services::api::pb;
 use babel_api::plugin::{ApplicationStatus, StakingStatus, SyncStatus};
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -118,9 +119,9 @@ pub async fn collect_metric<N: NodeConnection>(babel_engine: &mut BabelEngine<N>
     }
 }
 
-async fn timeout<F, T>(fut: F) -> anyhow::Result<T>
+async fn timeout<F, T>(fut: F) -> Result<T>
 where
-    F: std::future::Future<Output = anyhow::Result<T>>,
+    F: std::future::Future<Output = Result<T>>,
 {
     match tokio::time::timeout(TIMEOUT, fut).await {
         Ok(Ok(res)) => Ok(res),

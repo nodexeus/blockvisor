@@ -2,8 +2,8 @@ use crate::{
     services::api::AuthenticatedService,
     {config::SharedConfig, services, services::api::pb},
 };
-use anyhow::{Context, Result};
 use bv_utils::with_retry;
+use eyre::{Context, Result};
 use tonic::transport::Endpoint;
 use uuid::Uuid;
 

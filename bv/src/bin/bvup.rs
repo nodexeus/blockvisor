@@ -1,4 +1,3 @@
-use anyhow::{anyhow, bail, Context, Result};
 use blockvisord::config::SharedConfig;
 use blockvisord::{
     config, config::Config, hosts::HostInfo, linux_platform::bv_root, self_updater,
@@ -7,6 +6,7 @@ use blockvisord::{
 use bv_utils::cmd::{ask_confirm, run_cmd};
 use cidr_utils::cidr::Ipv4Cidr;
 use clap::{crate_version, ArgGroup, Parser};
+use eyre::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 

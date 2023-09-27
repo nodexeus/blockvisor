@@ -4,9 +4,9 @@ use crate::{
     services::api::{pb, AuthToken, AuthenticatedService},
     utils, BV_VAR_PATH,
 };
-use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use bv_utils::{run_flag::RunFlag, timer::AsyncTimer};
+use eyre::{anyhow, Context, Result};
 use std::{
     cmp::Ordering,
     env,
@@ -339,7 +339,7 @@ mod tests {
         };
 
         // no server
-        test_env.updater.get_latest().await.unwrap_err();
+        let _ = test_env.updater.get_latest().await.unwrap_err();
 
         let mut bundles_mock = MockTestBundleService::new();
         bundles_mock
@@ -389,7 +389,7 @@ mod tests {
         let mut server = mockito::Server::new();
 
         // no server
-        test_env
+        let _ = test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await
@@ -413,7 +413,7 @@ mod tests {
         });
         let bundle_server = test_env.start_test_server(bundles_mock);
 
-        test_env
+        let _ = test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await
@@ -421,7 +421,7 @@ mod tests {
 
         let mock = server.mock("GET", "/").with_body("invalid").create();
 
-        test_env
+        let _ = test_env
             .updater
             .download_and_install(bundle_id.clone())
             .await

@@ -1,4 +1,3 @@
-use anyhow::{bail, Result};
 use blockvisord::{
     bv,
     cli::{App, Command},
@@ -8,6 +7,7 @@ use blockvisord::{
 };
 use bv_utils::cmd::run_cmd;
 use clap::Parser;
+use eyre::{bail, Result};
 use tokio::time::{sleep, Duration};
 
 // TODO: use proper wait mechanism

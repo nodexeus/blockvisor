@@ -1,4 +1,4 @@
-use anyhow::Result;
+use eyre::Result;
 use tracing_subscriber::{
     self, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, FmtSubscriber,
 };

@@ -2,8 +2,8 @@ use crate::{
     config::SharedConfig, services, services::api::pb, services::api::AuthenticatedService, utils,
     BV_VAR_PATH,
 };
-use anyhow::{anyhow, Context, Result};
 use bv_utils::with_retry;
+use eyre::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tonic::transport::Endpoint;

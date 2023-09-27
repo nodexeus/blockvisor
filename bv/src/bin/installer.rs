@@ -1,9 +1,9 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use blockvisord::installer;
 use blockvisord::installer::Installer;
 use blockvisord::linux_platform::bv_root;
 use bv_utils::{cmd::run_cmd, logging::setup_logging_with_journald, timer::SysTimer};
+use eyre::Result;
 use tracing::error;
 
 struct SystemCtl;

@@ -7,7 +7,7 @@ use babel_api::{
 };
 use std::{collections::HashMap, fs, path::Path};
 
-pub fn rhai_smoke(path: &Path) -> anyhow::Result<BlockchainMetadata> {
+pub fn rhai_smoke(path: &Path) -> eyre::Result<BlockchainMetadata> {
     let script = fs::read_to_string(path)?;
     let mut babel = utils::MockBabelEngine::new();
     babel.expect_save_data().returning(|_| Ok(()));
