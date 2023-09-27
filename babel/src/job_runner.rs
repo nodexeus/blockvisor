@@ -14,7 +14,7 @@ use std::{
 use tracing::{debug, error, info, warn};
 
 const MAX_OPENED_FILES: u64 = 1024;
-const MAX_RUNNERS: usize = 8;
+const MAX_RUNNERS: usize = 4;
 const MAX_BUFFER_SIZE: usize = 128 * 1024 * 1024;
 const MAX_RETRIES: u32 = 5;
 const BACKOFF_BASE_MS: u64 = 500;
