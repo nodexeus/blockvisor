@@ -1,5 +1,5 @@
 use crate::metadata::BlockchainMetadata;
-use anyhow::Result;
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

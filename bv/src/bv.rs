@@ -14,10 +14,10 @@ use crate::{
     },
     workspace, BV_VAR_PATH,
 };
-use anyhow::{bail, Context, Result};
 use babel_api::engine::JobStatus;
 use bv_utils::cmd::{ask_confirm, run_cmd};
 use cli_table::print_stdout;
+use eyre::{anyhow, bail, Context, Result};
 use petname::Petnames;
 use std::future::Future;
 use std::{
@@ -310,7 +310,7 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                             .unwrap_or_default();
                         bail!("{msg}\n{caps}");
                     }
-                    return Err(anyhow::Error::from(e));
+                    return Err(eyre::Error::from(e));
                 }
             }
         }
@@ -836,7 +836,7 @@ async fn extract_babelsup(target_dir: &Path) -> Result<()> {
     )
     .with_context(|| "non canonical current binary path")?
     .parent()
-    .with_context(|| "invalid current binary dir - has no parent")?
+    .ok_or_else(|| anyhow!("invalid current binary dir - has no parent"))?
     .join("../../babelsup.tar.gz");
     run_cmd(
         "tar",

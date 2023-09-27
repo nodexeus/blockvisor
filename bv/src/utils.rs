@@ -1,5 +1,5 @@
-use anyhow::{bail, Result};
 use bv_utils::cmd::run_cmd;
+use eyre::{bail, Result};
 use rand::Rng;
 use semver::Version;
 use std::cmp::Ordering;

@@ -15,7 +15,6 @@ use crate::{
     utils::with_timeout,
     BV_VAR_PATH,
 };
-use anyhow::{bail, Context, Result};
 use babel_api::{
     babelsup::SupervisorConfig,
     metadata::{firewall, BlockchainMetadata},
@@ -24,6 +23,7 @@ use babel_api::{
 };
 use bv_utils::{cmd::run_cmd, with_retry};
 use chrono::{DateTime, Utc};
+use eyre::{bail, Context, Result};
 use std::{
     ffi::OsStr,
     fmt::Debug,

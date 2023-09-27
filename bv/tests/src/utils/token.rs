@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use eyre::{anyhow, Result};
 use jsonwebtoken as jwt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

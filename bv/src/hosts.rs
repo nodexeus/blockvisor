@@ -2,7 +2,7 @@ use crate::linux_platform::bv_root;
 use crate::services::api::pb;
 use crate::BV_VAR_PATH;
 use crate::{config::SharedConfig, services::api::HostsService};
-use anyhow::{anyhow, Result};
+use eyre::{anyhow, Result};
 use metrics::{register_gauge, Gauge};
 use std::collections::HashMap;
 use sysinfo::{CpuExt, DiskExt, NetworkExt, NetworksExt, System, SystemExt};

@@ -6,8 +6,8 @@ use crate::{
     utils::{get_process_pid, ip_to_mac},
     BV_VAR_PATH,
 };
-use anyhow::{bail, Result};
 use async_trait::async_trait;
+use eyre::{bail, Result};
 use firec::{config::JailerMode, Machine, MachineState};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};

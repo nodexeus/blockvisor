@@ -1,10 +1,10 @@
-use anyhow::{anyhow, bail, Context, Result};
 use babel_api::{
     engine::{JobProgress, JobStatus},
     metadata::{firewall, BlockchainMetadata, Requirements},
     rhai_plugin,
 };
 use chrono::{DateTime, Utc};
+use eyre::{anyhow, bail, Context, Result};
 use futures_util::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -41,11 +41,11 @@ use crate::{
 pub const REGISTRY_CONFIG_FILENAME: &str = "nodes.json";
 const MAX_SUPPORTED_RULES: usize = 128;
 
-fn id_not_found(id: Uuid) -> anyhow::Error {
+fn id_not_found(id: Uuid) -> eyre::Error {
     anyhow!("Node with id `{}` not found", id)
 }
 
-fn name_not_found(name: &str) -> anyhow::Error {
+fn name_not_found(name: &str) -> eyre::Error {
     anyhow!("Node with name `{}` not found", name)
 }
 
@@ -93,9 +93,9 @@ pub enum BabelError {
     #[error("given method not found")]
     MethodNotFound,
     #[error("BV plugin error: {err}")]
-    Plugin { err: anyhow::Error },
+    Plugin { err: eyre::Error },
     #[error("BV internal error: {err}")]
-    Internal { err: anyhow::Error },
+    Internal { err: eyre::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

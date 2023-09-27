@@ -4,9 +4,9 @@ use crate::{
     linux_platform::DEFAULT_BRIDGE_IFACE,
     ServiceStatus,
 };
-use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use async_trait::async_trait;
 use bv_utils::{timer::Timer, with_retry};
+use eyre::{anyhow, bail, ensure, Context, Error, Result};
 use semver::Version;
 use std::{
     io::Write,
@@ -384,7 +384,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
             .status()
             .with_context(|| "failed to launch backup installer")?
             .code()
-            .with_context(|| "failed to get backup installer exit status code")?;
+            .ok_or_else(|| anyhow!("failed to get backup installer exit status code"))?;
         ensure!(
             status_code == 0,
             "backup installer failed with exit code {status_code}"
@@ -512,9 +512,9 @@ mod tests {
     use crate::nodes;
     use crate::utils;
     use crate::utils::tests::test_channel;
-    use anyhow::anyhow;
     use assert_fs::TempDir;
     use bv_utils::timer::MockTimer;
+    use eyre::anyhow;
     use mockall::*;
     use std::ops::Add;
     use std::os::unix::fs::OpenOptionsExt;
@@ -733,7 +733,7 @@ mod tests {
         service_mock.expect_ensure_active().return_once(|| Ok(()));
         let mut installer = test_env.build_installer(timer_mock, service_mock);
         installer.backup_status = BackupStatus::Done(THIS_VERSION.to_owned());
-        installer.prepare_running().await.unwrap_err();
+        let _ = installer.prepare_running().await.unwrap_err();
         server.assert().await;
         Ok(())
     }
@@ -789,7 +789,7 @@ mod tests {
             sleep(Duration::from_millis(10));
         }
 
-        test_env
+        let _ = test_env
             .build_installer(timer_mock, MockTestBvService::new())
             .health_check()
             .await
@@ -832,7 +832,7 @@ mod tests {
         let installer = test_env.build_installer(MockTimer::new(), MockTestBvService::new());
         let bundle_path = test_env.tmp_root.join("bundle");
 
-        installer
+        let _ = installer
             .move_bundle_to_install_path(bundle_path.join("installer"))
             .unwrap_err();
 
@@ -865,11 +865,11 @@ mod tests {
         let test_env = TestEnv::new()?;
         let installer = test_env.build_installer(MockTimer::new(), MockTestBvService::new());
 
-        installer.install_this_version().unwrap_err();
+        let _ = installer.install_this_version().unwrap_err();
 
         let this_path = &installer.paths.this_version;
         fs::create_dir_all(this_path)?;
-        installer.install_this_version().unwrap_err();
+        let _ = installer.install_this_version().unwrap_err();
 
         fs::create_dir_all(this_path.join(BLOCKVISOR_BIN))?;
         fs::create_dir_all(this_path.join(BLOCKVISOR_SERVICES))?;
@@ -879,7 +879,7 @@ mod tests {
         touch_file(&this_path.join(BLOCKVISOR_BIN).join("some_bin"))?;
         touch_file(&this_path.join(BLOCKVISOR_SERVICES).join("some_service"))?;
         touch_file(&this_path.join(FC_BIN).join("firecracker"))?;
-        installer.install_this_version().unwrap_err();
+        let _ = installer.install_this_version().unwrap_err();
 
         fs::create_dir_all(&installer.paths.system_bin)?;
         fs::create_dir_all(&installer.paths.system_services)?;
@@ -907,7 +907,7 @@ mod tests {
         let mut installer = test_env.build_installer(MockTimer::new(), service_mock);
 
         installer.backup_status = BackupStatus::ThisIsRollback;
-        installer
+        let _ = installer
             .handle_broken_installation(anyhow!("error"))
             .await
             .unwrap_err();
@@ -915,7 +915,7 @@ mod tests {
 
         fs::create_dir_all(&installer.paths.install_path)?;
         installer.backup_status = BackupStatus::NothingToBackup;
-        installer
+        let _ = installer
             .handle_broken_installation(anyhow!("error"))
             .await
             .unwrap_err();
@@ -941,7 +941,7 @@ mod tests {
         }
         let _ = fs::remove_file(test_env.tmp_root.join("dummy_installer"));
         installer.backup_status = BackupStatus::Done(THIS_VERSION.to_owned());
-        installer
+        let _ = installer
             .handle_broken_installation(anyhow!("error"))
             .await
             .unwrap_err();
@@ -956,7 +956,7 @@ mod tests {
         let installer = test_env.build_installer(MockTimer::new(), MockTestBvService::new());
 
         // cant cleanup non existing dir nothing
-        installer.cleanup().unwrap_err();
+        let _ = installer.cleanup().unwrap_err();
 
         fs::create_dir_all(&installer.paths.install_path)?;
 

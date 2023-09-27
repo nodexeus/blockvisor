@@ -5,9 +5,9 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-anyhow = "1.0.68"
 async-trait = "0.1.60"
 ctrlc = { version = "3.2.4", features = ["termination"] }
+eyre = "0.6.8"
 mockall = "0.11.3"
 sysinfo = "0.29.2"
 tokio = {version = "1.0", features = ["full"]}

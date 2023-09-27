@@ -8,13 +8,13 @@ use crate::{
     services::api::pb::{Action, ChecksumType, Direction, Protocol, Rule},
     ServiceStatus,
 };
-use anyhow::{anyhow, bail, Context, Result};
 use babel_api::{
     engine::{Checksum, Chunk, Compression, DownloadManifest, FileLocation},
     metadata::firewall,
 };
 use base64::Engine;
 use bv_utils::with_retry;
+use eyre::{anyhow, bail, Context, Result};
 use metrics::{register_counter, Counter};
 use pb::{
     command_service_client::CommandServiceClient, discovery_service_client::DiscoveryServiceClient,
@@ -534,7 +534,7 @@ impl std::fmt::Display for pb::NodeType {
 }
 
 impl std::str::FromStr for pb::NodeType {
-    type Err = anyhow::Error;
+    type Err = eyre::Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let str = format!("NODE_TYPE_{}", s.to_uppercase());
@@ -543,7 +543,7 @@ impl std::str::FromStr for pb::NodeType {
 }
 
 impl TryFrom<Action> for firewall::Action {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(value: Action) -> Result<Self, Self::Error> {
         Ok(match value {
             Action::Unspecified => {
@@ -563,7 +563,7 @@ fn try_action(value: i32) -> Result<firewall::Action> {
 }
 
 impl TryFrom<Direction> for firewall::Direction {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(value: Direction) -> Result<Self, Self::Error> {
         Ok(match value {
             Direction::Unspecified => {
@@ -576,7 +576,7 @@ impl TryFrom<Direction> for firewall::Direction {
 }
 
 impl TryFrom<Protocol> for firewall::Protocol {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(value: Protocol) -> Result<Self, Self::Error> {
         Ok(match value {
             Protocol::Unspecified => bail!("Invalid Protocol"),
@@ -588,7 +588,7 @@ impl TryFrom<Protocol> for firewall::Protocol {
 }
 
 impl TryFrom<Rule> for firewall::Rule {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(rule: Rule) -> Result<Self, Self::Error> {
         let direction = rule.direction().try_into()?;
         let protocol = Some(rule.protocol().try_into()?);
@@ -604,7 +604,7 @@ impl TryFrom<Rule> for firewall::Rule {
 }
 
 impl TryFrom<NodeImage> for pb::ConfigIdentifier {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
 
     fn try_from(image: NodeImage) -> Result<Self, Self::Error> {
         let mut res = Self {
@@ -626,7 +626,7 @@ impl From<pb::compression::Compression> for Compression {
 }
 
 impl TryFrom<pb::DownloadManifest> for DownloadManifest {
-    type Error = anyhow::Error;
+    type Error = eyre::Error;
     fn try_from(manifest: pb::DownloadManifest) -> Result<Self, Self::Error> {
         let compression = if let Some(pb::Compression {
             compression: Some(compression),
@@ -676,7 +676,7 @@ impl TryFrom<pb::DownloadManifest> for DownloadManifest {
     }
 }
 
-fn try_into_array<const S: usize>(vec: Vec<u8>) -> Result<[u8; S], anyhow::Error> {
+fn try_into_array<const S: usize>(vec: Vec<u8>) -> Result<[u8; S]> {
     vec.try_into().map_err(|vec: Vec<u8>| {
         anyhow!(
             "expected {} bytes checksum, but {} bytes found",

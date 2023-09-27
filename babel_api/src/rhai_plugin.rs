@@ -3,7 +3,7 @@ use crate::{
     metadata::{check_metadata, BlockchainMetadata},
     plugin::{ApplicationStatus, Plugin, StakingStatus, SyncStatus},
 };
-use anyhow::{anyhow, bail, Context, Error, Result};
+use eyre::{anyhow, bail, Context, Error, Result};
 use rhai::{
     self,
     serde::{from_dynamic, to_dynamic},
@@ -316,7 +316,7 @@ mod tests {
     use crate::metadata::{
         firewall, BabelConfig, NetConfiguration, NetType, RamdiskConfiguration, Requirements,
     };
-    use anyhow::bail;
+    use eyre::bail;
     use mockall::*;
     use std::path::PathBuf;
 

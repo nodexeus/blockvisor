@@ -12,8 +12,8 @@ use crate::{
     utils::with_jitter,
     ServiceStatus,
 };
-use anyhow::{Context, Result};
 use bv_utils::run_flag::RunFlag;
+use eyre::{Context, Result};
 use metrics::{register_counter, Counter};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::time::Instant;

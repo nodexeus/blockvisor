@@ -7,7 +7,7 @@ use babel_api::{
 use std::{collections::HashMap, fs};
 
 #[test]
-fn test_testing() -> anyhow::Result<()> {
+fn test_testing() -> eyre::Result<()> {
     let mut babel = utils::MockBabelEngine::new();
     babel.expect_save_data().returning(|_| Ok(()));
 
