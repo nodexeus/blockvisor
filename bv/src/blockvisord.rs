@@ -38,6 +38,7 @@ use tracing::{debug, error, info, warn};
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(5);
 const RECOVERY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 const INFO_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
+const CLUSTER_UPDATES_INTERVAL: Duration = Duration::from_secs(30);
 
 lazy_static::lazy_static! {
     pub static ref BV_HOST_METRICS_COUNTER: Counter = register_counter!("bv.periodic.host.metrics.calls");
@@ -48,13 +49,15 @@ lazy_static::lazy_static! {
     pub static ref BV_NODES_METRICS_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.nodes.metrics.ms");
     pub static ref BV_NODES_INFO_COUNTER: Counter = register_counter!("bv.periodic.nodes.info.calls");
     pub static ref BV_NODES_INFO_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.nodes.info.ms");
+    pub static ref BV_CLUSTER_UPDATES_COUNTER: Counter = register_counter!("bv.periodic.cluster.updates.calls");
+    pub static ref BV_CLUSTER_UPDATES_TIME_MS_COUNTER: Counter = register_counter!("bv.periodic.cluster.updates.ms");
 }
 
 pub struct BlockvisorD<P> {
     pal: P,
     config: SharedConfig,
     listener: TcpListener,
-    cluster: Option<cluster::ClusterData>,
+    cluster: Arc<Option<cluster::ClusterData>>,
 }
 
 impl<P> BlockvisorD<P>
@@ -75,7 +78,7 @@ where
             pal,
             config: SharedConfig::new(config, bv_root),
             listener,
-            cluster: maybe_cluster,
+            cluster: Arc::new(maybe_cluster),
         })
     }
 
@@ -120,7 +123,7 @@ where
             run.clone(),
             self.listener,
             nodes.clone(),
-            self.cluster,
+            self.cluster.clone(),
         );
 
         let (cmd_watch_tx, cmd_watch_rx) = watch::channel(());
@@ -132,6 +135,9 @@ where
         );
         let mqtt_notification_future =
             Self::create_commands_listener(run.clone(), cmds_connector, cmd_watch_tx);
+
+        let cluster_updates_future =
+            Self::cluster_updates(run.clone(), nodes.clone(), self.cluster.clone());
 
         let nodes_recovery_future = Self::nodes_recovery(run.clone(), nodes.clone());
 
@@ -152,6 +158,7 @@ where
             internal_api_server_future,
             external_api_client_future,
             mqtt_notification_future,
+            cluster_updates_future,
             nodes_recovery_future,
             node_updates_future,
             node_metrics_future,
@@ -167,15 +174,12 @@ where
         mut run: RunFlag,
         listener: TcpListener,
         nodes: Arc<Nodes<P>>,
-        cluster: Option<cluster::ClusterData>,
+        cluster: Arc<Option<cluster::ClusterData>>,
     ) -> Result<()> {
         Server::builder()
             .max_concurrent_streams(1)
             .add_service(internal_server::service_server::ServiceServer::new(
-                internal_server::State {
-                    nodes: nodes.clone(),
-                    cluster,
-                },
+                internal_server::State { nodes, cluster },
             ))
             .serve_with_incoming_shutdown(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
@@ -250,6 +254,52 @@ where
         }
     }
 
+    /// This task runs periodically to update nodes info in p2p network.
+    async fn cluster_updates(
+        mut run: RunFlag,
+        nodes: Arc<Nodes<P>>,
+        cluster: Arc<Option<cluster::ClusterData>>,
+    ) {
+        while run.load() {
+            let now = Instant::now();
+            if let Some(ref cluster) = *cluster {
+                // collect interesting information about nodes
+                let mut updates = vec![];
+                for (id, node) in nodes.nodes.read().await.iter() {
+                    if let Ok(node) = node.try_read() {
+                        let status = node.status();
+                        let image = node.data.image.clone();
+                        updates.push((node.id(), status, image));
+                    } else {
+                        debug!(
+                            "Skipping node info collection for cluster metadata, node `{id}` busy"
+                        );
+                    }
+                }
+                // just render into string for now
+                match serde_json::to_string(&updates) {
+                    Ok(current_info) => {
+                        let mut cluster_lock = cluster.chitchat.lock().await;
+                        let host_state = cluster_lock.self_node_state();
+                        // update cluster state if old value differs from new
+                        match host_state.get("nodes") {
+                            Some(info) if info == current_info => {}
+                            _ => {
+                                host_state.set("nodes", current_info);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Cannot serialize node updates for cluster: {e:?}");
+                    }
+                }
+            };
+            BV_CLUSTER_UPDATES_COUNTER.increment(1);
+            BV_CLUSTER_UPDATES_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
+            run.select(sleep(CLUSTER_UPDATES_INTERVAL)).await;
+        }
+    }
+    /// This task runs periodically to make sure actual nodes state is equal to expected.
     async fn nodes_recovery(mut run: RunFlag, nodes: Arc<Nodes<P>>) {
         while run.load() {
             let now = Instant::now();
@@ -329,7 +379,7 @@ where
         None
     }
 
-    /// This task runs every minute to aggregate metrics from every node. It will call into the
+    /// This task runs periodically to aggregate metrics from every node. It will call into the
     /// nodes, query their metrics, then send them to blockvisor-api.
     async fn node_metrics(
         mut run: RunFlag,

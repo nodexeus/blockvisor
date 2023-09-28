@@ -44,7 +44,7 @@ trait Service {
 
 pub struct State<P: Pal + Debug> {
     pub nodes: Arc<Nodes<P>>,
-    pub cluster: Option<ClusterData>,
+    pub cluster: Arc<Option<ClusterData>>,
 }
 
 async fn status_check() -> Result<(), Status> {
@@ -357,12 +357,12 @@ where
     #[instrument(skip(self), ret(Debug))]
     async fn get_cluster_status(&self, _request: Request<()>) -> Result<Response<String>, Status> {
         status_check().await?;
-        let status = if let Some(cluster) = &self.cluster {
+        let status = if let Some(ref cluster) = *self.cluster {
             let chitchat = cluster.chitchat.lock().await;
             json!({"cluster_id": chitchat.cluster_id().to_string(),
                 "cluster_state": chitchat.state_snapshot(),
-                "live_nodes": chitchat.live_nodes().cloned().collect::<Vec<_>>(),
-                "dead_nodes": chitchat.dead_nodes().cloned().collect::<Vec<_>>(),
+                "live_hosts": chitchat.live_nodes().cloned().collect::<Vec<_>>(),
+                "dead_hosts": chitchat.dead_nodes().cloned().collect::<Vec<_>>(),
             })
             .to_string()
         } else {

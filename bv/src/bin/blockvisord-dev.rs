@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
         .add_service(internal_server::service_server::ServiceServer::new(
             internal_server::State {
                 nodes,
-                cluster: None,
+                cluster: Arc::new(None),
             },
         ))
         .serve_with_incoming_shutdown(
