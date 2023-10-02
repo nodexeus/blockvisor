@@ -21,7 +21,6 @@ lazy_static::lazy_static! {
     static ref BABEL_CONFIG_PATH: &'static Path = Path::new("/etc/babel.conf");
 }
 const DATA_DRIVE_PATH: &str = "/dev/vdb";
-const SWAP_FILE_PATH: &str = "/swapfile";
 const VSOCK_HOST_CID: u32 = 3;
 const VSOCK_BABEL_PORT: u32 = 42;
 
@@ -163,24 +162,28 @@ impl BabelPal for Pal {
     ///
     /// Based on this tutorial:
     /// https://www.digitalocean.com/community/tutorials/how-to-add-swap-space-on-ubuntu-20-04
-    async fn set_swap_file(&self, swap_size_mb: usize) -> eyre::Result<()> {
+    async fn set_swap_file(
+        &self,
+        swap_size_mb: usize,
+        swap_file_location: &str,
+    ) -> eyre::Result<()> {
         let swappiness = 1;
         let pressure = 50;
-        let _ = run_cmd("swapoff", [SWAP_FILE_PATH]).await;
-        let _ = tokio::fs::remove_file(SWAP_FILE_PATH).await;
+        let _ = run_cmd("swapoff", [swap_file_location]).await;
+        let _ = tokio::fs::remove_file(swap_file_location).await;
         run_cmd(
             "fallocate",
-            ["-l", &format!("{swap_size_mb}MB"), SWAP_FILE_PATH],
+            ["-l", &format!("{swap_size_mb}MB"), swap_file_location],
         )
         .await
         .map_err(|err| anyhow!("fallocate error: {err}"))?;
-        run_cmd("chmod", ["600", SWAP_FILE_PATH])
+        run_cmd("chmod", ["600", swap_file_location])
             .await
             .map_err(|err| anyhow!("chmod error: {err}"))?;
-        run_cmd("mkswap", [SWAP_FILE_PATH])
+        run_cmd("mkswap", [swap_file_location])
             .await
             .map_err(|err| anyhow!("mkswap error: {err}"))?;
-        run_cmd("swapon", [SWAP_FILE_PATH])
+        run_cmd("swapon", [swap_file_location])
             .await
             .map_err(|err| anyhow!("swapon error: {err}"))?;
         run_cmd("sysctl", [&format!("vm.swappiness={swappiness}")])
@@ -192,8 +195,12 @@ impl BabelPal for Pal {
         Ok(())
     }
 
-    async fn is_swap_file_set(&self, _swap_size_mb: usize) -> eyre::Result<bool> {
-        let path = Path::new(SWAP_FILE_PATH);
+    async fn is_swap_file_set(
+        &self,
+        _swap_size_mb: usize,
+        swap_file_location: &str,
+    ) -> eyre::Result<bool> {
+        let path = Path::new(swap_file_location);
         Ok(path.exists())
     }
 

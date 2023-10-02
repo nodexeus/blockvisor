@@ -571,11 +571,19 @@ mod tests {
             Ok(())
         }
 
-        async fn set_swap_file(&self, _swap_size_mb: usize) -> eyre::Result<()> {
+        async fn set_swap_file(
+            &self,
+            _swap_size_mb: usize,
+            _swap_file_location: &str,
+        ) -> eyre::Result<()> {
             Ok(())
         }
 
-        async fn is_swap_file_set(&self, _swap_size_mb: usize) -> Result<bool> {
+        async fn is_swap_file_set(
+            &self,
+            _swap_size_mb: usize,
+            _swap_file_location: &str,
+        ) -> Result<bool> {
             Ok(false)
         }
 
@@ -1080,6 +1088,7 @@ mod tests {
                     data_directory_mount_point: "".to_string(),
                     log_buffer_capacity_ln: 10,
                     swap_size_mb: 16,
+                    swap_file_location: "/swapfile".to_string(),
                     ramdisks: None,
                 },
             ))
