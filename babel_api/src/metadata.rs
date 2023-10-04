@@ -64,6 +64,9 @@ pub struct BabelConfig {
     pub log_buffer_capacity_ln: usize,
     /// Size of swap file created on the node, in MB.
     pub swap_size_mb: usize,
+    /// Location of swap file.
+    #[serde(default = "default_swap_file_location")]
+    pub swap_file_location: String,
     /// RAM disks configuration
     pub ramdisks: Option<Vec<RamdiskConfiguration>>,
 }
@@ -165,4 +168,8 @@ pub mod firewall {
         Udp,
         Both,
     }
+}
+
+fn default_swap_file_location() -> String {
+    "/swapfile".to_string()
 }

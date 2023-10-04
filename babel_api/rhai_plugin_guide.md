@@ -89,6 +89,9 @@ const METADATA = #{
         // Size of swap file created on the node, in MB.
         swap_size_mb: 512,
 
+        // Location of swap file.
+        swap_file_location: "/swapfile",
+
         // Set RAM disks inside VM
         ramdisks: [
             #{
