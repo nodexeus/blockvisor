@@ -599,6 +599,10 @@ mod tests {
                 &self,
                 request: tonic::Request<Uuid>,
             ) -> Result<tonic::Response<node_metrics::Metric>, tonic::Status>;
+            async fn get_cluster_status(
+                &self,
+                request: tonic::Request<()>,
+            ) -> Result<tonic::Response<String>, tonic::Status>;
         }
     }
 
@@ -663,6 +667,8 @@ mod tests {
                     update_check_interval_secs: None,
                     blockvisor_port: 0,
                     iface: "bvbr0".to_string(),
+                    cluster_id: None,
+                    cluster_seed_urls: None,
                 },
                 test_channel(&self.tmp_root),
             )

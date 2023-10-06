@@ -1,3 +1,4 @@
+use crate::cluster::ClusterData;
 use crate::config::Config;
 use crate::linux_platform::LinuxPlatform;
 use crate::node::Node;
@@ -7,6 +8,7 @@ use crate::pal::{NetInterface, Pal};
 use crate::{get_bv_status, set_bv_status, ServiceStatus};
 use crate::{node_metrics, BV_VAR_PATH};
 use chrono::Utc;
+use serde_json::json;
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -37,10 +39,12 @@ trait Service {
     fn list_capabilities(id: Uuid) -> Vec<String>;
     fn run(id: Uuid, method: String, param: String) -> String;
     fn get_node_metrics(id: Uuid) -> node_metrics::Metric;
+    fn get_cluster_status() -> String; // TODO: update with proper struct
 }
 
 pub struct State<P: Pal + Debug> {
     pub nodes: Arc<Nodes<P>>,
+    pub cluster: Arc<Option<ClusterData>>,
 }
 
 async fn status_check() -> Result<(), Status> {
@@ -348,6 +352,23 @@ where
             .await
             .map_err(|e| Status::unknown(format!("{e:#}")))?;
         Ok(Response::new(metrics))
+    }
+
+    #[instrument(skip(self), ret(Debug))]
+    async fn get_cluster_status(&self, _request: Request<()>) -> Result<Response<String>, Status> {
+        status_check().await?;
+        let status = if let Some(ref cluster) = *self.cluster {
+            let chitchat = cluster.chitchat.lock().await;
+            json!({"cluster_id": chitchat.cluster_id().to_string(),
+                "cluster_state": chitchat.state_snapshot(),
+                "live_hosts": chitchat.live_nodes().cloned().collect::<Vec<_>>(),
+                "dead_hosts": chitchat.dead_nodes().cloned().collect::<Vec<_>>(),
+            })
+            .to_string()
+        } else {
+            "None".to_string()
+        };
+        Ok(Response::new(status))
     }
 }
 

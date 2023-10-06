@@ -89,6 +89,10 @@ pub struct Config {
     /// Network interface name
     #[serde(default = "default_iface")]
     pub iface: String,
+    /// Host's cluster id
+    pub cluster_id: Option<String>,
+    /// Addresses of the seed nodes for cluster discovery and announcements
+    pub cluster_seed_urls: Option<Vec<String>>,
 }
 
 impl Config {

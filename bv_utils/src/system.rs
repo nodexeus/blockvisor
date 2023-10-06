@@ -1,6 +1,16 @@
+use eyre::{anyhow, Result};
 use std::cmp::Ordering;
 use std::path::Path;
 use sysinfo::{Disk, DiskExt, Pid, PidExt, ProcessExt, ProcessRefreshKind, System, SystemExt};
+
+pub fn get_ip_address(ifa_name: &str) -> Result<String> {
+    let ifas = local_ip_address::list_afinet_netifas()?;
+    let (_, ip) = ifas
+        .into_iter()
+        .find(|(name, ipaddr)| name == ifa_name && ipaddr.is_ipv4())
+        .ok_or_else(|| anyhow!("interface {ifa_name} not found"))?;
+    Ok(ip.to_string())
+}
 
 pub fn is_process_running(pid: u32) -> bool {
     let mut sys = System::new();

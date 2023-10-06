@@ -4,6 +4,7 @@ use blockvisord::{
     services::api::pb, BV_VAR_PATH,
 };
 use bv_utils::cmd::{ask_confirm, run_cmd};
+use bv_utils::system::get_ip_address;
 use cidr_utils::cidr::Ipv4Cidr;
 use clap::{crate_version, ArgGroup, Parser};
 use eyre::{anyhow, bail, Context, Result};
@@ -60,15 +61,6 @@ pub struct CmdArgs {
     /// Skip all [y/N] prompts.
     #[clap(short, long)]
     yes: bool,
-}
-
-pub fn get_ip_address(ifa_name: &str) -> Result<String> {
-    let ifas = local_ip_address::list_afinet_netifas()?;
-    let (_, ip) = ifas
-        .into_iter()
-        .find(|(name, ipaddr)| name == ifa_name && ipaddr.is_ipv4())
-        .ok_or_else(|| anyhow!("interface {ifa_name} not found"))?;
-    Ok(ip.to_string())
 }
 
 /// Struct to capture output of linux `ip --json route` command
@@ -240,6 +232,8 @@ async fn main() -> Result<()> {
                 .blockvisor_port
                 .unwrap_or_else(config::default_blockvisor_port),
             iface: cmd_args.bridge_ifa,
+            cluster_id: None,
+            cluster_seed_urls: None,
         };
         api_config.save(&bv_root).await?;
         Some(api_config)

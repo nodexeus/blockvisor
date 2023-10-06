@@ -36,7 +36,10 @@ async fn main() -> Result<()> {
     Server::builder()
         .max_concurrent_streams(1)
         .add_service(internal_server::service_server::ServiceServer::new(
-            internal_server::State { nodes },
+            internal_server::State {
+                nodes,
+                cluster: Arc::new(None),
+            },
         ))
         .serve_with_incoming_shutdown(
             tokio_stream::wrappers::TcpListenerStream::new(listener),
