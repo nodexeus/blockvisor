@@ -15,7 +15,7 @@ build-release:
 	strip target/x86_64-unknown-linux-musl/release/babel_job_runner
 	strip target/x86_64-unknown-linux-musl/release/babelsup
 
-get-firecraker: FC_VERSION=v1.4.1
+get-firecraker: FC_VERSION=v1.5.0
 get-firecraker:
 	rm -rf /tmp/fc
 	mkdir -p /tmp/fc
