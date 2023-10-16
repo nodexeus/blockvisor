@@ -703,6 +703,7 @@ where
 
     /// Find blockchain id by protocol name.
     async fn get_blockchain_id(&self, protocol: &str) -> eyre::Result<String> {
+        let protocol = protocol.to_lowercase();
         let mut blockchain_client = api::connect_to_api_service(
             &self.nodes.api_config,
             pb::blockchain_service_client::BlockchainServiceClient::with_interceptor,
@@ -717,7 +718,7 @@ where
         Ok(blockchains
             .blockchains
             .into_iter()
-            .find(|blockchain| blockchain.name == protocol)
+            .find(|blockchain| blockchain.name.to_lowercase() == protocol)
             .ok_or(anyhow!("blockchain id not found for {protocol}"))?
             .id)
     }
