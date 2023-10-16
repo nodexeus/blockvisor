@@ -555,44 +555,14 @@ where
         req: NodeCreateRequest,
     ) -> eyre::Result<NodeDisplayInfo> {
         let id = Uuid::new_v4();
-        let mut used_ips = vec![];
-        for (_, node) in self.nodes.nodes.read().await.iter() {
-            used_ips.push(node.read().await.data.network_interface.ip().to_string());
-        }
-        let props: HashMap<String, String> = req
-            .props
-            .as_deref()
-            .map(serde_json::from_str)
-            .transpose()?
-            .unwrap_or_default();
+        let name = Petnames::default().generate_one(3, "_");
+        let props = parse_props(&req)?;
         let properties = props
             .into_iter()
             .chain([("network".to_string(), req.network.clone())])
             .collect();
-        let net = utils::discover_net_params(&self.nodes.api_config.read().await.iface)
-            .await
-            .unwrap_or_default();
-        let ip = match req.ip {
-            None => {
-                let ip = utils::next_available_ip(&net, &used_ips).map_err(|err| {
-                    anyhow!("failed to auto assign ip - provide it manually : {err}")
-                })?;
-                info!("Auto-assigned ip `{ip}` for node '{id}'");
-                ip
-            }
-            Some(ip) => ip,
-        };
-        let name = Petnames::default().generate_one(3, "_");
-        let gateway = match req.gateway {
-            None => {
-                let gateway = net
-                    .gateway
-                    .ok_or(anyhow!("can't auto discover gateway - provide it manually",))?;
-                info!("Auto-discovered gateway `{gateway} for node '{id}'");
-                gateway
-            }
-            Some(gateway) => gateway,
-        };
+
+        let (ip, gateway) = self.discover_ip_and_gateway(&req, id).await?;
         self.nodes
             .create(
                 id,
@@ -622,12 +592,7 @@ where
 
     async fn create_node_with_api(&self, req: NodeCreateRequest) -> eyre::Result<NodeDisplayInfo> {
         // map properties into api format
-        let properties = req
-            .props
-            .as_deref()
-            .map(serde_json::from_str::<HashMap<String, String>>)
-            .transpose()?
-            .unwrap_or_default()
+        let properties = parse_props(&req)?
             .into_iter()
             .map(|(key, value)| pb::NodeProperty {
                 name: key.clone(),
@@ -638,49 +603,8 @@ where
                 value,
             })
             .collect();
-
-        // get org_id associated with this host
-        let host_id = self.nodes.api_config.read().await.id;
-        let mut host_client = api::connect_to_api_service(
-            &self.nodes.api_config,
-            pb::host_service_client::HostServiceClient::with_interceptor,
-        )
-        .await
-        .with_context(|| "error connecting to api")?;
-        let org_id = host_client
-            .get(pb::HostServiceGetRequest {
-                id: host_id.clone(),
-            })
-            .await
-            .with_context(|| "can't fetch host organization id")?
-            .into_inner()
-            .host
-            .ok_or(anyhow!("host {host_id} not found in API"))?
-            .org_id;
-
-        // get blockchain id for given image
-        let mut blockchain_client = api::connect_to_api_service(
-            &self.nodes.api_config,
-            pb::blockchain_service_client::BlockchainServiceClient::with_interceptor,
-        )
-        .await
-        .with_context(|| "error connecting to api")?;
-        let blockchains = blockchain_client
-            .list(pb::BlockchainServiceListRequest {
-                org_id: Some(org_id.clone()),
-            })
-            .await
-            .with_context(|| "can't fetch blockchains list")?
-            .into_inner();
-        let blockchain_id = blockchains
-            .blockchains
-            .into_iter()
-            .find(|blockchain| blockchain.name == req.image.protocol)
-            .ok_or(anyhow!(
-                "blockchain id not found for {}",
-                req.image.protocol
-            ))?
-            .id;
+        let (host_id, org_id) = self.get_host_and_org_id().await?;
+        let blockchain_id = self.get_blockchain_id(&org_id, &req.image.protocol).await?;
 
         let mut node_client = self.connect_to_node_service().await?;
         let node = node_client
@@ -716,4 +640,96 @@ where
             standalone: false,
         })
     }
+
+    /// Try to auto-discover ip and gateway for the node.
+    async fn discover_ip_and_gateway(
+        &self,
+        req: &NodeCreateRequest,
+        id: Uuid,
+    ) -> eyre::Result<(String, String)> {
+        let net = utils::discover_net_params(&self.nodes.api_config.read().await.iface)
+            .await
+            .unwrap_or_default();
+        let ip = match &req.ip {
+            None => {
+                let mut used_ips = vec![];
+                for (_, node) in self.nodes.nodes.read().await.iter() {
+                    used_ips.push(node.read().await.data.network_interface.ip().to_string());
+                }
+                let ip = utils::next_available_ip(&net, &used_ips).map_err(|err| {
+                    anyhow!("failed to auto assign ip - provide it manually : {err}")
+                })?;
+                info!("Auto-assigned ip `{ip}` for node '{id}'");
+                ip
+            }
+            Some(ip) => ip.clone(),
+        };
+        let gateway = match &req.gateway {
+            None => {
+                let gateway = net
+                    .gateway
+                    .ok_or(anyhow!("can't auto discover gateway - provide it manually",))?;
+                info!("Auto-discovered gateway `{gateway} for node '{id}'");
+                gateway
+            }
+            Some(gateway) => gateway.clone(),
+        };
+        Ok((ip, gateway))
+    }
+
+    /// Get org_id associated with this host.
+    async fn get_host_and_org_id(&self) -> eyre::Result<(String, String)> {
+        let host_id = self.nodes.api_config.read().await.id;
+        let mut host_client = api::connect_to_api_service(
+            &self.nodes.api_config,
+            pb::host_service_client::HostServiceClient::with_interceptor,
+        )
+        .await
+        .with_context(|| "error connecting to api")?;
+        Ok((
+            host_id.clone(),
+            host_client
+                .get(pb::HostServiceGetRequest {
+                    id: host_id.clone(),
+                })
+                .await
+                .with_context(|| "can't fetch host organization id")?
+                .into_inner()
+                .host
+                .ok_or(anyhow!("host {host_id} not found in API"))?
+                .org_id,
+        ))
+    }
+
+    /// Find blockchain id by protocol name.
+    async fn get_blockchain_id(&self, org_id: &str, protocol: &str) -> eyre::Result<String> {
+        let mut blockchain_client = api::connect_to_api_service(
+            &self.nodes.api_config,
+            pb::blockchain_service_client::BlockchainServiceClient::with_interceptor,
+        )
+        .await
+        .with_context(|| "error connecting to api")?;
+        let blockchains = blockchain_client
+            .list(pb::BlockchainServiceListRequest {
+                org_id: Some(org_id.to_owned()),
+            })
+            .await
+            .with_context(|| "can't fetch blockchains list")?
+            .into_inner();
+        Ok(blockchains
+            .blockchains
+            .into_iter()
+            .find(|blockchain| blockchain.name == protocol)
+            .ok_or(anyhow!("blockchain id not found for {protocol}"))?
+            .id)
+    }
+}
+
+fn parse_props(req: &NodeCreateRequest) -> eyre::Result<HashMap<String, String>> {
+    Ok(req
+        .props
+        .as_deref()
+        .map(serde_json::from_str::<HashMap<String, String>>)
+        .transpose()?
+        .unwrap_or_default())
 }
