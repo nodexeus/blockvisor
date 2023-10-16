@@ -604,7 +604,7 @@ where
             })
             .collect();
         let (host_id, org_id) = self.get_host_and_org_id().await?;
-        let blockchain_id = self.get_blockchain_id(&org_id, &req.image.protocol).await?;
+        let blockchain_id = self.get_blockchain_id(&req.image.protocol).await?;
 
         let mut node_client = self.connect_to_node_service().await?;
         let node = node_client
@@ -702,7 +702,7 @@ where
     }
 
     /// Find blockchain id by protocol name.
-    async fn get_blockchain_id(&self, org_id: &str, protocol: &str) -> eyre::Result<String> {
+    async fn get_blockchain_id(&self, protocol: &str) -> eyre::Result<String> {
         let mut blockchain_client = api::connect_to_api_service(
             &self.nodes.api_config,
             pb::blockchain_service_client::BlockchainServiceClient::with_interceptor,
@@ -710,9 +710,7 @@ where
         .await
         .with_context(|| "error connecting to api")?;
         let blockchains = blockchain_client
-            .list(pb::BlockchainServiceListRequest {
-                org_id: Some(org_id.to_owned()),
-            })
+            .list(pb::BlockchainServiceListRequest { org_id: None })
             .await
             .with_context(|| "can't fetch blockchains list")?
             .into_inner();
