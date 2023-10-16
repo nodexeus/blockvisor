@@ -99,6 +99,11 @@ where
     #[instrument(skip(self), ret(Debug))]
     async fn info(&self, _request: Request<()>) -> Result<Response<String>, Status> {
         let pal = LinuxPlatform::new().map_err(|e| Status::internal(format!("{e:#}")))?;
+        let mut config = Config::load(pal.bv_root())
+            .await
+            .map_err(|e| Status::internal(format!("{e:#}")))?;
+        config.token = "***".to_string();
+        config.refresh_token = "***".to_string();
         Ok(Response::new(format!(
             "{} {} - {:?}\n BV_PATH: {}\n BABEL_PATH: {}\n JOB_RUNNER_PATH: {}\n CONFIG: {:#?}",
             env!("CARGO_PKG_NAME"),
@@ -107,9 +112,7 @@ where
             pal.bv_root().join(BV_VAR_PATH).to_string_lossy(),
             pal.babel_path().to_string_lossy(),
             pal.job_runner_path().to_string_lossy(),
-            Config::load(pal.bv_root())
-                .await
-                .map_err(|e| Status::internal(format!("{e:#}")))?,
+            config,
         )))
     }
 
