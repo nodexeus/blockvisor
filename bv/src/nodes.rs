@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::{
     config::SharedConfig,
+    firecracker_machine::FC_BIN_NAME,
     hosts::HostInfo,
     node::{build_registry_dir, Node},
     node_data::{NodeData, NodeImage, NodeProperties, NodeStatus},
@@ -35,7 +36,7 @@ use crate::{
         kernel::KernelService,
         keyfiles::KeyService,
     },
-    BV_VAR_PATH,
+    utils, BV_VAR_PATH,
 };
 
 pub const REGISTRY_CONFIG_FILENAME: &str = "nodes.json";
@@ -633,6 +634,7 @@ impl<P: Pal + Debug> Nodes<P> {
             self.nodes.write().await.insert(id, RwLock::new(new));
             info!("Recovery: node with ID `{id}` recreated");
         }
+
         Ok(())
     }
 
@@ -779,6 +781,7 @@ impl<P: Pal + Debug> Nodes<P> {
         let mut nodes = HashMap::new();
         let mut node_ids = HashMap::new();
         let mut node_data_cache = HashMap::new();
+        let mut fc_processes_to_check = utils::get_all_processes_pids(FC_BIN_NAME)?;
         let mut dir = read_dir(registry_dir)
             .await
             .context("failed to read nodes registry dir")?;
@@ -802,6 +805,13 @@ impl<P: Pal + Debug> Nodes<P> {
                 .await
             {
                 Ok(node) => {
+                    // remove FC pid from list of all discovered FC pids
+                    // in the end of load this list should be empty
+                    if node.status() == NodeStatus::Running {
+                        let node_pid = utils::get_process_pid(FC_BIN_NAME, &node.id().to_string())?;
+                        fc_processes_to_check.retain(|p| p != &node_pid);
+                    }
+                    // insert node and its info into internal data structures
                     let id = node.id();
                     let name = &node.data.name;
                     node_ids.insert(name.clone(), id);
@@ -825,6 +835,11 @@ impl<P: Pal + Debug> Nodes<P> {
                 }
             };
         }
+        // check if we run some unmanaged FC processes on the host
+        for pid in fc_processes_to_check {
+            error!("Process with id {pid} is not managed by BV");
+        }
+
         Ok((nodes, node_ids, node_data_cache))
     }
 

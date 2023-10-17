@@ -28,6 +28,17 @@ pub fn get_process_pid(process_name: &str, cmd: &str) -> Result<u32> {
     }
 }
 
+/// Get pids of the running VM processes.
+pub fn get_all_processes_pids(process_name: &str) -> Result<Vec<u32>> {
+    let mut sys = System::new();
+    debug!("Retrieving pids for processes of `{process_name}`");
+    sys.refresh_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::everything()));
+    Ok(sys
+        .processes_by_name(process_name)
+        .map(|process| process.pid().as_u32())
+        .collect())
+}
+
 pub struct Archive(PathBuf);
 impl Archive {
     pub async fn ungzip(self) -> Result<Self> {
