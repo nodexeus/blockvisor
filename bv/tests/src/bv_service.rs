@@ -437,5 +437,7 @@ fn bv_run(commands: &[&str]) -> String {
     let mut cmd = Command::cargo_bin("bv").unwrap();
     let cmd = cmd.args(commands).env("NO_COLOR", "1");
     let output = cmd.output().unwrap();
-    str::from_utf8(&output.stdout).unwrap().to_string()
+    str::from_utf8(&[output.stdout, output.stderr].concat())
+        .unwrap()
+        .to_string()
 }
