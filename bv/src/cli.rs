@@ -108,7 +108,11 @@ pub enum NodeCommand {
         /// Node Image identifier
         image: Option<String>,
 
-        /// Create node in standalone mode - without involvement of the API
+        /// Create node in standalone mode - without involvement of the API.
+        /// Non-standalone mode mean that BV CLI acts like the API frontend. Once node is created
+        /// in non-standalone mode, all operations on the node will be performed via API.
+        /// If node is created in standalone node, then BV CLI will omit the API, and it won't
+        /// be aware of the node existence or any operation on it.
         #[clap(long, default_value = "false")]
         standalone: bool,
     },
