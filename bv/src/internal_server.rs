@@ -1,3 +1,4 @@
+use crate::config::SharedConfig;
 use crate::{
     cluster::ClusterData,
     config::Config,
@@ -6,6 +7,7 @@ use crate::{
     node_data::{NodeImage, NodeStatus},
     nodes::{self, NodeConfig, Nodes},
     pal::{NetInterface, Pal},
+    services,
     services::{api, api::pb},
     {get_bv_status, set_bv_status, utils, ServiceStatus}, {node_metrics, BV_VAR_PATH},
 };
@@ -76,6 +78,7 @@ trait Service {
 }
 
 pub struct State<P: Pal + Debug> {
+    pub config: SharedConfig,
     pub nodes: Arc<Nodes<P>>,
     pub cluster: Arc<Option<ClusterData>>,
     pub dev_mode: bool,
@@ -96,6 +99,7 @@ where
     P: Pal + Debug + Send + Sync + 'static,
     P::NetInterface: Send + Sync + 'static,
     P::NodeConnection: Send + Sync + 'static,
+    P::ApiServiceConnector: Send + Sync + 'static,
     P::VirtualMachine: Send + Sync + 'static,
 {
     #[instrument(skip(self), ret(Debug))]
@@ -148,7 +152,7 @@ where
     async fn get_node(&self, request: Request<Uuid>) -> Result<Response<NodeDisplayInfo>, Status> {
         status_check().await?;
         let id = request.into_inner();
-        let nodes_lock = self.nodes.nodes.read().await;
+        let nodes_lock = self.nodes.nodes_list().await;
         if let Some(node_lock) = nodes_lock.get(&id) {
             Ok(Response::new(
                 self.get_node_display_info(id, node_lock)
@@ -166,7 +170,7 @@ where
         _request: Request<()>,
     ) -> Result<Response<Vec<NodeDisplayInfo>>, Status> {
         status_check().await?;
-        let nodes_lock = self.nodes.nodes.read().await;
+        let nodes_lock = self.nodes.nodes_list().await;
         let mut nodes = vec![];
         for (id, node_lock) in nodes_lock.iter() {
             nodes.push(
@@ -224,25 +228,6 @@ where
     }
 
     #[instrument(skip(self), ret(Debug))]
-    async fn delete_node(&self, request: Request<Uuid>) -> Result<Response<()>, Status> {
-        status_check().await?;
-        let id = request.into_inner();
-        if self.is_standalone_node(id).await? {
-            self.nodes
-                .delete(id)
-                .await
-                .map_err(|e| Status::unknown(format!("{e:#}")))?;
-        } else {
-            self.connect_to_node_service()
-                .await?
-                .delete(pb::NodeServiceDeleteRequest { id: id.to_string() })
-                .await
-                .map_err(|e| Status::unknown(format!("{e:#}")))?;
-        }
-        Ok(Response::new(()))
-    }
-
-    #[instrument(skip(self), ret(Debug))]
     async fn start_node(&self, request: Request<Uuid>) -> Result<Response<()>, Status> {
         status_check().await?;
         let id = request.into_inner();
@@ -274,6 +259,25 @@ where
             self.connect_to_node_service()
                 .await?
                 .stop(pb::NodeServiceStopRequest { id: id.to_string() })
+                .await
+                .map_err(|e| Status::unknown(format!("{e:#}")))?;
+        }
+        Ok(Response::new(()))
+    }
+
+    #[instrument(skip(self), ret(Debug))]
+    async fn delete_node(&self, request: Request<Uuid>) -> Result<Response<()>, Status> {
+        status_check().await?;
+        let id = request.into_inner();
+        if self.is_standalone_node(id).await? {
+            self.nodes
+                .delete(id)
+                .await
+                .map_err(|e| Status::unknown(format!("{e:#}")))?;
+        } else {
+            self.connect_to_node_service()
+                .await?
+                .delete(pb::NodeServiceDeleteRequest { id: id.to_string() })
                 .await
                 .map_err(|e| Status::unknown(format!("{e:#}")))?;
         }
@@ -489,8 +493,7 @@ where
         Ok(self.dev_mode
             || self
                 .nodes
-                .nodes
-                .read()
+                .nodes_list()
                 .await
                 .get(&id)
                 .ok_or_else(|| Status::not_found(format!("node '{id}' not found")))?
@@ -501,8 +504,8 @@ where
     }
 
     async fn connect_to_node_service(&self) -> Result<api::NodesServiceClient, Status> {
-        api::connect_to_api_service(
-            &self.nodes.api_config,
+        services::connect_to_api_service(
+            &self.config,
             pb::node_service_client::NodeServiceClient::with_interceptor,
         )
         .await
@@ -647,13 +650,13 @@ where
         req: &NodeCreateRequest,
         id: Uuid,
     ) -> eyre::Result<(String, String)> {
-        let net = utils::discover_net_params(&self.nodes.api_config.read().await.iface)
+        let net = utils::discover_net_params(&self.config.read().await.iface)
             .await
             .unwrap_or_default();
         let ip = match &req.ip {
             None => {
                 let mut used_ips = vec![];
-                for (_, node) in self.nodes.nodes.read().await.iter() {
+                for (_, node) in self.nodes.nodes_list().await.iter() {
                     used_ips.push(node.read().await.data.network_interface.ip().to_string());
                 }
                 let ip = utils::next_available_ip(&net, &used_ips).map_err(|err| {
@@ -679,9 +682,9 @@ where
 
     /// Get org_id associated with this host.
     async fn get_host_and_org_id(&self) -> eyre::Result<(String, String)> {
-        let host_id = self.nodes.api_config.read().await.id;
-        let mut host_client = api::connect_to_api_service(
-            &self.nodes.api_config,
+        let host_id = self.config.read().await.id;
+        let mut host_client = services::connect_to_api_service(
+            &self.config,
             pb::host_service_client::HostServiceClient::with_interceptor,
         )
         .await
@@ -704,8 +707,8 @@ where
     /// Find blockchain id by protocol name.
     async fn get_blockchain_id(&self, protocol: &str) -> eyre::Result<String> {
         let protocol = protocol.to_lowercase();
-        let mut blockchain_client = api::connect_to_api_service(
-            &self.nodes.api_config,
+        let mut blockchain_client = services::connect_to_api_service(
+            &self.config,
             pb::blockchain_service_client::BlockchainServiceClient::with_interceptor,
         )
         .await
