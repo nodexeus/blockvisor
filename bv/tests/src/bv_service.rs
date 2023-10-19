@@ -280,7 +280,7 @@ async fn test_bv_service_e2e() {
     println!("check if node is deleted");
     let is_deleted = || {
         let stdout = bv_run(&["node", "list"]);
-        stdout.contains(&node_id)
+        !stdout.contains(&node_id)
     };
     let start = std::time::Instant::now();
     while !is_deleted() {
