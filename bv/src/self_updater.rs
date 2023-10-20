@@ -240,7 +240,7 @@ mod tests {
             bundles_mock: MockTestBundleService,
         ) -> utils::tests::TestServer {
             utils::tests::start_test_server(
-                self.tmp_root.join("test_socket"),
+                &self.tmp_root,
                 pb::bundle_service_server::BundleServiceServer::new(bundles_mock),
             )
         }

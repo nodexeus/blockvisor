@@ -238,7 +238,7 @@ pub mod tests {
     use http::{Request, Response};
     use hyper::Body;
     use std::convert::Infallible;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
     use std::sync::atomic::AtomicBool;
     use std::sync::{atomic, Arc};
     use std::thread::panicking;
@@ -365,7 +365,7 @@ pub mod tests {
         }
     }
 
-    pub fn start_test_server<S>(socket_path: PathBuf, service_mock: S) -> TestServer
+    pub fn start_test_server<S>(tmp_root: &Path, service_mock: S) -> TestServer
     where
         S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
             + NamedService
@@ -374,6 +374,7 @@ pub mod tests {
             + 'static,
         S::Future: Send + 'static,
     {
+        let socket_path = tmp_root.join("test_socket");
         let (tx, rx) = tokio::sync::oneshot::channel();
         TestServer {
             tx,

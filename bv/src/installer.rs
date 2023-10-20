@@ -651,7 +651,7 @@ mod tests {
 
         fn start_test_server(&self, bv_mock: MockTestBV) -> utils::tests::TestServer {
             utils::tests::start_test_server(
-                self.tmp_root.join("test_socket"),
+                &self.tmp_root,
                 internal_server::service_server::ServiceServer::new(bv_mock),
             )
         }

@@ -48,7 +48,7 @@ impl fmt::Display for NodeImage {
 }
 
 // Data that we store in data file
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct NodeData<N> {
     pub id: Uuid,
     pub name: String,

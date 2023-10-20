@@ -707,12 +707,12 @@ impl<P: Pal + Debug> Nodes<P> {
                     }
                     // insert node and its info into internal data structures
                     let id = node.id();
-                    let name = &node.data.name;
+                    let name = node.data.name.clone();
                     node_ids.insert(name.clone(), id);
                     node_data_cache.insert(
                         id,
                         NodeDataCache {
-                            name: name.clone(),
+                            name,
                             ip: node.data.network_interface.ip().to_string(),
                             gateway: node.data.network_interface.gateway().to_string(),
                             image: node.data.image.clone(),
@@ -785,4 +785,526 @@ fn id_not_found(id: Uuid) -> eyre::Error {
 
 fn name_not_found(name: &str) -> eyre::Error {
     anyhow!("Node with name `{}` not found", name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::services::api::pb::ArchiveLocation;
+    use crate::services::cookbook::ROOT_FS_FILE;
+    use crate::{
+        pal::{
+            BabelClient, BabelSupClient, CommandsStream, NodeConnection, ServiceConnector,
+            VirtualMachine, VmState,
+        },
+        services::{self, api::pb, AuthToken},
+        utils::tests::test_channel,
+    };
+    use assert_fs::TempDir;
+    use async_trait::async_trait;
+    use bv_utils::cmd::run_cmd;
+    use mockall::*;
+    use std::ffi::OsStr;
+    use std::str::FromStr;
+    use std::{path::Path, time::Duration};
+    use tokio_stream::wrappers::UnixListenerStream;
+    use tonic::transport::Channel;
+
+    mock! {
+        pub TestKernelService {}
+
+        #[tonic::async_trait]
+        impl pb::kernel_service_server::KernelService for TestKernelService {
+            async fn retrieve(&self, request: tonic::Request<pb::KernelServiceRetrieveRequest>
+            ) -> Result<tonic::Response<pb::KernelServiceRetrieveResponse>, tonic::Status>;
+            async fn list_kernel_versions(&self, request: tonic::Request<pb::KernelServiceListKernelVersionsRequest>,
+            ) -> Result<tonic::Response<pb::KernelServiceListKernelVersionsResponse>, tonic::Status>;
+        }
+    }
+
+    mock! {
+        pub TestCookbookService {}
+
+        #[tonic::async_trait]
+        impl pb::cookbook_service_server::CookbookService for TestCookbookService {
+            async fn retrieve_plugin(
+                &self,
+                request: tonic::Request<pb::CookbookServiceRetrievePluginRequest>,
+            ) -> Result<
+                tonic::Response<pb::CookbookServiceRetrievePluginResponse>,
+                tonic::Status,
+            >;
+            async fn retrieve_image(
+                &self,
+                request: tonic::Request<pb::CookbookServiceRetrieveImageRequest>,
+            ) -> Result<
+                tonic::Response<pb::CookbookServiceRetrieveImageResponse>,
+                tonic::Status,
+            >;
+            async fn requirements(
+                &self,
+                request: tonic::Request<pb::CookbookServiceRequirementsRequest>,
+            ) -> Result<
+                tonic::Response<pb::CookbookServiceRequirementsResponse>,
+                tonic::Status,
+            >;
+            async fn net_configurations(
+                &self,
+                request: tonic::Request<pb::CookbookServiceNetConfigurationsRequest>,
+            ) -> Result<
+                tonic::Response<pb::CookbookServiceNetConfigurationsResponse>,
+                tonic::Status,
+            >;
+            async fn list_babel_versions(
+                &self,
+                request: tonic::Request<pb::CookbookServiceListBabelVersionsRequest>,
+            ) -> Result<
+                tonic::Response<pb::CookbookServiceListBabelVersionsResponse>,
+                tonic::Status,
+            >;
+        }
+    }
+
+    #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+    pub struct DummyNet {
+        pub name: String,
+        pub ip: IpAddr,
+        pub gateway: IpAddr,
+        pub remaster_error: Option<String>,
+        pub delete_error: Option<String>,
+    }
+
+    #[async_trait]
+    impl NetInterface for DummyNet {
+        fn name(&self) -> &String {
+            &self.name
+        }
+        fn ip(&self) -> &IpAddr {
+            &self.ip
+        }
+        fn gateway(&self) -> &IpAddr {
+            &self.gateway
+        }
+        async fn remaster(&self) -> Result<()> {
+            if let Some(err) = &self.remaster_error {
+                bail!(err.clone())
+            } else {
+                Ok(())
+            }
+        }
+        async fn delete(self) -> Result<()> {
+            if let Some(err) = self.delete_error {
+                bail!(err)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct EmptyStreamConnector;
+    pub struct EmptyStream;
+
+    #[async_trait]
+    impl ServiceConnector<EmptyStream> for EmptyStreamConnector {
+        async fn connect(&self) -> Result<EmptyStream> {
+            Ok(EmptyStream)
+        }
+    }
+
+    #[async_trait]
+    impl CommandsStream for EmptyStream {
+        async fn wait_for_pending_commands(&mut self) -> Result<Option<Vec<u8>>> {
+            Ok(None)
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct TestConnector {
+        tmp_root: PathBuf,
+    }
+
+    #[async_trait]
+    impl services::ApiServiceConnector for TestConnector {
+        async fn connect<T, I>(&self, with_interceptor: I) -> Result<T>
+        where
+            I: Send + Sync + Fn(Channel, AuthToken) -> T,
+        {
+            Ok(with_interceptor(
+                test_channel(&self.tmp_root),
+                AuthToken("test_token".to_owned()),
+            ))
+        }
+    }
+
+    mock! {
+        #[derive(Debug)]
+        pub TestNodeConnection {}
+
+        #[async_trait]
+        impl NodeConnection for TestNodeConnection {
+            async fn open(&mut self, _max_delay: Duration) -> Result<()>;
+            fn close(&mut self);
+            fn is_closed(&self) -> bool;
+            fn mark_broken(&mut self);
+            fn is_broken(&self) -> bool;
+            async fn test(&self) -> Result<()>;
+            async fn babelsup_client<'a>(&'a mut self) -> Result<&'a mut BabelSupClient>;
+            async fn babel_client<'a>(&'a mut self) -> Result<&'a mut BabelClient>;
+        }
+    }
+
+    mock! {
+        #[derive(Debug)]
+        pub TestVM {}
+
+        #[async_trait]
+        impl VirtualMachine for TestVM {
+            fn state(&self) -> VmState;
+            async fn delete(self) -> Result<()>;
+            async fn shutdown(&mut self) -> Result<()>;
+            async fn force_shutdown(&mut self) -> Result<()>;
+            async fn start(&mut self) -> Result<()>;
+        }
+    }
+
+    mock! {
+        #[derive(Debug)]
+        pub TestPal {}
+
+        #[tonic::async_trait]
+        impl Pal for TestPal {
+            fn bv_root(&self) -> &Path;
+            fn babel_path(&self) -> &Path;
+            fn job_runner_path(&self) -> &Path;
+            type NetInterface = DummyNet;
+            async fn create_net_interface(
+                &self,
+                index: u32,
+                ip: IpAddr,
+                gateway: IpAddr,
+                config: &SharedConfig,
+            ) -> Result<DummyNet>;
+
+            type CommandsStream = EmptyStream;
+            type CommandsStreamConnector = EmptyStreamConnector;
+            fn create_commands_stream_connector(
+                &self,
+                config: &SharedConfig,
+            ) -> EmptyStreamConnector;
+
+            type ApiServiceConnector = TestConnector;
+            fn create_api_service_connector(&self, config: &SharedConfig) -> TestConnector;
+
+            type NodeConnection = MockTestNodeConnection;
+            fn create_node_connection(&self, node_id: Uuid) -> MockTestNodeConnection;
+
+            type VirtualMachine = MockTestVM;
+            async fn create_vm(
+                &self,
+                node_data: &NodeData<DummyNet>,
+            ) -> Result<MockTestVM>;
+            async fn attach_vm(
+                &self,
+                node_data: &NodeData<DummyNet>,
+            ) -> Result<MockTestVM>;
+            fn build_vm_data_path(&self, id: Uuid) -> PathBuf;
+        }
+    }
+
+    struct TestEnv {
+        tmp_root: PathBuf,
+
+        _async_panic_checker: utils::tests::AsyncPanicChecker,
+    }
+
+    impl TestEnv {
+        async fn new() -> Result<Self> {
+            let tmp_root = TempDir::new()?.to_path_buf();
+            fs::create_dir_all(&tmp_root).await?;
+
+            Ok(Self {
+                tmp_root,
+                _async_panic_checker: Default::default(),
+            })
+        }
+
+        fn default_pal(&self) -> MockTestPal {
+            let mut pal = MockTestPal::new();
+            pal.expect_bv_root()
+                .return_const(self.tmp_root.to_path_buf());
+            pal.expect_babel_path()
+                .return_const(self.tmp_root.join("babel"));
+            pal.expect_job_runner_path()
+                .return_const(self.tmp_root.join("job_runner"));
+            let tmp_root = self.tmp_root.clone();
+            pal.expect_build_vm_data_path()
+                .returning(move |id| tmp_root.clone().join(format!("vm_data_{id}")));
+            pal.expect_create_commands_stream_connector()
+                .return_const(EmptyStreamConnector);
+            pal.expect_create_api_service_connector()
+                .return_const(TestConnector {
+                    tmp_root: self.tmp_root.clone(),
+                });
+            pal
+        }
+
+        fn default_config(&self) -> SharedConfig {
+            SharedConfig::new(
+                Config {
+                    id: "host_id".to_string(),
+                    token: "token".to_string(),
+                    refresh_token: "refresh_token".to_string(),
+                    blockjoy_api_url: "api.url".to_string(),
+                    blockjoy_mqtt_url: Some("mqtt.url".to_string()),
+                    update_check_interval_secs: None,
+                    blockvisor_port: 888,
+                    iface: "bvbr7".to_string(),
+                    cluster_id: None,
+                    cluster_seed_urls: None,
+                },
+                self.tmp_root.clone(),
+            )
+        }
+
+        async fn generate_dummy_archive(&self) {
+            let mut file_path = self.tmp_root.join(ROOT_FS_FILE).into_os_string();
+            fs::write(&file_path, "dummy archive content")
+                .await
+                .unwrap();
+            let archive_file_path = &self.tmp_root.join("blockjoy.gz");
+            run_cmd("gzip", [OsStr::new("-kf"), &file_path])
+                .await
+                .unwrap();
+            file_path.push(".gz");
+            fs::rename(file_path, archive_file_path).await.unwrap();
+        }
+
+        async fn start_test_server(
+            &self,
+        ) -> (
+            utils::tests::TestServer,
+            mockito::ServerGuard,
+            Vec<mockito::Mock>,
+        ) {
+            let mut cookbook = MockTestCookbookService::new();
+            cookbook
+                .expect_retrieve_plugin()
+                .once()
+                .withf(|req| {
+                    req.get_ref().id
+                        == Some(pb::ConfigIdentifier {
+                            protocol: "testing".to_string(),
+                            node_type: pb::NodeType::Validator.into(),
+                            node_version: "1.2.3".to_string(),
+                        })
+                })
+                .returning(|req| {
+                    let id = req.into_inner().id.unwrap();
+                    Ok(tonic::Response::new(
+                        pb::CookbookServiceRetrievePluginResponse {
+                            plugin: Some(pb::Plugin {
+                                identifier: Some(id),
+                                rhai_content: include_bytes!(
+                                    "../../babel_api/protocols/testing/babel.rhai"
+                                )
+                                .to_vec(),
+                            }),
+                        },
+                    ))
+                });
+            self.generate_dummy_archive().await;
+            let mut http_server = mockito::Server::new();
+            let url = http_server.url();
+            cookbook
+                .expect_retrieve_image()
+                .once()
+                .withf(|req| {
+                    req.get_ref().id
+                        == Some(pb::ConfigIdentifier {
+                            protocol: "testing".to_string(),
+                            node_type: pb::NodeType::Validator.into(),
+                            node_version: "1.2.3".to_string(),
+                        })
+                })
+                .returning(move |_| {
+                    Ok(tonic::Response::new(
+                        pb::CookbookServiceRetrieveImageResponse {
+                            location: Some(ArchiveLocation {
+                                url: format!("{url}/image"),
+                            }),
+                        },
+                    ))
+                });
+            let http_mock_image = http_server
+                .mock("GET", "/image")
+                .with_body_from_file(&*self.tmp_root.join("blockjoy.gz").to_string_lossy())
+                .create();
+
+            let url = http_server.url();
+            let mut kernels = MockTestKernelService::new();
+            kernels
+                .expect_retrieve()
+                .once()
+                .withf(|req| {
+                    req.get_ref().id
+                        == Some(pb::KernelIdentifier {
+                            version: "5.10.174-build.1+fc.ufw".to_string(),
+                        })
+                })
+                .returning(move |_| {
+                    Ok(tonic::Response::new(pb::KernelServiceRetrieveResponse {
+                        location: Some(ArchiveLocation {
+                            url: format!("{url}/kernel"),
+                        }),
+                    }))
+                });
+            let http_mock_kernel = http_server
+                .mock("GET", "/kernel")
+                .with_body_from_file(&*self.tmp_root.join("blockjoy.gz").to_string_lossy())
+                .create();
+
+            let socket_path = self.tmp_root.join("test_socket");
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            (
+                utils::tests::TestServer {
+                    tx,
+                    handle: tokio::spawn(async move {
+                        let uds_stream = UnixListenerStream::new(
+                            tokio::net::UnixListener::bind(socket_path).unwrap(),
+                        );
+                        tonic::transport::server::Server::builder()
+                            .max_concurrent_streams(1)
+                            .add_service(pb::kernel_service_server::KernelServiceServer::new(
+                                kernels,
+                            ))
+                            .add_service(pb::cookbook_service_server::CookbookServiceServer::new(
+                                cookbook,
+                            ))
+                            .serve_with_incoming_shutdown(uds_stream, async {
+                                rx.await.ok();
+                            })
+                            .await
+                            .unwrap();
+                    }),
+                },
+                http_server,
+                vec![http_mock_image, http_mock_kernel],
+            )
+        }
+    }
+
+    fn add_create_node_expectations(
+        pal: &mut MockTestPal,
+        expected_index: u32,
+        id: Uuid,
+        config: &NodeConfig,
+    ) {
+        let expected_ip = config.ip.clone();
+        let expected_gateway = config.gateway.clone();
+        pal.expect_create_net_interface()
+            .once()
+            .withf(move |index, ip, gateway, _| {
+                *index == expected_index
+                    && ip.to_string() == expected_ip
+                    && gateway.to_string() == expected_gateway
+            })
+            .returning(|index, ip, gateway, _config| {
+                Ok(DummyNet {
+                    name: format!("bv{index}"),
+                    ip,
+                    gateway,
+                    remaster_error: None,
+                    delete_error: None,
+                })
+            });
+        pal.expect_create_vm()
+            .once()
+            .with(predicate::eq(NodeData {
+                id,
+                name: config.name.clone(),
+                expected_status: NodeStatus::Stopped,
+                started_at: None,
+                initialized: false,
+                image: config.image.clone(),
+                kernel: "5.10.174-build.1+fc.ufw".to_string(),
+                network_interface: DummyNet {
+                    name: format!("bv{expected_index}"),
+                    ip: IpAddr::from_str(&config.ip).unwrap(),
+                    gateway: IpAddr::from_str(&config.gateway).unwrap(),
+                    remaster_error: None,
+                    delete_error: None,
+                },
+                requirements: Requirements {
+                    vcpu_count: 1,
+                    mem_size_mb: 2048,
+                    disk_size_gb: 1,
+                },
+                firewall_rules: config.rules.clone(),
+                properties: config.properties.clone(),
+                network: config.network.clone(),
+                standalone: config.standalone,
+            }))
+            .returning(|_| Ok(MockTestVM::new()));
+        pal.expect_create_node_connection()
+            .once()
+            .with(predicate::eq(id))
+            .returning(|_| MockTestNodeConnection::new());
+    }
+
+    #[tokio::test]
+    async fn test_create_node() -> Result<()> {
+        let test_env = TestEnv::new().await?;
+        let mut pal = test_env.default_pal();
+        let config = test_env.default_config();
+
+        let first_node_id = Uuid::parse_str("4931bafa-92d9-4521-9fc6-a77eee047530").unwrap();
+        let first_node_config = NodeConfig {
+            name: "first node name".to_string(),
+            image: NodeImage {
+                protocol: "testing".to_string(),
+                node_type: "validator".to_string(),
+                node_version: "1.2.3".to_string(),
+            },
+            ip: "192.168.0.7".to_string(),
+            gateway: "192.168.0.1".to_string(),
+            rules: vec![],
+            properties: Default::default(),
+            network: "test".to_string(),
+            standalone: true,
+        };
+        add_create_node_expectations(&mut pal, 1, first_node_id, &first_node_config);
+
+        let second_node_id = Uuid::parse_str("4931bafa-92d9-4521-9fc6-a77eee047531").unwrap();
+        let second_node_config = NodeConfig {
+            name: "second node name".to_string(),
+            image: NodeImage {
+                protocol: "testing".to_string(),
+                node_type: "validator".to_string(),
+                node_version: "1.2.3".to_string(),
+            },
+            ip: "192.168.0.8".to_string(),
+            gateway: "192.168.0.1".to_string(),
+            rules: vec![],
+            properties: Default::default(),
+            network: "test".to_string(),
+            standalone: false,
+        };
+        add_create_node_expectations(&mut pal, 2, second_node_id, &second_node_config);
+
+        let nodes = Nodes::load(pal, config).await?;
+        assert!(nodes.nodes_list().await.is_empty());
+
+        let (test_server, _http_server, http_mocks) = test_env.start_test_server().await;
+
+        nodes.create(first_node_id, first_node_config).await?;
+        nodes.create(second_node_id, second_node_config).await?;
+
+        for mock in http_mocks {
+            mock.assert();
+        }
+        test_server.assert().await;
+        Ok(())
+    }
 }
