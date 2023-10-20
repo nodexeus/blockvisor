@@ -175,10 +175,14 @@ async fn test_bv_service_e2e() {
     let provision_token = response.token;
     println!("host provision token: {provision_token}");
 
+    const OLD_IMAGE_VERSION: &str = "0.0.2";
+    const OLD_IMAGE: &str = "testing/validator/0.0.2";
+    const NEW_IMAGE_VERSION: &str = "0.0.3";
+    const NEW_IMAGE: &str = "testing/validator/0.0.3";
     println!("add blockchain");
     let blockchain_query = r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
         INSERT INTO blockchain_node_types (id, blockchain_id, node_type) VALUES ('206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'validator');
-        INSERT INTO blockchain_versions (id, blockchain_id, blockchain_node_type_id, version) VALUES ('78d4c409-401d-491f-8c87-df7f35971bb7','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '0.0.3');
+        INSERT INTO blockchain_versions (id, blockchain_id, blockchain_node_type_id, version) VALUES ('78d4c409-401d-491f-8c87-df7f35971bb7','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '0.0.2');
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'keystore-file', NULL, 'file_upload', FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'TESTING_PARAM', NULL, 'text',        FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
         "#;
@@ -217,27 +221,18 @@ async fn test_bv_service_e2e() {
     test_env::bv_run(&["host", "update"], "Host info update sent", None);
 
     println!("test chain list query");
-    test_env::bv_run(&["chain", "list", "testing", "validator"], "0.0.3", None);
-
-    println!("removing 0.0.3 image from cache to download it again");
-    let folder = CookbookService::get_image_download_folder_path(
-        Path::new("/"),
-        &NodeImage {
-            protocol: "testing".to_string(),
-            node_type: "validator".to_string(),
-            node_version: "0.0.3".to_string(),
-        },
+    test_env::bv_run(
+        &["chain", "list", "testing", "validator"],
+        OLD_IMAGE_VERSION,
+        None,
     );
-    let _ = tokio::fs::remove_dir_all(&folder).await;
 
     println!("get blockchain id");
     let mut client = pb::blockchain_service_client::BlockchainServiceClient::connect(url)
         .await
         .unwrap();
 
-    let list_blockchains = pb::BlockchainServiceListRequest {
-        org_id: Some(org_id.to_string()),
-    };
+    let list_blockchains = pb::BlockchainServiceListRequest { org_id: None };
     let list = client
         .list(with_auth(list_blockchains, &auth_token))
         .await
@@ -246,11 +241,20 @@ async fn test_bv_service_e2e() {
     let blockchain = list.blockchains.first().unwrap();
     println!("got blockchain: {:?}", blockchain);
 
-    let image = "testing/validator/0.0.3";
+    println!("removing {NEW_IMAGE_VERSION} image from cache to download it again");
+    let folder = CookbookService::get_image_download_folder_path(
+        Path::new("/"),
+        &NodeImage {
+            protocol: "testing".to_string(),
+            node_type: "validator".to_string(),
+            node_version: NEW_IMAGE_VERSION.to_string(),
+        },
+    );
+    let _ = tokio::fs::remove_dir_all(&folder).await;
     let stdout = bv_run(&[
         "node",
         "create",
-        image,
+        OLD_IMAGE,
         "--props",
         r#"{"TESTING_PARAM":"I guess just some test value"}"#,
         "--network",
@@ -258,7 +262,9 @@ async fn test_bv_service_e2e() {
     ]);
     println!("created node: {stdout}");
     let node_id = stdout
-        .trim_start_matches(&format!("Created new node from `{image}` image with ID "))
+        .trim_start_matches(&format!(
+            "Created new node from `{OLD_IMAGE}` image with ID "
+        ))
         .split('`')
         .nth(1)
         .unwrap()
@@ -266,6 +272,34 @@ async fn test_bv_service_e2e() {
 
     println!("list created node, should be auto-started");
     test_env::wait_for_node_status(&node_id, "Running", Duration::from_secs(300), None).await;
+
+    println!("give user 'blockjoy-admin' so ity can add new blockchain version");
+    let org_query = r#"INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'blockjoy-admin');"#;
+    println!("add new image version {NEW_IMAGE_VERSION} - trigger auto upgrade");
+    execute_sql(db_url, org_query);
+    client
+        .add_version(with_auth(
+            pb::BlockchainServiceAddVersionRequest {
+                id: blockchain.id.clone(),
+                version: NEW_IMAGE_VERSION.to_string(),
+                description: None,
+                node_type: pb::NodeType::Validator.into(),
+                properties: vec![],
+            },
+            &auth_token,
+        ))
+        .await
+        .unwrap();
+
+    println!("list node, should be auto-upgraded");
+    let start = std::time::Instant::now();
+    while let Err(err) = test_env::try_bv_run(&["node", "ls"], NEW_IMAGE, None) {
+        if start.elapsed() < Duration::from_secs(300) {
+            sleep(Duration::from_secs(1)).await;
+        } else {
+            panic!("timeout expired: {err:#}")
+        }
+    }
 
     check_upload_and_download(&node_id);
 

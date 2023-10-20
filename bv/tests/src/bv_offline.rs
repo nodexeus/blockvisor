@@ -210,6 +210,9 @@ async fn test_bv_cmd_node_lifecycle() -> Result<()> {
     println!("list running node after node upgrade");
     test_env.bv_run(&["node", "status", vm_id], "Running");
 
+    println!("check jobs after node upgrade");
+    test_env.bv_run(&["node", "job", vm_id, "info", "echo"], "status: Running");
+
     println!("generate node keys");
     test_env.bv_run(&["node", "run", "generate_keys", vm_id], "");
 

@@ -6,7 +6,10 @@ pub async fn setup_rbac(db_url: &str) {
         insert into role_permissions (role, permission)
         values
         ('blockjoy-admin', 'auth-admin-list-permissions'),
+        ('blockjoy-admin', 'blockchain-admin-get'),
         ('blockjoy-admin', 'blockchain-admin-list'),
+        ('blockjoy-admin', 'blockchain-admin-add-node-type'),
+        ('blockjoy-admin', 'blockchain-admin-add-version'),
         ('blockjoy-admin', 'node-admin-create'),
         ('blockjoy-admin', 'node-admin-delete'),
         ('blockjoy-admin', 'node-admin-get'),
@@ -18,6 +21,7 @@ pub async fn setup_rbac(db_url: &str) {
         ('blockjoy-admin', 'node-admin-update-status'),
         ('blockjoy-admin', 'org-admin-list'),
         ('blockjoy-admin', 'user-admin-filter'),
+        ('blockjoy-admin', 'user-admin-get'),
         ('blockjoy-admin', 'user-admin-update');
         ",
         "
