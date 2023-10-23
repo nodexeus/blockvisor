@@ -1,4 +1,4 @@
-use crate::src::utils::execute_sql;
+use crate::src::utils::execute_sql_insert;
 
 pub async fn setup_rbac(db_url: &str) {
     let queries = vec![
@@ -275,6 +275,6 @@ pub async fn setup_rbac(db_url: &str) {
     ];
 
     for query in queries {
-        execute_sql(db_url, query);
+        execute_sql_insert(db_url, query);
     }
 }
