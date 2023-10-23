@@ -225,6 +225,7 @@ impl<P: Pal + Debug> Node<P> {
 
         self.data.image = image.clone();
         self.data.requirements = self.metadata.requirements.clone();
+        self.data.initialized = false;
         self.data.save(&self.paths.registry).await?;
         self.machine = self.pal.attach_vm(&self.data).await?;
 
