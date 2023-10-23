@@ -6,7 +6,11 @@ pub mod token;
 use assert_cmd::Command;
 use predicates::prelude::*;
 
-pub fn execute_sql(connection_str: &str, query: &str) {
+pub fn execute_sql_insert(connection_str: &str, query: &str) {
+    execute_sql(connection_str, query, "INSERT");
+}
+
+pub fn execute_sql(connection_str: &str, query: &str, out_pattern: &str) {
     Command::new("docker")
         .args([
             "compose",
@@ -20,5 +24,5 @@ pub fn execute_sql(connection_str: &str, query: &str) {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("INSERT"));
+        .stdout(predicate::str::contains(out_pattern));
 }

@@ -1,6 +1,10 @@
-use crate::src::utils::{execute_sql, rbac, stub_server::StubHostsServer, test_env};
+use crate::src::utils::test_env::DummyNet;
+use crate::src::utils::{
+    execute_sql, execute_sql_insert, rbac, stub_server::StubHostsServer, test_env,
+};
 use assert_cmd::Command;
 use assert_fs::TempDir;
+use blockvisord::node_data::NodeData;
 use blockvisord::{
     config::Config, node_data::NodeImage, services::api::pb, services::cookbook::CookbookService,
 };
@@ -130,7 +134,7 @@ async fn test_bv_service_e2e() {
     let user_query = r#"INSERT INTO users
         VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@blockjoy.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00', NULL, NULL);
         "#;
-    execute_sql(db_url, user_query);
+    execute_sql_insert(db_url, user_query);
 
     println!("login user");
     let mut client = pb::auth_service_client::AuthServiceClient::connect(url)
@@ -154,7 +158,7 @@ async fn test_bv_service_e2e() {
         INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'grpc-login');
         INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'grpc-new-host');
         "#;
-    execute_sql(db_url, org_query);
+    execute_sql_insert(db_url, org_query);
 
     let auth_token = login.token;
 
@@ -178,7 +182,6 @@ async fn test_bv_service_e2e() {
     const OLD_IMAGE_VERSION: &str = "0.0.2";
     const OLD_IMAGE: &str = "testing/validator/0.0.2";
     const NEW_IMAGE_VERSION: &str = "0.0.3";
-    const NEW_IMAGE: &str = "testing/validator/0.0.3";
     println!("add blockchain");
     let blockchain_query = r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
         INSERT INTO blockchain_node_types (id, blockchain_id, node_type) VALUES ('206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'validator');
@@ -186,7 +189,7 @@ async fn test_bv_service_e2e() {
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'keystore-file', NULL, 'file_upload', FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'TESTING_PARAM', NULL, 'text',        FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
         "#;
-    execute_sql(db_url, blockchain_query);
+    execute_sql_insert(db_url, blockchain_query);
 
     println!("stop blockvisor");
     test_env::bv_run(&["stop"], "blockvisor service stopped successfully", None);
@@ -260,23 +263,43 @@ async fn test_bv_service_e2e() {
         "--network",
         "test",
     ]);
-    println!("created node: {stdout}");
-    let node_id = stdout
-        .trim_start_matches(&format!(
-            "Created new node from `{OLD_IMAGE}` image with ID "
-        ))
-        .split('`')
-        .nth(1)
-        .unwrap()
-        .to_string();
+    println!("created first node: {stdout}");
+    let not_updated_node_id = parse_out_node_id(OLD_IMAGE, stdout);
+    let self_update_query = r#"UPDATE nodes SET self_update = false;"#;
+    execute_sql(db_url, self_update_query, "UPDATE 1");
+
+    let stdout = bv_run(&[
+        "node",
+        "create",
+        OLD_IMAGE,
+        "--props",
+        r#"{"TESTING_PARAM":"I guess just some test value"}"#,
+        "--network",
+        "test",
+    ]);
+    println!("created second node: {stdout}");
+    let auto_updated_node_id = parse_out_node_id(OLD_IMAGE, stdout);
 
     println!("list created node, should be auto-started");
-    test_env::wait_for_node_status(&node_id, "Running", Duration::from_secs(300), None).await;
+    test_env::wait_for_node_status(
+        &not_updated_node_id,
+        "Running",
+        Duration::from_secs(300),
+        None,
+    )
+    .await;
+    test_env::wait_for_node_status(
+        &auto_updated_node_id,
+        "Running",
+        Duration::from_secs(300),
+        None,
+    )
+    .await;
 
     println!("give user 'blockjoy-admin' so ity can add new blockchain version");
     let org_query = r#"INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'blockjoy-admin');"#;
     println!("add new image version {NEW_IMAGE_VERSION} - trigger auto upgrade");
-    execute_sql(db_url, org_query);
+    execute_sql_insert(db_url, org_query);
     client
         .add_version(with_auth(
             pb::BlockchainServiceAddVersionRequest {
@@ -293,28 +316,36 @@ async fn test_bv_service_e2e() {
 
     println!("list node, should be auto-upgraded");
     let start = std::time::Instant::now();
-    while let Err(err) = test_env::try_bv_run(&["node", "ls"], NEW_IMAGE, None) {
+    while node_version(&auto_updated_node_id).await != NEW_IMAGE_VERSION {
         if start.elapsed() < Duration::from_secs(300) {
             sleep(Duration::from_secs(1)).await;
         } else {
-            panic!("timeout expired: {err:#}")
+            panic!("timeout expired")
         }
     }
 
-    check_upload_and_download(&node_id);
+    check_upload_and_download(&auto_updated_node_id);
 
-    let stdout = bv_run(&["node", "stop", &node_id]);
+    assert_eq!(OLD_IMAGE_VERSION, node_version(&not_updated_node_id).await);
+
+    let stdout = bv_run(&["node", "stop", &auto_updated_node_id]);
     println!("executed stop node command: {stdout:?}");
 
     println!("get node status");
-    test_env::wait_for_node_status(&node_id, "Stopped", Duration::from_secs(60), None).await;
+    test_env::wait_for_node_status(
+        &auto_updated_node_id,
+        "Stopped",
+        Duration::from_secs(60),
+        None,
+    )
+    .await;
 
-    bv_run(&["node", "delete", &node_id]);
+    bv_run(&["node", "delete", &auto_updated_node_id]);
 
     println!("check if node is deleted");
     let is_deleted = || {
         let stdout = bv_run(&["node", "list"]);
-        !stdout.contains(&node_id)
+        !stdout.contains(&auto_updated_node_id)
     };
     let start = std::time::Instant::now();
     while !is_deleted() {
@@ -324,6 +355,23 @@ async fn test_bv_service_e2e() {
             panic!("timeout expired")
         }
     }
+}
+
+async fn node_version(id: &str) -> String {
+    NodeData::<DummyNet>::load(Path::new(&format!("/var/lib/blockvisor/nodes/{id}.json")))
+        .await
+        .unwrap()
+        .image
+        .node_version
+}
+
+fn parse_out_node_id(image: &str, std_out: String) -> String {
+    std_out
+        .trim_start_matches(&format!("Created new node from `{image}` image with ID "))
+        .split('`')
+        .nth(1)
+        .unwrap()
+        .to_string()
 }
 
 fn check_upload_and_download(node_id: &str) {
