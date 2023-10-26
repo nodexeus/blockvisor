@@ -1035,7 +1035,7 @@ mod tests {
 
         fn start_test_server(&self, babel_mock: MockBabelService) -> utils::tests::TestServer {
             utils::tests::start_test_server(
-                self.tmp_root.join("test_socket"),
+                &self.tmp_root,
                 babel_api::babel::babel_server::BabelServer::new(babel_mock),
             )
         }
