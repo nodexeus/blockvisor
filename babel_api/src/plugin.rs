@@ -16,7 +16,7 @@ pub trait Plugin {
     fn has_capability(&self, name: &str) -> bool;
 
     /// Init method is called by engine on node start.
-    fn init(&self, secret_keys: &HashMap<String, String>) -> Result<()>;
+    fn init(&self, keys: &HashMap<String, String>) -> Result<()>;
 
     /// Returns the height of the blockchain (in blocks).
     fn height(&self) -> Result<u64>;
@@ -46,9 +46,6 @@ pub trait Plugin {
 
     /// Returns blockchain staking status.
     fn staking_status(&self) -> Result<StakingStatus>;
-
-    /// Generates keys on the node.
-    fn generate_keys(&self) -> Result<()>;
 
     /// Call custom blockchain method by `name`, that gets String param as input and returns String as well.
     /// It is recommended to use Json string for more complex input/output.

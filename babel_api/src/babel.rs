@@ -1,9 +1,8 @@
 use crate::{
     engine::{HttpResponse, JobConfig, JobInfo, JrpcRequest, RestRequest, ShResponse},
-    metadata::{firewall, BabelConfig, KeysConfig},
+    metadata::{firewall, BabelConfig},
     utils::{Binary, BinaryStatus},
 };
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -18,10 +17,6 @@ pub trait Babel {
     fn shutdown_babel();
     /// Setup firewall according to given configuration.
     fn setup_firewall(config: firewall::Config);
-    /// Download key files from locations specified in `keys` section of Babel config.
-    fn download_keys(config: KeysConfig) -> Vec<BlockchainKey>;
-    /// Upload files into locations specified in `keys` section of Babel config.
-    fn upload_keys(config: KeysConfig, keys: Vec<BlockchainKey>) -> String;
     /// Check if JobRunner binary exists and its checksum match expected.
     fn check_job_runner(checksum: u32) -> BinaryStatus;
     /// Upload JobRunner binary, overriding existing one (if any).
@@ -73,13 +68,6 @@ pub trait Babel {
     /// Get logs gathered from babel processes (babel, babelsup and job_runner).
     #[server_streaming]
     fn get_babel_logs(max_lines: u32) -> String;
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct BlockchainKey {
-    pub name: String,
-    #[serde(with = "serde_bytes")]
-    pub content: Vec<u8>,
 }
 
 #[tonic_rpc::tonic_rpc(bincode)]

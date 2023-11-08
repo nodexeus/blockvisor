@@ -3,8 +3,6 @@ use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub type KeysConfig = HashMap<String, String>;
-
 pub fn check_metadata(meta: &BlockchainMetadata) -> Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     let min_babel_version = meta.min_babel_version.as_str();
@@ -52,8 +50,6 @@ pub struct BlockchainMetadata {
     pub babel_config: BabelConfig,
     /// Node firewall configuration.
     pub firewall: firewall::Config,
-    /// Configuration of blockchain keys.
-    pub keys: Option<KeysConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

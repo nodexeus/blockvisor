@@ -62,7 +62,6 @@ pub fn rhai_smoke(path: &Path) -> eyre::Result<BlockchainMetadata> {
     plugin.application_status().ok();
     plugin.sync_status().ok();
     plugin.staking_status().ok();
-    plugin.generate_keys().ok();
     plugin.metadata()
 }
 

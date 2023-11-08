@@ -4,9 +4,8 @@ use crate::{
 };
 use async_trait::async_trait;
 use babel_api::{
-    babel::BlockchainKey,
     engine::{HttpResponse, JobConfig, JobInfo, JrpcRequest, RestRequest, ShResponse},
-    metadata::{firewall, BabelConfig, KeysConfig},
+    metadata::{firewall, BabelConfig},
 };
 use eyre::{bail, eyre, Context, ContextCompat, Result};
 use reqwest::RequestBuilder;
@@ -15,19 +14,16 @@ use std::{
     collections::HashMap,
     mem,
     ops::{Deref, DerefMut},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
 use tokio::{
     fs,
-    fs::File,
-    io::AsyncWriteExt,
     sync::{broadcast, oneshot, Mutex, RwLock},
 };
 use tonic::{Request, Response, Status, Streaming};
 
-const WILDCARD_KEY_NAME: &str = "*";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const BABEL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -140,82 +136,6 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
                 Status::internal(format!("failed to apply firewall config with: {err}"))
             })?;
         Ok(Response::new(()))
-    }
-
-    async fn download_keys(
-        &self,
-        request: Request<KeysConfig>,
-    ) -> Result<Response<Vec<BlockchainKey>>, Status> {
-        let mut results = vec![];
-
-        for (name, location) in request.into_inner().iter() {
-            // TODO: open questions about keys download:
-            // should we bail if some key does not exist?
-            // should we return files from star dir? (potentially not secure)
-            if name != WILDCARD_KEY_NAME && Path::new(&location).exists() {
-                let content = fs::read(location).await?;
-                results.push(BlockchainKey {
-                    name: name.clone(),
-                    content,
-                })
-            }
-        }
-
-        Ok(Response::new(results))
-    }
-
-    async fn upload_keys(
-        &self,
-        request: Request<(KeysConfig, Vec<BlockchainKey>)>,
-    ) -> Result<Response<String>, Status> {
-        let (config, keys) = request.into_inner();
-        if keys.is_empty() {
-            return Err(Status::invalid_argument(
-                "Keys management error: No keys provided",
-            ));
-        }
-
-        if !config.contains_key(WILDCARD_KEY_NAME) {
-            for key in &keys {
-                let name = &key.name;
-                if !config.contains_key(name) {
-                    return Err(Status::not_found(format!(
-                        "Keys management error: Key `{name}` not found in `keys` config"
-                    )));
-                }
-            }
-        }
-
-        let mut results: Vec<String> = vec![];
-        for key in &keys {
-            let name = &key.name;
-
-            // Calculate destination file name
-            // Use location as is, if key is recognized
-            // If key is not recognized, but there is a star dir, put file into dir
-            let (filename, parent_dir) = if let Some(location) = config.get(name) {
-                let location = Path::new(location);
-                (location.to_path_buf(), location.parent())
-            } else {
-                let location = config.get(WILDCARD_KEY_NAME).unwrap(); // checked
-                let location = Path::new(location);
-                (location.join(name), Some(location))
-            };
-            if let Some(parent) = parent_dir {
-                fs::create_dir_all(parent).await?;
-            }
-
-            // Write key content into file
-            let mut f = File::create(filename.clone()).await?;
-            f.write_all(&key.content).await?;
-            let count = key.content.len();
-            results.push(format!(
-                "Done writing {count} bytes of key `{name}` into `{}`",
-                filename.to_string_lossy()
-            ));
-        }
-
-        Ok(Response::new(results.join("\n")))
     }
 
     async fn check_job_runner(
@@ -534,6 +454,7 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
     use std::env::temp_dir;
+    use std::path::Path;
     use tokio::net::UnixStream;
     use tokio_stream::wrappers::UnixListenerStream;
     use tonic::transport::{Channel, Endpoint, Server, Uri};
@@ -709,119 +630,6 @@ mod tests {
         assert_eq!(Duration::from_secs(7), extract_timeout(&req)?);
         req.set_timeout(Duration::from_nanos(77));
         assert_eq!(Duration::from_nanos(77), extract_timeout(&req)?);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_upload_download_keys() -> Result<()> {
-        let tmp_dir = TempDir::new().unwrap();
-        let tmp_dir_str = format!("{}", tmp_dir.to_string_lossy());
-
-        let service = build_babel_service_with_defaults().await?;
-        let cfg = HashMap::from([
-            ("first".to_string(), format!("{tmp_dir_str}/first/key")),
-            ("second".to_string(), format!("{tmp_dir_str}/second/key")),
-            ("third".to_string(), format!("{tmp_dir_str}/third/key")),
-        ]);
-
-        println!("no files uploaded yet");
-        let keys = service
-            .download_keys(Request::new(cfg.clone()))
-            .await?
-            .into_inner();
-        assert_eq!(keys.len(), 0);
-
-        println!("upload bad keys");
-        let status = service
-            .upload_keys(Request::new((cfg.clone(), vec![])))
-            .await
-            .err()
-            .unwrap();
-        assert_eq!(status.message(), "Keys management error: No keys provided");
-
-        println!("upload good keys");
-        let output = service
-            .upload_keys(Request::new((
-                cfg.clone(),
-                vec![
-                    BlockchainKey {
-                        name: "second".to_string(),
-                        content: b"123".to_vec(),
-                    },
-                    BlockchainKey {
-                        name: "third".to_string(),
-                        content: b"abcd".to_vec(),
-                    },
-                ],
-            )))
-            .await?
-            .into_inner();
-        assert_eq!(
-            output,
-            format!(
-                "Done writing 3 bytes of key `second` into `{tmp_dir_str}/second/key`\n\
-                 Done writing 4 bytes of key `third` into `{tmp_dir_str}/third/key`"
-            )
-        );
-
-        println!("download uploaded keys");
-        let mut keys = service
-            .download_keys(Request::new(cfg.clone()))
-            .await?
-            .into_inner();
-        assert_eq!(keys.len(), 2);
-        keys.sort_by_key(|k| k.name.clone());
-        assert_eq!(
-            keys[0],
-            BlockchainKey {
-                name: "second".to_string(),
-                content: b"123".to_vec(),
-            }
-        );
-        assert_eq!(
-            keys[1],
-            BlockchainKey {
-                name: "third".to_string(),
-                content: b"abcd".to_vec(),
-            }
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_upload_download_keys_with_star() -> Result<()> {
-        let tmp_dir = TempDir::new().unwrap();
-        let tmp_dir_str = format!("{}", tmp_dir.to_string_lossy());
-
-        let cfg = HashMap::from([(
-            WILDCARD_KEY_NAME.to_string(),
-            format!("{tmp_dir_str}/star/"),
-        )]);
-        let service = build_babel_service_with_defaults().await?;
-
-        println!("upload unknown keys");
-        let output = service
-            .upload_keys(Request::new((
-                cfg.clone(),
-                vec![BlockchainKey {
-                    name: "unknown".to_string(),
-                    content: b"12345".to_vec(),
-                }],
-            )))
-            .await?
-            .into_inner();
-
-        assert_eq!(
-            output,
-            format!("Done writing 5 bytes of key `unknown` into `{tmp_dir_str}/star/unknown`")
-        );
-
-        println!("files in star dir should not be downloading");
-        let keys = service
-            .download_keys(Request::new(cfg.clone()))
-            .await?
-            .into_inner();
-        assert_eq!(keys.len(), 0);
         Ok(())
     }
 

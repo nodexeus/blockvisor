@@ -12,7 +12,6 @@ use tonic::{
 pub mod api;
 pub mod cookbook;
 pub mod kernel;
-pub mod keyfiles;
 pub mod mqtt;
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);

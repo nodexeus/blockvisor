@@ -137,7 +137,6 @@ fn test_testing() -> eyre::Result<()> {
     );
     assert_eq!(SyncStatus::Synced, plugin.sync_status()?);
     assert_eq!(StakingStatus::Staking, plugin.staking_status()?);
-    plugin.generate_keys()?;
     assert_eq!(1, plugin.metadata()?.requirements.vcpu_count);
     Ok(())
 }

@@ -213,12 +213,6 @@ async fn test_bv_cmd_node_lifecycle() -> Result<()> {
     println!("check jobs after node upgrade");
     test_env.bv_run(&["node", "job", vm_id, "info", "echo"], "status: Running");
 
-    println!("generate node keys");
-    test_env.bv_run(&["node", "run", "generate_keys", vm_id], "");
-
-    println!("check node keys");
-    test_env.bv_run(&["node", "keys", vm_id], "first");
-
     println!("delete started node");
     test_env.bv_run(&["node", "delete", vm_id], "Deleted node");
     Ok(())

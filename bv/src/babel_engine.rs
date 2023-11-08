@@ -22,14 +22,13 @@ use babel_api::{
     engine::{
         HttpResponse, JobConfig, JobInfo, JobStatus, JobType, JrpcRequest, RestRequest, ShResponse,
     },
-    metadata::KeysConfig,
     plugin::{ApplicationStatus, Plugin, StakingStatus, SyncStatus},
 };
 use bv_utils::{run_flag::RunFlag, with_retry};
 use eyre::{anyhow, bail, Context, Error, Result};
 use futures_util::StreamExt;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     fmt::Debug,
     fs,
     path::{Path, PathBuf},
@@ -171,33 +170,8 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         self.on_plugin(|plugin| plugin.staking_status()).await
     }
 
-    pub async fn init(&mut self, secret_keys: HashMap<String, Vec<u8>>) -> Result<()> {
-        // TODO get rid of all key exchange related code
-        let mut node_keys = self
-            .node_info
-            .properties
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<HashMap<_, _>>();
-
-        for (k, v) in secret_keys.into_iter() {
-            match node_keys.entry(k) {
-                Entry::Occupied(entry) => {
-                    // A parameter named "KEY" that comes form the backend or possibly from a user
-                    // must not have the same name as any of the parameters in node_keys map. This
-                    // can lead to undefined behaviour or even a security issue. A user-provided
-                    // value could be (unintentionally) joined with a node_keys value into a single
-                    // parameter and used in an undesirable way. Since the user has no way to
-                    // define parameter names this must be treated as internal error (that should
-                    // never happen, but ...).
-                    bail!("Secret keys KEY collides with params KEY: {}", entry.key())
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(String::from_utf8(v)?);
-                }
-            }
-        }
-        self.on_plugin(move |plugin| plugin.init(&node_keys)).await
+    pub async fn init(&mut self, keys: HashMap<String, String>) -> Result<()> {
+        self.on_plugin(move |plugin| plugin.init(&keys)).await
     }
 
     /// This function calls babel by sending a blockchain command using the specified method name.
@@ -221,10 +195,6 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
             "application_status" => serde_json::to_string(&self.application_status().await?)?,
             "sync_status" => serde_json::to_string(&self.sync_status().await?)?,
             "staking_status" => serde_json::to_string(&self.staking_status().await?)?,
-            "generate_keys" => {
-                self.generate_keys().await?;
-                Default::default()
-            }
             _ => {
                 let method_name = name.to_owned();
                 let method_param = param.to_owned();
@@ -303,34 +273,6 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
             logs.push(log);
         }
         Ok(logs)
-    }
-
-    /// Returns blockchain node keys.
-    pub async fn download_keys(&mut self) -> Result<Vec<babel_api::babel::BlockchainKey>> {
-        let config = self.get_keys_config().await?;
-        let babel_client = self.node_connection.babel_client().await?;
-        let keys = with_retry!(babel_client.download_keys(config.clone()))?.into_inner();
-        Ok(keys)
-    }
-
-    /// Sets blockchain node keys.
-    pub async fn upload_keys(&mut self, keys: Vec<babel_api::babel::BlockchainKey>) -> Result<()> {
-        let config = self.get_keys_config().await?;
-        let babel_client = self.node_connection.babel_client().await?;
-        with_retry!(babel_client.upload_keys((config.clone(), keys.clone())))?;
-        Ok(())
-    }
-
-    async fn get_keys_config(&mut self) -> Result<KeysConfig> {
-        self.on_plugin(move |plugin| plugin.metadata())
-            .await?
-            .keys
-            .ok_or_else(|| anyhow!("No `keys` section found in metadata"))
-    }
-
-    /// Generates keys on node
-    pub async fn generate_keys(&mut self) -> Result<()> {
-        self.on_plugin(|plugin| plugin.generate_keys()).await
     }
 
     /// Clone plugin, move it to separate thread and call given function `f` on it.
@@ -749,7 +691,6 @@ mod tests {
     use assert_fs::TempDir;
     use async_trait::async_trait;
     use babel_api::{
-        babel::BlockchainKey,
         engine::{Engine, JobInfo, JobType, RestartPolicy},
         metadata::BabelConfig,
     };
@@ -779,14 +720,6 @@ mod tests {
                 &self,
                 request: Request<babel_api::metadata::firewall::Config>,
             ) -> Result<Response<()>, Status>;
-            async fn download_keys(
-                &self,
-                request: Request<babel_api::metadata::KeysConfig>,
-            ) -> Result<Response<Vec<BlockchainKey>>, Status>;
-            async fn upload_keys(
-                &self,
-                request: Request<(babel_api::metadata::KeysConfig, Vec<BlockchainKey>)>,
-            ) -> Result<Response<String>, Status>;
             async fn check_job_runner(
                 &self,
                 request: Request<u32>,
@@ -854,11 +787,11 @@ mod tests {
             self.engine.run_sh("has_capability", None).unwrap();
             true
         }
-        fn init(&self, secret_keys: &HashMap<String, String>) -> Result<()> {
+        fn init(&self, keys: &HashMap<String, String>) -> Result<()> {
             self.engine.render_template(
                 Path::new("template"),
                 Path::new("config"),
-                &serde_json::to_string(secret_keys)?,
+                &serde_json::to_string(keys)?,
             )?;
             Ok(())
         }
@@ -891,10 +824,6 @@ mod tests {
         fn staking_status(&self) -> Result<StakingStatus> {
             self.engine.run_sh("staking_status", None)?;
             Ok(StakingStatus::Staked)
-        }
-        fn generate_keys(&self) -> Result<()> {
-            self.engine.run_sh("generate_keys", None)?;
-            Ok(())
         }
         fn call_custom_method(&self, name: &str, param: &str) -> Result<String> {
             self.engine.create_job(
@@ -1057,8 +986,7 @@ mod tests {
                 let json = json.as_object().unwrap();
                 template == Path::new("template")
                     && out == Path::new("config")
-                    && json["some_key"].to_string() == r#""some value""#
-                    && json["secret_key"].to_string() == r#""\u0001\u0002\u0003""#
+                    && json["custom_key"].to_string() == r#""custom value""#
             })
             .return_once(|_| Ok(Response::new(())));
         // from custom_method
@@ -1206,8 +1134,8 @@ mod tests {
         test_env
             .engine
             .init(HashMap::from_iter([(
-                "secret_key".to_string(),
-                vec![1, 2, 3],
+                "custom_key".to_string(),
+                "custom value".to_string(),
             )]))
             .await?;
         assert_eq!(
@@ -1241,15 +1169,6 @@ mod tests {
             test_env.engine.capabilities().await?
         );
         assert!(test_env.engine.has_capability("some method").await?);
-        assert_eq!(
-            "no metadata",
-            test_env
-                .engine
-                .upload_keys(vec![])
-                .await
-                .unwrap_err()
-                .to_string()
-        );
         babel_server.assert().await;
 
         Ok(())
