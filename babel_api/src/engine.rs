@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use tracing::log::Level;
+use tracing::Level;
 
 pub const DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS: u64 = 60;
 pub const DEFAULT_JOB_SHUTDOWN_SIGNAL: PosixSignal = PosixSignal::SIGTERM;
