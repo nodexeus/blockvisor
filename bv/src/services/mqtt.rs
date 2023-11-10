@@ -1,14 +1,14 @@
-use crate::{config::SharedConfig, pal, services};
+use crate::{config::SharedConfig, pal, services, services::api::pb};
 use async_trait::async_trait;
 use eyre::{anyhow, bail, Result};
 use metrics::{register_counter, Counter};
+use prost::Message;
 use reqwest::Url;
-use rumqttc::{AsyncClient, Event, EventLoop, Incoming, LastWill, MqttOptions, QoS};
+use rumqttc::v5::mqttbytes::v5::LastWill;
+use rumqttc::v5::mqttbytes::QoS;
+use rumqttc::v5::{AsyncClient, Event, EventLoop, Incoming, MqttOptions};
 use std::time::Duration;
 use tracing::{debug, info};
-
-const ONLINE: &[u8] = "online".as_bytes();
-const OFFLINE: &[u8] = "offline".as_bytes();
 
 lazy_static::lazy_static! {
     pub static ref MQTT_POLL_COUNTER: Counter = register_counter!("mqtt.connection.poll");
@@ -48,12 +48,14 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
             let mut options = MqttOptions::new(&host_id, host, port);
             options.set_keep_alive(Duration::from_secs(30));
             // use last will to notify about host going offline
+            let offline = host_offline(host_id.clone());
             let status_topic = format!("/bv/hosts/{host_id}/status");
             options.set_last_will(LastWill {
-                topic: status_topic.clone(),
-                message: OFFLINE.into(),
+                topic: status_topic.clone().into(),
+                message: offline.into(),
                 qos: QoS::AtLeastOnce,
                 retain: true,
+                properties: None,
             });
             // use jwt as username, set empty password
             options.set_credentials(token.0, "");
@@ -62,8 +64,9 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
             let (client, eventloop) = AsyncClient::new(options, client_channel_capacity);
 
             // set status to online
+            let online = host_online(host_id.clone());
             client
-                .publish(status_topic, QoS::AtLeastOnce, true, ONLINE)
+                .publish(status_topic, QoS::AtLeastOnce, true, online)
                 .await?;
 
             // subscribe to host commands topic
@@ -84,8 +87,12 @@ impl pal::CommandsStream for MqttStream {
         MQTT_POLL_COUNTER.increment(1);
         match self.event_loop.poll().await {
             Ok(Event::Incoming(Incoming::Publish(p))) => {
-                info!("MQTT incoming topic: {}, payload: {:?}", p.topic, p.payload);
-                Ok(Some(p.payload.to_vec()))
+                let topic = String::from_utf8(p.topic.into())?;
+                info!(
+                    "MQTT incoming topic: {topic}, payload len: {}",
+                    p.payload.len()
+                );
+                Ok(Some(p.payload.into()))
             }
             Ok(Event::Incoming(i)) => {
                 debug!("MQTT incoming = {i:?}");
@@ -100,4 +107,20 @@ impl pal::CommandsStream for MqttStream {
             }
         }
     }
+}
+
+fn host_online(host_id: String) -> Vec<u8> {
+    pb::HostStatus {
+        host_id,
+        connection_status: Some(pb::HostConnectionStatus::Online.into()),
+    }
+    .encode_to_vec()
+}
+
+fn host_offline(host_id: String) -> Vec<u8> {
+    pb::HostStatus {
+        host_id,
+        connection_status: Some(pb::HostConnectionStatus::Offline.into()),
+    }
+    .encode_to_vec()
 }

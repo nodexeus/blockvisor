@@ -35,7 +35,7 @@ use std::{
     time::Duration,
 };
 use tonic::Status;
-use tracing::{debug, error, info, instrument, log::Level, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn, Level};
 use uuid::Uuid;
 
 lazy_static::lazy_static! {
@@ -651,11 +651,11 @@ impl babel_api::engine::Engine for Engine {
 
     fn log(&self, level: Level, message: &str) {
         match level {
-            Level::Error => error!("node_id: {}|{message}", self.node_id),
-            Level::Warn => warn!("node_id: {}|{message}", self.node_id),
-            Level::Info => info!("node_id: {}|{message}", self.node_id),
-            Level::Debug => debug!("node_id: {}|{message}", self.node_id),
-            Level::Trace => trace!("node_id: {}|{message}", self.node_id),
+            Level::ERROR => error!("node_id: {}|{message}", self.node_id),
+            Level::WARN => warn!("node_id: {}|{message}", self.node_id),
+            Level::INFO => info!("node_id: {}|{message}", self.node_id),
+            Level::DEBUG => debug!("node_id: {}|{message}", self.node_id),
+            Level::TRACE => trace!("node_id: {}|{message}", self.node_id),
         }
     }
 }
