@@ -531,7 +531,6 @@ pub mod tests {
     use async_trait::async_trait;
     use babel_api::utils::BinaryStatus;
     use babel_api::{
-        babel::BlockchainKey,
         engine::{HttpResponse, JobConfig, JobInfo, JrpcRequest, RestRequest, ShResponse},
         metadata::{BabelConfig, Requirements},
     };
@@ -744,14 +743,6 @@ pub mod tests {
                 &self,
                 request: Request<babel_api::metadata::firewall::Config>,
             ) -> Result<Response<()>, Status>;
-            async fn download_keys(
-                &self,
-                request: Request<babel_api::metadata::KeysConfig>,
-            ) -> Result<Response<Vec<BlockchainKey>>, Status>;
-            async fn upload_keys(
-                &self,
-                request: Request<(babel_api::metadata::KeysConfig, Vec<BlockchainKey>)>,
-            ) -> Result<Response<String>, Status>;
             async fn check_job_runner(
                 &self,
                 request: Request<u32>,

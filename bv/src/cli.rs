@@ -190,13 +190,6 @@ pub enum NodeCommand {
         max_lines: u32,
     },
 
-    /// Get installed key names
-    #[clap(alias = "k")]
-    Keys {
-        /// Node id or name. BV tries to get it from workspace if not provided.
-        id_or_name: Option<String>,
-    },
-
     /// Get node status
     Status {
         /// One or more node id or names.

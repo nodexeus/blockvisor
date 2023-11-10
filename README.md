@@ -129,45 +129,6 @@ sequenceDiagram
     babelsup->>fc: listen for messages on vsock
 ```
 
-#### More detailed view including key exchange and node initialization
-
-```mermaid
-sequenceDiagram
-    participant frontend as Frontend
-    participant backend as API
-    participant bv as BV
-    participant babel as Babel
-
-    frontend ->> backend: Create Node
-    backend ->> bv: Create Node
-    bv ->> bv: Download os.img, kernel, babel.rhai
-    bv ->> bv: Create data.img
-
-    backend ->> bv: Start Node
-
-    bv ->> babel: Start Node
-    babel ->> babel: Mount data.img
-
-    bv ->> backend: Get keys
-    backend -->> bv: Keys?
-    alt Got keys
-        bv ->> babel: Setup keys
-    else No keys found
-        bv ->> babel: Generate new keys
-        babel -->> bv: Keys
-        bv ->> backend: Save keys
-    end
-
-    bv ->> bv: call init on Babel plugin  
-    bv ->> babel: run_*, start_job, ...
-    Note right of bv: forward run_*, start_job and other calls<br> to bebel, so it can be run on the node
-    babel -->> bv: 
-    Note right of bv: result is sent back to BVand processed<br>  by Babel plugin 
-    
-    frontend ->> backend: Get keys
-    backend -->> frontend: Keys
-```
-
 ### Execute Method on Blockchain
 
 ```mermaid

@@ -97,19 +97,13 @@ const METADATA = #{
             },
         ],
     },
-    // [optional] Configuration of blockchain keys.
-    // keys: #{
-    //     first: "/opt/secrets/first.key",
-    //     second: "/opt/secrets/second.key",
-    //     "*": "/tmp",
-    // },
 };
 
 // You can define some constants to use in the code
 const API_HOST = "http://localhost:4467/";
 
 // Function that is called by BV on first node start.
-// It takes secret keys key-value map as argument.
+// It takes keys key-value map as argument.
 // SHALL be implemented
 fn init(keys) {
     // Run Sh script on the blockchain VM and return it's result (with default 15s timeout)
@@ -200,13 +194,6 @@ fn sync_status() {
 // SHOULD be implemented
 fn staking_status() {
     "staking"
-}
-
-// Generates keys on the node.
-// SHOULD be implemented
-fn generate_keys() {
-    run_sh("mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key");
-    return;
 }
 
 // Test functions starting with test_ COULD be implemented as part of test harness

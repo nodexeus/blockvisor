@@ -257,15 +257,6 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                 println!("{status}");
             }
         }
-        NodeCommand::Keys { id_or_name } => {
-            let id = client
-                .resolve_id_or_name(&node_id_with_fallback(id_or_name)?)
-                .await?;
-            let keys = client.get_node_keys(id).await?;
-            for name in keys.into_inner() {
-                println!("{name}");
-            }
-        }
         NodeCommand::Capabilities { id_or_name } => {
             let id = client
                 .resolve_id_or_name(&node_id_with_fallback(id_or_name)?)

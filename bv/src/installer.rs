@@ -590,7 +590,6 @@ mod tests {
                 &self,
                 request: tonic::Request<(Uuid, u32)>,
             ) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
-            async fn get_node_keys(&self, request: tonic::Request<Uuid>) -> Result<tonic::Response<Vec<String>>, tonic::Status>;
             async fn get_node_id_for_name(
                 &self,
                 request: tonic::Request<String>,

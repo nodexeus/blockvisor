@@ -235,9 +235,9 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         self.ast.iter_functions().any(|meta| meta.name == name)
     }
 
-    fn init(&self, secret_keys: &HashMap<String, String>) -> Result<()> {
-        let secret_keys = Map::from_iter(secret_keys.iter().map(|(k, v)| (k.into(), v.into())));
-        self.call_fn("init", (secret_keys,))
+    fn init(&self, keys: &HashMap<String, String>) -> Result<()> {
+        let keys = Map::from_iter(keys.iter().map(|(k, v)| (k.into(), v.into())));
+        self.call_fn("init", (keys,))
     }
 
     fn height(&self) -> Result<u64> {
@@ -276,10 +276,6 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         Ok(from_dynamic(
             &self.call_fn::<_, Dynamic>("staking_status", ())?,
         )?)
-    }
-
-    fn generate_keys(&self) -> Result<()> {
-        self.call_fn::<_, ()>("generate_keys", ())
     }
 
     fn call_custom_method(&self, name: &str, param: &str) -> Result<String> {
@@ -431,10 +427,6 @@ mod tests {
         fn staking_status() {
             "staking"
         }
-
-        fn generate_keys() {
-            save_data("keys generated");
-        }
 "#;
         let mut babel = MockBabelEngine::new();
         babel
@@ -461,7 +453,6 @@ mod tests {
         );
         assert_eq!(SyncStatus::Synced, plugin.sync_status()?);
         assert_eq!(StakingStatus::Staking, plugin.staking_status()?);
-        plugin.generate_keys()?;
         Ok(())
     }
 
@@ -849,12 +840,6 @@ const METADATA = #{
             },
         ],
     },
-    keys: #{
-        key_a_name: "key A Value",
-        key_B_name: "key B Value",
-        key_X_name: "X",
-        "*": "/*"
-    },
 };
 fn any_function() {}
 "#;
@@ -932,12 +917,6 @@ fn any_function() {}
                     },
                 ],
             },
-            keys: Some(HashMap::from_iter([
-                ("key_X_name".to_string(), "X".to_string()),
-                ("*".to_string(), "/*".to_string()),
-                ("key_a_name".to_string(), "key A Value".to_string()),
-                ("key_B_name".to_string(), "key B Value".to_string()),
-            ])),
         };
         let plugin = RhaiPlugin::new(meta_rhai, MockBabelEngine::new())?;
         assert_eq!(meta_rust, plugin.metadata()?);

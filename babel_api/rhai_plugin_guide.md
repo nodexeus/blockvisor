@@ -151,13 +151,6 @@ const METADATA = #{
             },
         ],
     },
-    
-    // [optional] Configuration of blockchain keys.
-    keys: #{
-        first: "/opt/secrets/first.key",
-        second: "/opt/secrets/second.key",
-        "*": "/tmp",
-    },
 };
 ```
 
@@ -165,7 +158,7 @@ const METADATA = #{
 
 Functions listed below are required by BV to work properly.
 
-- `init` - Function that is called by BV on first node start. It takes `secret_keys` key-value map as argument.
+- `init` - Function that is called by BV on first node start. It takes `keys` key-value map as argument.
   It shall do all required initializations and start required background jobs. See 'Engine Interface' chapter for more details on how to start jobs.
   Once node is **successfully** started it is not called by BV anymore. Hence `init` function may be called more than
   once only if node start failed for some reason.
@@ -212,7 +205,6 @@ to recognise the node, but the purpose may vary per blockchain.
   <br>**Allowed return values**: _syncing_, _synced_
 - `staking_status()` - Returns blockchain staking status.
   <br>**Allowed return values**: _follower_, _staked_, _staking_, _validating_, _consensus_, _unstaked_
-- `generate_keys()` - Generates keys on the node.
 
 ## Functions that MAY be implemented by Plugin
 

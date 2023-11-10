@@ -44,9 +44,6 @@ const METADATA = #{
             },
         ],
     },
-    keys: #{
-        "*": "/opt/secrets",
-    },
 };
 
 const API_HOST = "http://localhost:4467/";
@@ -108,9 +105,4 @@ fn sync_status() {
 
 fn staking_status() {
     "staking"
-}
-
-fn generate_keys() {
-    run_sh("mkdir -p /opt/secrets && echo first > /opt/secrets/first.key && echo second > /opt/secrets/second.key");
-    return;
 }

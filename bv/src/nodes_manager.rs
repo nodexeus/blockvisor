@@ -467,17 +467,6 @@ impl<P: Pal + Debug> NodesManager<P> {
     }
 
     #[instrument(skip(self))]
-    pub async fn keys(&self, id: Uuid) -> Result<Vec<babel_api::babel::BlockchainKey>> {
-        let nodes = self.nodes.read().await;
-        let mut node = nodes
-            .get(&id)
-            .ok_or_else(|| id_not_found(id))?
-            .write()
-            .await;
-        node.babel_engine.download_keys().await
-    }
-
-    #[instrument(skip(self))]
     pub async fn capabilities(&self, id: Uuid) -> Result<Vec<String>> {
         let nodes = self.nodes.read().await;
         let mut node = nodes
