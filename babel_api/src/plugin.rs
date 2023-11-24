@@ -94,6 +94,6 @@ pub enum ApplicationStatus {
     Minting,
     Processing,
     Relaying,
-    Removed,
-    Removing,
+    Deleting,
+    Updating,
 }

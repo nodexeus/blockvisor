@@ -259,8 +259,8 @@ impl From<ApplicationStatus> for pb::NodeStatus {
             ApplicationStatus::Minting => pb::NodeStatus::Minting,
             ApplicationStatus::Processing => pb::NodeStatus::Processing,
             ApplicationStatus::Relaying => pb::NodeStatus::Relaying,
-            ApplicationStatus::Removed => pb::NodeStatus::Removed,
-            ApplicationStatus::Removing => pb::NodeStatus::Removing,
+            ApplicationStatus::Deleting => pb::NodeStatus::Deleting,
+            ApplicationStatus::Updating => pb::NodeStatus::Updating,
         }
     }
 }
