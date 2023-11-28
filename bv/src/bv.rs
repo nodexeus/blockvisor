@@ -3,13 +3,14 @@ use crate::{
         ChainCommand, ClusterCommand, HostCommand, ImageCommand, JobCommand, NodeCommand,
         WorkspaceCommand,
     },
-    config::{Config, SharedConfig},
+    config::SharedConfig,
     hosts::{self, HostInfo, HostMetrics},
     internal_server,
     internal_server::NodeCreateRequest,
-    linux_platform::bv_root,
+    linux_platform::{bv_root, LinuxPlatform},
     node_context::REGISTRY_CONFIG_DIR,
     node_data::{NodeImage, NodeStatus},
+    nodes_manager::NodesManager,
     pretty_table::{PrettyTable, PrettyTableRow},
     services,
     services::blockchain::{
@@ -396,7 +397,11 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
     Ok(())
 }
 
-pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Result<()> {
+pub async fn process_image_command(
+    bv_url: String,
+    config: SharedConfig,
+    command: ImageCommand,
+) -> Result<()> {
     match command {
         ImageCommand::Create {
             image_id,
@@ -421,11 +426,13 @@ pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Res
             source_image_id,
             destination_image_id,
         } => {
-            parse_image(&source_image_id)?; // just validate source image id format
+            let source_image = parse_image(&source_image_id)?;
             let destination_image = parse_image(&destination_image_id)?;
             let images_dir = build_bv_var_path().join(IMAGES_DIR);
             let destination_image_path = images_dir.join(destination_image_id);
             fs::create_dir_all(&destination_image_path)?;
+            let pal = LinuxPlatform::new()?;
+            let _ = NodesManager::fetch_image_data(pal.into(), config, &source_image).await?;
             fs_extra::dir::copy(
                 images_dir.join(source_image_id),
                 &destination_image_path,
@@ -491,9 +498,8 @@ pub async fn process_image_command(bv_url: String, command: ImageCommand) -> Res
     Ok(())
 }
 
-pub async fn process_chain_command(command: ChainCommand) -> Result<()> {
+pub async fn process_chain_command(config: SharedConfig, command: ChainCommand) -> Result<()> {
     let bv_root = bv_root();
-    let config = SharedConfig::new(Config::load(&bv_root).await?, bv_root.clone());
 
     match command {
         ChainCommand::List {
