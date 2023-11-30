@@ -197,8 +197,7 @@ impl<P: Pal + Debug> NodesManager<P> {
             }
         }
 
-        let meta = self
-            .fetch_image_data(&config.image)
+        let meta = Self::fetch_image_data(self.pal.clone(), self.api_config.clone(), &config.image)
             .await
             .with_context(|| "fetch image data failed")?;
 
@@ -270,7 +269,8 @@ impl<P: Pal + Debug> NodesManager<P> {
                     image.node_type
                 )));
             }
-            let new_meta = self.fetch_image_data(&image).await?;
+            let new_meta =
+                Self::fetch_image_data(self.pal.clone(), self.api_config.clone(), &image).await?;
             if data.kernel != new_meta.kernel {
                 command_failed!(Error::Internal(anyhow!("Cannot upgrade kernel")));
             }
@@ -589,55 +589,6 @@ impl<P: Pal + Debug> NodesManager<P> {
     }
 
     #[instrument(skip(self))]
-    async fn fetch_image_data(&self, image: &NodeImage) -> Result<BlockchainMetadata> {
-        let bv_root = self.pal.bv_root();
-        let folder = BlockchainService::get_image_download_folder_path(bv_root, image);
-        let rhai_path = folder.join(BABEL_PLUGIN_NAME);
-
-        let script = if !BlockchainService::is_image_cache_valid(bv_root, image)
-            .await
-            .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
-        {
-            let mut blockchain_service = BlockchainService::connect(
-                self.pal.create_api_service_connector(&self.api_config),
-                bv_root.to_path_buf(),
-            )
-            .await
-            .with_context(|| "cannot connect to blockchain service")?;
-            blockchain_service
-                .download_babel_plugin(image)
-                .await
-                .with_context(|| "cannot download babel plugin")?;
-            blockchain_service
-                .download_image(image)
-                .await
-                .with_context(|| "cannot download image")?;
-            fs::read_to_string(rhai_path).await.map_err(into_internal)?
-        } else {
-            fs::read_to_string(rhai_path).await.map_err(into_internal)?
-        };
-        let meta = rhai_plugin::read_metadata(&script)?;
-        if !KernelService::is_kernel_cache_valid(bv_root, &meta.kernel)
-            .await
-            .with_context(|| format!("Failed to check kernel cache: `{}`", meta.kernel))?
-        {
-            let mut kernel_service = KernelService::connect(
-                self.pal.create_api_service_connector(&self.api_config),
-                bv_root.to_path_buf(),
-            )
-            .await
-            .with_context(|| "cannot connect to kernel service")?;
-            kernel_service
-                .download_kernel(&meta.kernel)
-                .await
-                .with_context(|| "cannot download kernel")?;
-        }
-
-        info!("Reading blockchain requirements: {:?}", &meta.requirements);
-        Ok(meta)
-    }
-
-    #[instrument(skip(self))]
     async fn image(&self, id: Uuid) -> commands::Result<NodeImage> {
         let nodes = self.nodes.read().await;
         let node = nodes
@@ -778,6 +729,59 @@ impl<P: Pal + Debug> NodesManager<P> {
             ))?;
 
         Ok(iface)
+    }
+
+    #[instrument(skip(pal, api_config))]
+    pub async fn fetch_image_data(
+        pal: Arc<P>,
+        api_config: SharedConfig,
+        image: &NodeImage,
+    ) -> Result<BlockchainMetadata> {
+        let bv_root = pal.bv_root();
+        let folder = BlockchainService::get_image_download_folder_path(bv_root, image);
+        let rhai_path = folder.join(BABEL_PLUGIN_NAME);
+
+        let script = if !BlockchainService::is_image_cache_valid(bv_root, image)
+            .await
+            .with_context(|| format!("Failed to check image cache: `{image:?}`"))?
+        {
+            let mut blockchain_service = BlockchainService::connect(
+                pal.create_api_service_connector(&api_config),
+                bv_root.to_path_buf(),
+            )
+            .await
+            .with_context(|| "cannot connect to blockchain service")?;
+            blockchain_service
+                .download_babel_plugin(image)
+                .await
+                .with_context(|| "cannot download babel plugin")?;
+            blockchain_service
+                .download_image(image)
+                .await
+                .with_context(|| "cannot download image")?;
+            fs::read_to_string(rhai_path).await.map_err(into_internal)?
+        } else {
+            fs::read_to_string(rhai_path).await.map_err(into_internal)?
+        };
+        let meta = rhai_plugin::read_metadata(&script)?;
+        if !KernelService::is_kernel_cache_valid(bv_root, &meta.kernel)
+            .await
+            .with_context(|| format!("Failed to check kernel cache: `{}`", meta.kernel))?
+        {
+            let mut kernel_service = KernelService::connect(
+                pal.create_api_service_connector(&api_config),
+                bv_root.to_path_buf(),
+            )
+            .await
+            .with_context(|| "cannot connect to kernel service")?;
+            kernel_service
+                .download_kernel(&meta.kernel)
+                .await
+                .with_context(|| "cannot download kernel")?;
+        }
+
+        info!("Reading blockchain requirements: {:?}", &meta.requirements);
+        Ok(meta)
     }
 }
 
