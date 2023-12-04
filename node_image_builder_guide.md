@@ -55,13 +55,14 @@ Created node can be now edited and tested, e.g. :
 
 Above can be done with `bv` CLI or with VS Code "Run and Debug".
 
-__NOTE 1__: All of Rhai functions can be immediately tested, just after file is saved. The only exception is `init()` function,
-which is not accessible via CLI. Additionally, it is called only once, on first node startup. Hence, it is recommended
-to put `init()` function body into some custom function first, so it can be easily tested.
+__NOTE 1__: All of Rhai functions can be immediately tested, just after file is saved (including `init()` function).
 
 __NOTE 2__: `bv node check` executes set of build in functions and all other functions that starts with `test_` prefix.
 This can be used to implement blockchain specific a'la unit tests, that will validate other functions output and throw
 exception when assertion fail.
+
+__NOTE 3__: Experimenting with init function may result in some unwanted jobs running.
+Use `bv n job` CLI to stop unwanted jobs.
 
 ### Capture and Upload Image
 
