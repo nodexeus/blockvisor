@@ -69,7 +69,7 @@ services:
       CF_ZONE: 89560cdd783e35f7a9d718755ea9c656
       CF_DNS_BASE: n0des.xyz
       CF_TTL: 300
-      CF_TOKEN: 9QjEiXC4B26tgshHZjuZ57kJcjaChSSsDfzUvfYQ
+      CF_TOKEN: ${CF_TOKEN}
       # logs
       LOG_ENVIRONMENT: dev
       OPENTELEMETRY_ENDPOINT: http://api:8080
