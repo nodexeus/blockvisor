@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "babel"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "assert_fs",
  "async-trait",
@@ -570,7 +570,7 @@ dependencies = [
 
 [[package]]
 name = "babel_api"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "cidr-utils",
  "eyre",
@@ -680,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "blockvisord"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
@@ -754,7 +754,7 @@ checksum = "7f30e7476521f6f8af1a1c4c0b8cc94f0bee37d91763d0ca2665f299b6cd8aec"
 
 [[package]]
 name = "bv_utils"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "async-trait",
  "ctrlc",
@@ -3917,7 +3917,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "upload_manifest_generator"
-version = "0.45.0"
+version = "0.46.0"
 dependencies = [
  "aws-sdk-s3",
  "babel_api",
