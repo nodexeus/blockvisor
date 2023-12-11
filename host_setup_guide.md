@@ -21,6 +21,7 @@ Beside standard linux tool available in all distributions, BV requires following
 - `pigz`
 - `tar`
 - `fallocate`
+- `debootstrap`
 - `systemctl`
 - `tmux`
 - `ip`

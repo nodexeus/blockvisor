@@ -479,7 +479,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
 
 async fn check_cli_dependencies() -> Result<()> {
     // smoke test for all CLI tools used in BV
-    for cmd in ["pigz", "tar", "fallocate", "systemctl"] {
+    for cmd in ["pigz", "tar", "fallocate", "debootstrap", "systemctl"] {
         bv_utils::cmd::run_cmd(cmd, ["--version"]).await?;
     }
     for cmd in ["tmux", "ip", "mkfs.ext4"] {
