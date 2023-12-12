@@ -53,6 +53,9 @@ pub struct CmdArgs {
     #[clap(long = "port")]
     pub blockvisor_port: Option<u16>,
 
+    #[clap(long = "update", default_value = "60")]
+    pub update_check_interval_secs: u64,
+
     /// Skip provisioning and init phase
     #[clap(long = "skip-init")]
     pub skip_init: bool,
@@ -175,7 +178,7 @@ async fn main() -> Result<()> {
             refresh_token: host.refresh,
             blockjoy_api_url: cmd_args.blockjoy_api_url.clone(),
             blockjoy_mqtt_url: cmd_args.blockjoy_mqtt_url,
-            update_check_interval_secs: None,
+            update_check_interval_secs: Some(cmd_args.update_check_interval_secs),
             blockvisor_port: cmd_args
                 .blockvisor_port
                 .unwrap_or_else(config::default_blockvisor_port),

@@ -93,12 +93,12 @@ and run the following command to verify `BV` service status:
 systemctl status blockvisor.service
 ```
 
-## [optional] Enable auto-update
+## [optional] Check auto-update
 
-BV auto-update can be enabled (disabled by default)
-by adding following field to `/etc/blockvisor.json` config file:
+BV auto-update can be disabled (enabled by default)
+by setting the following field in `/etc/blockvisor.json` config file:
 ```json
-"update_check_interval_secs": 60
+"update_check_interval_secs": null
 ```
 
 Remember to restart BV service to apply new settings:
