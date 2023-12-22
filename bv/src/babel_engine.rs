@@ -449,14 +449,21 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         match &mut job_config.job_type {
             JobType::Download { manifest, .. } => {
                 if manifest.is_none() {
-                    manifest.replace(
-                        retrieve_download_manifest(
-                            &self.api_config,
-                            self.node_info.image.clone(),
-                            self.node_info.network.clone(),
-                        )
-                        .await?,
-                    );
+                    match retrieve_download_manifest(
+                        &self.api_config,
+                        self.node_info.image.clone(),
+                        self.node_info.network.clone(),
+                    )
+                    .await
+                    {
+                        Ok(retrieved_manifest) => {
+                            let _ = manifest.replace(retrieved_manifest);
+                        }
+                        Err(err) => {
+                            warn!("{err:?}");
+                            bail!("{err}");
+                        }
+                    }
                 } // if already set it mean that plugin use some custom manifest source - other than the API
                 if let Some(manifest) = manifest {
                     manifest.validate()?
@@ -478,17 +485,24 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
                         .into_inner(),
                         Some(slots) => *slots,
                     };
-                    manifest.replace(
-                        retrieve_upload_manifest(
-                            &self.api_config,
-                            self.node_info.image.clone(),
-                            self.node_info.network.clone(),
-                            slots,
-                            *url_expires_secs,
-                            *data_version,
-                        )
-                        .await?,
-                    );
+                    match retrieve_upload_manifest(
+                        &self.api_config,
+                        self.node_info.image.clone(),
+                        self.node_info.network.clone(),
+                        slots,
+                        *url_expires_secs,
+                        *data_version,
+                    )
+                    .await
+                    {
+                        Ok(retrieved_manifest) => {
+                            let _ = manifest.replace(retrieved_manifest);
+                        }
+                        Err(err) => {
+                            warn!("{err:?}");
+                            bail!("{err}");
+                        }
+                    }
                 } // if already set it mean that plugin use some custom manifest source - other than the API
                 if let Some(manifest) = manifest {
                     manifest.validate()?

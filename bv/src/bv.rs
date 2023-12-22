@@ -932,10 +932,10 @@ async fn on_rootfs<C: FnOnce(PathBuf) -> F, F: Future<Output = Result<()>>>(
 
     run_cmd("mount", [os_img_path.as_os_str(), mount_point.as_os_str()])
         .await
-        .with_context(|| "failed to mount os.img")?;
+        .with_context(|| format!("failed to mount {ROOT_FS_FILE}"))?;
     let call_result = call(mount_point.clone()).await;
     run_cmd("umount", [mount_point.as_os_str()])
         .await
-        .with_context(|| "failed to umount os.img")?;
+        .with_context(|| format!("failed to umount {ROOT_FS_FILE}"))?;
     call_result
 }
