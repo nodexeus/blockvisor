@@ -160,6 +160,7 @@ async fn test_bv_service_e2e() {
         INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'api-key-node');
         INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'grpc-login');
         INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'grpc-new-host');
+        INSERT INTO user_roles (user_id, org_id, role) values ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', '53b28794-fb68-4cd1-8165-b98a51a19c46', 'view-developer-preview');
         "#;
     execute_sql_insert(db_url, org_query);
 
@@ -186,8 +187,8 @@ async fn test_bv_service_e2e() {
     const OLD_IMAGE: &str = "testing/validator/0.0.2";
     const NEW_IMAGE_VERSION: &str = "0.0.3";
     println!("add blockchain");
-    let blockchain_query = r#"INSERT INTO blockchains (id, name) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing');
-        INSERT INTO blockchain_node_types (id, blockchain_id, node_type) VALUES ('206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'validator');
+    let blockchain_query = r#"INSERT INTO blockchains (id, name, visibility) values ('ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'Testing', 'public');
+        INSERT INTO blockchain_node_types (id, blockchain_id, node_type, visibility) VALUES ('206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'validator', 'public');
         INSERT INTO blockchain_versions (id, blockchain_id, blockchain_node_type_id, version) VALUES ('78d4c409-401d-491f-8c87-df7f35971bb7','ab5d8cfc-77b1-4265-9fee-ba71ba9de092', '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '0.0.2');
         INSERT INTO blockchain_properties VALUES ('5972a35a-333c-421f-ab64-a77f4ae17533', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'keystore-file', NULL, 'file_upload', FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
         INSERT INTO blockchain_properties VALUES ('a989ad08-b455-4a57-9fe0-696405947e48', 'ab5d8cfc-77b1-4265-9fee-ba71ba9de092', 'TESTING_PARAM', NULL, 'text',        FALSE, FALSE, '206fae73-0ea5-4b3c-9b76-f8ea2b9b5f45', '78d4c409-401d-491f-8c87-df7f35971bb7', 'Wow nice property');
