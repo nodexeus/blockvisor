@@ -122,6 +122,15 @@ pub struct StubCommandsServer {
 
 #[tonic::async_trait]
 impl pb::command_service_server::CommandService for StubCommandsServer {
+    async fn list(
+        &self,
+        _request: Request<pb::CommandServiceListRequest>,
+    ) -> Result<pb::CommandServiceListResponse> {
+        Ok(Response::new(pb::CommandServiceListResponse {
+            commands: vec![],
+        }))
+    }
+
     async fn update(
         &self,
         request: Request<pb::CommandServiceUpdateRequest>,
