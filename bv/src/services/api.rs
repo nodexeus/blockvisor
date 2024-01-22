@@ -335,7 +335,6 @@ async fn process_node_command<P: Pal + Debug>(
                 API_UPDATE_COUNTER.increment(1);
                 API_UPDATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
-            Command::InfoGet(_) => unimplemented!(),
         },
         None => command_failed!(Error::Internal(anyhow!("Node command is `None`"))),
     };
