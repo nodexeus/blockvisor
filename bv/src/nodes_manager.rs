@@ -582,7 +582,7 @@ impl<P: Pal + Debug> NodesManager<P> {
             .with_context(|| format!("can't check '{ROOT_FS_FILE}' size for {image}"))?
             .len();
         // take into account additional copy of os.img made by firec while creating vm
-        let mut available_space = (available_space - os_image_size) as usize / 1_000_000;
+        let mut available_space_gb = (available_space - os_image_size) as usize / 1_000_000_000;
 
         let mut allocated_mem_size_mb = 0;
         let mut allocated_vcpu_count = 0;
@@ -595,12 +595,12 @@ impl<P: Pal + Debug> NodesManager<P> {
         let mut total_mem_size_mb = host_info.memory_bytes as usize / 1_000_000;
         let mut total_vcpu_count = host_info.cpu_count;
         if let Some(tol) = tolerance {
-            available_space += tol.disk_size_gb;
+            available_space_gb += tol.disk_size_gb;
             total_mem_size_mb += tol.mem_size_mb;
             total_vcpu_count += tol.vcpu_count;
         }
 
-        if requirements.disk_size_gb > available_space {
+        if requirements.disk_size_gb > available_space_gb {
             command_failed!(Error::Internal(anyhow!(
                 "Not enough disk space to allocate for the node"
             )));
