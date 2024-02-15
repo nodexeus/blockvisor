@@ -126,9 +126,9 @@ fn start_blockchain(needed) {
         // "always" key means that job is always restarted - equivalent to entrypoint
         restart: #{
             always: #{
-                // if job stay alive given amount of time (in miliseconds) backoff is reset
+                // if job stay alive given amount of time (in milliseconds) backoff is reset
                 backoff_timeout_ms: 60000,
-                // base time (in miliseconds) for backof,
+                // base time (in milliseconds) for backoff,
                 // multiplied by consecutive power of 2 each time
                 backoff_base_ms: 1000,
                 // [optional] maximum number of retries, or there is no such limit if not set
@@ -153,9 +153,9 @@ fn start_blockchain(needed) {
 }
 
 // Function that is called by BV on first node start.
-// It takes keys key-value map as argument.
+// It takes params key-value map as argument (empty by default - reserved for future use).
 // SHALL be implemented
-fn init(keys) {
+fn init(params) {
     // Allowing people to put arbitrary data into sh-commands safely
     let param = sanitize_sh_param(node_params().EXAMPLE_PARAM);
 
@@ -206,13 +206,6 @@ fn init(keys) {
     start_blockchain(["download"]);
 }
 
-// The address of the node.
-// The meaning of this varies from blockchain to blockchain.
-// SHALL be implemented
-fn address() {
-    parse_json(run_jrpc(#{ host: global::API_HOST, method: "peer_addr"}).body).result.peer_addr.to_string()
-}
-
 // Returns blockchain application status.
 // SHALL be implemented
 fn application_status() {
@@ -229,6 +222,13 @@ fn height() {
 // SHOULD be implemented
 fn block_age() {
     parse_json(run_jrpc(#{ host: global::API_HOST, method: "info_block_age"}).body).result.block_age
+}
+
+// The address of the node.
+// The meaning of this varies from blockchain to blockchain.
+// SHOULD be implemented
+fn address() {
+    parse_json(run_jrpc(#{ host: global::API_HOST, method: "peer_addr"}).body).result.peer_addr.to_string()
 }
 
 // Returns the name of the node.
