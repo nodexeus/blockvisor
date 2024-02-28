@@ -59,7 +59,7 @@ impl babel_api::babelsup::babel_sup_server::BabelSup for BabelSupService {
         let mut stream = request.into_inner();
         let checksum = utils::save_bin_stream(&self.babel_bin_path, &mut stream)
             .await
-            .map_err(|e| Status::internal(format!("start_new_babel failed with {e:#}")))?;
+            .map_err(|e| Status::internal(format!("start_new_babel failed with: {e:#}")))?;
         self.babel_change_tx.send_modify(|value| {
             let _ = value.insert(checksum);
         });
