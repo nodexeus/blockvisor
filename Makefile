@@ -88,7 +88,7 @@ ci-clean:
 	for i in $$(seq 1 100); do ip link delete bv$$i type tuntap; done || true
 
 new-release:
-	cargo release --execute $(git-conventional-commits version)
+	cargo release --execute $$(git-conventional-commits version)
 
 promote-prod:
 	BV_VERSION=$$(cargo metadata --format-version=1 --no-deps | jq -caM '.packages[] | select(.name == "blockvisord") | .version' | tr -d '"'); \
