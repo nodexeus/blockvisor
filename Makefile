@@ -80,6 +80,7 @@ ci-clean:
 	pkill -9 babel || true
 	pkill -9 babel_job_runner || true
 	umount -A --recursive /var/lib/blockvisor/bare/*/os || true
+	umount -A --recursive /tmp/*/var/lib/blockvisor/bare/*/os || true
 	rm -rf /var/lib/blockvisor/bare/
 	pkill -9 firecracker || true
 	rm -rf /var/lib/blockvisor/firecracker/
