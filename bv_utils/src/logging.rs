@@ -4,10 +4,11 @@ use tracing_subscriber::{
 
 #[cfg(not(feature = "bv_fmt_log"))]
 pub fn setup_logging() {
+    println!(env!("CARGO_PKG_NAME"));
     if let Ok(journald) = tracing_journald::layer() {
         let _ = tracing_subscriber::registry()
             .with(<tracing_journald::Layer as Layer<Registry>>::with_filter(
-                journald.with_syslog_identifier(env!("CARGO_PKG_NAME").to_string()),
+                journald.with_syslog_identifier("blockvisor".to_string()),
                 EnvFilter::from_default_env(),
             ))
             .try_init();
