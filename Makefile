@@ -79,9 +79,8 @@ ci-clean:
 	apptainer instance stop -a || true
 	pkill -9 babel || true
 	pkill -9 babel_job_runner || true
-	umount -A --recursive /var/lib/blockvisor/bare/*/os || true
-	umount -A --recursive /tmp/*/var/lib/blockvisor/bare/*/os || true
-	rm -rf /var/lib/blockvisor/bare/
+	umount -A --recursive /var/lib/blockvisor/nodes/*/os || true
+	umount -A --recursive /tmp/*/var/lib/blockvisor/nodes/*/os || true
 	rm -rf /var/lib/blockvisor/nodes/
 	rm -f /var/lib/blockvisor/nodes.json
 
