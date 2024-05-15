@@ -6,7 +6,9 @@ use tracing_subscriber::{EnvFilter, Layer, Registry};
 #[cfg(not(feature = "bv_fmt_log"))]
 pub fn setup_logging() {
     if let Ok(journald) = tracing_journald::layer() {
-        let _ = tracing_subscriber::registry().with(journald).try_init();
+        let _ = tracing_subscriber::registry()
+            .with(journald.with_syslog_identifier(env!("CARGO_PKG_NAME").to_string()))
+            .try_init();
     }
 }
 
