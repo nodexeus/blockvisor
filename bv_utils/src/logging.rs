@@ -1,13 +1,15 @@
-use tracing_subscriber::{self, layer::SubscriberExt, util::SubscriberInitExt};
-
-#[cfg(feature = "bv_fmt_log")]
-use tracing_subscriber::{EnvFilter, Layer, Registry};
+use tracing_subscriber::{
+    self, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer, Registry,
+};
 
 #[cfg(not(feature = "bv_fmt_log"))]
 pub fn setup_logging() {
     if let Ok(journald) = tracing_journald::layer() {
         let _ = tracing_subscriber::registry()
-            .with(journald.with_syslog_identifier(env!("CARGO_PKG_NAME").to_string()))
+            .with(<tracing_journald::Layer as Layer<Registry>>::with_filter(
+                journald.with_syslog_identifier(env!("CARGO_BIN_NAME").to_string()),
+                EnvFilter::from_default_env(),
+            ))
             .try_init();
     }
 }
