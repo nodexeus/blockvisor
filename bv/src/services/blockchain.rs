@@ -21,7 +21,6 @@ pub const BABEL_ARCHIVE_IMAGE_NAME: &str = "blockjoy.gz";
 pub const BABEL_IMAGE_NAME: &str = "blockjoy";
 pub const BABEL_PLUGIN_NAME: &str = "babel.rhai";
 pub const ROOTFS_FILE: &str = "os.img";
-pub const DATA_FILE: &str = "data.img";
 
 pub struct BlockchainService<C> {
     connector: C,

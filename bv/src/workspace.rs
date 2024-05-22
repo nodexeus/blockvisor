@@ -1,7 +1,4 @@
-use crate::{
-    linux_platform::bv_root, node_context::NODES_DIR, node_state::NodeImage,
-    services::blockchain::BABEL_PLUGIN_NAME, BV_VAR_PATH,
-};
+use crate::{linux_platform::bv_root, node_context, node_state::NodeImage};
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::{fs, os::unix, path::Path};
@@ -46,15 +43,9 @@ pub fn set_active_node(path: &Path, id: Uuid, name: &str) -> Result<()> {
         name: name.to_owned(),
     });
     fs::write(ws_path, serde_json::to_string(&workspace)?)?;
-    let plugin_link_path = path.join(BABEL_PLUGIN_NAME);
-    let _ = fs::remove_file(&plugin_link_path);
-    unix::fs::symlink(
-        bv_root()
-            .join(BV_VAR_PATH)
-            .join(NODES_DIR)
-            .join(format!("{id}.rhai")),
-        plugin_link_path,
-    )?;
+    let node_link_path = path.join("node");
+    let _ = fs::remove_file(&node_link_path);
+    unix::fs::symlink(node_context::build_node_dir(&bv_root(), id), node_link_path)?;
     Ok(())
 }
 
@@ -66,7 +57,7 @@ pub fn unset_active_node(path: &Path, id: Uuid) -> Result<()> {
         if active_node.id == id {
             workspace.active_node = None;
             fs::write(ws_path, serde_json::to_string(&workspace)?)?;
-            let plugin_link_path = path.join(BABEL_PLUGIN_NAME);
+            let plugin_link_path = path.join("node");
             let _ = fs::remove_file(plugin_link_path);
         }
     }
@@ -128,7 +119,7 @@ pub mod tests {
             }),
             workspace.active_node
         );
-        assert!(tmp_dir.join(BABEL_PLUGIN_NAME).is_symlink());
+        assert!(tmp_dir.join("node").is_symlink());
         Ok(())
     }
 }

@@ -40,7 +40,7 @@ impl NodeContext {
         Self {
             bv_root: bv_root.to_path_buf(),
             plugin_data: node_dir.join("plugin.data"),
-            plugin_script: node_dir.join("babel.rhai"),
+            plugin_script: node_dir.join(BABEL_PLUGIN_NAME),
             nodes_dir,
             node_dir,
         }
