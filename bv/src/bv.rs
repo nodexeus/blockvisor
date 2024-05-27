@@ -9,7 +9,7 @@ use crate::{
     internal_server::NodeCreateRequest,
     linux_apptainer_platform::LinuxApptainerPlatform,
     linux_platform::bv_root,
-    node_context::NODES_DIR,
+    node_context::build_node_dir,
     node_state::{NodeImage, NodeStatus},
     nodes_manager::NodesManager,
     pretty_table::{PrettyTable, PrettyTableRow},
@@ -482,23 +482,17 @@ pub async fn process_image_command(
                     bail!("Can't capture running node!")
                 }
             }
-            let build_bv_var_path = build_bv_var_path();
-            let image_dir = build_bv_var_path
+            let image_dir = build_bv_var_path()
                 .join(IMAGES_DIR)
                 .join(format!("{}", node.image));
+            let node_dir = build_node_dir(&bv_root(), id);
             // capture rhai script
             fs::copy(
-                build_bv_var_path.join(NODES_DIR).join(format!("{id}.rhai")),
+                node_dir.join(BABEL_PLUGIN_NAME),
                 image_dir.join(BABEL_PLUGIN_NAME),
             )?;
             // capture os.img
-            fs::copy(
-                build_bv_var_path
-                    .join(NODES_DIR)
-                    .join(format!("{id}"))
-                    .join(ROOTFS_FILE),
-                image_dir.join(ROOTFS_FILE),
-            )?;
+            fs::copy(node_dir.join(ROOTFS_FILE), image_dir.join(ROOTFS_FILE))?;
             cleanup_rootfs(&image_dir, &node.image)
                 .await
                 .with_context(|| "failed to cleanup rootfs")?;
