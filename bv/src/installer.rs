@@ -31,7 +31,7 @@ const THIS_VERSION: &str = env!("CARGO_PKG_VERSION");
 const BV_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
 const BV_REQ_TIMEOUT: Duration = Duration::from_secs(1);
 const BV_CHECK_INTERVAL: Duration = Duration::from_millis(100);
-const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(60);
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(180);
 const PREPARE_FOR_UPDATE_TIMEOUT: Duration = Duration::from_secs(180);
 
 struct InstallerPaths {
