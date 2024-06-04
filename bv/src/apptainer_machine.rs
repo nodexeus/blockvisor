@@ -21,8 +21,8 @@ use tokio::time::sleep;
 use tracing::{debug, error};
 use uuid::Uuid;
 
+pub const DATA_DIR: &str = "data";
 const ROOTFS_DIR: &str = "rootfs";
-const DATA_DIR: &str = "data";
 const JOURNAL_DIR: &str = "/run/systemd/journal";
 const BABEL_BIN_NAME: &str = "babel";
 const BABEL_KILL_TIMEOUT: Duration = Duration::from_secs(60);
