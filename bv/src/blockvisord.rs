@@ -442,7 +442,7 @@ where
                     }
                 }
                 Err(err) => {
-                    error!("Could not collect host metrics! `{err:#}`");
+                    warn!("Could not collect host metrics! `{err:#}`");
                 }
             };
             BV_HOST_METRICS_COUNTER.increment(1);
