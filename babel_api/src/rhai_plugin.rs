@@ -381,7 +381,7 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                 self.create_and_start_job(&name, plugin_config::build_job_config(job))?;
                 jobs.push(name);
             }
-            Ok(jobs)
+            Ok(if jobs.is_empty() { needs } else { jobs })
         } else {
             Ok(needs)
         }
@@ -1301,6 +1301,36 @@ mod tests {
         assert_eq!(
             ApplicationStatus::Broadcasting,
             plugin.application_status()?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_run_actions_without_jobs() -> Result<()> {
+        let mut babel = MockBabelEngine::new();
+        babel
+            .expect_run_sh()
+            .with(predicate::eq("echo action_cmd"), predicate::eq(None))
+            .return_once(|_, _| {
+                Ok(ShResponse {
+                    exit_code: 0,
+                    stdout: "".to_string(),
+                    stderr: "".to_string(),
+                })
+            });
+        let plugin = RhaiPlugin::new("", babel)?;
+        assert_eq!(
+            vec!["some_job".to_string()],
+            plugin
+                .bare
+                .run_actions(
+                    Some(Actions {
+                        commands: vec!["echo action_cmd".to_string()],
+                        jobs: vec![]
+                    }),
+                    vec!["some_job".to_string()]
+                )
+                .unwrap()
         );
         Ok(())
     }
