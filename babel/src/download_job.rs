@@ -30,7 +30,6 @@ use std::{
     os::unix::fs::FileExt,
     path::{Path, PathBuf},
     slice::Iter,
-    usize,
 };
 use tokio::sync::Semaphore;
 use tokio::task::JoinError;
