@@ -151,6 +151,10 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         Ok(())
     }
 
+    pub fn update_node_image(&mut self, node_image: NodeImage) {
+        self.node_info.image = node_image;
+    }
+
     /// Returns the height of the blockchain (in blocks).
     pub async fn height(&mut self) -> Result<u64> {
         self.on_plugin(|plugin| plugin.height()).await

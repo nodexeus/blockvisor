@@ -419,7 +419,7 @@ impl<P: Pal + Debug> Node<P> {
         self.babel_engine
             .update_plugin(|engine| RhaiPlugin::new(&script, engine))
             .await?;
-
+        self.babel_engine.update_node_image(image.clone());
         self.state.image = image.clone();
         self.state.requirements = self.metadata.requirements.clone();
         self.state.initialized = false;
