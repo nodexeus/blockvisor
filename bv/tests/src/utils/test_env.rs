@@ -43,7 +43,6 @@ pub static TEST_TOKEN: AtomicU32 = AtomicU32::new(0);
 pub struct TestEnv {
     pub bv_root: PathBuf,
     pub api_config: Config,
-    pub token: u32,
 }
 
 impl TestEnv {
@@ -78,7 +77,6 @@ impl TestEnv {
         Ok(Self {
             bv_root,
             api_config,
-            token,
         })
     }
 
