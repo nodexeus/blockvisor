@@ -405,28 +405,28 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
     }
 
     fn default_init(&self, config: PluginConfig) -> Result<()> {
-        let init_jobs = self.run_actions(config.init, vec![])?;
-        if let Ok(true) = self.babel_engine.is_download_completed() {
-            self.start_services(config.services, init_jobs)?;
-        } else {
+        let mut services_needs = self.run_actions(config.init, vec![])?;
+        if !self.babel_engine.is_download_completed()? {
             if self.babel_engine.has_blockchain_archive()? {
                 self.create_and_start_job(
                     DOWNLOAD_JOB_NAME,
-                    plugin_config::build_download_job_config(config.download, init_jobs),
+                    plugin_config::build_download_job_config(config.download, services_needs),
                 )?;
+                services_needs =
+                    self.run_actions(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
             } else if let Some(alternative_download) = config.alternative_download {
                 self.create_and_start_job(
                     DOWNLOAD_JOB_NAME,
                     plugin_config::build_alternative_download_job_config(
                         alternative_download,
-                        init_jobs,
+                        services_needs,
                     ),
                 )?;
+                services_needs =
+                    self.run_actions(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
             }
-            let post_download_jobs =
-                self.run_actions(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
-            self.start_services(config.services, post_download_jobs)?;
         }
+        self.start_services(config.services, services_needs)?;
         if let Some(tasks) = config.scheduled {
             for task in tasks {
                 self.babel_engine.add_task(
