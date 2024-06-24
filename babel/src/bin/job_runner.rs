@@ -192,7 +192,7 @@ async fn run_log_handler(
     let mut log_file = file_rotate::FileRotate::new(
         path,
         file_rotate::suffix::AppendCount::new(2),
-        file_rotate::ContentLimit::Lines(capacity),
+        file_rotate::ContentLimit::Bytes(capacity * 1_000_000),
         file_rotate::compression::Compression::OnRotate(0),
         None,
     );
