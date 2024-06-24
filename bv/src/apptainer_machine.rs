@@ -330,7 +330,7 @@ impl ApptainerMachine {
         )
         .await?;
         let mut cmd = Command::new(APPTAINER_BIN_NAME);
-        cmd.args(["exec", "--containall", "--cleanenv", "--userns"]);
+        cmd.args(["exec", "--ipc", "--cleanenv", "--userns", "--pid"]);
         cmd.args([
             OsStr::new("--env-file"),
             self.chroot_dir.join(NODE_ENV_FILE_PATH).as_os_str(),
