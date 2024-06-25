@@ -198,7 +198,7 @@ async fn test_bv_cmd_node_lifecycle() -> Result<()> {
         .await;
 
     println!("delete started node");
-    test_env.bv_run(&["node", "delete", vm_id], "Deleted node");
+    test_env.bv_run(&["node", "delete", "--yes", vm_id], "Deleted node");
     Ok(())
 }
 
@@ -255,7 +255,7 @@ async fn test_bv_cmd_node_recovery() -> Result<()> {
         .await;
 
     println!("delete started node");
-    test_env.bv_run(&["node", "delete", vm_id], "Deleted node");
+    test_env.bv_run(&["node", "delete", "--yes", vm_id], "Deleted node");
     Ok(())
 }
 
@@ -304,7 +304,7 @@ async fn test_bv_cmd_node_recovery_fail() -> Result<()> {
         .await;
 
     println!("delete started node");
-    test_env.bv_run(&["node", "delete", vm_id], "Deleted node");
+    test_env.bv_run(&["node", "delete", "--yes", vm_id], "Deleted node");
     Ok(())
 }
 

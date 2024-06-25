@@ -363,7 +363,7 @@ async fn test_bv_service_e2e() {
     )
     .await;
 
-    bv_run(&["node", "delete", &auto_updated_node_id]);
+    bv_run(&["node", "delete", "--yes", &auto_updated_node_id]);
 
     println!("check if node is deleted");
     let is_deleted = || {
