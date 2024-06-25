@@ -320,7 +320,6 @@ impl<'a> ParallelChunkUploaders<'a> {
 
 struct ChunkUploader {
     chunk: Chunk,
-    client: reqwest::Client,
     config: TransferConfig,
     connection_pool: ConnectionPool,
 }
@@ -329,7 +328,6 @@ impl ChunkUploader {
     fn new(chunk: Chunk, config: TransferConfig, connection_pool: ConnectionPool) -> Self {
         Self {
             chunk,
-            client: reqwest::Client::new(),
             config,
             connection_pool,
         }
@@ -388,9 +386,10 @@ impl ChunkUploader {
                 }
             };
             let connection_permit = self.connection_pool.acquire().await?;
+            let client = reqwest::Client::new();
             if let Some(resp) = run
                 .select(
-                    self.client
+                    client
                         .put(
                             self.chunk
                                 .url
