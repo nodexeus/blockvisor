@@ -184,6 +184,11 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                 } else {
                     bail!("<ID_OR_NAMES> neither provided nor found in the workspace");
                 }
+            } else if !ask_confirm(
+                &format!("Are you sure you want to delete following node(s)?\n{id_or_names:?}"),
+                yes,
+            )? {
+                return Ok(());
             }
             for id_or_name in id_or_names {
                 let id = client.resolve_id_or_name(&id_or_name).await?;
