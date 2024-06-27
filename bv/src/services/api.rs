@@ -295,7 +295,7 @@ where
                     .create(
                         node_id,
                         nodes_manager::NodeConfig {
-                            name: args.node_name,
+                            name: args.name,
                             image,
                             ip: args.ip,
                             gateway: args.gateway,

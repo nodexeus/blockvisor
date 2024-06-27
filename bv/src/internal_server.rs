@@ -588,7 +588,7 @@ where
         let blockchain_id = self.get_blockchain_id(&req.image.protocol).await?;
 
         let mut node_client = self.connect_to_node_service().await?;
-        let mut created_nodes = node_client
+        let node = node_client
             .create(pb::NodeServiceCreateRequest {
                 org_id,
                 blockchain_id,
@@ -605,19 +605,14 @@ where
             .await
             .with_context(|| "create node via API failed")?
             .into_inner()
-            .nodes;
-
-        let node = match created_nodes.len() {
-            0 => Err(anyhow!("empty node create response from API")),
-            1 => Ok(created_nodes.pop().expect("one created node")),
-            _ => Err(anyhow!("unexpected multiple node creation response")),
-        }?;
+            .node
+            .ok_or_else(|| anyhow!("empty node create response from API"))?;
 
         Ok(NodeDisplayInfo {
             id: Uuid::parse_str(&node.id).with_context(|| {
                 format!("node_create received invalid node id from API: {}", node.id)
             })?,
-            name: node.node_name,
+            name: node.name,
             image: req.image,
             network: req.network,
             ip: node.ip,
