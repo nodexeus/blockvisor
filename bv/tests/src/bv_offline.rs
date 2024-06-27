@@ -359,7 +359,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: node_name.clone(),
+                    node_name: node_name.clone(),
+                    dns_name: node_name.clone(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),
@@ -378,7 +379,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: "some-new-name".to_string(),
+                    node_name: "some-new-name".to_string(),
+                    dns_name: "some-new-name".to_string(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),
@@ -397,7 +399,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: node_name.clone(),
+                    node_name: node_name.clone(),
+                    dns_name: node_name.clone(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),
@@ -426,7 +429,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: "some-new-name".to_string(),
+                    node_name: "some-new-name".to_string(),
+                    dns_name: "some-new-name".to_string(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),
@@ -447,7 +451,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: "some-new-name".to_string(),
+                    node_name: "some-new-name".to_string(),
+                    dns_name: "some-new-name".to_string(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),
@@ -468,7 +473,8 @@ async fn test_bv_nodes_via_pending_grpc_commands() -> Result<()> {
                 host_id: host_id.clone(),
                 host_name: "".to_string(),
                 command: Some(pb::node_command::Command::Create(pb::NodeCreate {
-                    name: "some-new-name".to_string(),
+                    node_name: "some-new-name".to_string(),
+                    dns_name: "some-new-name".to_string(),
                     image: image.clone(),
                     blockchain: "testing".to_string(),
                     node_type: common::NodeType::Validator.into(),

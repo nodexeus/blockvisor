@@ -1,11 +1,15 @@
-include!("src/cli.rs");
-use clap::CommandFactory;
 use std::path::Path;
 use std::{env, fs};
 
-const PROTO_DIRS: &[&str] = &["./proto"];
+use clap::CommandFactory;
+use eyre::{Context, Result};
 
-fn main() {
+const PROTO_DIRS: &[&str] = &["./proto"];
+const EXCLUDE_DIRS: &[&str] = &[".direnv"];
+
+include!("src/cli.rs");
+
+fn main() -> Result<()> {
     let mut app = App::command();
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -21,29 +25,38 @@ fn main() {
     tonic_build::configure()
         .build_server(true)
         .build_client(true)
-        .compile(&proto_files(), PROTO_DIRS)
-        .expect("Failed to compile protos")
+        .compile(&proto_files()?, PROTO_DIRS)
+        .context("Failed to compile protos")
 }
 
-fn proto_files() -> Vec<PathBuf> {
+fn proto_files() -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
     for dir in PROTO_DIRS {
-        find_recursive(Path::new(dir), &mut files);
+        find_recursive(Path::new(dir), &mut files)?;
     }
-    files
+    Ok(files)
 }
 
-fn find_recursive(path: &Path, files: &mut Vec<PathBuf>) {
-    if !path.is_dir() {
-        return;
+fn find_recursive(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+    let is_excluded = || {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| EXCLUDE_DIRS.contains(&name))
+            .unwrap_or_default()
+    };
+
+    if !path.is_dir() || is_excluded() {
+        return Ok(());
     }
 
-    for entry in fs::read_dir(path).expect("read_dir") {
-        let path = entry.expect("entry").path();
+    for entry in fs::read_dir(path)? {
+        let path = entry?.path();
         if path.is_dir() {
-            find_recursive(&path, files);
+            find_recursive(&path, files)?;
         } else if path.extension().map_or(false, |ext| ext == "proto") {
             files.push(path.to_path_buf());
         }
     }
+
+    Ok(())
 }
