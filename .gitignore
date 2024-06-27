@@ -1,7 +1,8 @@
 target
 **/.env
-.vscode
+.direnv
 .idea
 .ignore
 .repl.rhai.swp
 .rhai-repl-history
+.vscode
