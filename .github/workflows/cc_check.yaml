@@ -6,14 +6,16 @@ on:
       - "main"
       - "master"
 
+permissions: read-all
+
 jobs:
   test:
     name: Check
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: taskmedia/action-conventional-commits@v1.1.0
+      - uses: actions/checkout@v3
+      - uses: taskmedia/action-conventional-commits@v1.1.17
         with:
           # allow different types in commit message
           # Default: fix|feat|revert
