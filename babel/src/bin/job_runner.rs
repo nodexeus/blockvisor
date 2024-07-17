@@ -19,7 +19,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::{env, fs, time::Duration};
 use tokio::join;
-use tracing::info;
+use tracing::{error, info, warn};
 
 /// Logs are forwarded asap to log server, so we don't need big buffer, only to buffer logs during some
 /// temporary log server unavailability (e.g. while updating).
@@ -38,6 +38,22 @@ async fn main() -> eyre::Result<()> {
     );
     // use `setsid()` to make sure job runner won't be killed when babel is stopped with SIGINT
     let _ = nix::unistd::setsid();
+    match get_job_name() {
+        Ok(job_name) => {
+            let res = run_job(job_name, UdsConnector).await;
+            if let Err(err) = &res {
+                warn!("JobRunner failed with: {err:#}");
+            }
+            res
+        }
+        Err(err) => {
+            error!("{err:#}");
+            Err(err)
+        }
+    }
+}
+
+fn get_job_name() -> eyre::Result<String> {
     let mut args = env::args();
     let job_name = args
         .nth(1)
@@ -45,7 +61,7 @@ async fn main() -> eyre::Result<()> {
     if args.count() != 0 {
         bail!("Invalid number of arguments! Expected only one argument: unique job name.");
     }
-    run_job(job_name, UdsConnector).await
+    Ok(job_name)
 }
 
 async fn run_job(
