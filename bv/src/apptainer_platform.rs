@@ -58,12 +58,7 @@ impl ApptainerPlatform {
             base: linux_platform::LinuxPlatform::new().await?,
             bridge_ip: IpAddr::from_str("127.0.0.1")?,
             mask_bits: 28,
-            config: ApptainerConfig {
-                extra_args: None,
-                host_network: false,
-                cpu_limit: false,
-                memory_limit: false,
-            },
+            config: Default::default(),
         })
     }
 

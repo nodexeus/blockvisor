@@ -93,19 +93,19 @@ pub struct NodeEnv {
     /// Node version.
     pub node_version: String,
     /// Node protocol name.
-    pub protocol: String,
+    pub blockchain_type: String,
     /// Node type.
     pub node_type: String,
     /// Node IP.
-    pub ip: String,
+    pub node_ip: String,
     /// Node gateway IP.
-    pub gateway: String,
+    pub node_gateway: String,
     /// Indicate if node run in standalone mode.
-    pub standalone: bool,
+    pub node_standalone: bool,
     /// Host id.
-    pub bv_id: String,
+    pub bv_host_id: String,
     /// Host name.
-    pub bv_name: String,
+    pub bv_host_name: String,
     /// API url used by host.
     pub bv_api_url: String,
     /// Organisation id to which node belongs to.
