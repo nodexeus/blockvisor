@@ -28,7 +28,7 @@ const DEFAULT_MAX_DOWNLOAD_CONNECTIONS: usize = 3;
 const DEFAULT_MAX_UPLOAD_CONNECTIONS: usize = 3;
 const DEFAULT_MAX_RUNNERS: usize = 8;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> eyre::Result<()> {
     setup_logging();
     info!(
@@ -81,15 +81,15 @@ async fn run_job(
             if !logs_dir.exists() {
                 fs::create_dir_all(&logs_dir)?;
             }
-            let log_handler = run_log_handler(
+            let log_handler = tokio::spawn(run_log_handler(
                 run.clone(),
                 log_buffer.subscribe(),
                 logs_dir.join(&job_name),
                 job_config
                     .log_buffer_capacity_mb
                     .unwrap_or(DEFAULT_LOG_BUFFER_CAPACITY_MB),
-            );
-            join!(
+            ));
+            let _ = join!(
                 RunShJob::new(
                     bv_utils::timer::SysTimer,
                     body,
