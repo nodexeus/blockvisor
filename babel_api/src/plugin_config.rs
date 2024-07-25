@@ -72,7 +72,7 @@ impl PluginConfig {
             self.services
                 .iter()
                 .all(|service| unique.insert(&service.name)),
-            "Post-download jobs names are not unique"
+            "Services names are not unique"
         );
         if let Some(pre_upload) = &self.pre_upload {
             ensure!(
