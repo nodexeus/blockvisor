@@ -4,11 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub fn check_metadata(meta: &BlockchainMetadata) -> Result<()> {
-    let version = env!("CARGO_PKG_VERSION");
-    let min_babel_version = meta.min_babel_version.as_str();
-    if version < min_babel_version {
-        bail!("Required minimum babel version is `{min_babel_version}`, running is `{version}`");
-    }
     check_firewall_rules(&meta.firewall.rules)?;
     Ok(())
 }
