@@ -31,7 +31,7 @@ use tracing::{debug, error};
 use uuid::Uuid;
 
 pub const DATA_DIR: &str = "data";
-const ROOTFS_DIR: &str = "rootfs";
+pub const ROOTFS_DIR: &str = "rootfs";
 const CGROUPS_CONF_FILE: &str = "cgroups.toml";
 const APPTAINER_PID_FILE: &str = "apptainer.pid";
 const JOURNAL_DIR: &str = "/run/systemd/journal";

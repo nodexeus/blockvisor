@@ -1,4 +1,5 @@
 use crate::{
+    apptainer_machine::ROOTFS_DIR,
     apptainer_platform::ApptainerPlatform,
     cli::{
         ChainCommand, ClusterCommand, HostCommand, ImageCommand, JobCommand, NodeCommand,
@@ -10,6 +11,7 @@ use crate::{
     internal_server::NodeCreateRequest,
     linux_platform::bv_root,
     node_context::build_node_dir,
+    node_env::NODE_ENV_FILE_PATH,
     node_state::{NodeImage, NodeStatus},
     nodes_manager::NodesManager,
     pretty_table::{PrettyTable, PrettyTableRow},
@@ -279,7 +281,8 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                     follow,
                 } => {
                     let log_path = build_node_dir(&bv_root(), id)
-                        .join("rootfs/var/lib/babel/jobs/logs")
+                        .join(ROOTFS_DIR)
+                        .join("var/lib/babel/jobs/logs")
                         .join(&name);
                     if !log_path.exists() {
                         bail!("No logs for '{name}' job found!")
@@ -414,26 +417,38 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
             }
         }
         NodeCommand::Shell { id_or_name } => {
-            let name = match id_or_name {
+            let (name, id) = match id_or_name {
                 None => {
                     if let Ok(workspace::Workspace {
-                        active_node: Some(workspace::ActiveNode { name, .. }),
+                        active_node: Some(workspace::ActiveNode { name, id }),
                         ..
                     }) = workspace::read(&std::env::current_dir()?)
                     {
-                        name
+                        (name, id)
                     } else {
                         bail!("<ID_OR_NAME> neither provided nor found in the workspace");
                     }
                 }
                 Some(id_or_name) => match Uuid::parse_str(&id_or_name) {
-                    Ok(id) => client.get_node(id).await?.into_inner().name,
-                    Err(_) => id_or_name,
+                    Ok(id) => (client.get_node(id).await?.into_inner().name, id),
+                    Err(_) => (
+                        id_or_name.clone(),
+                        Uuid::parse_str(
+                            &client.get_node_id_for_name(id_or_name).await?.into_inner(),
+                        )?,
+                    ),
                 },
             };
 
             let mut cmd = Command::new("apptainer");
-            cmd.arg("shell");
+            cmd.args(["shell", "--ipc", "--cleanenv", "--userns", "--pid"]);
+            cmd.args([
+                OsStr::new("--env-file"),
+                build_node_dir(&bv_root(), id)
+                    .join(ROOTFS_DIR)
+                    .join(NODE_ENV_FILE_PATH)
+                    .as_os_str(),
+            ]);
             cmd.arg(format!("instance://{name}"));
             cmd.spawn()?.wait().await?;
         }
