@@ -151,6 +151,10 @@ async fn worker(
             handle_action(&mut tasks, action);
         }
     }
+    // handle pending actions before stop
+    while let Ok(action) = rx.try_recv() {
+        handle_action(&mut tasks, action);
+    }
     tasks.into_iter().map(|(_, task)| task).collect()
 }
 
