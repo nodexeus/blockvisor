@@ -912,6 +912,7 @@ fn name_not_found(name: &str) -> eyre::Error {
 mod tests {
     use super::*;
     use crate::node_state::NetInterface;
+    use crate::scheduler::Task;
     use crate::{
         node::tests::*,
         node_context, pal,
@@ -1212,6 +1213,7 @@ mod tests {
             .expect_delete()
             .once()
             .returning(|| bail!("delete VM failed"));
+        vm_mock.expect_delete().once().returning(|| Ok(()));
         add_create_node_expectations(
             &mut pal,
             1,
@@ -1439,6 +1441,27 @@ mod tests {
             "BV internal error: delete VM failed",
             nodes.delete(first_node_id).await.unwrap_err().to_string()
         );
+        nodes
+            .scheduler
+            .tx()
+            .send(Action::Add(Scheduled {
+                node_id: first_node_id,
+                name: "task".to_string(),
+                schedule: cron::Schedule::from_str("1 * * * * * *").unwrap(),
+                task: Task::PluginFnCall {
+                    name: "scheduled_fn".to_string(),
+                    param: "scheduled_param".to_string(),
+                },
+            }))
+            .await
+            .unwrap();
+        nodes.delete(first_node_id).await.unwrap();
+        assert!(!nodes
+            .node_state_cache
+            .read()
+            .await
+            .contains_key(&first_node_id));
+        assert!(nodes.scheduler.stop().await.unwrap().is_empty());
 
         for mock in http_mocks {
             mock.assert();
