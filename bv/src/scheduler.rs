@@ -44,7 +44,7 @@ where
                     Task::PluginFnCall { name, param } => {
                         debug!("calling scheduled plugin function '{name}({param})'");
                         if let Err(err) = node_lock.babel_engine.call_method(name, param).await {
-                            warn!("scheduled function '{name}({param}' failed with: {err:#}");
+                            warn!("scheduled function '{name}({param})' failed with: {err:#}");
                         };
                     }
                 }
