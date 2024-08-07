@@ -180,8 +180,14 @@ impl<P: Pal + Debug> Node<P> {
 
         let mut node_conn = pal.create_node_connection(node_id);
         let bv_context = BvContext::from_config(api_config.config.read().await.clone());
-        let machine = pal.attach_vm(&bv_context, &state).await?;
-        let (script, metadata) = context.load_script(machine.rootfs_dir()).await?;
+        let machine = pal
+            .attach_vm(&bv_context, &state)
+            .await
+            .with_context(|| "attach vm failed")?;
+        let (script, metadata) = context
+            .load_script(machine.rootfs_dir())
+            .await
+            .with_context(|| "load rhai script failed")?;
         if machine.state().await == pal::VmState::RUNNING {
             debug!("connecting to babel ...");
             // Since this is the startup phase it doesn't make sense to wait a long time
@@ -209,7 +215,8 @@ impl<P: Pal + Debug> Node<P> {
             context.plugin_data.clone(),
             scheduler_tx,
         )
-        .await?;
+        .await
+        .with_context(|| "can't initialize BabelEngine")?;
         if state.expected_status == NodeStatus::Running {
             if let Err(err) = babel_engine.start().await {
                 error!("failed to start babel engine for node {node_id}: {err:#}");
