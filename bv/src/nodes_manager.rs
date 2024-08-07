@@ -815,9 +815,7 @@ where
             match NodeState::load(&path)
                 .and_then(|state| async {
                     cpu_registry.mark_acquired(&state.assigned_cpus);
-                    Node::attach(pal.clone(), api_config.clone(), state, tx.clone())
-                        .await
-                        .with_context(|| "attach node failed")
+                    Node::attach(pal.clone(), api_config.clone(), state, tx.clone()).await
                 })
                 .await
             {
