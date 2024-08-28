@@ -77,8 +77,8 @@ pub async fn get_download_manifest(
                 network: network.clone(),
             },
             // we don't know how download manifest is big, but it can be pretty big
-            // lets give it time that should be enough for 20 000 of chunks ~ 20TB of blockchian data
-            Duration::from_secs(200),
+            // lets give it time that should be enough for 60 000 of chunks ~ 30TB of blockchian data
+            Duration::from_secs(600),
         ))
     )
     .with_context(|| format!("cannot get download manifest for {:?}-{}", image, network))?
