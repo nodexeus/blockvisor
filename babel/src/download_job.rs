@@ -330,7 +330,12 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkD
                 self.chunks = self
                     .connector
                     .connect()
-                    .get_download_chunks((self.data_version, indexes.clone()))
+                    .get_download_chunks(with_timeout(
+                        (self.data_version, indexes.clone()),
+                        // checking download manifest require validity check, which may be time-consuming
+                        // let's give it a minute
+                        Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+                    ))
                     .await?
                     .into_inner();
             }
