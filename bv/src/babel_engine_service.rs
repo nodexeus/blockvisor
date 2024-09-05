@@ -21,8 +21,11 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
         &self,
         request: Request<(DownloadManifest, u64)>,
     ) -> eyre::Result<Response<()>, Status> {
-        debug!("putting DownloadManifest to API...");
         let (manifest, data_version) = request.into_inner();
+        debug!(
+            "putting DownloadManifest to API for {}/{}/{}",
+            self.node_info.image, self.node_info.network, data_version
+        );
         if let Err(err) = services::blockchain_archive::put_download_manifest(
             &self.config,
             self.node_info.image.clone(),
