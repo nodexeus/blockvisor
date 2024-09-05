@@ -180,7 +180,7 @@ pub async fn has_download_manifest(
             Ok(false)
         } else {
             bail!(
-                "cannot check download manifest for {:?}-{}: {err:#}",
+                "cannot check download metadata for {:?}-{}: {err:#}",
                 image,
                 network
             );
