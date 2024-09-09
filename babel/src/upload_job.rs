@@ -884,6 +884,12 @@ mod tests {
         let slots = test_env.dummy_upload_slots();
         mock.expect_get_upload_slots()
             .once()
+            .withf(|req| {
+                let (data_version, slots, url_expires_secs) = req.get_ref();
+                let mut sorted_slots = slots.clone();
+                sorted_slots.sort();
+                *data_version == None && sorted_slots == vec![0, 1, 2] && *url_expires_secs == 60
+            })
             .returning(move |_| Ok(Response::new(slots.clone())));
         mock.expect_put_download_manifest()
             .once()
@@ -1131,6 +1137,10 @@ mod tests {
         slots.slots.retain(|slot| slot.index == 2);
         mock.expect_get_upload_slots()
             .once()
+            .withf(|req| {
+                let (data_version, slots, url_expires_secs) = req.get_ref();
+                *data_version == Some(0) && slots == &vec![2] && *url_expires_secs == 60
+            })
             .returning(move |_| Ok(Response::new(slots.clone())));
         mock.expect_put_download_manifest()
             .once()

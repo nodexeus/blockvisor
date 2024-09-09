@@ -717,6 +717,7 @@ mod tests {
     use babel_api::engine::{Checksum, JobStatus, RestartConfig, RestartPolicy};
     use bv_tests_utils::start_test_server;
     use bv_utils::timer::SysTimer;
+    use mockall::Sequence;
     use mockito::{Server, ServerGuard};
     use std::fs;
     use std::os::unix::fs::MetadataExt;
@@ -863,6 +864,12 @@ mod tests {
         ];
         mock.expect_get_download_chunks()
             .once()
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                let mut sorted_indexes = chunk_indexes.clone();
+                sorted_indexes.sort();
+                *data_version == 1 && sorted_indexes == &[0, 1]
+            })
             .returning(move |_| Ok(Response::new(chunks.clone())));
 
         test_env
@@ -1035,6 +1042,12 @@ mod tests {
         ];
         mock.expect_get_download_chunks()
             .once()
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                let mut sorted_indexes = chunk_indexes.clone();
+                sorted_indexes.sort();
+                *data_version == 1 && sorted_indexes == &[0, 1]
+            })
             .returning(move |_| Ok(Response::new(chunks.clone())));
         let chunks = vec![first_chunk];
         mock.expect_get_download_chunks()
@@ -1383,7 +1396,7 @@ mod tests {
             total_size: 450,
             compression: None,
             chunks: 3,
-            data_version: 0,
+            data_version: 3,
         };
         let serialized_meta = serde_json::to_string(&metadata)?;
         let first_chunk = Chunk {
@@ -1405,42 +1418,54 @@ mod tests {
                 },
             ],
         };
-        let chunks = vec![
-            first_chunk.clone(),
-            Chunk {
-                index: 1,
-                key: "second_chunk".to_string(),
-                url: test_env.url("second_chunk"),
-                checksum: Checksum::Sha1([
-                    152, 150, 127, 36, 91, 230, 29, 94, 132, 21, 41, 252, 81, 126, 200, 137, 69,
-                    117, 117, 134,
-                ]),
+        let second_chunk = Chunk {
+            index: 1,
+            key: "second_chunk".to_string(),
+            url: test_env.url("second_chunk"),
+            checksum: Checksum::Sha1([
+                152, 150, 127, 36, 91, 230, 29, 94, 132, 21, 41, 252, 81, 126, 200, 137, 69, 117,
+                117, 134,
+            ]),
+            size: 150,
+            destinations: vec![FileLocation {
+                path: PathBuf::from("second.file"),
+                pos: 0,
                 size: 150,
-                destinations: vec![FileLocation {
-                    path: PathBuf::from("second.file"),
-                    pos: 0,
-                    size: 150,
-                }],
-            },
-            Chunk {
-                index: 2,
-                key: "third_chunk".to_string(),
-                url: test_env.url("third_chunk"),
-                checksum: Checksum::Sha1([
-                    250, 1, 243, 45, 249, 202, 133, 7, 222, 104, 232, 37, 207, 74, 223, 126, 2,
-                    142, 95, 170,
-                ]),
+            }],
+        };
+        let third_chunk = Chunk {
+            index: 2,
+            key: "third_chunk".to_string(),
+            url: test_env.url("third_chunk"),
+            checksum: Checksum::Sha1([
+                250, 1, 243, 45, 249, 202, 133, 7, 222, 104, 232, 37, 207, 74, 223, 126, 2, 142,
+                95, 170,
+            ]),
+            size: 150,
+            destinations: vec![FileLocation {
+                path: PathBuf::from("third.file"),
+                pos: 0,
                 size: 150,
-                destinations: vec![FileLocation {
-                    path: PathBuf::from("third.file"),
-                    pos: 0,
-                    size: 150,
-                }],
-            },
-        ];
+            }],
+        };
         mock.expect_get_download_chunks()
             .once()
-            .returning(move |_| Ok(Response::new(chunks.clone())));
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                let mut sorted_indexes = chunk_indexes.clone();
+                sorted_indexes.sort();
+                *data_version == 3 && sorted_indexes == &[2]
+            })
+            .returning(move |_| Ok(Response::new(vec![third_chunk.clone()])));
+        mock.expect_get_download_chunks()
+            .once()
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                let mut sorted_indexes = chunk_indexes.clone();
+                sorted_indexes.sort();
+                *data_version == 3 && sorted_indexes == &[1]
+            })
+            .returning(move |_| Ok(Response::new(vec![second_chunk.clone()])));
 
         test_env
             .server
@@ -1458,7 +1483,7 @@ mod tests {
             .create();
         let server = test_env.start_server(mock).await;
 
-        // create files form first chunk
+        // create files from first chunk
         fs::create_dir_all(&test_env.dest_dir)?;
         fs::write(test_env.dest_dir.join("zero.file"), "")?;
         fs::write(test_env.dest_dir.join("first.file"), "")?;
@@ -1601,10 +1626,13 @@ mod tests {
             data_version: 0,
         };
         let meta = metadata.clone();
+        let mut seq = Sequence::new();
         mock.expect_get_download_metadata()
             .once()
+            .in_sequence(&mut seq)
             .returning(move |_| Ok(Response::new(meta.clone())));
-        let chunks = vec![Chunk {
+
+        let first_chunk = Chunk {
             index: 0,
             key: "first_chunk".to_string(),
             url: test_env.url("first_chunk"),
@@ -1630,12 +1658,8 @@ mod tests {
                     size: 300,
                 },
             ],
-        }];
-        mock.expect_get_download_chunks()
-            .once()
-            .returning(move |_| Ok(Response::new(chunks.clone())));
-
-        let chunks = vec![Chunk {
+        };
+        let second_chunk = Chunk {
             index: 1,
             key: "second_chunk".to_string(),
             url: test_env.url("second_chunk"),
@@ -1646,20 +1670,36 @@ mod tests {
                 pos: 0,
                 size: 324,
             }],
-        }];
+        };
         mock.expect_get_download_chunks()
             .once()
-            .returning(move |_| Ok(Response::new(chunks.clone())));
+            .in_sequence(&mut seq)
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                let mut sorted_indexes = chunk_indexes.clone();
+                sorted_indexes.sort();
+                *data_version == 0
+            })
+            .returning(move |_| Ok(Response::new(vec![first_chunk.clone()])));
+        mock.expect_get_download_chunks()
+            .once()
+            .in_sequence(&mut seq)
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                *data_version == 0 && chunk_indexes == &[1]
+            })
+            .returning(move |_| Ok(Response::new(vec![second_chunk.clone()])));
 
         let another_meta = DownloadMetadata {
             total_size: 1,
             compression: None,
             chunks: 1,
-            data_version: 0,
+            data_version: 1,
         };
         let meta = another_meta.clone();
         mock.expect_get_download_metadata()
             .once()
+            .in_sequence(&mut seq)
             .returning(move |_| Ok(Response::new(meta.clone())));
         let chunks = vec![Chunk {
             index: 0,
@@ -1678,6 +1718,11 @@ mod tests {
         }];
         mock.expect_get_download_chunks()
             .once()
+            .in_sequence(&mut seq)
+            .withf(|req| {
+                let (data_version, chunk_indexes) = req.get_ref();
+                *data_version == 1 && chunk_indexes == &[0]
+            })
             .returning(move |_| Ok(Response::new(chunks.clone())));
 
         test_env
