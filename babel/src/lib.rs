@@ -21,6 +21,18 @@ use tokio::fs;
 use tonic::{codegen::InterceptedService, transport::Channel};
 use tracing::info;
 
+lazy_static::lazy_static! {
+    static ref NON_RETRIABLE: Vec<tonic::Code> = vec![tonic::Code::Internal,
+        tonic::Code::InvalidArgument, tonic::Code::Unimplemented, tonic::Code::PermissionDenied];
+}
+
+#[macro_export]
+macro_rules! with_selective_retry {
+    ($fun:expr) => {{
+        bv_utils::with_selective_retry!($fun, $crate::NON_RETRIABLE)
+    }};
+}
+
 pub const JOBS_MONITOR_UDS_PATH: &str = "/var/lib/babel/jobs_monitor.socket";
 const POST_SETUP_SCRIPT: &str = "/var/lib/babel/post_setup.sh";
 

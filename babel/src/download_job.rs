@@ -11,6 +11,7 @@ use crate::{
     jobs,
     jobs::{load_job_data, save_job_data},
     pal::BabelEngineConnector,
+    with_selective_retry,
 };
 use async_trait::async_trait;
 use babel_api::engine::{
@@ -180,17 +181,14 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
             )
         } else {
             cleanup_job(&self.config.archive_jobs_meta_dir, &self.destination_dir)?;
-            let metadata = self
-                .connector
-                .connect()
-                .get_download_metadata(with_timeout(
-                    (),
-                    // checking download manifest require validity check, which may be time-consuming
-                    // let's give it a minute
-                    Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
-                ))
-                .await?
-                .into_inner();
+            let mut client = self.connector.connect();
+            let metadata = with_selective_retry!(client.get_download_metadata(with_timeout(
+                (),
+                // checking download manifest require validity check, which may be time-consuming
+                // let's give it a minute
+                Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+            )))?
+            .into_inner();
             save_job_data(&metadata_path, &metadata)?;
             (metadata, vec![])
         })
@@ -327,17 +325,14 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkD
                     .take(self.config.max_runners)
                     .map(|index| index.to_owned())
                     .collect::<Vec<_>>();
-                self.chunks = self
-                    .connector
-                    .connect()
-                    .get_download_chunks(with_timeout(
-                        (self.data_version, indexes.clone()),
-                        // checking download manifest require validity check, which may be time-consuming
-                        // let's give it a minute
-                        Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
-                    ))
-                    .await?
-                    .into_inner();
+                let mut client = self.connector.connect();
+                self.chunks = with_selective_retry!(client.get_download_chunks(with_timeout(
+                    (self.data_version, indexes.clone()),
+                    // checking download manifest require validity check, which may be time-consuming
+                    // let's give it a minute
+                    Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+                )))?
+                .into_inner();
             }
             while self.futures.len() < self.config.max_runners {
                 let Some(chunk) = self.chunks.pop() else {

@@ -8,7 +8,7 @@ use crate::{
     jobs::{load_chunks, load_job_data, save_chunk, save_job_data, RunnersState},
     pal::BabelEngineConnector,
     utils::sources_list,
-    BabelEngineClient,
+    with_selective_retry, BabelEngineClient,
 };
 use async_trait::async_trait;
 use babel_api::engine::{
@@ -177,13 +177,11 @@ impl<C: BabelEngineConnector + Send> Runner for Uploader<C> {
                 blueprint.manifest.chunks.len(),
             );
         let mut client = self.connector.connect();
-        client
-            .put_download_manifest(with_timeout(
-                (blueprint.manifest, blueprint.data_version),
-                custom_timeout,
-            ))
-            .await
-            .with_context(|| "failed to send DownloadManifest blueprint back to API")?;
+        with_selective_retry!(client.put_download_manifest(with_timeout(
+            (blueprint.manifest.clone(), blueprint.data_version),
+            custom_timeout,
+        )))
+        .with_context(|| "failed to send DownloadManifest blueprint back to API")?;
 
         cleanup_job(&self.config.archive_jobs_meta_dir)?;
         Ok(())
@@ -197,15 +195,18 @@ async fn fetch_slots(
     data_version: Option<u64>,
     url_expires_secs: u32,
 ) -> Result<UploadSlots> {
-    let chunks = chunks.iter().rev().take(count);
-    Ok(client
-        .get_upload_slots((
-            data_version,
-            chunks.map(|chunk| chunk.index).collect(),
-            url_expires_secs,
-        ))
-        .await?
-        .into_inner())
+    let chunks = chunks
+        .iter()
+        .rev()
+        .take(count)
+        .map(|chunk| chunk.index)
+        .collect::<Vec<_>>();
+    Ok(with_selective_retry!(client.get_upload_slots((
+        data_version,
+        chunks.clone(),
+        url_expires_secs,
+    )))?
+    .into_inner())
 }
 
 fn assign_slots(chunks: &mut [Chunk], slots: Vec<Slot>) {

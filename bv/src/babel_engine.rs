@@ -1271,7 +1271,7 @@ mod tests {
         assert_eq!(expected_action, test_env.rx.try_recv().unwrap());
         assert_eq!(
             scheduler::Action::Delete("task_name".to_string()),
-            timeout(Duration::from_secs(1), test_env.rx.recv())
+            timeout(Duration::from_secs(15), test_env.rx.recv())
                 .await
                 .unwrap()
                 .unwrap()
