@@ -868,7 +868,7 @@ mod tests {
                 let (data_version, chunk_indexes) = req.get_ref();
                 let mut sorted_indexes = chunk_indexes.clone();
                 sorted_indexes.sort();
-                *data_version == 1 && sorted_indexes == &[0, 1]
+                *data_version == 1 && sorted_indexes == [0, 1]
             })
             .returning(move |_| Ok(Response::new(chunks.clone())));
 
@@ -1046,7 +1046,7 @@ mod tests {
                 let (data_version, chunk_indexes) = req.get_ref();
                 let mut sorted_indexes = chunk_indexes.clone();
                 sorted_indexes.sort();
-                *data_version == 1 && sorted_indexes == &[0, 1]
+                *data_version == 1 && sorted_indexes == [0, 1]
             })
             .returning(move |_| Ok(Response::new(chunks.clone())));
         let chunks = vec![first_chunk];
@@ -1454,7 +1454,7 @@ mod tests {
                 let (data_version, chunk_indexes) = req.get_ref();
                 let mut sorted_indexes = chunk_indexes.clone();
                 sorted_indexes.sort();
-                *data_version == 3 && sorted_indexes == &[2]
+                *data_version == 3 && sorted_indexes == [2]
             })
             .returning(move |_| Ok(Response::new(vec![third_chunk.clone()])));
         mock.expect_get_download_chunks()
@@ -1463,7 +1463,7 @@ mod tests {
                 let (data_version, chunk_indexes) = req.get_ref();
                 let mut sorted_indexes = chunk_indexes.clone();
                 sorted_indexes.sort();
-                *data_version == 3 && sorted_indexes == &[1]
+                *data_version == 3 && sorted_indexes == [1]
             })
             .returning(move |_| Ok(Response::new(vec![second_chunk.clone()])));
 

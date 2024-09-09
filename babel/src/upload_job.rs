@@ -888,7 +888,7 @@ mod tests {
                 let (data_version, slots, url_expires_secs) = req.get_ref();
                 let mut sorted_slots = slots.clone();
                 sorted_slots.sort();
-                *data_version == None && sorted_slots == vec![0, 1, 2] && *url_expires_secs == 60
+                data_version.is_none() && sorted_slots == vec![0, 1, 2] && *url_expires_secs == 60
             })
             .returning(move |_| Ok(Response::new(slots.clone())));
         mock.expect_put_download_manifest()
