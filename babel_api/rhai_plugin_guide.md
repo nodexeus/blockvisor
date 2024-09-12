@@ -161,6 +161,8 @@ To make implementation of Babel Plugin interface possible, BV provides following
 - `load_data()` - Load plugin data from persistent storage. Returns string (as it was passed to `save_data`).
 - `put_secret(key, value)` - Put plugin secret data to encrypted cloud storage. It takes string `key` and BLOB `value` as arguments. Use `to_blob` if you want to store simple string.
 - `get_secret(key)` - Get plugin secret data from encrypted cloud storage. It takes string `key` and returns BLOB (as it was passed to `put_secret`). Use `as_string` if you expect simple string.
+- `file_write(path, content)` - Write binary `content` (BLOB) into node filesystem. Use `to_blob` if you want to store simple string.
+- `file_read(path)` - Read binary content (BLOB) from node filesystem. Use `as_string` if you expect simple string.
 - `DATA_DRIVE_MOUNT_POINT` - Globally available constant, containing absolute path to directory where data drive is mounted.
 - `BLOCKCHAIN_DATA_PATH` - Globally available constant, containing absolute path to directory where blockchain data are stored.
   This is the path, where blockchain data archives are downloaded to, and where are uploaded from.
@@ -409,8 +411,8 @@ fn custom_function(arg) {
         peer_id = get_secret("id").as_string();
     } (err) catch {
         if err == "not_found" {
-            peer_key = blob(7, 6, 5, 4, 3, 2, 1);
-            peer_id = "generated-id";
+            peer_key = file_read("/blockjoy/peer.key");
+            peer_id = file_read("/blockjoy/peer.id").as_string();
             put_secret("key", peer_key);
             put_secret("id", peer_id.to_blob());
         } else {
