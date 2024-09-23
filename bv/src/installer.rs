@@ -5,7 +5,6 @@ use crate::{
 use async_trait::async_trait;
 use bv_utils::{timer::Timer, with_retry};
 use eyre::{anyhow, bail, ensure, Context, Error, Result};
-use semver::Version;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -13,7 +12,6 @@ use std::{
     time::Duration,
     {env, fs},
 };
-use sysinfo::{System, SystemExt};
 use tonic::{codegen::InterceptedService, transport::Channel};
 use tracing::{debug, info, warn};
 
@@ -483,7 +481,6 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     async fn check_requirements(&self) -> Result<()> {
         info!("checking BV {THIS_VERSION} requirements ...");
         check_cli_dependencies().await?;
-        check_kernel_requirements()?;
         self.check_network_setup().await?;
         Ok(())
     }
@@ -510,21 +507,6 @@ async fn check_cli_dependencies() -> Result<()> {
     }
     for cmd in ["ip", "mkfs.ext4"] {
         bv_utils::cmd::run_cmd(cmd, ["-V"]).await?;
-    }
-    Ok(())
-}
-
-fn check_kernel_requirements() -> Result<()> {
-    const MIN_KERNEL_VERSION: Version = Version::new(4, 14, 0);
-    const MAX_KERNEL_VERSION: Version = Version::new(6, 0, 0);
-    let mut sys = System::new_all();
-    sys.refresh_all();
-    let kernel_version = Version::parse(
-        &sys.kernel_version()
-            .ok_or_else(|| anyhow!("can't read kernel version"))?,
-    )?;
-    if kernel_version < MIN_KERNEL_VERSION || kernel_version >= MAX_KERNEL_VERSION {
-        bail!("supported kernel versions are >={MIN_KERNEL_VERSION} and <{MAX_KERNEL_VERSION}, but {kernel_version} found")
     }
     Ok(())
 }
