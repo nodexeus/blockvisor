@@ -48,7 +48,9 @@ impl Engine for LinterEngine {
 
     fn job_info(&self, _job_name: &str) -> eyre::Result<JobInfo> {
         Ok(JobInfo {
-            status: JobStatus::Pending,
+            status: JobStatus::Pending {
+                waiting_for: vec![],
+            },
             progress: None,
             restart_count: 0,
             logs: vec![],
@@ -60,7 +62,9 @@ impl Engine for LinterEngine {
         Ok(HashMap::from_iter([(
             "dummy_job".to_string(),
             JobInfo {
-                status: JobStatus::Pending,
+                status: JobStatus::Pending {
+                    waiting_for: vec![],
+                },
                 progress: None,
                 restart_count: 0,
                 logs: vec![],

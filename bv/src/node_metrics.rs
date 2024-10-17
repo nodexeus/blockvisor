@@ -210,7 +210,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     .into_iter()
                     .map(|(name, info)| {
                         let (status, exit_code, message) = match info.status {
-                            JobStatus::Pending => (pb::NodeJobStatus::Pending, None, None),
+                            JobStatus::Pending { .. } => (pb::NodeJobStatus::Pending, None, None),
                             JobStatus::Running => (pb::NodeJobStatus::Running, None, None),
                             JobStatus::Finished { exit_code, message } => (
                                 if exit_code == Some(0) {

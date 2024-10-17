@@ -661,20 +661,21 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
 
     fn application_status(&self) -> Result<ApplicationStatus> {
         let jobs = self.bare.babel_engine.get_jobs()?;
-        let check_job_status = |name: &str, expected_status: JobStatus| {
+        let check_job_status = |name: &str, check_status: fn(&JobStatus) -> bool| {
             jobs.get(name)
-                .map(|info| info.status == expected_status)
+                .map(|info| check_status(&info.status))
                 .unwrap_or(false)
         };
-        if check_job_status(UPLOAD_JOB_NAME, JobStatus::Running) {
+        if check_job_status(UPLOAD_JOB_NAME, |status| *status == JobStatus::Running) {
             Ok(ApplicationStatus::Uploading)
-        } else if check_job_status(DOWNLOAD_JOB_NAME, JobStatus::Running) {
+        } else if check_job_status(DOWNLOAD_JOB_NAME, |status| *status == JobStatus::Running) {
             Ok(ApplicationStatus::Downloading)
         } else if self.bare.plugin_config.as_ref().is_some_and(|config| {
-            config
-                .services
-                .iter()
-                .any(|service| check_job_status(&service.name, JobStatus::Pending))
+            config.services.iter().any(|service| {
+                check_job_status(&service.name, |status| {
+                    matches!(status, JobStatus::Pending { .. })
+                })
+            })
         }) {
             Ok(ApplicationStatus::Initializing)
         } else {
@@ -1445,7 +1446,9 @@ mod tests {
                 (
                     "blockchain_service_b".to_string(),
                     JobInfo {
-                        status: JobStatus::Pending,
+                        status: JobStatus::Pending {
+                            waiting_for: vec![],
+                        },
                         progress: Default::default(),
                         restart_count: 0,
                         logs: vec![],

@@ -369,7 +369,7 @@ pub enum JobStatus {
     /// The current job was requested to start, but the process has not been launched yet.
     /// It was not picked by the JobRunner yet, or needs another job to be finished first.
     /// Every job starts with this state.
-    Pending,
+    Pending { waiting_for: Vec<String> },
     /// The JobRunner actually picked that job.
     Running,
     /// Job finished - successfully or not. It means that the JobRunner won't try to restart that job anymore.
@@ -539,7 +539,9 @@ impl fmt::Debug for UploadSlots {
 impl fmt::Display for JobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            JobStatus::Pending => write!(f, "Pending"),
+            JobStatus::Pending { waiting_for } => {
+                write!(f, "Pending (waiting for: {waiting_for:?})")
+            }
             JobStatus::Running => write!(f, "Running"),
             JobStatus::Finished {
                 exit_code: Some(exit_code),
@@ -574,5 +576,13 @@ impl fmt::Display for JobProgress {
         } = self;
         let progress = *current as f32 * 100.0 / *total as f32;
         write!(f, "{progress:.2}% ({current}/{total} {message})")
+    }
+}
+
+impl JobConfig {
+    pub fn waiting_for(&self) -> Vec<String> {
+        let mut waiting_for = self.needs.clone().unwrap_or_default();
+        waiting_for.append(&mut self.wait_for.clone().unwrap_or_default());
+        waiting_for
     }
 }

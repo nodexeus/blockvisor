@@ -122,10 +122,11 @@ async fn load_jobs(
                         info!("{name} - Active(PID: {pid})");
                         JobState::Active(*pid)
                     } else {
-                        let status = jobs_context
-                            .jobs_data
-                            .load_status(&name)
-                            .unwrap_or(JobStatus::Pending);
+                        let status = jobs_context.jobs_data.load_status(&name).unwrap_or(
+                            JobStatus::Pending {
+                                waiting_for: config.waiting_for(),
+                            },
+                        );
                         info!("{name} - Inactive(status: {status:?})");
                         JobState::Inactive(status)
                     };
@@ -285,7 +286,9 @@ impl<C: BabelEngineConnector + Send> JobsManagerClient for Client<C> {
             match &mut job.state {
                 JobState::Active(_) => return Ok(()),
                 JobState::Inactive(status) => {
-                    *status = JobStatus::Pending;
+                    *status = JobStatus::Pending {
+                        waiting_for: job.config.waiting_for(),
+                    };
                     jobs_context.jobs_data.clear_status(name)?;
                 }
             }
@@ -585,7 +588,7 @@ impl<C: BabelEngineConnector> Manager<C> {
                 ..
             } = job
             {
-                if *status == JobStatus::Pending {
+                if matches!(status, JobStatus::Pending { .. }) {
                     match deps_finished(name, &deps, needs, wait_for) {
                         Ok(true) => {
                             if needs.is_some() || wait_for.is_some() {
@@ -672,7 +675,9 @@ impl<C: BabelEngineConnector> Manager<C> {
             error!(message);
             let mut client = connector.connect();
             let _ = with_retry!(client.bv_error(message.clone()));
-            job.state = JobState::Inactive(JobStatus::Pending);
+            job.state = JobState::Inactive(JobStatus::Pending {
+                waiting_for: job.config.waiting_for(),
+            });
         } else {
             job.state = match self.start_job_runner(name).await {
                 Ok(pid) => {
@@ -696,7 +701,9 @@ impl<C: BabelEngineConnector> Manager<C> {
                             error!(message);
                             let mut client = connector.connect();
                             let _ = with_retry!(client.bv_error(message.clone()));
-                            JobState::Inactive(JobStatus::Pending)
+                            JobState::Inactive(JobStatus::Pending {
+                                waiting_for: job.config.waiting_for(),
+                            })
                         }
                     }
                 }
@@ -939,7 +946,9 @@ mod tests {
             .unwrap());
         assert_eq!(
             JobInfo {
-                status: JobStatus::Pending,
+                status: JobStatus::Pending {
+                    waiting_for: vec![]
+                },
                 progress: Default::default(),
                 restart_count: 0,
                 logs: vec![],
@@ -994,7 +1003,12 @@ mod tests {
         // stop inactive
         test_env.client.jobs_registry.lock().await.jobs.insert(
             "test_job".to_owned(),
-            Job::new(JobState::Inactive(JobStatus::Pending), dummy_job_config()),
+            Job::new(
+                JobState::Inactive(JobStatus::Pending {
+                    waiting_for: vec![],
+                }),
+                dummy_job_config(),
+            ),
         );
         test_env.client.stop("test_job").await?;
         assert_eq!(
@@ -1076,7 +1090,12 @@ mod tests {
         .await?;
 
         assert_eq!(
-            Job::new(JobState::Inactive(JobStatus::Pending), config.clone()),
+            Job::new(
+                JobState::Inactive(JobStatus::Pending {
+                    waiting_for: vec![]
+                }),
+                config.clone()
+            ),
             *jobs_context.jobs.get("pending_job").unwrap()
         );
         assert_eq!(
@@ -1128,7 +1147,9 @@ mod tests {
         let monitor_handle = test_env.spawn_monitor();
 
         assert_eq!(
-            JobStatus::Pending,
+            JobStatus::Pending {
+                waiting_for: vec![]
+            },
             test_env.client.info("test_job").await?.status
         );
 
@@ -1173,7 +1194,10 @@ mod tests {
 
         let monitor_handle = test_env.spawn_monitor();
 
-        while JobStatus::Pending == test_env.client.info("test_job").await?.status {
+        while matches!(
+            test_env.client.info("test_job").await?.status,
+            JobStatus::Pending { .. }
+        ) {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
 
@@ -1271,7 +1295,9 @@ mod tests {
             test_env.client.info("test_job_b").await?.status
         );
         assert_eq!(
-            JobStatus::Pending,
+            JobStatus::Pending {
+                waiting_for: vec!["test_job_a".to_string(), "test_job_b".to_string()]
+            },
             test_env.client.info("test_pending_job").await?.status
         );
 
