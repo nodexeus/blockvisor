@@ -8,22 +8,13 @@ use blockvisord::linux_platform::bv_root;
 use blockvisord::{
     bv_config::Config,
     node_state::NodeState,
+    services,
     services::api::{common, pb},
 };
 use predicates::prelude::*;
 use std::path::PathBuf;
 use std::{path::Path, str};
 use tokio::time::{sleep, Duration};
-use tonic::Request;
-
-fn with_auth<T>(inner: T, auth_token: &str) -> Request<T> {
-    let mut request = Request::new(inner);
-    request.metadata_mut().insert(
-        "authorization",
-        format!("Bearer {}", auth_token).parse().unwrap(),
-    );
-    request
-}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn test_bv_service_e2e() {
@@ -95,32 +86,35 @@ async fn test_bv_service_e2e() {
         org_id: org_id.to_string(),
     };
 
-    let mut client = pb::org_service_client::OrgServiceClient::connect(url)
+    let channel = tonic::transport::Endpoint::from_static(url)
+        .connect()
         .await
         .unwrap();
+    let mut client = pb::org_service_client::OrgServiceClient::with_interceptor(
+        channel.clone(),
+        services::AuthToken(auth_token.clone()),
+    );
 
     let response = client
-        .get_provision_token(with_auth(get_token, &auth_token))
+        .get_provision_token(get_token)
         .await
         .unwrap()
         .into_inner();
     let provision_token = response.token;
     println!("host provision token: {provision_token}");
 
-    let mut client = pb::api_key_service_client::ApiKeyServiceClient::connect(url)
-        .await
-        .unwrap();
+    let mut client = pb::api_key_service_client::ApiKeyServiceClient::with_interceptor(
+        channel,
+        services::AuthToken(auth_token),
+    );
     let response = client
-        .create(with_auth(
-            pb::ApiKeyServiceCreateRequest {
-                label: "token".to_string(),
-                resource: Some(common::Resource {
-                    resource_type: common::ResourceType::User.into(),
-                    resource_id: user_id.to_string(),
-                }),
-            },
-            &auth_token,
-        ))
+        .create(pb::ApiKeyServiceCreateRequest {
+            label: "token".to_string(),
+            resource: Some(common::Resource {
+                resource_type: common::ResourceType::User.into(),
+                resource_id: user_id.to_string(),
+            }),
+        })
         .await
         .unwrap()
         .into_inner();

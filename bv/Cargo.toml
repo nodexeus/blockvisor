@@ -61,6 +61,7 @@ prost = "0.11.6"
 prost-types = "0.11.6"
 rand = "0.8.5"
 reqwest = { version = "0.11.14", features = ["rustls-tls"], default-features = false }
+rpassword = "7.3.1"
 rumqttc = "0.24.0"
 semver = "1.0.16"
 serde = "1.0.152"

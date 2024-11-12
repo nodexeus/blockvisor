@@ -12,10 +12,9 @@ pub struct App {
 }
 
 #[derive(Args)]
-pub struct ConfigArgs {
-    /// Client authentication token.
-    pub token: String,
-
+pub struct LoginArgs {
+    /// User id.
+    pub user_id: String,
     /// BlockJoy API url.
     #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
     pub blockjoy_api_url: String,
@@ -24,7 +23,7 @@ pub struct ConfigArgs {
 #[derive(Subcommand)]
 pub enum Command {
     /// Connect nib to the API.
-    Config(ConfigArgs),
+    Login(LoginArgs),
 
     /// Manage images and send them to the API.
     #[clap(alias = "i")]
