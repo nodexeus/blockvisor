@@ -317,14 +317,14 @@ impl<T: Timer, S: BvService> Installer<T, S> {
         symlink_all(BLOCKVISOR_SERVICES, &self.paths.system_services)?;
 
         let symlink_sh_complete = |dir, file| {
-            let completion_dir = self.paths.bv_root.join(dir);
-            let _ = fs::create_dir_all(&completion_dir);
-            let completion_file = completion_dir.join(file);
-            let _ = fs::remove_file(&completion_file);
-            let _ = std::os::unix::fs::symlink(
-                self.paths.current.join(SH_COMPLETE).join(file),
-                completion_file,
-            );
+            let from = self.paths.current.join(SH_COMPLETE).join(file);
+            if from.exists() {
+                let completion_dir = self.paths.bv_root.join(dir);
+                let _ = fs::create_dir_all(&completion_dir);
+                let to = completion_dir.join(file);
+                let _ = fs::remove_file(&to);
+                let _ = std::os::unix::fs::symlink(from, to);
+            }
         };
         symlink_sh_complete(COMPLETION_DIR_BASH, BV_COMPLETION_FILE_BASH);
         symlink_sh_complete(COMPLETION_DIR_ZSH, BV_COMPLETION_FILE_ZSH);
