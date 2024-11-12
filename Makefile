@@ -24,7 +24,7 @@ bundle-base: build-release
 	cp target/x86_64-unknown-linux-musl/release/babel /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/babel_job_runner /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/bvup /tmp/bvup
-	make /tmp/bundle/sh_complete
+	mkdir /tmp/bundle/sh_complete
 
 bundle: bundle-base
 	cp target/x86_64-unknown-linux-musl/release/sh_complete/_bv /tmp/bundle/sh_complete/
