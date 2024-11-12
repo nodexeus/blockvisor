@@ -25,10 +25,10 @@ bundle-base: build-release
 	cp target/x86_64-unknown-linux-musl/release/babel_job_runner /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/bvup /tmp/bvup
 	mkdir /tmp/bundle/sh_complete
-
-bundle: bundle-base
 	cp target/x86_64-unknown-linux-musl/release/sh_complete/_bv /tmp/bundle/sh_complete/
 	cp target/x86_64-unknown-linux-musl/release/sh_complete/bv.bash /tmp/bundle/sh_complete/
+
+bundle: bundle-base
 	rm -rf /tmp/bundle.tar.gz
 	tar -C /tmp -czvf /tmp/bundle.tar.gz bundle
 
