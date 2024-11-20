@@ -10,6 +10,8 @@
 BV doesn't require any particular linux distribution, but it is recommended to use:
 `Ubuntu Server 18.04+`
 
+BV requires Linux kernel 5.10+.
+
 ### Install BV Dependencies
 
 Beside standard linux tool available in all distributions, BV requires following CLI tools to be available:

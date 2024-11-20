@@ -60,7 +60,7 @@ pub async fn create<C: BabelEngineConnector>(
         load_jobs(&mut jobs_context, &job_runner_bin_path.to_string_lossy()).await?;
     }
     let jobs_registry = Arc::new(Mutex::new(jobs_context));
-    let (job_added_tx, job_added_rx) = watch::channel(());
+    let (job_started_tx, job_started_rx) = watch::channel(());
     let (jobs_manager_state_tx, jobs_manager_state_rx) = watch::channel(state);
     let (jobs_monitor_tx, jobs_monitor_rx) = mpsc::channel(256);
     Ok((
@@ -68,7 +68,7 @@ pub async fn create<C: BabelEngineConnector>(
             jobs_registry: jobs_registry.clone(),
             job_runner_bin_path: job_runner_bin_path.to_string_lossy().to_string(),
             jobs_dir: jobs_dir.to_path_buf(),
-            job_added_tx,
+            job_started_tx,
             jobs_manager_state_tx,
         },
         Monitor { jobs_monitor_tx },
@@ -76,7 +76,7 @@ pub async fn create<C: BabelEngineConnector>(
             jobs_registry,
             job_runner_lock,
             job_runner_bin_path: job_runner_bin_path.to_string_lossy().to_string(),
-            job_added_rx,
+            job_started_rx,
             jobs_manager_state_rx,
             jobs_monitor_rx,
         },
@@ -275,7 +275,7 @@ pub struct Client<C> {
     jobs_registry: JobsRegistry<C>,
     job_runner_bin_path: String,
     jobs_dir: PathBuf,
-    job_added_tx: watch::Sender<()>,
+    job_started_tx: watch::Sender<()>,
     jobs_manager_state_tx: watch::Sender<JobsManagerState>,
 }
 
@@ -374,7 +374,6 @@ impl<C: BabelEngineConnector + Send> JobsManagerClient for Client<C> {
             format!("failed to create job '{name}', can't save job config to file")
         })?;
         jobs_context.jobs.insert(name.to_string(), job);
-        let _ = self.job_added_tx.send(());
         Ok(())
     }
 
@@ -395,7 +394,7 @@ impl<C: BabelEngineConnector + Send> JobsManagerClient for Client<C> {
         } else {
             bail!("can't start, job '{name}' not found")
         }
-        let _ = self.job_added_tx.send(());
+        let _ = self.job_started_tx.send(());
         Ok(())
     }
 
@@ -562,7 +561,7 @@ pub struct Manager<C> {
     jobs_registry: JobsRegistry<C>,
     job_runner_lock: JobRunnerLock,
     job_runner_bin_path: String,
-    job_added_rx: watch::Receiver<()>,
+    job_started_rx: watch::Receiver<()>,
     jobs_manager_state_rx: watch::Receiver<JobsManagerState>,
     jobs_monitor_rx: mpsc::Receiver<JobReport>,
 }
@@ -580,15 +579,14 @@ impl<C: BabelEngineConnector> Manager<C> {
         }
         while run.load() && *self.jobs_manager_state_rx.borrow() == JobsManagerState::Ready {
             sys.refresh_processes();
-            if let Ok(async_pids) = self.update_jobs(sys.processes()).await {
-                if async_pids.is_empty() {
-                    // no jobs :( - just wait for job to be added
-                    select!(
-                        _ = self.job_added_rx.changed() => {}
-                        _ = self.jobs_manager_state_rx.changed() => {}
-                        _ = run.wait() => {}
-                    );
-                } else {
+            match self.update_jobs(sys.processes()).await {
+                // no active jobs :( - just wait for job to be started
+                Ok(async_pids) if async_pids.is_empty() => select!(
+                    _ = self.job_started_rx.changed() => {}
+                    _ = self.jobs_manager_state_rx.changed() => {}
+                    _ = run.wait() => {}
+                ),
+                Ok(async_pids) => {
                     let mut futures: FuturesUnordered<_> =
                         async_pids.iter().map(|a| a.watch()).collect();
                     'monitor: loop {
@@ -598,14 +596,28 @@ impl<C: BabelEngineConnector> Manager<C> {
                                 continue 'monitor
                             }
                             _ = futures.next() => {}
-                            _ = self.job_added_rx.changed() => {}
+                            _ = self.job_started_rx.changed() => {}
                             _ = self.jobs_manager_state_rx.changed() => {}
                             _ = run.wait() => {}
                         );
                         break 'monitor;
                     }
                 }
-            } // refresh process and update_jobs again in case of error
+                // failed to get async pids - fallback to periodic checks
+                Err(_) => 'monitor: loop {
+                    select!(
+                        report = self.jobs_monitor_rx.recv() => {
+                            self.handle_job_report(report).await;
+                            continue 'monitor
+                        }
+                        _ = tokio::time::sleep(Duration::from_secs(1)) => {}
+                        _ = self.job_started_rx.changed() => {}
+                        _ = self.jobs_manager_state_rx.changed() => {}
+                        _ = run.wait() => {}
+                    );
+                    break 'monitor;
+                },
+            }
         }
     }
 
@@ -1039,7 +1051,7 @@ mod tests {
         assert!(test_env
             .manager
             .unwrap()
-            .job_added_rx
+            .job_started_rx
             .has_changed()
             .unwrap());
         assert_eq!(

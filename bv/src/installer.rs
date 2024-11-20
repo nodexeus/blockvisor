@@ -484,6 +484,16 @@ impl<T: Timer, S: BvService> Installer<T, S> {
 
     async fn check_requirements(&self) -> Result<()> {
         info!("checking BV {THIS_VERSION} requirements ...");
+        if semver::Version::parse(
+            bv_utils::cmd::run_cmd("uname", ["-r"])
+                .await?
+                .split("-")
+                .next()
+                .ok_or(anyhow!("can't check kernel version"))?,
+        )? < semver::Version::new(5, 10, 0)
+        {
+            bail!("Linux kernel 5.10+ is required");
+        }
         check_cli_dependencies().await?;
         self.check_network_setup().await?;
         Ok(())
