@@ -122,6 +122,9 @@ properties:
   # It is required to be lower-kebab-case.
   - key: arbitrary-text-property
 
+    # Property display name.
+    name: Text Property
+
     # [optional] Brief property description.
     description: this is some text property example
 
@@ -147,31 +150,32 @@ properties:
       add_disk_gb: 1
 
   - key: switch-property
+    name: Switch Property
     description: this is some switch example
     dynamic_value: true
-    default_value: off-value
+    default_value: off
     ui_type: !switch
       on:
-        value: on-value
-        impact:
-          new_archive: true
-          add_cpu: 3
-          add_memory_mb: 10
-          add_disk_gb: 10
-      off:
-        value: off-value
-        impact: null
+        new_archive: true
+        add_cpu: 3
+        add_memory_mb: 10
+        add_disk_gb: 10
+      off: null
 
   - key: enum-property
+    name: Enum Property
     description: this is some enum example
     dynamic_value: true
     default_value: variant-a
     ui_type: !enum
       - value: variant-a
+        name: Variant A
         impact: null
       - value: variant-b
+        name: Variant B
         impact: null
       - value: variant-c
+        name: Variant C
         impact:
           new_archive: true
           add_cpu: -1

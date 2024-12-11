@@ -499,48 +499,42 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
             }
             UiType::Switch { on, off } => {
                 add_properties.push(pb::AddImageProperty {
-                    key: format!("{}-{}", property.key, on.value),
+                    key: format!("{}-on", property.key),
                     key_group: Some(property.key.clone()),
                     description: property.description.clone(),
                     new_archive: on
-                        .impact
                         .as_ref()
                         .map(|impact| impact.new_archive)
                         .unwrap_or_default(),
-                    is_group_default: Some(property.default_value == on.value),
-                    default_value: on.value,
+                    is_group_default: Some(property.default_value == "on"),
+                    default_value: "on".to_string(),
                     dynamic_value: property.dynamic_value,
                     ui_type: common::UiType::Switch.into(),
-                    add_cpu_cores: on.impact.as_ref().and_then(|impact| impact.add_cpu),
+                    add_cpu_cores: on.as_ref().and_then(|impact| impact.add_cpu),
                     add_memory_bytes: on
-                        .impact
                         .as_ref()
                         .and_then(|impact| impact.add_memory_mb.map(|value| value * 1_000_000)),
                     add_disk_bytes: on
-                        .impact
                         .as_ref()
                         .and_then(|impact| impact.add_disk_gb.map(|value| value * 1_000_000_000)),
                 });
                 add_properties.push(pb::AddImageProperty {
-                    key: format!("{}-{}", property.key, off.value),
+                    key: format!("{}-off", property.key),
                     key_group: Some(property.key.clone()),
                     description: property.description,
                     new_archive: off
-                        .impact
                         .as_ref()
                         .map(|impact| impact.new_archive)
                         .unwrap_or_default(),
-                    is_group_default: Some(property.default_value == off.value),
-                    default_value: off.value,
+                    is_group_default: Some(property.default_value == "off"),
+                    default_value: "off".to_string(),
                     dynamic_value: property.dynamic_value,
                     ui_type: common::UiType::Switch.into(),
-                    add_cpu_cores: off.impact.as_ref().and_then(|impact| impact.add_cpu),
+                    add_cpu_cores: off.as_ref().and_then(|impact| impact.add_cpu),
                     add_memory_bytes: off
-                        .impact
                         .as_ref()
                         .and_then(|impact| impact.add_memory_mb.map(|value| value * 1_000_000)),
                     add_disk_bytes: off
-                        .impact
                         .as_ref()
                         .and_then(|impact| impact.add_disk_gb.map(|value| value * 1_000_000_000)),
                 });

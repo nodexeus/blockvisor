@@ -127,6 +127,7 @@ pub struct PortName {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ImageProperty {
     pub key: String,
+    pub name: String,
     pub description: Option<String>,
     pub dynamic_value: bool,
     pub default_value: String,
@@ -145,7 +146,10 @@ pub struct ImageImpact {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum UiType {
-    Switch { on: EnumVariant, off: EnumVariant },
+    Switch {
+        on: Option<ImageImpact>,
+        off: Option<ImageImpact>,
+    },
     Text(Option<ImageImpact>),
     Password(Option<ImageImpact>),
     Enum(Vec<EnumVariant>),
@@ -154,5 +158,6 @@ pub enum UiType {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EnumVariant {
     pub value: String,
+    pub name: String,
     pub impact: Option<ImageImpact>,
 }
