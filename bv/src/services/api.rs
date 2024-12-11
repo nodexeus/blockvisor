@@ -562,7 +562,7 @@ impl TryFrom<pb::Node> for NodeState {
                 .into(),
             protocol_name: node.protocol_name,
             org_id: node.org_id,
-            display_name: node.display_name.unwrap_or_default(),
+            display_name: node.display_name,
             org_name: node.org_name,
             dns_name: node.dns_name,
             assigned_cpus: vec![],

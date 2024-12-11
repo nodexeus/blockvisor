@@ -299,9 +299,9 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
                 .into_iter()
                 .map(|property| pb::AddImageProperty {
                     key: property.key,
-                    name: property.name,
+                    display_name: property.display_name,
                     key_group: property.key_group,
-                    group_name: property.group_name,
+                    display_group: property.display_group,
                     description: property.description,
                     new_archive: property.new_archive,
                     default_value: property.default_value,
@@ -480,9 +480,9 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
             UiType::Text(impact) | UiType::Password(impact) => {
                 add_properties.push(pb::AddImageProperty {
                     key: property.key,
-                    name: property.name,
+                    display_name: Some(property.name),
                     key_group: None,
-                    group_name: None,
+                    display_group: None,
                     description: property.description,
                     new_archive: impact
                         .as_ref()
@@ -504,9 +504,9 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
             UiType::Switch { on, off } => {
                 add_properties.push(pb::AddImageProperty {
                     key: format!("{}-on", property.key),
-                    name: "On".to_string(),
+                    display_name: None,
                     key_group: Some(property.key.clone()),
-                    group_name: Some(property.name.clone()),
+                    display_group: Some(property.name.clone()),
                     description: property.description.clone(),
                     new_archive: on
                         .as_ref()
@@ -526,9 +526,9 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                 });
                 add_properties.push(pb::AddImageProperty {
                     key: format!("{}-off", property.key),
-                    name: "Off".to_string(),
+                    display_name: None,
                     key_group: Some(property.key.clone()),
-                    group_name: Some(property.name),
+                    display_group: Some(property.name),
                     description: property.description,
                     new_archive: off
                         .as_ref()
@@ -551,9 +551,9 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                 for variant in variants {
                     add_properties.push(pb::AddImageProperty {
                         key: format!("{}-{}", property.key, variant.value),
-                        name: variant.name,
+                        display_name: Some(variant.name),
                         key_group: Some(property.key.clone()),
-                        group_name: Some(property.name.clone()),
+                        display_group: Some(property.name.clone()),
                         description: property.description.clone(),
                         new_archive: variant
                             .impact
