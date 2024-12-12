@@ -279,8 +279,9 @@ impl<'a> CommandsService<'a> {
             }
         };
         let mut client = connect_command_service(self.config).await?;
-        api_with_retry!(client, client.update(req.clone()))
-            .with_context(|| format!("failed to update command '{command_id}' status"))?;
+        if let Err(err) = api_with_retry!(client, client.update(req.clone())) {
+            warn!("failed to update command '{command_id}' status: {err:#}");
+        }
         self.save_cache().await;
         Ok(command_result?)
     }
