@@ -128,7 +128,8 @@ pub async fn collect_metric<N: NodeConnection>(
         }
         Some(ProtocolStatus { state, .. })
             if state == babel_api::plugin_config::DOWNLOADING_STATE_NAME
-                || state == babel_api::plugin_config::UPLOADING_STATE_NAME =>
+                || state == babel_api::plugin_config::UPLOADING_STATE_NAME
+                || state == babel_api::plugin_config::STARTING_STATE_NAME =>
         {
             let jobs = timeout(babel_engine.get_jobs())
                 .await
@@ -142,11 +143,6 @@ pub async fn collect_metric<N: NodeConnection>(
                 protocol_status,
                 jobs,
             })
-        }
-        Some(ProtocolStatus { state, .. })
-            if state == babel_api::plugin_config::STARTING_STATE_NAME =>
-        {
-            None
         }
         _ => {
             let height = match babel_engine.has_capability("height") {
