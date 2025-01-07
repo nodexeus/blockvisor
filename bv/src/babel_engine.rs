@@ -511,9 +511,10 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
 
     async fn handle_create_job(
         &mut self,
-        job_name: String,
+        mut job_name: String,
         job_config: JobConfig,
     ) -> std::result::Result<(), Error> {
+        job_name = job_name.trim().to_string();
         if job_name.is_empty() {
             bail!("empty job name is not allowed")
         }
