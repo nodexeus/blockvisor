@@ -60,7 +60,7 @@ Functions listed below are required by BV to work properly.
   finally starts configured services.
 
   See [minimalistic example](examples/init_minimal.rhai) or go to [Protocol Data Archives](#protocol-data-archives) chapter for example including download step)
-- `app_status()` - Returns protocol application status in form of following structure.
+- `protocol_status()` - Returns protocol application status in form of following structure.
 ```rust
 {
   // Arbitrary application state name.

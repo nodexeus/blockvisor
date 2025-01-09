@@ -23,6 +23,7 @@ use tracing::Level;
 
 pub const PLUGIN_CONFIG_CONST_NAME: &str = "PLUGIN_CONFIG";
 const INIT_FN_NAME: &str = "init";
+const PROTOCOL_STATUS_FN_NAME: &str = "protocol_status";
 const BASE_CONFIG_CONST_NAME: &str = "BASE_CONFIG";
 const BABEL_VERSION_CONST_NAME: &str = "BABEL_VERSION";
 
@@ -628,9 +629,11 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
             .find(|meta| meta.name == INIT_FN_NAME)
         {
             if init_meta.params.is_empty() {
-                self.call_fn(init_meta.name, ())
+                self.call_fn(INIT_FN_NAME, ())
             } else {
-                self.call_fn(init_meta.name, (Map::default(),))
+                // LEGACY node support - remove once all nodes upgraded
+                // keep backward compatibility with obsolete `upload(param)` functions
+                self.call_fn(INIT_FN_NAME, (Map::default(),))
             }
         } else {
             self.bare.default_init()
@@ -647,6 +650,7 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
             if fn_meta.params.is_empty() {
                 self.call_fn(UPLOAD_JOB_NAME, ())
             } else {
+                // LEGACY node support - remove once all nodes upgraded
                 // keep backward compatibility with obsolete `upload(param)` functions
                 self.call_fn(UPLOAD_JOB_NAME, ("",))
                     .map(|_ignored: String| ())
@@ -706,28 +710,44 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
             })
         } else {
             // LEGACY node support - remove once all nodes upgraded
-            if !self
+            if !self.bare.ast.iter_functions().any(|function| {
+                function.name == PROTOCOL_STATUS_FN_NAME && function.params.is_empty()
+            }) && self
                 .bare
                 .ast
                 .iter_functions()
-                .any(|function| function.name == "protocol_status" && function.params.is_empty())
-                && self.bare.ast.iter_functions().any(|function| {
-                    function.name == "application_status" && function.params.is_empty()
-                })
+                .any(|function| function.name == "application_status" && function.params.is_empty())
             {
                 Ok(from_dynamic(
                     &self.call_fn::<_, Dynamic>("application_status", ())?,
                 )?)
             } else {
                 Ok(from_dynamic(
-                    &self.call_fn::<_, Dynamic>("protocol_status", ())?,
+                    &self.call_fn::<_, Dynamic>(PROTOCOL_STATUS_FN_NAME, ())?,
                 )?)
             }
         }
     }
 
     fn call_custom_method(&self, name: &str, param: &str) -> Result<String> {
-        self.call_fn(name, (param.to_string(),))
+        if self
+            .bare
+            .ast
+            .iter_functions()
+            .any(|meta| meta.name == name && meta.params.len() == 1)
+        {
+            self.call_fn(name, (param.to_string(),))
+        } else if param.is_empty()
+            && self
+                .bare
+                .ast
+                .iter_functions()
+                .any(|meta| meta.name == name && meta.params.is_empty())
+        {
+            self.call_fn(name, ())
+        } else {
+            bail!("no matching method '{name}' found")
+        }
     }
 }
 
@@ -2019,7 +2039,7 @@ mod tests {
             "Rhai function 'custom_failing_method' returned error: Runtime error: some Rust error"
         ));
         assert_eq!(
-            "Rhai function 'no_method' returned error: Function not found: no_method",
+            "no matching method 'no_method' found",
             format!(
                 "{:#}",
                 plugin.call_custom_method("no_method", "").unwrap_err()
