@@ -640,13 +640,18 @@ where
                 org_id: config.private_org_id.ok_or(anyhow!(
                     "create node is not supported on public hosts - use web frontend"
                 ))?,
-                placement: Some(common::NodePlacement {
-                    placement: Some(common::node_placement::Placement::HostId(config.id)),
-                }),
                 new_values: properties,
                 image_id,
                 add_rules: vec![],
                 tags: None,
+                launcher: Some(common::NodeLauncher {
+                    launch: Some(common::node_launcher::Launch::ByHost(common::ByHost {
+                        host_counts: vec![common::HostCount {
+                            host_id: config.id,
+                            node_count: 1,
+                        }],
+                    })),
+                }),
             })
             .await
             .with_context(|| "create node via API failed")?

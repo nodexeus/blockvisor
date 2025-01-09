@@ -237,7 +237,7 @@ async fn main() -> Result<()> {
             )?;
         }
 
-        let create = pb::HostServiceCreateRequest {
+        let create = pb::HostServiceCreateHostRequest {
             provision_token: cmd_args.provision_token.unwrap(),
             is_private: cmd_args.private,
             network_name: host_info.name.clone(),
@@ -250,8 +250,8 @@ async fn main() -> Result<()> {
             os_version: host_info.os_version,
             ip_address: net_conf.host_ip.to_string(),
             ip_gateway: net_conf.gateway_ip.to_string(),
-            region: Some(region),
-            schedule_type: pb::ScheduleType::Automatic.into(),
+            region_id: region,
+            schedule_type: common::ScheduleType::Automatic.into(),
             ips: net_conf
                 .available_ips
                 .iter()
@@ -271,7 +271,7 @@ async fn main() -> Result<()> {
         )
         .await?;
 
-        let host = client.create(create).await?.into_inner();
+        let host = client.create_host(create).await?.into_inner();
 
         let mut host_config = Config {
             id: host

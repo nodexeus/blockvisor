@@ -172,7 +172,7 @@ pub async fn send_info_update(config: SharedConfig) -> Result<()> {
         pb::host_service_client::HostServiceClient::with_interceptor,
     )
     .await?;
-    let update = pb::HostServiceUpdateRequest {
+    let update = pb::HostServiceUpdateHostRequest {
         host_id: config.read().await.id,
         network_name: Some(info.name),
         display_name: None,
@@ -180,14 +180,14 @@ pub async fn send_info_update(config: SharedConfig) -> Result<()> {
         cpu_cores: None,
         os: Some(info.os),
         os_version: Some(info.os_version),
-        region: None,
+        region_id: None,
         disk_bytes: Some(info.disk_space_bytes),
         schedule_type: None,
         update_tags: None,
         memory_bytes: None,
         cost: None,
     };
-    api_with_retry!(client, client.update(update.clone()))?;
+    api_with_retry!(client, client.update_host(update.clone()))?;
 
     Ok(())
 }

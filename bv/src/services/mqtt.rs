@@ -1,4 +1,4 @@
-use crate::{bv_config::SharedConfig, pal, services, services::api::pb};
+use crate::{bv_config::SharedConfig, pal, services, services::api::common};
 use async_trait::async_trait;
 use eyre::{anyhow, bail, Result};
 use metrics::{register_counter, Counter};
@@ -133,17 +133,17 @@ impl pal::CommandsStream for MqttStream {
 }
 
 fn host_online(host_id: String) -> Vec<u8> {
-    pb::HostStatus {
+    common::HostStatus {
         host_id,
-        connection_status: Some(pb::HostConnectionStatus::Online.into()),
+        connection_status: Some(common::HostConnectionStatus::Online.into()),
     }
     .encode_to_vec()
 }
 
 fn host_offline(host_id: String) -> Vec<u8> {
-    pb::HostStatus {
+    common::HostStatus {
         host_id,
-        connection_status: Some(pb::HostConnectionStatus::Offline.into()),
+        connection_status: Some(common::HostConnectionStatus::Offline.into()),
     }
     .encode_to_vec()
 }
