@@ -34,9 +34,14 @@ pub struct RhaiPlugin<E> {
 
 impl<E: Engine + Sync + Send + 'static> Clone for RhaiPlugin<E> {
     fn clone(&self) -> Self {
+        let mut rhai_engine = Self::new_rhai_engine(self.bare.babel_engine.clone());
+        if let Some(plugin_dir) = &self.bare.plugin_path {
+            rhai_engine.set_module_resolver(FileModuleResolver::new_with_path(plugin_dir));
+        }
+
         let mut clone = Self {
             bare: self.bare.clone(),
-            rhai_engine: Self::new_rhai_engine(self.bare.babel_engine.clone()),
+            rhai_engine,
         };
         clone.register_defaults();
         clone
@@ -45,6 +50,7 @@ impl<E: Engine + Sync + Send + 'static> Clone for RhaiPlugin<E> {
 
 #[derive(Debug)]
 pub(crate) struct BarePlugin<E> {
+    pub(crate) plugin_path: Option<PathBuf>,
     pub(crate) babel_engine: Arc<E>,
     pub(crate) ast: AST,
     pub(crate) plugin_config: Option<PluginConfig>,
@@ -54,6 +60,7 @@ pub(crate) struct BarePlugin<E> {
 impl<E: Engine + Sync + Send + 'static> Clone for BarePlugin<E> {
     fn clone(&self) -> Self {
         Self {
+            plugin_path: self.plugin_path.clone(),
             babel_engine: self.babel_engine.clone(),
             ast: self.ast.clone(),
             plugin_config: self.plugin_config.clone(),
@@ -101,23 +108,23 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         let ast = rhai_engine
             .compile(script)
             .with_context(|| "Rhai syntax error")?;
-        Self::new(ast, babel_engine, rhai_engine)
+        Self::new(ast, babel_engine, rhai_engine, None)
     }
 
     pub fn from_file(plugin_path: PathBuf, babel_engine: E) -> Result<Self> {
         let babel_engine = Arc::new(babel_engine);
         let mut rhai_engine = Self::new_rhai_engine(babel_engine.clone());
+        let plugin_dir = plugin_path
+            .parent()
+            .ok_or(anyhow!("invalid plugin parent dir"))?
+            .to_path_buf();
+        rhai_engine.set_module_resolver(FileModuleResolver::new_with_path(&plugin_dir));
 
-        rhai_engine.set_module_resolver(FileModuleResolver::new_with_path(
-            plugin_path
-                .parent()
-                .ok_or(anyhow!("invalid plugin parent dir"))?,
-        ));
         // compile script to AST
         let ast = rhai_engine
             .compile_file(plugin_path)
             .with_context(|| "Rhai syntax error")?;
-        Self::new(ast, babel_engine, rhai_engine)
+        Self::new(ast, babel_engine, rhai_engine, Some(plugin_dir))
     }
 
     pub fn evaluate_plugin_config(&mut self) -> Result<()> {
@@ -145,10 +152,16 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         Ok(())
     }
 
-    fn new(ast: AST, babel_engine: Arc<E>, rhai_engine: rhai::Engine) -> Result<Self> {
+    fn new(
+        ast: AST,
+        babel_engine: Arc<E>,
+        rhai_engine: rhai::Engine,
+        plugin_path: Option<PathBuf>,
+    ) -> Result<Self> {
         check_babel_version(&ast)?;
         let mut plugin = RhaiPlugin {
             bare: BarePlugin {
+                plugin_path,
                 babel_engine,
                 ast,
                 plugin_config: None,
