@@ -718,9 +718,10 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
                 .iter_functions()
                 .any(|function| function.name == "application_status" && function.params.is_empty())
             {
-                Ok(from_dynamic(
-                    &self.call_fn::<_, Dynamic>("application_status", ())?,
-                )?)
+                Ok(ProtocolStatus {
+                    state: self.call_fn::<_, String>("application_status", ())?,
+                    health: NodeHealth::Neutral,
+                })
             } else {
                 Ok(from_dynamic(
                     &self.call_fn::<_, Dynamic>(PROTOCOL_STATUS_FN_NAME, ())?,
