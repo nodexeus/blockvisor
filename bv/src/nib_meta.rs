@@ -32,14 +32,14 @@ pub struct ArchivePointer {
     #[serde(default)]
     pub new_archive_properties: Vec<String>,
     // LEGACY node support - deprecate and add warning to nib image check, once all nodes upgraded
-    pub legacy_store_id: Option<String>,
+    pub legacy_store_key: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StorePointer {
     CombinationDisallowed,
-    StoreId(String),
+    StoreKey(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

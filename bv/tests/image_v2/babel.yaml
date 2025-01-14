@@ -10,8 +10,8 @@ protocol_key: testing
 variants:
   - key: test
     archive_pointers:
-      - pointer: !store_id unique-store-id-v1
-        legacy_store_id: testing-test-test2
+      - pointer: !store_key unique-store-id-v1
+        legacy_store_key: testing-test-test2
     min_cpu: 1
     min_memory_mb: 1000
     min_disk_gb: 2

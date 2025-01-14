@@ -525,7 +525,7 @@ impl TryFrom<pb::Node> for NodeState {
             version: node.semantic_version,
             config_id: node.config_id,
             archive_id: image_config.archive_id,
-            store_id: image_config.store_id,
+            store_key: image_config.store_key,
             uri: image_config.image_uri,
         };
         let properties = to_node_properties(image_config.values);

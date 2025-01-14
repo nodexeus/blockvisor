@@ -54,11 +54,12 @@ pub async fn process_image_command(
                             for variant in image.variants {
                                 let variant_key = variant.key;
                                 for pointer in variant.archive_pointers {
-                                    let nib_meta::StorePointer::StoreId(store_id) = pointer.pointer
+                                    let nib_meta::StorePointer::StoreKey(store_key) =
+                                        pointer.pointer
                                     else {
                                         continue;
                                     };
-                                    let Some(legacy_store_id) = pointer.legacy_store_id else {
+                                    let Some(legacy_store_key) = pointer.legacy_store_key else {
                                         continue;
                                     };
                                     if let Some((
@@ -67,14 +68,14 @@ pub async fn process_image_command(
                                             protocol_key: first_protocol_key,
                                             variant_key: first_variant_key,
                                         },
-                                    )) = mapping.get(&legacy_store_id)
+                                    )) = mapping.get(&legacy_store_key)
                                     {
-                                        bail!("legacy_store_id '{legacy_store_id}' defined twice: first for {first_protocol_key}/{first_variant_key}, then for {protocol_key}/{variant_key}");
+                                        bail!("legacy_store_key '{legacy_store_key}' defined twice: first for {first_protocol_key}/{first_variant_key}, then for {protocol_key}/{variant_key}");
                                     }
                                     mapping.insert(
-                                        legacy_store_id,
+                                        legacy_store_key,
                                         (
-                                            store_id,
+                                            store_key,
                                             ProtocolImageKey {
                                                 protocol_key: protocol_key.clone(),
                                                 variant_key: variant_key.clone(),
@@ -177,7 +178,7 @@ pub async fn process_image_command(
                         version: local_image.version,
                         config_id: "00000000-0000-0000-0000-000000000000".to_string(),
                         archive_id: "00000000-0000-0000-0000-000000000000".to_string(),
-                        store_id: "dev-node-store-id".to_string(),
+                        store_key: "dev-node-store-id".to_string(),
                         uri: local_image.container_uri,
                     },
                     assigned_cpus: vec![],

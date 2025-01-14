@@ -467,7 +467,7 @@ impl From<nib_meta::ArchivePointer> for pb::ArchivePointer {
             new_archive_keys: value.new_archive_properties,
             pointer: Some(match value.pointer {
                 StorePointer::CombinationDisallowed => pb::archive_pointer::Pointer::Disallowed(()),
-                StorePointer::StoreId(id) => pb::archive_pointer::Pointer::StoreId(id),
+                StorePointer::StoreKey(key) => pb::archive_pointer::Pointer::StoreKey(key),
             }),
         }
     }

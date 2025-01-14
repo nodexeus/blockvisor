@@ -33,7 +33,7 @@ pub struct NodeImage {
     pub version: String,
     pub config_id: String,
     pub archive_id: String,
-    pub store_id: String,
+    pub store_key: String,
     pub uri: String,
 }
 
@@ -314,7 +314,7 @@ impl From<LegacyState> for NodeState {
                 version: value.image.node_version.clone(),
                 config_id: "00000000-0000-0000-0000-000000000000".to_string(),
                 archive_id: "00000000-0000-0000-0000-000000000000".to_string(),
-                store_id: format!(
+                store_key: format!(
                     "legacy-{}-{}-{}",
                     value.image.protocol, value.image.node_type, value.network
                 ),

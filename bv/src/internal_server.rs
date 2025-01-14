@@ -106,10 +106,10 @@ where
         for (_, node_lock) in nodes_lock.iter() {
             if let MaybeNode::Node(node) = node_lock {
                 let mut node = node.write().await;
-                if let Some((new_store_id, new_image_key)) =
-                    mapping.get(&node.state.image.store_id).cloned()
+                if let Some((new_store_key, new_image_key)) =
+                    mapping.get(&node.state.image.store_key).cloned()
                 {
-                    node.state.image.store_id = new_store_id;
+                    node.state.image.store_key = new_store_key;
                     node.state.image_key = new_image_key;
                     nodes.push(NodeDisplayInfo {
                         state: node.state.clone(),

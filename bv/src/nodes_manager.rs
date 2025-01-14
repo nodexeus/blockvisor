@@ -279,10 +279,10 @@ where
             let node = read_node.state.clone();
             drop(read_node);
 
-            if desired_state.image.store_id != node.image.store_id {
+            if desired_state.image.store_key != node.image.store_key {
                 command_failed!(Error::Internal(anyhow!(
                     "cannot upgrade node to version that uses different data set: `{}`",
-                    desired_state.image.store_id
+                    desired_state.image.store_key
                 )));
             }
             if !node.dev_mode {
@@ -1239,9 +1239,9 @@ mod tests {
             nodes.upgrade(broken_node).await.unwrap_err().to_string()
         );
         let mut new_archive_node_state = new_state.clone();
-        new_archive_node_state.image.store_id = "different_store_id".to_string();
+        new_archive_node_state.image.store_key = "different_store_key".to_string();
         assert_eq!(
-            "BV internal error: 'cannot upgrade node to version that uses different data set: `different_store_id`'",
+            "BV internal error: 'cannot upgrade node to version that uses different data set: `different_store_key`'",
             nodes
                 .upgrade(new_archive_node_state)
                 .await
