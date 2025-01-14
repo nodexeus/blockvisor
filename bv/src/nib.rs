@@ -173,10 +173,10 @@ pub async fn process_image_command(
                     dns_name: "dev.node.dns.name".to_string(),
                     vm_config: variant.into(),
                     image: NodeImage {
-                        id: format!("dev-node-image-id-{}", local_image.version),
+                        id: "00000000-0000-0000-0000-000000000000".to_string(),
                         version: local_image.version,
-                        config_id: "dev-node-config-id".to_string(),
-                        archive_id: "dev-node-archive-id".to_string(),
+                        config_id: "00000000-0000-0000-0000-000000000000".to_string(),
+                        archive_id: "00000000-0000-0000-0000-000000000000".to_string(),
                         store_id: "dev-node-store-id".to_string(),
                         uri: local_image.container_uri,
                     },
