@@ -18,6 +18,7 @@ pub struct Protocol {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Variant {
     pub key: String,
+    pub sku_code: String,
     pub archive_pointers: Vec<ArchivePointer>,
     pub min_cpu: u64,
     pub min_memory_mb: u64,
@@ -47,7 +48,6 @@ pub struct Image {
     /// Set by image provider, shall follow semver.
     pub version: String,
     pub container_uri: String,
-    pub sku_code: String,
     pub org_id: Option<String>,
     pub description: Option<String>,
     pub visibility: Visibility,

@@ -114,7 +114,7 @@ async fn test_bv_service_e2e() {
         .create_region(pb::HostServiceCreateRegionRequest {
             region_key: "eu-1".to_string(),
             display_name: "Europe".to_string(),
-            sku_code: Some("SKU_EU".to_string()),
+            sku_code: Some("EU1".to_string()),
         })
         .await
         .unwrap();

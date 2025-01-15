@@ -199,18 +199,19 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
         &mut self,
         remote: pb::ProtocolVersion,
         image: nib_meta::Image,
+        variant: nib_meta::Variant,
     ) -> Result<()> {
         let mut client = self.connect_protocol_service().await?;
         let visibility: common::Visibility = image.visibility.into();
         if remote.visibility() != visibility
             || remote.description != image.description
-            || remote.sku_code != image.sku_code
+            || remote.sku_code != variant.sku_code
         {
             let req = pb::ProtocolServiceUpdateVersionRequest {
                 protocol_version_id: remote.protocol_version_id,
                 visibility: Some(visibility.into()),
                 description: image.description,
-                sku_code: Some(image.sku_code),
+                sku_code: Some(variant.sku_code),
             };
             api_with_retry!(client, client.update_version(req.clone()))?;
         }
@@ -230,7 +231,7 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
                 variant_key: variant.key,
             }),
             semantic_version: image.version,
-            sku_code: image.sku_code,
+            sku_code: variant.sku_code,
             description: image.description,
         };
 

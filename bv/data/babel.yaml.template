@@ -5,9 +5,6 @@ version: 0.0.1
 # To test with local image use docker-daemon://<image_tag>:latest
 container_uri: docker://blockjoy/{{protocol_key}}/{{variant_key}}/0.0.1
 
-# The SKU code for this version (e.g. ETH-MN).
-sku_code: SKU_code
-
 # [optional] Uuid of organization to which protocol belongs to, or null if public.
 org_id: null
 
@@ -27,6 +24,9 @@ variants:
   # This value will be available in a Rhai runtime via `node_env().node_variant`.
   # It is required to be lower-kebab-case.
   - key: {{variant_key}}
+    # The SKU code for this variant (e.g. ETHRETH-MN-F). SKU format shall be:
+    # [Blockchain]-[NodeType]-[NetType]
+    sku_code: TST-TN-N
     # List of protocol data archive pointers.
     archive_pointers:
       # Association of image variant with protocol data archive. Identify protocol data archive that will be used

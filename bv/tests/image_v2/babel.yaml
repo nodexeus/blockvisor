@@ -1,7 +1,6 @@
 version: 0.0.2
 container_uri: docker-daemon://test_v2:latest
 
-sku_code: SKU_code
 org_id: null
 description: Example image description
 visibility: public
@@ -9,6 +8,7 @@ visibility: public
 protocol_key: testing
 variants:
   - key: test
+    sku_code: TST-TN-N
     archive_pointers:
       - pointer: !store_key unique-store-id-v1
         legacy_store_key: testing-test-test2

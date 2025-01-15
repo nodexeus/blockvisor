@@ -10,7 +10,7 @@ use crate::{
 };
 use babel_api::{engine::NodeEnv, rhai_plugin_linter, utils::RamdiskConfiguration};
 use bv_utils::cmd::run_cmd;
-use eyre::{anyhow, bail, Context};
+use eyre::{anyhow, bail, ensure, Context};
 use petname::Petnames;
 use std::{
     ffi::OsStr,
@@ -302,11 +302,25 @@ pub async fn process_image_command(
                     protocol_key: local_image.protocol_key.clone(),
                     variant_key: variant.key.clone(),
                 };
+
+                ensure!(
+                    variant.sku_code.chars().all(|character| character == '-'
+                        || character.is_ascii_digit()
+                        || character.is_ascii_uppercase())
+                        && variant.sku_code.split("-").count() == 3,
+                    "invalud SKU format for variant '{}'",
+                    variant.key
+                );
+
                 let protocol_version_id =
                     match client.get_protocol_version(image_key.clone()).await? {
                         Some(remote) if remote.semantic_version == local_image.version => {
                             client
-                                .update_protocol_version(remote.clone(), local_image.clone())
+                                .update_protocol_version(
+                                    remote.clone(),
+                                    local_image.clone(),
+                                    variant.clone(),
+                                )
                                 .await?;
                             println!(
                                 "Protocol version '{}/{}/{}' updated",
