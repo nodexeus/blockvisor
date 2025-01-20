@@ -5,7 +5,9 @@ build:
 build-release:
 	cargo build -p blockvisord --target x86_64-unknown-linux-musl --release
 	strip target/x86_64-unknown-linux-musl/release/bv
+	chmod u+s target/x86_64-unknown-linux-musl/release/bv
 	strip target/x86_64-unknown-linux-musl/release/nib
+	chmod u+s target/x86_64-unknown-linux-musl/release/nib
 	strip target/x86_64-unknown-linux-musl/release/bvup
 	strip target/x86_64-unknown-linux-musl/release/blockvisord
 	strip target/x86_64-unknown-linux-musl/release/blockvisord-dev
