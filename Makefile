@@ -22,6 +22,7 @@ bundle-base: build-release
 	cp target/x86_64-unknown-linux-musl/release/blockvisord /tmp/bundle/blockvisor/bin
 	cp target/x86_64-unknown-linux-musl/release/installer /tmp/bundle
 	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
+	cp target/x86_64-unknown-linux-musl/release/nib /tmp/bundle/blockvisor/bin
 	mkdir -p /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/babel /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/babel_job_runner /tmp/bundle/babel/bin
@@ -29,6 +30,8 @@ bundle-base: build-release
 	mkdir /tmp/bundle/sh_complete
 	cp target/x86_64-unknown-linux-musl/release/sh_complete/_bv /tmp/bundle/sh_complete/
 	cp target/x86_64-unknown-linux-musl/release/sh_complete/bv.bash /tmp/bundle/sh_complete/
+	cp target/x86_64-unknown-linux-musl/release/sh_complete/_nib /tmp/bundle/sh_complete/
+	cp target/x86_64-unknown-linux-musl/release/sh_complete/nib.bash /tmp/bundle/sh_complete/
 
 bundle: bundle-base
 	rm -rf /tmp/bundle.tar.gz
@@ -36,9 +39,6 @@ bundle: bundle-base
 
 bundle-dev: bundle-base
 	cp target/x86_64-unknown-linux-musl/release/blockvisord-dev /tmp/bundle/blockvisor/bin/blockvisord
-	cp target/x86_64-unknown-linux-musl/release/nib /tmp/bundle/blockvisor/bin
-	cp target/x86_64-unknown-linux-musl/release/sh_complete/_nib /tmp/bundle/sh_complete/
-	cp target/x86_64-unknown-linux-musl/release/sh_complete/nib.bash /tmp/bundle/sh_complete/
 	rm -rf /tmp/bundle-dev.tar.gz
 	tar -C /tmp -czvf /tmp/bundle-dev.tar.gz bundle
 
