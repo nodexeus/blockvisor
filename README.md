@@ -61,7 +61,6 @@ used during debugging issues, not printed by default
 - `/var/lib/blockvisor/nodes/<uuid>/plugin.data` Babel plugin data persistence (see load_data/save_data functions in [RHAI plugin scripting guide](babel_api/rhai_plugin_guide.md))
 - `/var/lib/blockvisor/nodes/<uuid>/rootfs/` node rootfs (from `os.img`)
 - `/var/lib/blockvisor/nodes/<uuid>/data/` protocol data dir, bind to node `/blockjoy/`, persist node upgrade
-- `/var/lib/blockvisor/images/<protocol>/<node_type>/<node_version>/` downloaded images cache
 
 ### Node
 - `/usr/bin/babel`

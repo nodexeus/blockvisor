@@ -19,7 +19,6 @@ Beside standard linux tool available in all distributions, BV requires following
 - `pigz`
 - `tar`
 - `fallocate`
-- `debootstrap`
 - `systemctl`
 - `ip`
 - `mkfs.ext4`
@@ -28,7 +27,7 @@ For _Ubuntu_ based distributions:
 
 ```shell
 apt update
-apt install pigz debootstrap util-linux e2fsprogs chrony
+apt install pigz util-linux e2fsprogs chrony
 ```
 
 ### Install Apptainer

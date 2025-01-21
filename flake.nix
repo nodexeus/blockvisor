@@ -28,7 +28,6 @@
           devShells.default = pkgs.mkShell {
             packages = with pkgs; [
               chrony
-              debootstrap
               e2fsprogs
               pigz
               protobuf
@@ -38,4 +37,3 @@
         };
     };
 }
-
