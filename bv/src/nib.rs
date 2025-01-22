@@ -324,7 +324,7 @@ pub async fn process_image_command(
                                 .update_protocol_version(remote.clone(), image_variant.clone())
                                 .await?;
                             println!(
-                                "Protocol version '{}/{}/{}' updated",
+                                "Variant version '{}/{}/{}' updated",
                                 image_variant.protocol_key,
                                 image_variant.variant_key,
                                 image_variant.version
@@ -337,7 +337,7 @@ pub async fn process_image_command(
                                 .await?
                                 .protocol_version_id;
                             println!(
-                                "Protocol version '{}/{}/{}' added",
+                                "Variant version '{}/{}/{}' added",
                                 image_variant.protocol_key,
                                 image_variant.variant_key,
                                 image_variant.version
