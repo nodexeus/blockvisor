@@ -154,8 +154,9 @@ async fn main() -> Result<()> {
             net_conf.prefix =
                 u8::from_str(&value).with_context(|| format!("invalid subnet prefix '{value}'"))?;
         }
-        if net_conf.available_ips.is_empty() {
-            net_conf.available_ips.push(net_conf.host_ip);
+
+        if net_conf.available_ips.is_empty() || cmd_args.use_host_network {
+            net_conf.available_ips = vec![net_conf.host_ip];
         }
         if let Some(value) = ask_value(
             "available IPs",
