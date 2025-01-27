@@ -122,6 +122,9 @@ pub struct Config {
     pub cluster_seed_urls: Option<Vec<String>>,
     /// Apptainer configuration
     pub apptainer: ApptainerConfig,
+    /// Run in maintenance mode - use on your own risk.
+    #[serde(default)]
+    pub maintenance_mode: bool,
 }
 
 impl Config {

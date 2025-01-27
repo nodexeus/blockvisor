@@ -586,6 +586,10 @@ where
         state: &NodeState,
         tolerance: Option<&VmConfig>,
     ) -> commands::Result<()> {
+        if self.api_config.config.read().await.maintenance_mode {
+            // skip requirements check in maintenance mode
+            return Ok(());
+        }
         let mut available = self
             .pal
             .available_resources(self.nodes_data_cache().await)
