@@ -150,8 +150,14 @@ pub async fn new_legacy(
     let cgroups_path = node_dir.join(CGROUPS_CONF_FILE);
     let apptainer_pid_path = node_dir.join(APPTAINER_PID_FILE);
     let data_dir = node_dir.join(DATA_DIR);
-    if !data_dir.exists() {
-        fs::create_dir_all(&data_dir).await?;
+    // make sure download won't run for migrated nodes after upgrade
+    let babel_jobs = data_dir.join(".babel_jobs");
+    if !babel_jobs.exists() {
+        fs::create_dir_all(&babel_jobs).await?;
+    }
+    let download_completed = babel_jobs.join("download.completed");
+    if !download_completed.exists() {
+        fs::File::create(download_completed).await?;
     }
     // migrate plugin script
     let mut script = fs::read_to_string(node_dir.join("babel.rhai"))
