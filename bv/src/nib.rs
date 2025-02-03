@@ -435,13 +435,12 @@ async fn discover_ip_and_gateway(
     let ip = match &ip {
         None => {
             let used_ips = nodes.iter().map(|node| node.state.ip).collect::<Vec<_>>();
-            let ip = ipnet::IpAddrRange::from(ipnet::Ipv4AddrRange::new(
-                net::Ipv4Addr::new(0, 0, 0, 1),
-                net::Ipv4Addr::new(0, 255, 255, 255),
-            ))
-            .into_iter()
-            .find(|ip| !used_ips.contains(ip))
-            .ok_or(anyhow!("failed to auto assign ip - provide it manually"))?;
+            let ip = *config
+                .net_conf
+                .available_ips
+                .iter()
+                .find(|ip| !used_ips.contains(ip))
+                .ok_or(anyhow!("failed to auto assign ip - provide it manually"))?;
             info!("Auto-assigned ip `{ip}` for node '{id}'");
             ip
         }
