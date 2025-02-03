@@ -468,6 +468,14 @@ impl ApptainerMachine {
         }
         Ok(())
     }
+
+    fn corresponding_host_data_path(&self, vm_data_path: &Path) -> PathBuf {
+        self.data_dir.join(
+            vm_data_path
+                .strip_prefix(DATA_DRIVE_MOUNT_POINT)
+                .unwrap_or(vm_data_path),
+        )
+    }
 }
 
 async fn is_built(path: &Path) -> Result<bool> {
@@ -549,8 +557,8 @@ impl pal::VirtualMachine for ApptainerMachine {
         let desired_protocol_data_path = PathBuf::from_str(PROTOCOL_DATA_PATH)?;
         if self.config.node_env.protocol_data_path != desired_protocol_data_path {
             fs::rename(
-                &self.config.node_env.protocol_data_path,
-                &desired_protocol_data_path,
+                self.corresponding_host_data_path(&self.config.node_env.protocol_data_path),
+                self.corresponding_host_data_path(&desired_protocol_data_path),
             )
             .await
             .inspect_err(|err| error!("legacy node migration failed: {err:#}"))?;
