@@ -603,8 +603,8 @@ impl pal::VirtualMachine for ApptainerMachine {
                 && backup.node_env.protocol_data_path.exists()
             {
                 fs::rename(
-                    &backup.node_env.protocol_data_path,
-                    &self.config.node_env.protocol_data_path,
+                    self.corresponding_host_data_path(&backup.node_env.protocol_data_path),
+                    self.corresponding_host_data_path(&self.config.node_env.protocol_data_path),
                 )
                 .await
                 .inspect_err(|err| error!("legacy node rollback failed: {err:#}"))?;
