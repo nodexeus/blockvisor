@@ -168,21 +168,25 @@ pub struct ConfigUpdate {
 impl NodeState {
     pub async fn load(path: &Path) -> Result<Self> {
         info!("Reading node state file: {}", path.display());
-        fs::read_to_string(&path)
+        let (state, need_save) = fs::read_to_string(&path)
             .await
             .and_then(|content| match serde_json::from_str::<Self>(&content) {
-                Ok(state) => Ok(state),
+                Ok(state) => Ok((state, false)),
                 Err(err) => {
                     // LEGACY node support - remove once all nodes upgraded
                     if let Ok(legacy_state) = serde_json::from_str::<LegacyState>(&content) {
-                        Ok(legacy_state.into())
+                        Ok((legacy_state.into(), true))
                     } else {
                         error!("{err:#}");
                         Err(err.into())
                     }
                 }
             })
-            .with_context(|| format!("Failed to read node state file `{}`", path.display()))
+            .with_context(|| format!("Failed to read node state file `{}`", path.display()))?;
+        if need_save {
+            fs::write(&path, &serde_json::to_string(&state)?).await?;
+        }
+        Ok(state)
     }
 
     pub async fn save(&self, nodes_dir: &Path) -> Result<()> {
@@ -190,8 +194,7 @@ impl NodeState {
             .join(self.id.to_string())
             .join(NODE_STATE_FILENAME);
         info!("Writing node state: {}", path.display());
-        let content = serde_json::to_string(self)?;
-        fs::write(&path, &*content).await?;
+        fs::write(&path, &serde_json::to_string(self)?).await?;
         Ok(())
     }
 }
