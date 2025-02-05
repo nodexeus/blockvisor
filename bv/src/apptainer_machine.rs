@@ -100,6 +100,10 @@ pub async fn new(
     if !data_dir.exists() {
         fs::create_dir_all(&data_dir).await?;
     }
+    if node_state.initialized && !babel_api::utils::is_protocol_data_locked(&data_dir) {
+        babel_api::utils::lock_protocol_data(&data_dir)?;
+    }
+
     Ok(ApptainerMachine {
         node_dir,
         babel_path,
@@ -154,9 +158,8 @@ pub async fn new_legacy(
     if !data_dir.exists() {
         fs::create_dir_all(&data_dir).await?;
     }
-    let data_lock = data_dir.join(".protocol_data.lock");
-    if !data_lock.exists() {
-        fs::File::create(data_lock).await?;
+    if node_state.initialized && !babel_api::utils::is_protocol_data_locked(&data_dir) {
+        babel_api::utils::lock_protocol_data(&data_dir)?;
     }
     // migrate plugin script
     let mut script = fs::read_to_string(node_dir.join("babel.rhai"))

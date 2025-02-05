@@ -1,11 +1,10 @@
 use crate::{
-    apply_babel_config, is_protocol_data_locked, jobs_manager::JobsManagerClient, load_config,
-    pal::BabelPal, utils,
+    apply_babel_config, jobs_manager::JobsManagerClient, load_config, pal::BabelPal, utils,
 };
 use async_trait::async_trait;
 use babel_api::{
     engine::{HttpResponse, JobConfig, JobInfo, JobsInfo, JrpcRequest, RestRequest, ShResponse},
-    utils::BabelConfig,
+    utils::{is_protocol_data_locked, BabelConfig},
 };
 use eyre::{anyhow, ContextCompat, Result};
 use futures_util::StreamExt;

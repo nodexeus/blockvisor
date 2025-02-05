@@ -2,7 +2,6 @@ use babel::{
     babel::BABEL_CONFIG_PATH,
     chroot_platform::UdsConnector,
     download_job::Downloader,
-    is_protocol_data_locked,
     job_runner::{save_job_status, ArchiveJobRunner, TransferConfig},
     jobs::{self, ARCHIVE_JOBS_META_DIR},
     load_config,
@@ -10,7 +9,6 @@ use babel::{
     pal::BabelEngineConnector,
     run_sh_job::RunShJob,
     upload_job::Uploader,
-    PROTOCOL_DATA_LOCK_FILENAME,
 };
 use babel_api::engine::{
     Compression, JobStatus, JobType, DEFAULT_JOB_SHUTDOWN_SIGNAL, DEFAULT_JOB_SHUTDOWN_TIMEOUT_SECS,
@@ -77,14 +75,8 @@ async fn run_job(
     let job_config = jobs::load_config(&job_dir)?;
     let babel_config = load_config(&BABEL_CONFIG_PATH).await?;
 
-    if job_config.protocol_data_lock.unwrap_or_default() {
-        let data_lock = babel_config
-            .node_env
-            .data_mount_point
-            .join(PROTOCOL_DATA_LOCK_FILENAME);
-        if !data_lock.exists() {
-            fs::File::create(data_lock)?;
-        }
+    if job_config.protocol_data_lock == Some(true) {
+        babel_api::utils::lock_protocol_data(&babel_config.node_env.data_mount_point)?;
     }
     match job_config.job_type {
         JobType::RunSh(body) => {
@@ -122,7 +114,7 @@ async fn run_job(
             max_connections,
             max_runners,
         } => {
-            if is_protocol_data_locked(&babel_config.node_env.data_mount_point) {
+            if babel_api::utils::is_protocol_data_locked(&babel_config.node_env.data_mount_point) {
                 save_job_status(
                     &JobStatus::Finished {
                         exit_code: Some(0),

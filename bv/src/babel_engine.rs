@@ -435,7 +435,7 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
                     .send(scheduler::Action::Delete(task))
                     .await;
             }
-            EngineRequest::IsProtocolDataCompleted { response_tx } => {
+            EngineRequest::IsProtocolDataLocked { response_tx } => {
                 let _ = response_tx.send(match self.node_connection.babel_client().await {
                     Ok(babel_client) => with_retry!(babel_client.is_protocol_data_locked(()))
                         .map_err(|err| self.handle_connection_errors(err))
@@ -653,7 +653,7 @@ enum EngineRequest {
     },
     AddTask(scheduler::Scheduled),
     DeleteTask(String),
-    IsProtocolDataCompleted {
+    IsProtocolDataLocked {
         response_tx: ResponseTx<Result<bool>>,
     },
     HasProtocolArchive {
@@ -840,7 +840,7 @@ impl babel_api::engine::Engine for Engine {
     fn is_protocol_data_locked(&self) -> Result<bool> {
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
         self.tx
-            .blocking_send(EngineRequest::IsProtocolDataCompleted { response_tx })?;
+            .blocking_send(EngineRequest::IsProtocolDataLocked { response_tx })?;
         response_rx.blocking_recv()?
     }
 
