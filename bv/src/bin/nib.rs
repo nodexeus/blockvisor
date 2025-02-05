@@ -40,7 +40,10 @@ async fn main() -> Result<()> {
                 .await?;
             let mut client = pb::api_key_service_client::ApiKeyServiceClient::with_interceptor(
                 channel,
-                services::AuthToken(login.token),
+                services::ApiInterceptor(
+                    services::AuthToken(login.token),
+                    bv_utils::rpc::DefaultTimeout(services::DEFAULT_API_REQUEST_TIMEOUT),
+                ),
             );
             let response = client
                 .create(pb::ApiKeyServiceCreateRequest {
