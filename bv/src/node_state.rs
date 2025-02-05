@@ -110,6 +110,7 @@ pub struct StateBackup {
     pub org_name: String,
     pub protocol_name: String,
     pub dns_name: String,
+    #[serde(default)]
     pub tags: Vec<String>,
     pub vm_config: VmConfig,
     pub image: NodeImage,
