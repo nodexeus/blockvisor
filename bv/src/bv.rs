@@ -172,10 +172,24 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
             client.start_nodes(&ids).await?;
         }
         NodeCommand::Upgrade {
-            id_or_names,
+            mut id_or_names,
             version,
             build,
+            all,
         } => {
+            if id_or_names.is_empty() {
+                if all {
+                    id_or_names = client
+                        .get_nodes(())
+                        .await?
+                        .into_inner()
+                        .into_iter()
+                        .map(|n| n.state.id.to_string())
+                        .collect();
+                } else {
+                    bail!("<ID_OR_NAMES> can't be empty list");
+                }
+            }
             let ids = client.get_node_ids(id_or_names).await?;
             for id in ids {
                 client.upgrade_node((id, version.clone(), build)).await?;

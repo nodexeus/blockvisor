@@ -136,12 +136,18 @@ pub enum NodeCommand {
         /// Version of image, or skip to use latest,
         #[clap(long)]
         version: Option<String>,
+
         /// Version of image build, or skip to use latest,
         #[clap(long)]
         build: Option<u64>,
+
         /// Node id or name.
         #[clap(required(false))]
         id_or_names: Vec<String>,
+
+        /// Upgrade all nodes on this host.
+        #[clap(long, short)]
+        all: bool,
     },
 
     /// Delete node and clean up resources.
