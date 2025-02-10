@@ -46,7 +46,7 @@ pub async fn put_secret(
                 resource_type: common::ResourceType::Node.into(),
                 resource_id: node_id.to_string()
             }),
-            name: name.to_string(),
+            key: name.to_string(),
             value: value.to_vec(),
         })
     )
@@ -69,7 +69,7 @@ pub async fn get_secret(
                     resource_type: common::ResourceType::Node.into(),
                     resource_id: node_id.to_string()
                 }),
-                name: name.to_string(),
+                key: name.to_string(),
             })
         ) {
             Ok(value) => Some(value.into_inner().value),
