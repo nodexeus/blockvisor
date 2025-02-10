@@ -192,8 +192,11 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
             }
             let ids = client.get_node_ids(id_or_names).await?;
             for id in ids {
-                client.upgrade_node((id, version.clone(), build)).await?;
-                println!("Node `{id}` upgrade triggered");
+                if let Err(err) = client.upgrade_node((id, version.clone(), build)).await {
+                    println!("Failed to upgrade node `{id}`: {err:#}");
+                } else {
+                    println!("Node `{id}` upgrade triggered");
+                }
             }
         }
         NodeCommand::Delete {
