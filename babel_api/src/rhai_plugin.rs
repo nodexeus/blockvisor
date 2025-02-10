@@ -103,31 +103,6 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         Self::new(ast, babel_engine, rhai_engine, Some(plugin_dir))
     }
 
-    pub fn evaluate_plugin_config(&mut self) -> Result<()> {
-        let mut scope = self.build_scope();
-        self.rhai_engine
-            .run_ast_with_scope(&mut scope, &self.bare.ast)?;
-        if let Some(dynamic) = scope.get(BASE_CONFIG_CONST_NAME) {
-            let value: BaseConfig = from_dynamic(dynamic).with_context(|| {
-                format!("Invalid Rhai script - failed to deserialize {BASE_CONFIG_CONST_NAME}")
-            })?;
-            self.bare.base_config = Some(value);
-        }
-        if let Some(dynamic) = scope.get(PLUGIN_CONFIG_CONST_NAME) {
-            let value: PluginConfig = from_dynamic(dynamic).with_context(|| {
-                format!("Invalid Rhai script - failed to deserialize {PLUGIN_CONFIG_CONST_NAME}")
-            })?;
-            value.validate(
-                self.bare
-                    .base_config
-                    .as_ref()
-                    .and_then(|config| config.services.as_ref()),
-            )?;
-            self.bare.plugin_config = Some(value);
-        }
-        Ok(())
-    }
-
     fn new(
         ast: AST,
         babel_engine: Arc<E>,
@@ -615,6 +590,31 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         } else {
             self.bare.default_init()
         }
+    }
+
+    fn evaluate_plugin_config(&mut self) -> Result<()> {
+        let mut scope = self.build_scope();
+        self.rhai_engine
+            .run_ast_with_scope(&mut scope, &self.bare.ast)?;
+        if let Some(dynamic) = scope.get(BASE_CONFIG_CONST_NAME) {
+            let value: BaseConfig = from_dynamic(dynamic).with_context(|| {
+                format!("Invalid Rhai script - failed to deserialize {BASE_CONFIG_CONST_NAME}")
+            })?;
+            self.bare.base_config = Some(value);
+        }
+        if let Some(dynamic) = scope.get(PLUGIN_CONFIG_CONST_NAME) {
+            let value: PluginConfig = from_dynamic(dynamic).with_context(|| {
+                format!("Invalid Rhai script - failed to deserialize {PLUGIN_CONFIG_CONST_NAME}")
+            })?;
+            value.validate(
+                self.bare
+                    .base_config
+                    .as_ref()
+                    .and_then(|config| config.services.as_ref()),
+            )?;
+            self.bare.plugin_config = Some(value);
+        }
+        Ok(())
     }
 
     fn upload(&self) -> Result<()> {

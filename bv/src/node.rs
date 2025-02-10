@@ -722,11 +722,7 @@ impl<P: Pal + Debug> Node<P> {
         let plugin_path = self.machine.plugin_path();
         self.babel_engine
             .update_plugin(
-                |engine| {
-                    let mut plugin = RhaiPlugin::from_file(plugin_path, engine)?;
-                    plugin.evaluate_plugin_config()?;
-                    Ok(plugin)
-                },
+                |engine| RhaiPlugin::from_file(plugin_path, engine),
                 self.node_env.clone(),
             )
             .await

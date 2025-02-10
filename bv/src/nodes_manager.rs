@@ -344,6 +344,9 @@ where
         }
         if VmStatus::Running != node.expected_status() {
             node.start().await?;
+            if reload_plugin {
+                node.babel_engine.reevaluate_plugin_config().await?;
+            }
         }
         Ok(())
     }
@@ -565,6 +568,12 @@ where
             node.reload_plugin()
                 .await
                 .map_err(|err| BabelError::Internal { err })?;
+            if node.expected_status() == VmStatus::Running {
+                node.babel_engine
+                    .reevaluate_plugin_config()
+                    .await
+                    .map_err(|err| BabelError::Internal { err })?;
+            }
         }
         if !node.babel_engine.has_capability(method) {
             Err(BabelError::MethodNotFound)

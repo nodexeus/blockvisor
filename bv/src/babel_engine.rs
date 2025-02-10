@@ -156,6 +156,11 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         Ok(())
     }
 
+    pub async fn reevaluate_plugin_config(&mut self) -> Result<()> {
+        self.on_plugin(move |mut plugin| plugin.evaluate_plugin_config())
+            .await
+    }
+
     pub fn update_node_info(&mut self, node_image: NodeImage, properties: NodeProperties) {
         self.node_info.image = node_image;
         self.node_info.properties = properties;
@@ -1020,6 +1025,10 @@ mod tests {
                 Path::new("config"),
                 "init_params",
             )?;
+            Ok(())
+        }
+
+        fn evaluate_plugin_config(&mut self) -> Result<()> {
             Ok(())
         }
 
