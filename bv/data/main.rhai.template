@@ -61,6 +61,15 @@ const PLUGIN_CONFIG = #{
                 /// [optional] Prepend timestamp to each log, or not.
                 /// If not set default to false.
                 log_timestamp: true,
+                /// [optional] Indicate if job should run only once.
+                /// One-time jobs never run again, even after node upgrade.
+                /// If not set default to false.
+                one_time: true,
+                /// [optional] Flag indicating if job uses protocol data.
+                /// Job that uses protocol data, automatically create lock that prevents
+                /// re-initialization of the data after job is started.
+                /// If not set default to false.
+                use_protocol_data: false,
             }
         ]
     },
@@ -96,17 +105,19 @@ const PLUGIN_CONFIG = #{
             shutdown_signal: "SIGINT",
             /// [optional] Run job as a different user.
             run_as: "some_user",
-            /// [optional] Flag indicating if service uses protocol data.
-            /// Services that uses protocol data won't be started until all init steps and download
-            /// is finished. They are also stopped while uploading protocol archive.
-            /// If not set default to true.
-            use_protocol_data: true,
             /// [optional] Capacity of log buffer (in megabytes).
             /// If not set default to 128.
             log_buffer_capacity_mb: 256,
             /// [optional] Prepend timestamp to each log, or not.
             /// If not set default to false.
             log_timestamp: true,
+            /// [optional] Flag indicating if service uses protocol data.
+            /// Services that uses protocol data won't be started until all init steps and download
+            /// is finished. They are also stopped while uploading protocol archive.
+            /// Additionally services that uses protocol data, automatically create lock that prevents
+            /// re-initialization of the data after job is started.
+            /// NOTE: In contrast to regular jobs, for services default value is true.
+            use_protocol_data: true,
         },
         #{
             name: "protocol_service_b",
@@ -160,12 +171,35 @@ const PLUGIN_CONFIG = #{
         #{
             name: "post_download_job",
             run_sh: `echo restoreDB`,
-            /// [optional] Indicate if job should 'lock' protocol data.
-            /// Lock prevents re-initialization of the data after job is started.
-            /// If not set default to false.
-            protocol_data_lock: true,
+            use_protocol_data: true,
         }
     ],
+    /// [optional] Alternative protocol data initialization.
+    /// It is fallback job, run only if neither regular archive nor `alternative_download` is available.
+    /// NOTE: `post_download` is not run after `cold_init`.
+    cold_init: #{
+        /// Sh script body. It shall be blocking (foreground) process.
+        run_sh: `/usr/bin/wget -q -O - some_url`,
+        /// [optional] InitJob restart config.
+        /// If not set default to "never".
+        restart_config: #{
+            backoff_timeout_ms: 60000,
+            backoff_base_ms: 10000,
+            max_retries: 3,
+        },
+        /// [optional] Run job as a different user.
+        run_as: "some_user",
+        /// [optional] Capacity of log buffer (in megabytes).
+        /// If not set default to 128.
+        log_buffer_capacity_mb: 64,
+        /// [optional] Prepend timestamp to each log, or not.
+        /// If not set default to false.
+        log_timestamp: true,
+        /// [optional] Indicate if job should run only once.
+        /// One-time jobs never run again, even after node upgrade.
+        /// If not set default to false.
+        one_time: true,
+    },
     /// [optional] Pre-upload action.
     pre_upload: #{
         /// list of sh commands to be executed before upload

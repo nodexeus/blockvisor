@@ -157,7 +157,7 @@ async fn test_bv_cmd_jobs() -> Result<()> {
         &data_mount_point
     ));
     test_env.bv_run(
-        &["node", "run", "start_custom_job", "--param", r#"{"name":"data_lock","config":{"job_type":{"run_sh":"echo X"},"restart": "never","protocol_data_lock":true}}"#, vm_id],
+        &["node", "run", "start_custom_job", "--param", r#"{"name":"data_lock","config":{"job_type":{"run_sh":"echo X"},"restart": "never","use_protocol_data":true}}"#, vm_id],
         "custom job data_lock started",
     );
     test_env

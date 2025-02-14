@@ -1100,7 +1100,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: None,
                 },
             )?;

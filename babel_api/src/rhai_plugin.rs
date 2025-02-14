@@ -1,5 +1,7 @@
 use crate::plugin::NodeHealth;
-use crate::plugin_config::{DOWNLOADING_STATE_NAME, STARTING_STATE_NAME, UPLOADING_STATE_NAME};
+use crate::plugin_config::{
+    COLD_INIT_JOB_NAME, DOWNLOADING_STATE_NAME, STARTING_STATE_NAME, UPLOADING_STATE_NAME,
+};
 use crate::{
     engine::{Engine, HttpResponse, JobConfig, JobStatus, JrpcRequest, RestRequest, ShResponse},
     plugin::{Plugin, ProtocolStatus},
@@ -511,6 +513,12 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                 )?;
                 services_needs =
                     self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
+            } else if let Some(cold_init) = config.cold_init {
+                self.create_and_start_job(
+                    COLD_INIT_JOB_NAME,
+                    plugin_config::build_cold_init_job_config(cold_init, services_needs),
+                )?;
+                services_needs = vec![COLD_INIT_JOB_NAME.to_string()];
             }
         }
         self.start_services(config.services, services_needs, Default::default())?;
@@ -1159,7 +1167,7 @@ mod tests {
                     run_as: Some("some_user".to_string()),
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: None,
                 }),
             )
@@ -1185,7 +1193,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: None,
                 }),
             )
@@ -1571,7 +1579,7 @@ mod tests {
                         name: "post_upload_job",
                         run_sh: `echo post_upload_job`,
                         needs: ["some"],
-                        protocol_data_lock: true,
+                        use_protocol_data: true,
                     }
                 ],
             };
@@ -1607,7 +1615,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: None,
                 })),
             )
@@ -1665,7 +1673,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: Some(true),
+                    use_protocol_data: Some(true),
                     one_time: None,
                 })),
             )
@@ -1862,7 +1870,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: Some(true),
                 })),
             )
@@ -1917,7 +1925,7 @@ mod tests {
                     run_as: None,
                     log_buffer_capacity_mb: None,
                     log_timestamp: None,
-                    protocol_data_lock: None,
+                    use_protocol_data: None,
                     one_time: None,
                 })),
             )

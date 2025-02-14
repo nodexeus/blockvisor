@@ -31,15 +31,16 @@ fn init() {
         /// If not set default to false.
         log_timestamp: true,
 
-        /// [optional] Indicate if job should 'lock' protocol data.
-        /// Lock prevents re-initialization of the data after job is started.
-        /// If not set default to false.
-        protocol_data_lock: true,
-
         /// [optional] Indicate if job should run only once.
         /// One-time jobs never run again, even after node upgrade.
         /// If not set default to false.
         one_time: true,
+
+        /// [optional] Flag indicating if job uses protocol data.
+        /// Job that uses protocol data, automatically create lock that prevents
+        /// re-initialization of the data after job is started.
+        /// If not set default to false.
+        use_protocol_data: true,
     };
     create_job("job_name_A", job_config_A);
 

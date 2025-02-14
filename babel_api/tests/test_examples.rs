@@ -272,7 +272,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: Some("some_user".to_string()),
                 log_buffer_capacity_mb: Some(32),
                 log_timestamp: Some(true),
-                protocol_data_lock: None,
+                use_protocol_data: Some(true),
                 one_time: Some(true),
             }),
         )
@@ -317,7 +317,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: None,
+                use_protocol_data: None,
                 one_time: None,
             }),
         )
@@ -344,7 +344,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: Some("some_user".to_string()),
                 log_buffer_capacity_mb: Some(64),
                 log_timestamp: Some(true),
-                protocol_data_lock: None,
+                use_protocol_data: None,
                 one_time: None,
             }),
         )
@@ -370,7 +370,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: Some(true),
+                use_protocol_data: Some(true),
                 one_time: None,
             }),
         )
@@ -402,7 +402,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: Some("some_user".to_string()),
                 log_buffer_capacity_mb: Some(256),
                 log_timestamp: Some(true),
-                protocol_data_lock: Some(true),
+                use_protocol_data: Some(true),
                 one_time: None,
             }),
         )
@@ -434,7 +434,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: Some(true),
+                use_protocol_data: Some(true),
                 one_time: None,
             }),
         )
@@ -485,7 +485,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: None,
+                use_protocol_data: None,
                 one_time: None,
             }),
         )
@@ -527,7 +527,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: None,
+                use_protocol_data: None,
                 one_time: None,
             }),
         )
@@ -555,7 +555,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: None,
+                use_protocol_data: None,
                 one_time: None,
             }),
         )
@@ -587,7 +587,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: Some("some_user".to_string()),
                 log_buffer_capacity_mb: Some(256),
                 log_timestamp: Some(true),
-                protocol_data_lock: Some(true),
+                use_protocol_data: Some(true),
                 one_time: None,
             }),
         )
@@ -619,7 +619,7 @@ fn test_plugin_config() -> eyre::Result<()> {
                 run_as: None,
                 log_buffer_capacity_mb: None,
                 log_timestamp: None,
-                protocol_data_lock: Some(true),
+                use_protocol_data: Some(true),
                 one_time: None,
             }),
         )

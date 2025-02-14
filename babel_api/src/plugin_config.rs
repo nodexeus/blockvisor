@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+pub const COLD_INIT_JOB_NAME: &str = "download";
 pub const DOWNLOAD_JOB_NAME: &str = "download";
 pub const DOWNLOADING_STATE_NAME: &str = "downloading";
 pub const UPLOAD_JOB_NAME: &str = "upload";
@@ -17,14 +18,18 @@ pub struct PluginConfig {
     pub config_files: Option<Vec<ConfigFile>>,
     /// Node init actions.
     pub init: Option<Actions>,
-    /// List of protocol services.
-    pub services: Vec<Service>,
     /// Download configuration.
     pub download: Option<Download>,
     /// Alternative download configuration.
     pub alternative_download: Option<AlternativeDownload>,
     /// List of post-download jobs.
     pub post_download: Option<Vec<Job>>,
+    /// Alternative protocol data initialization.
+    /// It is fallback job, run only if neither regular archive nor `alternative_download` is available.
+    /// NOTE: `post_download` is not run after `cold_init`.
+    pub cold_init: Option<ColdInit>,
+    /// List of protocol services.
+    pub services: Vec<Service>,
     /// List of pre-upload actions.
     pub pre_upload: Option<Actions>,
     /// Upload configuration.
@@ -176,7 +181,7 @@ pub struct Job {
     pub name: String,
     /// Sh script body. It shall be blocking (foreground) process.
     pub run_sh: String,
-    /// InitJob restart policy.
+    /// Job restart policy.
     pub restart: Option<RestartPolicy>,
     /// Job shutdown timeout - how long it may take to gracefully shutdown the job.
     /// After given time job won't be killed, but babel will rise the error.
@@ -194,9 +199,11 @@ pub struct Job {
     pub log_buffer_capacity_mb: Option<usize>,
     /// Prepend timestamp to each log, or not.
     pub log_timestamp: Option<bool>,
-    /// Indicate if job should 'lock' protocol data.
-    /// Lock prevents re-initialization of the data after job is started.
-    pub protocol_data_lock: Option<bool>,
+    /// Flag indicating if job uses protocol data.
+    /// Job that uses protocol data, automatically create lock that prevents
+    /// re-initialization of the data after job is started.
+    /// Default to `false`.
+    pub use_protocol_data: Option<bool>,
     /// Indicate if job should run only once.
     /// One-time jobs never run again, even after node upgrade.
     pub one_time: Option<bool>,
@@ -260,6 +267,23 @@ pub struct AlternativeDownload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ColdInit {
+    /// Sh script body. It shall be blocking (foreground) process.
+    pub run_sh: String,
+    /// ColdInit restart config.
+    pub restart_config: Option<RestartConfig>,
+    /// Run job as a different user.
+    pub run_as: Option<String>,
+    /// Capacity of log buffer (in megabytes).
+    pub log_buffer_capacity_mb: Option<usize>,
+    /// Prepend timestamp to each log, or not.
+    pub log_timestamp: Option<bool>,
+    /// Indicate if job should run only once.
+    /// One-time jobs never run again, even after node upgrade.
+    pub one_time: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Upload {
     /// Upload restart config.
     pub restart_config: Option<RestartConfig>,
@@ -305,7 +329,7 @@ pub fn build_job_config(job: Job) -> JobConfig {
         run_as: job.run_as,
         log_buffer_capacity_mb: job.log_buffer_capacity_mb,
         log_timestamp: job.log_timestamp,
-        protocol_data_lock: job.protocol_data_lock,
+        use_protocol_data: job.use_protocol_data,
         one_time: job.one_time,
     }
 }
@@ -332,7 +356,7 @@ pub fn build_download_job_config(download: Option<Download>, init_jobs: Vec<Stri
             run_as: None,
             log_buffer_capacity_mb: None,
             log_timestamp: None,
-            protocol_data_lock: None,
+            use_protocol_data: None,
             one_time: None,
         }
     } else {
@@ -349,7 +373,7 @@ pub fn build_download_job_config(download: Option<Download>, init_jobs: Vec<Stri
             run_as: None,
             log_buffer_capacity_mb: None,
             log_timestamp: None,
-            protocol_data_lock: None,
+            use_protocol_data: None,
             one_time: None,
         }
     }
@@ -373,8 +397,28 @@ pub fn build_alternative_download_job_config(
         run_as: alternative_download.run_as,
         log_buffer_capacity_mb: alternative_download.log_buffer_capacity_mb,
         log_timestamp: alternative_download.log_timestamp,
-        protocol_data_lock: None,
+        use_protocol_data: None,
         one_time: None,
+    }
+}
+
+pub fn build_cold_init_job_config(cold_init: ColdInit, init_jobs: Vec<String>) -> JobConfig {
+    JobConfig {
+        job_type: JobType::RunSh(cold_init.run_sh),
+        restart: if let Some(restart) = cold_init.restart_config {
+            engine::RestartPolicy::OnFailure(restart)
+        } else {
+            engine::RestartPolicy::Never
+        },
+        shutdown_timeout_secs: None,
+        shutdown_signal: None,
+        needs: Some(init_jobs),
+        wait_for: None,
+        run_as: cold_init.run_as,
+        log_buffer_capacity_mb: cold_init.log_buffer_capacity_mb,
+        log_timestamp: cold_init.log_timestamp,
+        use_protocol_data: None,
+        one_time: cold_init.one_time,
     }
 }
 
@@ -405,7 +449,7 @@ pub fn build_service_job_config(
         run_as: service.run_as,
         log_buffer_capacity_mb: service.log_buffer_capacity_mb,
         log_timestamp: service.log_timestamp,
-        protocol_data_lock: Some(service.use_protocol_data),
+        use_protocol_data: Some(service.use_protocol_data),
         one_time: None,
     }
 }
@@ -442,7 +486,7 @@ pub fn build_upload_job_config(value: Option<Upload>, pre_upload_jobs: Vec<Strin
             run_as: None,
             log_buffer_capacity_mb: None,
             log_timestamp: None,
-            protocol_data_lock: None,
+            use_protocol_data: None,
             one_time: None,
         }
     } else {
@@ -464,7 +508,7 @@ pub fn build_upload_job_config(value: Option<Upload>, pre_upload_jobs: Vec<Strin
             run_as: None,
             log_buffer_capacity_mb: None,
             log_timestamp: None,
-            protocol_data_lock: None,
+            use_protocol_data: None,
             one_time: None,
         }
     }

@@ -72,7 +72,7 @@ pub async fn run_job(
     {
         return Ok(());
     }
-    if job_config.protocol_data_lock == Some(true) {
+    if job_config.use_protocol_data == Some(true) {
         babel_api::utils::lock_protocol_data(&babel_config.node_env.data_mount_point)?;
     }
     match job_config.job_type {

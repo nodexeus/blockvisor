@@ -338,10 +338,11 @@ pub struct JobConfig {
     pub log_buffer_capacity_mb: Option<usize>,
     /// Prepend timestamp to each log, or not.
     pub log_timestamp: Option<bool>,
-    /// Indicate if job should 'lock' protocol data.
-    /// Lock prevents re-initialization of the data after job is started.
+    /// Flag indicating if job uses protocol data.
+    /// Job that uses protocol data, automatically create lock that prevents
+    /// re-initialization of the data after job is started.
     /// Default to `false`.
-    pub protocol_data_lock: Option<bool>,
+    pub use_protocol_data: Option<bool>,
     /// Indicate if job should run only once.
     /// One-time jobs never run again, even after node upgrade.
     pub one_time: Option<bool>,
