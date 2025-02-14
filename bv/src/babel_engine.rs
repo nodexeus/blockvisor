@@ -882,7 +882,7 @@ impl babel_api::engine::Engine for Engine {
             })?;
             response_rx.blocking_recv()?
         } else {
-            Ok(Some("dev secret".as_bytes().to_vec()))
+            Ok(Some("dev-secret".as_bytes().to_vec()))
         }
     }
 
