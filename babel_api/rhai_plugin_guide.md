@@ -119,6 +119,8 @@ If no `init` function is defined, but only `PLUGIN_CONFIG`, then `default_init` 
 - start `init` jobs
 - start `download` job (if download is not completed yet and not `dev_node`)
 - if data archive is not available and `alternative_download` is defined then start it
+- start `post_download` jobs
+- if neither `download` nor `alternative_download` is provided, start `cold_init` job
 - start services
 - schedule tasks defined in `PLUGIN_CONFIG`
 

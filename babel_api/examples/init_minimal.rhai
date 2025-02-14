@@ -20,6 +20,7 @@ fn init() {
               backoff_base_ms: 1000,
           },
       },
+      use_protocol_data: true,
   });
   start_job("protocol_service_b", #{
       job_type: #{
