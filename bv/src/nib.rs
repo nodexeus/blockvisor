@@ -502,6 +502,7 @@ pub struct ImageVariant {
     pub min_disk_gb: u64,
     pub ramdisks: Vec<RamdiskConfig>,
     pub metadata: Vec<VariantMetadata>,
+    pub dns_scheme: Option<String>,
 }
 
 impl ImageVariant {
@@ -541,6 +542,7 @@ impl ImageVariant {
             min_disk_gb: variant.min_disk_gb,
             ramdisks: variant.ramdisks,
             metadata,
+            dns_scheme: variant.dns_scheme.or(image.dns_scheme.clone()),
         }
     }
 }

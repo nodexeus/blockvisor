@@ -28,6 +28,7 @@ pub struct Variant {
     pub ramdisks: Vec<RamdiskConfig>,
 
     // overrides
+    pub dns_scheme: Option<String>,
     pub description: Option<String>,
     pub visibility: Option<Visibility>,
     pub properties: Option<Vec<ImageProperty>>,
@@ -64,6 +65,7 @@ pub struct Image {
     pub container_uri: String,
     pub protocol_key: String,
     pub org_id: Option<String>,
+    pub dns_scheme: Option<String>,
     pub description: Option<String>,
     pub visibility: Visibility,
     pub variants: Vec<Variant>,
