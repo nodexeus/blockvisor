@@ -233,10 +233,11 @@ async fn fetch_slots(
         .take(count)
         .map(|chunk| chunk.index)
         .collect::<Vec<_>>();
-    Ok(with_selective_retry!(client.get_upload_slots((
-        data_version,
-        chunks.clone(),
-        url_expires_secs,
+    Ok(with_selective_retry!(client.get_upload_slots(with_timeout(
+        (data_version, chunks.clone(), url_expires_secs),
+        // let make timeout proportional to number of slots
+        // it is expected that 1000 of slots should be downloaded in less thant 5s
+        RPC_REQUEST_TIMEOUT * 2 + Duration::from_secs(count as u64 / 200)
     )))?
     .into_inner())
 }
