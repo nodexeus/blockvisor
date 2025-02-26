@@ -126,6 +126,8 @@ pub enum UpgradeStep {
     Plugin,
     Firewall,
     Restart,
+    // LEGACY left for backward compatibility - remove once all nodes upgraded
+    ReInit,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
