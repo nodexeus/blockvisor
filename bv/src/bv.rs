@@ -432,7 +432,7 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                     }
                     if !info.logs.is_empty() {
                         if info.logs.len() > 3 {
-                            let _ = info.logs.split_off(6);
+                            info.logs.truncate(3);
                             info.logs
                                 .push(format!("... use `bv node job info {}` to get more", name));
                         }
