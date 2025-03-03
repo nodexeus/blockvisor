@@ -1020,22 +1020,9 @@ mod tests {
 "#;
 
         let mut babel = MockBabelEngine::new();
-        babel.expect_load_config().returning(|| {
-            Ok(PluginConfig {
-                config_files: None,
-                aux_services: None,
-                init: None,
-                download: None,
-                alternative_download: None,
-                post_download: None,
-                cold_init: None,
-                services: vec![],
-                pre_upload: None,
-                upload: None,
-                post_upload: None,
-                scheduled: None,
-            })
-        });
+        babel
+            .expect_load_config()
+            .returning(|| Ok(Default::default()));
         let plugin = RhaiPlugin::from_str(script, babel)?;
         let mut expected_capabilities = vec![
             "init".to_string(),
