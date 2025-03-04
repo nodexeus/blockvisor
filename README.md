@@ -9,7 +9,7 @@ The service that runs on the host systems and is responsible for provisioning an
 2. Run `cargo release --execute $(git-conventional-commits version)` 
 3. CI `publish` workflow will then build a bundle and create a new GH release
 4. Bundle is automatically deployed on DEV environment. When bundle is tested and ready to promote
-on PROD environment, use `make promote-prod` (requires `AWS_ACCOUNT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION` env variable set). 
+on STAGING or PROD environment, use `make promote-staging`/`make promote-prod` (requires `AWS_ACCOUNT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION` env variable set). 
 
 ## Host Setup
 
@@ -59,6 +59,7 @@ used during debugging issues, not printed by default
 - `/var/lib/blockvisor/nodes/<uuid>/` node specific data
 - `/var/lib/blockvisor/nodes/<uuid>/state.json` node state persistence
 - `/var/lib/blockvisor/nodes/<uuid>/plugin.data` Babel plugin data persistence (see load_data/save_data functions in [RHAI plugin scripting guide](babel_api/rhai_plugin_guide.md))
+- `/var/lib/blockvisor/nodes/<uuid>/plugin_config.json` Babel plugin config persistence
 - `/var/lib/blockvisor/nodes/<uuid>/rootfs/` node rootfs (from `os.img`)
 - `/var/lib/blockvisor/nodes/<uuid>/data/` protocol data dir, bind to node `/blockjoy/`, persist node upgrade
 
@@ -75,7 +76,7 @@ used during debugging issues, not printed by default
 - `/var/lib/babel/post_setup.sh`
 - `/var/lib/babel/plugin/*.rhai` node specific Babel plugin files
 - `/blockjoy/.babel_jobs/` archive jobs (e.g. download) metadata dir
-- `/blockjoy/.protocol_data.lock` protocol data lock file created whenever first service using that data is started 
+- `/blockjoy/.protocol_data.lock` protocol data lock file `touch`ed whenever service using that data is started 
 - `/blockjoy/protocol_data/` directory where protocol data are downloaded (uploaded from)
 
 ### Bundle
