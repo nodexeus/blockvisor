@@ -38,13 +38,6 @@ jobs:
           make ci-cleanup
           RUST_LOG="off" make ci-setup
 
-      - id: 'auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v1'
-        with:
-          token_format: 'access_token'
-          credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
-
       - uses: 'docker/login-action@v1'
         with:
           registry: 'us-docker.pkg.dev'
