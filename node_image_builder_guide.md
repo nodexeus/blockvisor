@@ -80,7 +80,7 @@ To create fist node image:
 2. Update image metadata in `babel.yaml` file.
 In particular, set `container_uri` to `docker-daemon://variant-key:latest`
 3. Run some basic sanity checks on the image `nib image check`. Use `--lint-only` option to limit checks to Rhai script only,
-otherwise `nib image check` will create dev node, and run also runtime checks. See `nib image check --help` for more details.
+otherwise `nib image check` will create dev node, and run also runtime checks. See `nib image check --help` for full list of check and the defaults.
 4. Use `nib image play --props '{"property_key":"some property value"}'` to create dev node.
 
 ### Add Required Binaries and Snapshots
@@ -137,7 +137,7 @@ Hence, editing `*.rhai` files from image dir won't affect created node.
 __NOTE 1__: All of Rhai functions can be immediately tested, just after file is saved (including `init()` function).
 Use `bv node run <METHOD>` to run specific Rhai function from script.
 
-__NOTE 2__: Use `nib image check --lint-only` for quick `babel.rhai` script smoke tests and other sanity checks.
+__NOTE 2__: Use `nib image check plugin` for quick `babel.rhai` script smoke tests and other sanity checks.
 
 __NOTE 3__: Experimenting with `init()` function may result in some unwanted jobs running.
 Use `bv n job` CLI to stop or cleanup unwanted jobs.
@@ -156,7 +156,7 @@ in some base container image. Then it can be imported and used by node specific 
 
 See [Plugin Config Example](babel_api/examples/plugin_config.rhai) for more details.
 
-__NOTE__: Use `nib image check` to quickly check if node can be created, started and jobs doesn't crash.
+__NOTE__: Use `nib image check` to quickly check if node can be created and started.
 
 ### Push Image to the API
 
