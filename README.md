@@ -60,7 +60,7 @@ used during debugging issues, not printed by default
 - `/var/lib/blockvisor/nodes/<uuid>/state.json` node state persistence
 - `/var/lib/blockvisor/nodes/<uuid>/plugin.data` Babel plugin data persistence (see load_data/save_data functions in [RHAI plugin scripting guide](babel_api/rhai_plugin_guide.md))
 - `/var/lib/blockvisor/nodes/<uuid>/plugin_config.json` Babel plugin config persistence
-- `/var/lib/blockvisor/nodes/<uuid>/rootfs/` node rootfs (from `os.img`)
+- `/var/lib/blockvisor/nodes/<uuid>/rootfs/` node rootfs
 - `/var/lib/blockvisor/nodes/<uuid>/data/` protocol data dir, bind to node `/blockjoy/`, persist node upgrade
 
 ### Node
@@ -161,7 +161,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant repo as Cookbook+Storage
+    participant repo as Bundle Storage
     participant bv as BlockvisorD
     participant installer as bundle/installer
     
