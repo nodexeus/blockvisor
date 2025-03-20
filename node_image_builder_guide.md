@@ -33,7 +33,10 @@ Download, untar, and run `./bundle/installer`.<br>
 It means no regular cloud communication (only when need to download existing images) and commands handling.
 Also, other housekeeping tasks, like node recovery, metrics gathering or auto update, are disabled in that variant.<br>
 
-- Generate API key for `nib` and configure it `nib config <API_KEY> --api='<api_url>''`
+- `nib` tool connected to the API. Use `nib login <USER_ID>` command with `USER_ID` that can be found in web frontend. 
+  You will be also asked for associated email and password. Use `--api='<api_url>'` option to connect non-default API instance.
+  
+  See `nib login --help` for more details.
 
 - [optional] VS Code installed on developer PC, with following extensions installed:
     - "Remote - SSH"
