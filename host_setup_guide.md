@@ -18,10 +18,8 @@ Beside standard linux tool available in all distributions, BV requires following
 
 - `pigz`
 - `tar`
-- `fallocate`
 - `systemctl`
 - `ip`
-- `mkfs.ext4`
 
 For _Ubuntu_ based distributions:
 
