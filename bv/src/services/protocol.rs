@@ -173,7 +173,7 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
     pub async fn add_protocol(&mut self, protocol: nib_meta::Protocol) -> Result<()> {
         let mut client = self.connect_protocol_service().await?;
         let req = pb::ProtocolServiceAddProtocolRequest {
-            org_id: protocol.org_id,
+            org_id: protocol.org_id.map(|id| id.to_string()),
             key: protocol.key,
             name: protocol.name,
             description: protocol.description,
@@ -223,7 +223,7 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
     ) -> Result<pb::ProtocolVersion> {
         let mut client = self.connect_protocol_service().await?;
         let req = pb::ProtocolServiceAddVersionRequest {
-            org_id: image.org_id,
+            org_id: image.org_id.map(|id| id.to_string()),
             version_key: Some(common::ProtocolVersionKey {
                 protocol_key: image.protocol_key,
                 variant_key: image.variant_key,
@@ -268,7 +268,7 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
         firewall.rules.sort_by(|a, b| a.key.cmp(&b.key));
         let req = pb::ImageServiceAddImageRequest {
             protocol_version_id,
-            org_id: image.org_id,
+            org_id: image.org_id.map(|id| id.to_string()),
             description: image.description,
             properties: add_properties(image.properties),
             firewall: Some(firewall),

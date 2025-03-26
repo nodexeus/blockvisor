@@ -399,6 +399,10 @@ pub async fn process_protocol_command(
                 serde_yaml_ng::from_str(&fs::read_to_string(path).await?)?;
             for local in local_protocols {
                 let protocol_key = local.key.clone();
+                ensure!(
+                    protocol_key.chars().all(|c| LOWER_KEBAB_CASE.contains(c)),
+                    "'protocol_key: {protocol_key}' isn't lower-kebab-case"
+                );
 
                 if let Some(remote) = client.get_protocol(protocol_key.clone()).await? {
                     client
@@ -489,7 +493,7 @@ pub struct ImageVariant {
     pub version: String,
     pub container_uri: String,
     pub protocol_key: String,
-    pub org_id: Option<String>,
+    pub org_id: Option<Uuid>,
     pub description: Option<String>,
     pub visibility: Visibility,
     pub properties: Vec<ImageProperty>,
@@ -527,7 +531,7 @@ impl ImageVariant {
             version: image.version.clone(),
             container_uri: image.container_uri.clone(),
             protocol_key: image.protocol_key.clone(),
-            org_id: image.org_id.clone(),
+            org_id: image.org_id,
             description: variant.description.or(image.description.clone()),
             visibility: variant.visibility.unwrap_or(image.visibility.clone()),
             properties: variant.properties.unwrap_or(image.properties.clone()),
@@ -550,9 +554,6 @@ impl ImageVariant {
         self.validate_variant_sku()?;
         semver::Version::from_str(&self.version).with_context(|| "version must be semantic")?;
         Uri::from_str(&self.container_uri).with_context(|| "invalid container_uri")?;
-        self.org_id.as_ref().map_or(Ok(Uuid::default()), |org_id| {
-            Uuid::parse_str(org_id).with_context(|| "invalid org_id")
-        })?;
         self.validate_keys()?;
         self.validate_ips()?;
         if let Some(suspicious_rule) = self

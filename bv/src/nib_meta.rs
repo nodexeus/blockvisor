@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Protocol {
@@ -7,7 +8,7 @@ pub struct Protocol {
     /// Display name visible in frontend - can be modified.
     pub name: String,
     /// Uuid of organization where which protocol belongs to, or null if public.
-    pub org_id: Option<String>,
+    pub org_id: Option<Uuid>,
     pub ticker: Option<String>,
     /// Brief protocol description.
     pub description: Option<String>,
@@ -64,7 +65,7 @@ pub struct Image {
     pub version: String,
     pub container_uri: String,
     pub protocol_key: String,
-    pub org_id: Option<String>,
+    pub org_id: Option<Uuid>,
     pub dns_scheme: Option<String>,
     pub description: Option<String>,
     pub visibility: Visibility,
