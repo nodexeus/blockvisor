@@ -134,6 +134,8 @@ async fn test_bv_service_e2e() {
                 "protocol-admin-update-version".to_string(),
                 "protocol-admin-add-protocol".to_string(),
                 "protocol-admin-add-version".to_string(),
+                "protocol-admin-view-private".to_string(),
+                "protocol-view-development".to_string(),
                 "protocol-view-public".to_string(),
                 "protocol-get-protocol".to_string(),
                 "protocol-get-latest".to_string(),
