@@ -416,7 +416,6 @@ pub async fn load_bv_config(bv_root: &Path) -> eyre::Result<bv_config::Config> {
 }
 
 async fn extract_image_fs(rootfs_path: &Path, container_image_uri: &str) -> eyre::Result<()> {
-    let rootfs_image_path = rootfs_path.join("image.tar");
     let uri = container_image_uri
         .split_once("://")
         .map(|(_, uri_wo_prefix)| uri_wo_prefix)
@@ -426,29 +425,34 @@ async fn extract_image_fs(rootfs_path: &Path, container_image_uri: &str) -> eyre
         .with_context(|| format!("create {uri}"))?
         .trim()
         .to_string();
-    run_cmd(
-        "docker",
-        [
-            OsStr::new("export"),
-            OsStr::new(&container_id),
-            OsStr::new("-o"),
-            rootfs_image_path.as_os_str(),
-        ],
-    )
-    .await
-    .with_context(|| format!("export {uri}:{container_id}"))?;
-    run_cmd(
-        "tar",
-        [
-            OsStr::new("-xf"),
-            rootfs_image_path.as_os_str(),
-            OsStr::new("-C"),
-            rootfs_path.as_os_str(),
-        ],
-    )
-    .await?;
+    async fn extract(container_id: &str, rootfs_path: &Path) -> eyre::Result<()> {
+        let rootfs_image_path = rootfs_path.join("image.tar");
+        run_cmd(
+            "docker",
+            [
+                OsStr::new("export"),
+                OsStr::new(container_id),
+                OsStr::new("-o"),
+                rootfs_image_path.as_os_str(),
+            ],
+        )
+        .await
+        .with_context(|| format!("export {container_id}"))?;
+        run_cmd(
+            "tar",
+            [
+                OsStr::new("-xf"),
+                rootfs_image_path.as_os_str(),
+                OsStr::new("-C"),
+                rootfs_path.as_os_str(),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+    let res = extract(&container_id, rootfs_path).await;
     run_cmd("docker", ["rm", &container_id]).await?;
-    Ok(())
+    res
 }
 
 async fn discover_ip_and_gateway(
