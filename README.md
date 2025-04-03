@@ -15,7 +15,7 @@ on STAGING or PROD environment, use `make promote-staging`/`make promote-prod` (
 
 See [BlockVisor Host Setup Guide](host_setup_guide.md) for more details.
 
-Published version of above guide with `bvup` tool can be found [here](https://github.com/blockjoy/bv-host-setup/releases).
+Published version of above guide with `bvup` tool can be found [here](https://github.com/blockjoy/blockvisor/releases).
 
 ## Babel Plugins
 
