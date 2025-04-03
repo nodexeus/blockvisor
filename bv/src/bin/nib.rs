@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use blockvisord::{
     linux_platform::bv_root,
     nib,
@@ -5,10 +6,18 @@ use blockvisord::{
     nib_config::Config,
     services,
     services::api::{common, pb},
+    services::{
+        ApiInterceptor, ApiServiceConnector, AuthToken, DEFAULT_API_CONNECT_TIMEOUT,
+        DEFAULT_API_REQUEST_TIMEOUT,
+    },
 };
+use bv_utils::rpc::DefaultTimeout;
 use clap::Parser;
 use eyre::Result;
 use std::io::{BufRead, Write};
+use std::str::FromStr;
+use tonic::transport::{Channel, Endpoint};
+use tonic::Status;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -82,21 +91,37 @@ async fn main() -> Result<()> {
             .await?;
         }
         Command::Image { command } => {
-            let config = Config::load().await?;
-            let connector = blockvisord::services::PlainConnector {
-                token: config.token,
-                url: config.blockjoy_api_url,
-            };
-            nib::process_image_command(connector, &bv_root, command).await?;
+            nib::process_image_command(NibConnector, &bv_root, command).await?;
         }
         Command::Protocol { command } => {
-            let config = Config::load().await?;
-            let connector = blockvisord::services::PlainConnector {
-                token: config.token,
-                url: config.blockjoy_api_url,
-            };
-            nib::process_protocol_command(connector, command).await?;
+            nib::process_protocol_command(NibConnector, command).await?;
         }
     }
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct NibConnector;
+
+#[async_trait]
+impl ApiServiceConnector for NibConnector {
+    async fn connect<T, I>(&self, with_interceptor: I) -> Result<T, Status>
+    where
+        I: Send + Sync + Fn(Channel, ApiInterceptor) -> T,
+    {
+        let config = Config::load()
+            .await
+            .map_err(|err| Status::internal(format!("{err:#}")))?;
+        let endpoint = Endpoint::from_str(&config.blockjoy_api_url)
+            .map_err(|err| Status::internal(format!("{err:#}")))?
+            .connect_timeout(DEFAULT_API_CONNECT_TIMEOUT);
+        let channel = Endpoint::connect_lazy(&endpoint);
+        Ok(with_interceptor(
+            channel,
+            ApiInterceptor(
+                AuthToken(config.token),
+                DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
+            ),
+        ))
+    }
 }

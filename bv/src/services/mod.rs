@@ -286,29 +286,3 @@ impl ApiServiceConnector for DefaultConnector {
         Ok(connect_to_api_service(&self.config, with_interceptor).await?)
     }
 }
-
-#[derive(Clone)]
-pub struct PlainConnector {
-    pub token: String,
-    pub url: String,
-}
-
-#[async_trait]
-impl ApiServiceConnector for PlainConnector {
-    async fn connect<T, I>(&self, with_interceptor: I) -> Result<T, Status>
-    where
-        I: Send + Sync + Fn(Channel, ApiInterceptor) -> T,
-    {
-        let endpoint = Endpoint::from_str(&self.url)
-            .map_err(|err| Status::internal(format!("{err:#}")))?
-            .connect_timeout(DEFAULT_API_CONNECT_TIMEOUT);
-        let channel = Endpoint::connect_lazy(&endpoint);
-        Ok(with_interceptor(
-            channel,
-            ApiInterceptor(
-                AuthToken(self.token.clone()),
-                DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
-            ),
-        ))
-    }
-}
