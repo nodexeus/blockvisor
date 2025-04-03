@@ -228,24 +228,15 @@ pub async fn process_image_command(
             let (rootfs_path, dev_node) =
                 if checks.len() == 1 && checks.contains(&NodeChecks::Plugin) {
                     let rootfs_path = tmp_dir.path();
-                    run_cmd(
-                        "apptainer",
-                        [
-                            OsStr::new("build"),
-                            OsStr::new("--sandbox"),
-                            OsStr::new("--force"),
-                            rootfs_path.as_os_str(),
-                            OsStr::new(&image_variant.container_uri),
-                        ],
-                    )
-                    .await
-                    .map_err(|err| {
-                        anyhow!(
-                            "failed to build sandbox for '{}' in `{}`: {err:#}",
-                            path.display(),
-                            rootfs_path.display(),
-                        )
-                    })?;
+                    extract_image_fs(rootfs_path, &image_variant.container_uri)
+                        .await
+                        .map_err(|err| {
+                            anyhow!(
+                                "failed to extract filesystem for '{}' in `{}`: {err:#}",
+                                path.display(),
+                                rootfs_path.display(),
+                            )
+                        })?;
                     (rootfs_path.to_path_buf(), None)
                 } else {
                     let dev_node = DevNode::create(
@@ -422,6 +413,42 @@ pub async fn process_protocol_command(
 pub async fn load_bv_config(bv_root: &Path) -> eyre::Result<bv_config::Config> {
     let bv_path = bv_root.join(bv_config::CONFIG_PATH);
     Ok(serde_json::from_str(&fs::read_to_string(&bv_path).await?)?)
+}
+
+async fn extract_image_fs(rootfs_path: &Path, container_image_uri: &str) -> eyre::Result<()> {
+    let rootfs_image_path = rootfs_path.join("image.tar");
+    let uri = container_image_uri
+        .split_once("://")
+        .map(|(_, uri_wo_prefix)| uri_wo_prefix)
+        .unwrap_or(container_image_uri);
+    let container_id = run_cmd("docker", ["create", uri])
+        .await
+        .with_context(|| format!("create {uri}"))?
+        .trim()
+        .to_string();
+    run_cmd(
+        "docker",
+        [
+            OsStr::new("export"),
+            OsStr::new(&container_id),
+            OsStr::new("-o"),
+            rootfs_image_path.as_os_str(),
+        ],
+    )
+    .await
+    .with_context(|| format!("export {uri}:{container_id}"))?;
+    run_cmd(
+        "tar",
+        [
+            OsStr::new("-xf"),
+            rootfs_image_path.as_os_str(),
+            OsStr::new("-C"),
+            rootfs_path.as_os_str(),
+        ],
+    )
+    .await?;
+    run_cmd("docker", ["rm", &container_id]).await?;
+    Ok(())
 }
 
 async fn discover_ip_and_gateway(
