@@ -24,7 +24,7 @@ jobs:
 
       - name: Get Tag Name
         id: get-tag
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "TAG_NAME=$(git describe --tags)" >> $GITHUB_OUTPUT
 
       - name: Dispatch BV Publish Workflow
         id: dispatch-publish
