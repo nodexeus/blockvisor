@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     }
     let config = SharedConfig::new(Config::load(&bv_root).await?, bv_root);
     let port = config.read().await.blockvisor_port;
-    let bv_url = format!("http://localhost:{port}");
+    let bv_url = format!("http://127.0.0.1:{port}");
 
     match args.command {
         Command::Start(_) => {
