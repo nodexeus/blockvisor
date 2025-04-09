@@ -1,5 +1,5 @@
 use crate::src::utils::{
-    execute_sql_insert, rbac,
+    execute_sql_insert,
     test_env::{self, link_apptainer_config},
 };
 use assert_cmd::Command;
@@ -27,7 +27,6 @@ async fn test_bv_service_e2e() {
     let org_id = "53b28794-fb68-4cd1-8165-b98a51a19c46";
     let db_url = "postgres://blockvisor:password@database:5432/blockvisor_db";
 
-    rbac::setup_rbac(db_url).await;
     println!("create user");
     let user_query = r#"INSERT INTO users
         VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@blockjoy.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00');

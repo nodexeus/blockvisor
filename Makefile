@@ -46,28 +46,10 @@ bundle-dev: bundle-base
 	rm -rf /tmp/bundle-dev.tar.gz
 	tar -C /tmp -czvf /tmp/bundle-dev.tar.gz bundle
 
-ci-setup: bundle-base
-	cp target/x86_64-unknown-linux-musl/release/nib /tmp/bundle/blockvisor/bin
-	systemctl stop blockvisor.service || true
-	rm -rf /opt/blockvisor
-	/tmp/bundle/installer
-	docker build -t test_v1 bv/tests/image_v1
-	docker build -t test_v2 bv/tests/image_v2
-	systemctl start blockvisor.service
-
-ci-cleanup:
-	bv node rm --all --yes || true
-	bv stop || true
-	apptainer instance stop -a || true
-	pkill -9 babel || true
-	pkill -9 babel_job_runner || true
-	umount -A --recursive /var/lib/blockvisor/nodes/*/rootfs || true
-	umount -A --recursive /tmp/*/var/lib/blockvisor/nodes/*/rootfs || true
-	rm -rf /var/lib/blockvisor/nodes/
-	rm -f /var/lib/blockvisor/commands_cache.pb
-
 new-release:
 	cargo release --execute $$(git-conventional-commits version)
+
+
 
 promote-staging:
 	BV_VERSION=$$(cargo metadata --format-version=1 --no-deps | jq -caM '.packages[] | select(.name == "blockvisord") | .version' | tr -d '"'); \
