@@ -21,7 +21,7 @@ use tokio::time::{sleep, Duration};
 #[serial]
 async fn test_bv_service_e2e() {
     let url = "http://localhost:8080";
-    let email = "tester@blockjoy.com";
+    let email = "tester@example.com";
     let password = "ilovemytests";
     let user_id = "1cff0487-412b-4ca4-a6cd-fdb9957d5d2f";
     let org_id = "53b28794-fb68-4cd1-8165-b98a51a19c46";
@@ -29,7 +29,7 @@ async fn test_bv_service_e2e() {
 
     println!("create user");
     let user_query = r#"INSERT INTO users
-        VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@blockjoy.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00');
+        VALUES ('1cff0487-412b-4ca4-a6cd-fdb9957d5d2f', 'tester@example.com', '57snVgOUjwtfOrMxLHez8KOQaTNaNnLXMkUpzaxoRDs', 'cM4OaOTJUottdF4i8unbuA', '2023-01-17 22:13:52.422342+00', 'Luuk', 'Wester', '2023-01-17 22:14:06.297602+00');
         "#;
     execute_sql_insert(db_url, user_query);
 
