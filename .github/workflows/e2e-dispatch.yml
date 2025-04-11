@@ -26,7 +26,7 @@ jobs:
           gh workflow run platform-e2e.yml \
             --repo blockjoy/deployer \
             --ref $DEFAULT_BRANCH \
-            -f submodule_repo=blockjoy/blockvisor \
+            -f submodule_repo=${{ github.repository }} \
             -f pr_number=${{ github.event.pull_request.number }} \
             -f pr_sha=${{ github.event.pull_request.head.sha }} \
             -f pr_action=${{ github.event.action }} \
