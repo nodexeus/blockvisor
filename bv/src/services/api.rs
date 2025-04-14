@@ -153,7 +153,7 @@ struct CommandsService<'a> {
     cache_path: PathBuf,
 }
 
-impl<'a> CommandsService<'a> {
+impl CommandsService<'_> {
     async fn save_cache(&self) {
         if let Err(err) = save(&self.commands, &self.cache_path).await {
             error!("failed to save commands cache: {err:#}");

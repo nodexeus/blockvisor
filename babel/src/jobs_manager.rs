@@ -102,7 +102,7 @@ async fn load_jobs(
             let config_path = path.join(jobs::CONFIG_FILENAME);
             if config_path.exists() {
                 path.components()
-                    .last()
+                    .next_back()
                     .map(|name| name.as_os_str().to_string_lossy().to_string())
             } else {
                 None
@@ -744,7 +744,7 @@ impl<C: BabelEngineConnector> Manager<C> {
                             }
                         }
                     }
-                    JobStatus::Running { .. } => {
+                    JobStatus::Running => {
                         self.handle_stopped_job(name, job, &jobs_context.connector)
                             .await
                     }

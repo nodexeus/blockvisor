@@ -236,6 +236,7 @@ pub fn bv_run(commands: &[&str], stdout_pattern: &str, bv_root: Option<&Path>) {
     bv_tool_run("bv", commands, stdout_pattern, bv_root)
 }
 
+#[allow(clippy::result_large_err)]
 pub fn try_bv_run(commands: &[&str], stdout_pattern: &str, bv_root: Option<&Path>) -> AssertResult {
     try_bv_tool_run("bv", commands, stdout_pattern, bv_root)
 }
@@ -255,6 +256,7 @@ fn bv_tool_run(tool_name: &str, commands: &[&str], stdout_pattern: &str, bv_root
         .stdout(predicate::str::contains(stdout_pattern));
 }
 
+#[allow(clippy::result_large_err)]
 fn try_bv_tool_run(
     tool_name: &str,
     commands: &[&str],

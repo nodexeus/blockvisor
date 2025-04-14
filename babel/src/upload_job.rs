@@ -374,7 +374,7 @@ struct ParallelChunkUploaders<'a> {
     data_version: u64,
 }
 
-impl<'a> ParallelChunkUploaders<'a> {
+impl ParallelChunkUploaders<'_> {
     fn new(
         run: RunFlag,
         mut chunks: Vec<Chunk>,

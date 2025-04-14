@@ -46,7 +46,7 @@ pub fn is_process_running(pid: Pid) -> bool {
     sys.refresh_process_specifics(pid, ProcessRefreshKind::new())
         .then(|| sys.process(pid).map(|proc| proc.status()))
         .flatten()
-        .map_or(false, |status| status != sysinfo::ProcessStatus::Zombie)
+        .is_some_and(|status| status != sysinfo::ProcessStatus::Zombie)
 }
 
 /// Kill all processes that match `cmd` and passed `args`.

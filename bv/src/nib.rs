@@ -616,18 +616,19 @@ impl ImageVariant {
     }
 
     fn validate_variant_sku(&self) -> eyre::Result<()> {
-        Ok(ensure!(
-        self
-            .sku_code
-            .chars()
-            .all(|character| character == '-'
-                || character.is_ascii_digit()
-                || character.is_ascii_uppercase())
-            && self.sku_code.split("-").count() == 3,
-        "Invalid SKU format for variant '{}': '{}' (Should be formatted as 3 sections of uppercased ascii alphanumeric characters split by `-`, e.g.: `ETH-ERG-SF`)",
-        self.variant_key,
-        self.sku_code
-    ))
+        ensure!(
+            self
+                .sku_code
+                .chars()
+                .all(|character| character == '-'
+                    || character.is_ascii_digit()
+                    || character.is_ascii_uppercase())
+                && self.sku_code.split("-").count() == 3,
+            "Invalid SKU format for variant '{}': '{}' (Should be formatted as 3 sections of uppercased ascii alphanumeric characters split by `-`, e.g.: `ETH-ERG-SF`)",
+            self.variant_key,
+            self.sku_code
+        );
+        Ok(())
     }
 
     fn validate_keys(&self) -> eyre::Result<()> {

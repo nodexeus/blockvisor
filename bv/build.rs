@@ -60,7 +60,7 @@ fn find_recursive(path: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         let path = entry?.path();
         if path.is_dir() {
             find_recursive(&path, files)?;
-        } else if path.extension().map_or(false, |ext| ext == "proto") {
+        } else if path.extension().is_some_and(|ext| ext == "proto") {
             files.push(path.to_path_buf());
         }
     }

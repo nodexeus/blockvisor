@@ -273,7 +273,7 @@ struct ParallelChunkDownloaders<'a, C> {
     connection_pool: ConnectionPool,
 }
 
-impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownloaders<'a, C> {
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownloaders<'_, C> {
     fn new(
         connector: C,
         run: RunFlag,
