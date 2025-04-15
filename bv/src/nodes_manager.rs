@@ -780,7 +780,8 @@ fn check_babel_version(min_babel_version: &str) -> commands::Result<()> {
         ))
     };
     let current_version = env!("CARGO_PKG_VERSION");
-    let min_babel_version = semver::Version::parse(min_babel_version).map_err(parse_err)?;
+    let mut min_babel_version = semver::Version::parse(min_babel_version).map_err(parse_err)?;
+    min_babel_version.patch = 0; // It is fine to use BV with older version if it is only patch difference.
     let version = semver::Version::parse(current_version).map_err(parse_err)?;
     if version < min_babel_version {
         command_failed!(Error::Internal(anyhow!("image require never version of babel '{min_babel_version}' while current is '{current_version}' - upgrade bv first")));
