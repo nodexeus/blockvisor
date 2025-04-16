@@ -22,16 +22,6 @@ jobs:
           private-key: ${{ secrets.BJ_PROTOCOLS_APP_PK }}
           owner: blockjoy
 
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          token: ${{ steps.generate-token.outputs.token }}
-          repository: blockjoy/blockvisor
-
-      - name: Get Tag Name
-        id: get-tag
-        run: echo "TAG_NAME=$(git describe --tags)" >> $GITHUB_OUTPUT
-
       - name: Dispatch BV Publish Workflow
         id: dispatch-publish
         env:
@@ -42,4 +32,4 @@ jobs:
           gh workflow run bv-publish.yml \
             --repo blockjoy/deployer \
             --ref $DEFAULT_BRANCH \
-            -f tag_name=${{ steps.get-tag.outputs.TAG_NAME }}
+            -f tag_name=${{ github.ref_name }}
