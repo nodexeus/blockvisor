@@ -36,5 +36,4 @@ jobs:
           gh workflow run bv-publish.yml \
             --repo blockjoy/deployer \
             --ref $DEFAULT_BRANCH \
-            -f tag_name=${{ steps.get-tag.outputs.TAG_NAME }} \
-            -f repository=blockjoy/blockvisor
+            -f tag_name=${{ steps.get-tag.outputs.TAG_NAME }}
