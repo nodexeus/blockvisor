@@ -8,14 +8,17 @@ on:
 
 permissions:
   contents: write
+  id-token: write # Needed for AWS authentication
 
 jobs:
-  publish:
-    name: Release
+  build:
+    name: Build Release
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
     steps:
-      
-      - uses: actions/checkout@v2
+      - name: Checkout Code
+        uses: actions/checkout@v2
         with:
           submodules: recursive
       
@@ -66,22 +69,62 @@ jobs:
             
             ## Changes
             Automated build from the latest blockvisor code.
+      
+      - name: Upload artifacts for later stages
+        uses: actions/upload-artifact@v3
+        with:
+          name: blockvisor-artifacts
+          path: |
+            /tmp/bundle-dev.tar.gz
+            /tmp/bundle.tar.gz
+            /tmp/bvup
+            /tmp/bundle/blockvisor/bin/nib
+          retention-days: 7
 
-      # - name: Generate GitHub App Token
-      #   id: generate-token
-      #   uses: actions/create-github-app-token@v1
-      #   with:
-      #     app-id: ${{ secrets.BJ_PROTOCOLS_WORKFLOW_APP_ID }}
-      #     private-key: ${{ secrets.BJ_PROTOCOLS_APP_PK }}
-      #     owner: blockjoy
-      # - name: Dispatch BV Publish Workflow
-      #   id: dispatch-publish
-      #   env:
-      #     GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-      #   run: |
-      #     DEFAULT_BRANCH=$(gh api repos/blockjoy/deployer --jq '.default_branch')
+  deploy-dev:
+    name: Deploy to Dev
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: https://app.dev.nodexeus.io
+    
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: blockvisor-artifacts
+          path: ./artifacts
 
-      #     gh workflow run bv-publish.yml \
-      #       --repo blockjoy/deployer \
-      #       --ref $DEFAULT_BRANCH \
-      #       -f tag_name=${{ github.ref_name }}
+      - name: Upload to B2 Dev Bucket
+        uses: yamatt/backblaze-b2-upload-action@v7
+        with:
+          key_id: ${{ secrets.B2_KEY_ID }}
+          application_key: ${{ secrets.B2_APP_KEY }}
+          bucket_name: ${{ secrets.B2_DEV_BUCKET }}
+          file_path: ./artifacts/bundle.tar.gz
+          remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: [build, deploy-dev]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.nodexeus.io
+    
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: blockvisor-artifacts
+          path: ./artifacts
+
+      - name: Upload to B2 Production Bucket
+        uses: yamatt/backblaze-b2-upload-action@v7
+        with:
+          key_id: ${{ secrets.B2_KEY_ID }}
+          application_key: ${{ secrets.B2_APP_KEY }}
+          bucket_name: ${{ secrets.B2_PROD_BUCKET }}
+          file_path: ./artifacts/bundle.tar.gz
+          remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
