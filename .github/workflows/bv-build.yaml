@@ -71,15 +71,14 @@ jobs:
             Automated build from the latest blockvisor code.
       
       - name: Upload artifacts for later stages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: blockvisor-artifacts
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
           path: |
             /tmp/bundle-dev.tar.gz
             /tmp/bundle.tar.gz
-            /tmp/bvup
-            /tmp/bundle/blockvisor/bin/nib
           retention-days: 7
+          overwrite: true
 
   deploy-dev:
     name: Deploy to Dev
@@ -90,11 +89,10 @@ jobs:
       url: https://app.dev.nodexeus.io
     
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - name: Download artifacts for dev
+        uses: actions/download-artifact@v4
         with:
-          name: blockvisor-artifacts
-          path: ./artifacts
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
 
       - name: Upload to B2 Dev Bucket
         uses: yamatt/backblaze-b2-upload-action@v7
@@ -102,7 +100,7 @@ jobs:
           key_id: ${{ secrets.B2_KEY_ID }}
           application_key: ${{ secrets.B2_APP_KEY }}
           bucket_name: ${{ secrets.B2_DEV_BUCKET }}
-          file_path: ./artifacts/bundle.tar.gz
+          file_path: ./artifacts/bundle-dev.tar.gz
           remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
 
   deploy-prod:
@@ -114,11 +112,10 @@ jobs:
       url: https://app.nodexeus.io
     
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - name: Download artifacts for production
+        uses: actions/download-artifact@v4
         with:
-          name: blockvisor-artifacts
-          path: ./artifacts
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
 
       - name: Upload to B2 Production Bucket
         uses: yamatt/backblaze-b2-upload-action@v7
