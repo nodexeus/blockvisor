@@ -1,0 +1,89 @@
+name: Release BV
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Get Version
+        run: echo GIT_VERSION=$(git describe --tags) >> $GITHUB_ENV
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: x86_64-unknown-linux-musl
+      - name: Setup packages
+        run: >
+          sudo apt -y install build-essential pkg-config libssl-dev cmake musl-tools pigz jq
+      - name: Install protoc
+        run: |
+          PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+          curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
+          unzip protoc-3.15.8-linux-x86_64.zip -d $HOME/.local
+          export PATH="$PATH:$HOME/.local/bin"
+
+      - name: Build bundle file
+        run: >
+          make bundle bundle-dev
+      - name: Publish Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          body_path: host_setup_guide.md
+          files: |
+            /tmp/bundle-dev.tar.gz
+            /tmp/bundle.tar.gz
+            /tmp/bvup
+            /tmp/bundle/blockvisor/bin/nib
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            /tmp/bundle-dev.tar.gz
+            /tmp/bundle.tar.gz
+            /tmp/bvup
+            /tmp/bundle/blockvisor/bin/nib
+          generate_release_notes: true
+          body: |
+            Blockvisor version ${{ steps.get_version.outputs.VERSION }}
+            
+            ## Changes
+            Automated build from the latest blockvisor code.
+
+      # - name: Generate GitHub App Token
+      #   id: generate-token
+      #   uses: actions/create-github-app-token@v1
+      #   with:
+      #     app-id: ${{ secrets.BJ_PROTOCOLS_WORKFLOW_APP_ID }}
+      #     private-key: ${{ secrets.BJ_PROTOCOLS_APP_PK }}
+      #     owner: blockjoy
+      # - name: Dispatch BV Publish Workflow
+      #   id: dispatch-publish
+      #   env:
+      #     GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+      #   run: |
+      #     DEFAULT_BRANCH=$(gh api repos/blockjoy/deployer --jq '.default_branch')
+
+      #     gh workflow run bv-publish.yml \
+      #       --repo blockjoy/deployer \
+      #       --ref $DEFAULT_BRANCH \
+      #       -f tag_name=${{ github.ref_name }}
