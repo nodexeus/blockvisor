@@ -428,12 +428,9 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
                 fmt_opt(node_info.state.started_at.map(fmt_uptime))
             );
             let metrics = client.get_node_metrics(id).await?.into_inner();
-            println!(
-                "Protocol Status:     {}",
-                fmt_opt(metrics.protocol_status.map(|status| format!("{status:?}")))
-            );
             println!("Block height:   {}", fmt_opt(metrics.height));
             println!("Block age:      {}", fmt_opt(metrics.block_age));
+            println!("APR:            {}", fmt_opt(metrics.apr));
             println!("In consensus:   {}", fmt_opt(metrics.consensus));
             if !metrics.jobs.is_empty() {
                 println!("Jobs:");

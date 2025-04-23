@@ -402,7 +402,7 @@ async fn test_discovery_on_connection_error() -> Result<()> {
         api_config: ApiConfig {
             token: TokenGenerator::create_host(id, "1245456"),
             refresh_token: "any refresh token".to_string(),
-            blockjoy_api_url: "http://localhost:8091".to_string(),
+            nodexeus_api_url: "http://127.0.0.1:8091".to_string(),
         },
         iface: "bvbr0".to_string(),
         ..Default::default()
@@ -410,7 +410,7 @@ async fn test_discovery_on_connection_error() -> Result<()> {
     let config = SharedConfig::new(config, "/some/dir/conf.json".into());
     let connect_future = services::connect_with_discovery(&config, |config| async {
         let config = config.read().await;
-        if config.blockjoy_mqtt_url.is_none() {
+        if config.nodexeus_mqtt_url.is_none() {
             bail!("first try without urls")
         }
         Ok(config)
@@ -420,6 +420,6 @@ async fn test_discovery_on_connection_error() -> Result<()> {
         _ = server_future => {unreachable!()},
         res = connect_future => {res},
     }?;
-    assert_eq!("notification_url", &final_cfg.blockjoy_mqtt_url.unwrap());
+    assert_eq!("notification_url", &final_cfg.nodexeus_mqtt_url.unwrap());
     Ok(())
 }

@@ -37,6 +37,7 @@ pub struct Metric {
     pub block_age: Option<u64>,
     pub consensus: Option<bool>,
     pub protocol_status: Option<ProtocolStatus>,
+    pub apr: Option<f64>,
     pub jobs: JobsInfo,
 }
 
@@ -47,6 +48,7 @@ impl Metrics {
                 || m.block_age.is_some()
                 || m.consensus.is_some()
                 || m.protocol_status.is_some()
+                || m.apr.is_some()
                 || !m.jobs.is_empty()
         })
     }
@@ -123,6 +125,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 block_age: None,
                 consensus: None,
                 protocol_status,
+                apr: None,
                 jobs,
             })
         }
@@ -141,6 +144,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 block_age: None,
                 consensus: None,
                 protocol_status,
+                apr: None,
                 jobs,
             })
         }
@@ -157,6 +161,10 @@ pub async fn collect_metric<N: NodeConnection>(
                 true => timeout(babel_engine.consensus()).await.ok(),
                 false => None,
             };
+            let apr = match babel_engine.has_capability("apr") {
+                true => timeout(babel_engine.apr()).await.ok(),
+                false => None,
+            };
             let jobs = timeout(babel_engine.get_jobs())
                 .await
                 .ok()
@@ -167,6 +175,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 height,
                 block_age,
                 consensus,
+                apr,
                 // these are expected in every chain
                 protocol_status,
                 jobs,
@@ -248,6 +257,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     node_status: v
                         .protocol_status
                         .map(|protocol_status| protocol_status.into()),
+                    apr: v.apr,
                     jobs,
                 }
             })

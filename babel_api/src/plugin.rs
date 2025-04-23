@@ -22,6 +22,9 @@ pub trait Plugin {
     /// Returns the block age of the blockchain (in seconds).
     fn block_age(&self) -> Result<u64>;
 
+    /// Returns the APR (Annual Percentage Rate) of the node as a percentage value.
+    fn apr(&self) -> Result<f64>;
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example

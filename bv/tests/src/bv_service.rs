@@ -179,7 +179,7 @@ async fn test_bv_service_e2e() {
 
     blockvisord::nib_config::Config {
         token: api_key,
-        blockjoy_api_url: url.to_string(),
+        nodexeus_api_url: url.to_string(),
     }
     .save()
     .await

@@ -13,7 +13,7 @@ impl BvContext {
         Self {
             id: config.id,
             name: config.name,
-            url: config.api_config.blockjoy_api_url,
+            url: config.api_config.nodexeus_api_url,
             bridge: if !apptainer_config.unwrap_or(config.apptainer).host_network {
                 Some(config.iface)
             } else {

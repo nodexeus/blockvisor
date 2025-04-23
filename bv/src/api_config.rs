@@ -13,7 +13,7 @@ pub struct ApiConfig {
     /// The refresh token.
     pub refresh_token: String,
     /// API endpoint url
-    pub blockjoy_api_url: String,
+    pub nodexeus_api_url: String,
 }
 
 impl ApiConfig {
@@ -24,7 +24,7 @@ impl ApiConfig {
     pub async fn refresh_token(&mut self) -> Result<(), tonic::Status> {
         let resp = timeout(
             REFRESH_TOKEN_TIMEOUT,
-            request_refresh_token(&self.blockjoy_api_url, &self.token, &self.refresh_token),
+            request_refresh_token(&self.nodexeus_api_url, &self.token, &self.refresh_token),
         )
         .await
         .map_err(|_| {

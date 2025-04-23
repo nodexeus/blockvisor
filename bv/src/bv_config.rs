@@ -44,7 +44,7 @@ impl SharedConfig {
     }
 
     pub async fn set_mqtt_url(&self, mqtt_url: Option<String>) {
-        self.config.write().await.blockjoy_mqtt_url = mqtt_url;
+        self.config.write().await.nodexeus_mqtt_url = mqtt_url;
     }
 
     pub async fn token(&self) -> Result<AuthToken, tonic::Status> {
@@ -104,7 +104,7 @@ pub struct Config {
     #[serde(flatten)]
     pub api_config: ApiConfig,
     /// Url for mqtt broker to receive commands and updates from.
-    pub blockjoy_mqtt_url: Option<String>,
+    pub nodexeus_mqtt_url: Option<String>,
     /// Self update check interval - how often blockvisor shall check for new version of itself
     pub update_check_interval_secs: Option<u64>,
     /// Port to be used by blockvisor internal service

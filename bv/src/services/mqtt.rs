@@ -37,8 +37,8 @@ impl pal::ServiceConnector<MqttStream> for MqttConnector {
             let token = config.token().await?;
             let config = config.read().await;
             let url = config
-                .blockjoy_mqtt_url
-                .ok_or_else(|| anyhow!("missing blockjoy_mqtt_url"))?
+                .nodexeus_mqtt_url
+                .ok_or_else(|| anyhow!("missing nodexeus_mqtt_url"))?
                 .clone();
             let host_id = config.id;
             // parse url into host and port

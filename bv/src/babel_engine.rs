@@ -183,6 +183,11 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         self.on_plugin(|plugin| plugin.block_age()).await
     }
 
+    /// Returns the APR (Annual Percentage Rate) of the node as a percentage value.
+    pub async fn apr(&mut self) -> Result<f64> {
+        self.on_plugin(|plugin| plugin.apr()).await
+    }
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example

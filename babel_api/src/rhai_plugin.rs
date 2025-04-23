@@ -23,6 +23,19 @@ use std::path::PathBuf;
 use std::{path::Path, sync::Arc, time::Duration};
 use tracing::Level;
 
+/// GraphQL request type for Rhai
+#[derive(Debug, Deserialize)]
+pub struct BareGraphQLRequest {
+    pub url: String,
+    pub query: String,
+    #[serde(default)]
+    pub variables: Option<Map>,
+    #[serde(default)]
+    pub operation_name: Option<String>,
+    #[serde(default)]
+    pub headers: Vec<(String, String)>,
+}
+
 pub const PLUGIN_CONFIG_CONST_NAME: &str = "PLUGIN_CONFIG";
 pub const PLUGIN_CONFIG_FN_NAME: &str = "plugin_config";
 const INIT_FN_NAME: &str = "init";
@@ -197,6 +210,121 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
             into_rhai_result(
                 babel_engine
                     .run_rest(req, None)
+                    .map(DressedHttpResponse::from),
+            )
+        });
+        let babel_engine = engine.clone();
+        rhai_engine.register_fn("run_graphql", move |req: Dynamic, timeout: i64| {
+            let timeout = into_rhai_result(timeout.try_into().map_err(Error::new))?;
+            let graphql_req = match from_dynamic::<BareGraphQLRequest>(&req) {
+                Ok(req) => req,
+                Err(e) => return Err(Box::new(rhai::EvalAltResult::ErrorRuntime(
+                    format!("Failed to parse GraphQL request: {}", e).into(),
+                    rhai::Position::NONE
+                )))
+            };
+            
+            // Prepare headers with content-type
+            let mut rest_headers = Vec::new();
+            rest_headers.push(("Content-Type".to_string(), "application/json".to_string()));
+            rest_headers.push(("Accept".to_string(), "application/json".to_string()));
+            
+            // Add any custom headers
+            for (k, v) in &graphql_req.headers {
+                if k.to_lowercase() != "content-type" && k.to_lowercase() != "accept" {
+                    rest_headers.push((k.clone(), v.clone()));
+                }
+            }
+            
+            // For GraphQL GET requests, we need to encode the query directly in the URL
+            // The query parameter should be the raw query string, not JSON
+            let url = if graphql_req.url.contains('?') {
+                format!("{}&query={}", graphql_req.url, urlencoding::encode(&graphql_req.query))
+            } else {
+                format!("{}?query={}", graphql_req.url, urlencoding::encode(&graphql_req.query))
+            };
+            
+            // If we have variables, add them as a URL parameter
+            let url = if let Some(ref variables) = graphql_req.variables {
+                let vars_json = rhai::format_map_as_json(variables);
+                format!("{}&variables={}", url, urlencoding::encode(&vars_json))
+            } else {
+                url
+            };
+            
+            // If we have an operation name, add it as a URL parameter
+            let url = if let Some(ref operation_name) = graphql_req.operation_name {
+                format!("{}&operationName={}", url, urlencoding::encode(operation_name))
+            } else {
+                url
+            };
+            
+            let rest_req = RestRequest {
+                url,
+                headers: Some(rest_headers),
+            };
+            
+            // Use run_rest to execute the request
+            into_rhai_result(
+                babel_engine
+                    .run_rest(rest_req, Some(Duration::from_secs(timeout)))
+                    .map(DressedHttpResponse::from),
+            )
+        });
+        let babel_engine = engine.clone();
+        rhai_engine.register_fn("run_graphql", move |req: Dynamic| {
+            let graphql_req = match from_dynamic::<BareGraphQLRequest>(&req) {
+                Ok(req) => req,
+                Err(e) => return Err(Box::new(rhai::EvalAltResult::ErrorRuntime(
+                    format!("Failed to parse GraphQL request: {}", e).into(),
+                    rhai::Position::NONE
+                )))
+            };
+            
+            // Prepare headers with content-type
+            let mut rest_headers = Vec::new();
+            rest_headers.push(("Content-Type".to_string(), "application/json".to_string()));
+            rest_headers.push(("Accept".to_string(), "application/json".to_string()));
+            
+            // Add any custom headers
+            for (k, v) in &graphql_req.headers {
+                if k.to_lowercase() != "content-type" && k.to_lowercase() != "accept" {
+                    rest_headers.push((k.clone(), v.clone()));
+                }
+            }
+            
+            // For GraphQL GET requests, we need to encode the query directly in the URL
+            // The query parameter should be the raw query string, not JSON
+            let url = if graphql_req.url.contains('?') {
+                format!("{}&query={}", graphql_req.url, urlencoding::encode(&graphql_req.query))
+            } else {
+                format!("{}?query={}", graphql_req.url, urlencoding::encode(&graphql_req.query))
+            };
+            
+            // If we have variables, add them as a URL parameter
+            let url = if let Some(ref variables) = graphql_req.variables {
+                let vars_json = rhai::format_map_as_json(variables);
+                format!("{}&variables={}", url, urlencoding::encode(&vars_json))
+            } else {
+                url
+            };
+            
+            // If we have an operation name, add it as a URL parameter
+            let url = if let Some(ref operation_name) = graphql_req.operation_name {
+                format!("{}&operationName={}", url, urlencoding::encode(operation_name))
+            } else {
+                url
+            };
+            
+            let rest_req = RestRequest {
+                url,
+                headers: Some(rest_headers),
+            };
+            
+            // Use run_rest to execute the request
+            into_rhai_result(
+                babel_engine
+                    .run_rest(rest_req, None)
                     .map(DressedHttpResponse::from),
             )
         });
@@ -683,6 +811,13 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         Ok(self.call_fn::<_, i64>("block_age", ())?.try_into()?)
     }
 
+    fn apr(&self) -> Result<f64> {
+        // Get the APR value as a string from the Rhai script
+        let apr_str: String = self.call_fn("apr", ())?;
+        // Convert the string to a float
+        Ok(apr_str.parse::<f64>()?)
+    }
+
     fn name(&self) -> Result<String> {
         self.call_fn("name", ())
     }
@@ -1059,6 +1194,10 @@ mod tests {
             18
         }
 
+        fn apr() {
+            5.25
+        }
+
         fn name() {
             "block name"
         }
@@ -1095,6 +1234,7 @@ mod tests {
         plugin.upload()?;
         assert_eq!(77, plugin.height()?);
         assert_eq!(18, plugin.block_age()?);
+        assert_eq!(5.25, plugin.apr()?);
         assert_eq!("block name", &plugin.name()?);
         assert_eq!("node address", &plugin.address()?);
         assert!(plugin.consensus()?);
@@ -1477,7 +1617,11 @@ mod tests {
         let mut babel = MockBabelEngine::new();
         babel.expect_load_config().returning(|| bail!("no config"));
         babel.expect_save_config().once().returning(|_| Ok(()));
-        babel.expect_node_env().returning(Default::default);
+        babel.expect_node_env().returning(|| NodeEnv {
+            node_id: "node-id".to_string(),
+            node_name: "node name".to_string(),
+            ..Default::default()
+        });
         babel.expect_get_jobs().once().returning(|| {
             Ok(HashMap::from_iter([(
                 "download".to_string(),
@@ -1643,7 +1787,11 @@ mod tests {
         let mut babel = MockBabelEngine::new();
         babel.expect_load_config().returning(|| bail!("no config"));
         babel.expect_save_config().once().returning(|_| Ok(()));
-        babel.expect_node_env().returning(Default::default);
+        babel.expect_node_env().returning(|| NodeEnv {
+            node_id: "node-id".to_string(),
+            node_name: "node name".to_string(),
+            ..Default::default()
+        });
         babel
             .expect_run_sh()
             .with(predicate::eq("echo pre_upload_cmd"), predicate::eq(None))

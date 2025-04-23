@@ -95,7 +95,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
             bail!("BV {THIS_VERSION} is on a blacklist - can't install")
         }
         self.check_requirements().await.with_context(|| {
-            format!("Host doesn't meet the requirements, see [Host Setup Guide]('https://github.com/blockjoy/blockvisor/releases/tag/{THIS_VERSION}') for more details.")
+            format!("Host doesn't meet the requirements, see [Host Setup Guide]('https://github.com/nodexeus/blockvisor/releases/tag/{THIS_VERSION}') for more details.")
         })?;
         info!("installing BV {THIS_VERSION}...");
 

@@ -84,9 +84,9 @@ impl TestEnv {
             api_config: ApiConfig {
                 token: "token".to_owned(),
                 refresh_token: "fresh boii".to_owned(),
-                blockjoy_api_url: "http://localhost:8070".to_owned(),
+                nodexeus_api_url: "http://127.0.0.1:8070".to_owned(),
             },
-            blockjoy_mqtt_url: Some("mqtt://localhost:1873".to_string()),
+            nodexeus_mqtt_url: Some("mqtt://127.0.0.1:1873".to_string()),
             blockvisor_port: 0, // 0 has special meaning - pick first free port
             iface: "bvbr0".to_string(),
             ..Default::default()

@@ -153,7 +153,7 @@ pub async fn connect_to_api_service<T, I>(
 where
     I: Fn(Channel, ApiInterceptor) -> T,
 {
-    let url = config.read().await.api_config.blockjoy_api_url;
+    let url = config.read().await.api_config.nodexeus_api_url;
     let endpoint = Endpoint::from_str(&url)
         .map_err(|err| Status::internal(format!("{err:#}")))?
         .connect_timeout(DEFAULT_API_CONNECT_TIMEOUT);
@@ -226,7 +226,7 @@ impl Interceptor for AuthToken {
 
 impl AuthToken {
     pub fn expired(token: &str) -> Result<bool, Status> {
-        let margin = chrono::Duration::minutes(1);
+        let margin = chrono::Duration::seconds(30);
         Self::expiration(token).map(|exp| exp < chrono::Utc::now() - margin)
     }
 
