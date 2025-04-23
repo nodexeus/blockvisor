@@ -73,7 +73,7 @@ jobs:
       - name: Upload artifacts for later stages
         uses: actions/upload-artifact@v4
         with:
-          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
+          name: blockvisor-artifacts-${{ steps.get_version.outputs.VERSION }}
           path: |
             /tmp/bundle-dev.tar.gz
             /tmp/bundle.tar.gz
