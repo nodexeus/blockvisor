@@ -145,8 +145,12 @@ async fn load_jobs(
                     info!("{name} - Active(PID: {pid})");
                     JobState::Active { pid, start_time }
                 } else {
-                    let (status, timestamp) = jobs::load_status(&job_dir)
-                        .unwrap_or((JobStatus::Running, SystemTime::now()));
+                    let (status, timestamp) = jobs::load_status(&job_dir).unwrap_or((
+                        JobStatus::Pending {
+                            waiting_for: Default::default(),
+                        },
+                        SystemTime::now(),
+                    ));
                     info!("{name} - Inactive(status: {status:?})");
                     JobState::Inactive { status, timestamp }
                 };
@@ -237,7 +241,9 @@ async fn load_jobs(
                                 .and_then(|s| {
                                     serde_json::from_str::<JobStatus>(&s).map_err(Into::into)
                                 })
-                                .unwrap_or(JobStatus::Running);
+                                .unwrap_or(JobStatus::Pending {
+                                    waiting_for: Default::default(),
+                                });
                             info!("{name} - Inactive(status: {status:?})");
                             JobState::Inactive { status, timestamp }
                         };
@@ -1269,7 +1275,9 @@ mod tests {
                 crashed_job_dir,
                 config.clone(),
                 JobState::Inactive {
-                    status: JobStatus::Running,
+                    status: JobStatus::Pending {
+                        waiting_for: Default::default()
+                    },
                     timestamp: SystemTime::UNIX_EPOCH
                 }
             ),
