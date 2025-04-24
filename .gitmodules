@@ -1,3 +1,4 @@
 [submodule "proto"]
 	path = bv/proto
 	url = git@github.com:nodexeus/protobufs.git
+        branch = main
