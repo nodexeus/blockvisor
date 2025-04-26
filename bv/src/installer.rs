@@ -82,7 +82,7 @@ pub struct Installer<T, S> {
 impl<T: Timer, S: BvService> Installer<T, S> {
     pub async fn new(timer: T, bv_service: S, bv_root: &Path) -> Result<Self> {
         let config = Config::load(bv_root).await?;
-        let channel = Channel::from_shared(format!("http://localhost:{}", config.blockvisor_port))?
+        let channel = Channel::from_shared(format!("http://127.0.0.1:{}", config.blockvisor_port))?
             .connect_timeout(BV_CONNECT_TIMEOUT)
             .connect_lazy();
         Ok(Self::internal_new(
@@ -339,11 +339,39 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     async fn restart_and_reenable_blockvisor(&self) -> Result<()> {
-        self.bv_service.reload().await?;
-        self.bv_service.stop().await?;
-        self.backup_and_migrate_bv_data().await?;
-        self.bv_service.start().await?;
-        self.bv_service.enable().await?;
+        info!("Reloading blockvisor service configuration...");
+        match self.bv_service.reload().await {
+            Ok(_) => info!("Successfully reloaded service configuration"),
+            Err(e) => warn!("Service reload had an issue: {:#}", e),
+        }
+    
+        info!("Stopping blockvisor service...");
+        self.bv_service.stop().await
+            .with_context(|| "Failed to stop blockvisor service")?;
+        info!("Blockvisor service stopped successfully");
+    
+        // Add a delay to ensure the service has fully stopped
+        info!("Waiting for service to fully terminate...");
+        self.timer.sleep(Duration::from_secs(2)).await;
+    
+        info!("Backing up and migrating blockvisor data...");
+        self.backup_and_migrate_bv_data().await
+            .with_context(|| "Failed to backup and migrate blockvisor data")?;
+        info!("Data backup and migration completed successfully");
+    
+    // Add another delay before starting the service
+        self.timer.sleep(Duration::from_secs(1)).await;
+    
+        info!("Starting blockvisor service with new version...");
+        self.bv_service.start().await
+            .with_context(|| "Failed to start blockvisor service with new version")?;
+        info!("Blockvisor service started successfully");
+    
+        info!("Enabling blockvisor service...");
+        self.bv_service.enable().await
+            .with_context(|| "Failed to enable blockvisor service")?;
+        info!("Blockvisor service enabled successfully");
+    
         Ok(())
     }
 
@@ -398,24 +426,68 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     }
 
     async fn rollback(&self) -> Result<()> {
+        info!("Starting rollback process due to installation failure");
         // stop broken version first
+        info!("Stopping broken installation...");
         self.bv_service
             .stop()
             .await
             .with_context(|| "failed to stop broken installation - can't continue rollback")?;
+        info!("Successfully stopped broken installation");
+
+        // Add a delay to ensure the service has fully stopped
+        info!("Waiting for service to fully terminate...");
+        self.timer.sleep(Duration::from_secs(2));
+    
+        info!("Rolling back blockvisor data...");
         self.rollback_bv_data()
             .with_context(|| "failed to rollback BV data")?;
+        info!("Successfully rolled back blockvisor data");
+
+        // Release the lock file if it exists to prevent "already locked" errors
+        let lock_path = self.paths.bv_root.join(".lock");
+        if lock_path.exists() {
+            info!("Found existing lock file, removing it before running backup installer");
+            match fs::remove_file(&lock_path) {
+                Ok(_) => info!("Successfully removed lock file"),
+                Err(e) => warn!("Failed to remove lock file: {:#}, continuing anyway", e),
+            }
+        }
+
         let backup_installer = self.paths.backup.join(INSTALLER_BIN);
         ensure!(backup_installer.exists(), "no backup found");
-        let status_code = Command::new(backup_installer)
-            .status()
-            .with_context(|| "failed to launch backup installer")?
-            .code()
+
+        info!("Running backup installer: {}", backup_installer.display());
+        let output = Command::new(&backup_installer)
+            .output()
+            .with_context(|| "failed to launch backup installer")?;
+
+        let status_code = output.status.code()
             .ok_or_else(|| anyhow!("failed to get backup installer exit status code"))?;
+
+        // Log stdout and stderr for debugging
+        if !output.stdout.is_empty() {
+            info!("Backup installer stdout: {}", String::from_utf8_lossy(&output.stdout));
+        }
+        if !output.stderr.is_empty() {
+            warn!("Backup installer stderr: {}", String::from_utf8_lossy(&output.stderr));
+        }
+    
         ensure!(
             status_code == 0,
             "backup installer failed with exit code {status_code}"
         );
+    
+        info!("Rollback completed successfully");
+        // let status_code = Command::new(backup_installer)
+        //     .status()
+        //     .with_context(|| "failed to launch backup installer")?
+        //     .code()
+        //     .ok_or_else(|| anyhow!("failed to get backup installer exit status code"))?;
+        // ensure!(
+        //     status_code == 0,
+        //     "backup installer failed with exit code {status_code}"
+        // );
         Ok(())
     }
 
