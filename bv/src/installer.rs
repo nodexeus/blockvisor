@@ -352,7 +352,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
     
         // Add a delay to ensure the service has fully stopped
         info!("Waiting for service to fully terminate...");
-        self.timer.sleep(Duration::from_secs(2)).await;
+        self.timer.sleep(Duration::from_secs(2));
     
         info!("Backing up and migrating blockvisor data...");
         self.backup_and_migrate_bv_data().await
@@ -360,7 +360,7 @@ impl<T: Timer, S: BvService> Installer<T, S> {
         info!("Data backup and migration completed successfully");
     
     // Add another delay before starting the service
-        self.timer.sleep(Duration::from_secs(1)).await;
+        self.timer.sleep(Duration::from_secs(1));
     
         info!("Starting blockvisor service with new version...");
         self.bv_service.start().await
