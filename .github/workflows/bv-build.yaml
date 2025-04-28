@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     name: Build Release
-    runs-on: ubuntu-latest
+    runs-on: blockvisor
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
@@ -83,7 +83,7 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: blockvisor
     environment:
       name: development
       url: https://app.dev.nodexeus.io
@@ -106,7 +106,7 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     needs: [build, deploy-dev]
-    runs-on: ubuntu-latest
+    runs-on: blockvisor
     environment:
       name: production
       url: https://app.nodexeus.io
