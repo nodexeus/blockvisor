@@ -180,9 +180,10 @@ pub async fn collect_metric<N: NodeConnection>(
 
             let jailed = match babel_engine.has_capability("jailed") {
                 true => timeout(babel_engine.jailed()).await
-                    .ok()
-                    .and_then(|result| result.ok())
-                    .flatten(),
+                    .and_then(|result| match result {
+                        Ok(opt_bool) => opt_bool,
+                        Err(_) => None,
+                    }),
                 false => None,
             };
             let jailed_reason = match babel_engine.has_capability("jailed_reason") {
