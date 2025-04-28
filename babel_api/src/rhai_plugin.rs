@@ -819,7 +819,7 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
     }
 
     fn jailed(&self) -> Result<Option<bool>> {
-        Ok(self.call_fn::<_, Option<bool>>("jailed", ())?)
+        self.call_fn("jailed", ())
     }
 
     fn jailed_reason(&self) -> Result<String> {

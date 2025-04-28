@@ -26,7 +26,7 @@ pub trait Plugin {
     fn apr(&self) -> Result<f64>;
 
     /// Returns the jailed status of the node.
-    fn jailed(&self) -> Result<bool>;
+    fn jailed(&self) -> Result<Option<bool>>;
 
     /// Returns the jailed reason of the node.
     fn jailed_reason(&self) -> Result<String>;
