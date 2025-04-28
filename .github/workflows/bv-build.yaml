@@ -27,10 +27,9 @@ jobs:
         run: |
           VERSION=$(grep -A1 "\[workspace.package\]" Cargo.toml | grep "version" | cut -d '"' -f 2)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-      
-      # - name: Set Home Directory
-      #   run: |
-      #     echo "HOME=/" >> ${GITHUB_ENV}
+      - name: Set Home Directory
+        run: |
+          echo "HOME=/opt/actions-runner" >> ${GITHUB_ENV}
 
       - uses: actions-rs/toolchain@v1
         with:
