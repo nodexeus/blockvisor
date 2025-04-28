@@ -25,6 +25,12 @@ pub trait Plugin {
     /// Returns the APR (Annual Percentage Rate) of the node as a percentage value.
     fn apr(&self) -> Result<f64>;
 
+    /// Returns the jailed status of the node.
+    fn jailed(&self) -> Result<bool>;
+
+    /// Returns the jailed reason of the node.
+    fn jailed_reason(&self) -> Result<String>;
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example

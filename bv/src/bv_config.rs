@@ -9,7 +9,7 @@ use tokio::fs;
 use tracing::debug;
 
 pub const CONFIG_PATH: &str = "etc/blockvisor.json";
-pub const DEFAULT_BRIDGE_IFACE: &str = "bvbr0";
+pub const DEFAULT_BRIDGE_IFACE: &str = "br0";
 
 pub fn default_blockvisor_port() -> u16 {
     9001
@@ -339,14 +339,14 @@ pub mod tests {
     fn test_net_conf_from_json() {
         let json = r#"[
             {
-               "dev" : "bvbr0",
+               "dev" : "br0",
                "dst" : "default",
                "flags" : [],
                "gateway" : "192.69.220.81",
                "protocol" : "static"
             },
             {
-               "dev" : "bvbr0",
+               "dev" : "br0",
                "dst" : "192.69.220.80/28",
                "flags" : [],
                "prefsrc" : "192.69.220.82",
@@ -374,6 +374,6 @@ pub mod tests {
                 IpAddr::from(Ipv4Addr::from_str("192.69.220.94").unwrap()),
             ],
         };
-        assert_eq!(expected, NetConf::from_json(json, "bvbr0").unwrap());
+        assert_eq!(expected, NetConf::from_json(json, "br0").unwrap());
     }
 }

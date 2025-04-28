@@ -774,7 +774,7 @@ mod tests {
                 bv_service,
                 &self.tmp_root,
                 Config {
-                    iface: "bvbr0".to_string(),
+                    iface: "br0".to_string(),
                     ..Default::default()
                 },
                 test_channel(&self.tmp_root),

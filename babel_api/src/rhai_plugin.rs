@@ -818,6 +818,14 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         Ok(apr_str.parse::<f64>()?)
     }
 
+    fn jailed(&self) -> Result<Option<bool>> {
+        Ok(self.call_fn::<_, Option<bool>>("jailed", ())?)
+    }
+
+    fn jailed_reason(&self) -> Result<String> {
+        self.call_fn("jailed_reason", ())
+    }
+
     fn name(&self) -> Result<String> {
         self.call_fn("name", ())
     }
@@ -1198,6 +1206,14 @@ mod tests {
             5.25
         }
 
+        fn jailed() {
+            false
+        }
+
+        fn jailed_reason() {
+            ""
+        }
+
         fn name() {
             "block name"
         }
@@ -1231,10 +1247,11 @@ mod tests {
             .return_once(|| Ok(HashMap::default()));
         let mut plugin = RhaiPlugin::from_str(script, babel)?.clone(); // call clone() to make sure it works as well
         plugin.init()?;
-        plugin.upload()?;
         assert_eq!(77, plugin.height()?);
         assert_eq!(18, plugin.block_age()?);
         assert_eq!(5.25, plugin.apr()?);
+        assert_eq!(false, plugin.jailed()?);
+        assert_eq!("", &plugin.jailed_reason()?);
         assert_eq!("block name", &plugin.name()?);
         assert_eq!("node address", &plugin.address()?);
         assert!(plugin.consensus()?);
@@ -1707,7 +1724,7 @@ mod tests {
         assert_eq!(
             ProtocolStatus {
                 state: "delinquent".to_string(),
-                health: NodeHealth::Unhealthy
+                health: NodeHealth::Unhealthy,
             },
             plugin.protocol_status()?
         );

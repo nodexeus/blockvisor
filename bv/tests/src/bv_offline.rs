@@ -404,7 +404,7 @@ async fn test_discovery_on_connection_error() -> Result<()> {
             refresh_token: "any refresh token".to_string(),
             nodexeus_api_url: "http://127.0.0.1:8091".to_string(),
         },
-        iface: "bvbr0".to_string(),
+        iface: "br0".to_string(),
         ..Default::default()
     };
     let config = SharedConfig::new(config, "/some/dir/conf.json".into());

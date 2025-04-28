@@ -88,7 +88,7 @@ impl TestEnv {
             },
             nodexeus_mqtt_url: Some("mqtt://127.0.0.1:1873".to_string()),
             blockvisor_port: 0, // 0 has special meaning - pick first free port
-            iface: "bvbr0".to_string(),
+            iface: "br0".to_string(),
             ..Default::default()
         };
         Self::new_with_api_config(api_config).await

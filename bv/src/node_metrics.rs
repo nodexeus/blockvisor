@@ -39,6 +39,8 @@ pub struct Metric {
     pub protocol_status: Option<ProtocolStatus>,
     pub apr: Option<f64>,
     pub jobs: JobsInfo,
+    pub jailed: Option<bool>,
+    pub jailed_reason: Option<String>,
 }
 
 impl Metrics {
@@ -50,6 +52,8 @@ impl Metrics {
                 || m.protocol_status.is_some()
                 || m.apr.is_some()
                 || !m.jobs.is_empty()
+                || m.jailed.is_some()
+                || m.jailed_reason.is_some()
         })
     }
 }
@@ -127,6 +131,8 @@ pub async fn collect_metric<N: NodeConnection>(
                 protocol_status,
                 apr: None,
                 jobs,
+                jailed: None,
+                jailed_reason: None,
             })
         }
         Some(ProtocolStatus { state, .. })
@@ -146,6 +152,8 @@ pub async fn collect_metric<N: NodeConnection>(
                 protocol_status,
                 apr: None,
                 jobs,
+                jailed: None,
+                jailed_reason: None,
             })
         }
         _ => {
@@ -170,6 +178,15 @@ pub async fn collect_metric<N: NodeConnection>(
                 .ok()
                 .unwrap_or_default();
 
+            let jailed = match babel_engine.has_capability("jailed") {
+                true => timeout(babel_engine.jailed()).await.ok(),
+                false => None,
+            };
+            let jailed_reason = match babel_engine.has_capability("jailed_reason") {
+                true => timeout(babel_engine.jailed_reason()).await.ok(),
+                false => None,
+            };
+
             Some(Metric {
                 // these could be optional
                 height,
@@ -179,6 +196,8 @@ pub async fn collect_metric<N: NodeConnection>(
                 // these are expected in every chain
                 protocol_status,
                 jobs,
+                jailed,
+                jailed_reason,
             })
         }
     }
@@ -259,6 +278,8 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                         .map(|protocol_status| protocol_status.into()),
                     apr: v.apr,
                     jobs,
+                    jailed: v.jailed,
+                    jailed_reason: v.jailed_reason,
                 }
             })
             .collect();

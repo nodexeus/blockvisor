@@ -3,7 +3,7 @@
 ## Prerequisites
 
  - `bvup` tool (see assets bellow)
- - `PROVISION_TOKEN` obtained from BlockJoy portal
+ - `PROVISION_TOKEN` obtained from Nodexeus portal
 
 ### OS Requirements
 
@@ -37,7 +37,7 @@ In case of any issues, try to build apptainer [from sources](https://apptainer.o
 ### Network Setup
 
 BV uses Apptainer to run protocol nodes, it requires bridge interface to be configured. 
-If bridge interface name is different thant default `bvbr0`, then it must be explicitly passed to `bvup`
+If bridge interface name is different thant default `br0`, then it must be explicitly passed to `bvup`
 when provisioning(see `bvup --help` for more details).
 
 **Example:**
@@ -55,7 +55,7 @@ network:
       dhcp4: false
       dhcp6: false
   bridges:
-    bvbr0:
+    br0:
       interfaces: [ enp33s0 ]
       addresses: [ 50.115.46.98/28 ]
       gateway4: 50.115.46.97
@@ -71,7 +71,7 @@ network:
       dhcp6: no
 ```
 - Apply netplan configuration `netplan apply`
-- Verify that the bridge `bvbr0` is the primary interface
+- Verify that the bridge `br0` is the primary interface
 - Reboot the server. Verify the network configuration persists through reboot and the server is reachable.
 
 ## Host Provisioning with `bvup`
@@ -81,7 +81,7 @@ Once everything described above is configured, run `bvup` to provision host and 
 ```sh
 ./bvup <PROVISION_TOKEN> [--region REGION]
 ```
-where `<PROVISION_TOKEN>` is token obtained from BlockJoy portal.
+where `<PROVISION_TOKEN>` is token obtained from Nodexeus portal.
 
 See `bvup --help` for more details.
 

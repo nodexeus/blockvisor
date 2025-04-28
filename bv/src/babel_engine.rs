@@ -188,6 +188,16 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         self.on_plugin(|plugin| plugin.apr()).await
     }
 
+    /// Returns the jailed status of the node.
+    pub async fn jailed(&mut self) -> Result<Option<bool>> {
+        self.on_plugin(|plugin| plugin.jailed()).await
+    }
+
+    /// Returns the jailed reason of the node.
+    pub async fn jailed_reason(&mut self) -> Result<String> {
+        self.on_plugin(|plugin| plugin.jailed_reason()).await
+    }
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example
@@ -1310,7 +1320,7 @@ mod tests {
                 connection,
                 SharedConfig::new(
                     Config {
-                        iface: "bvbr0".to_string(),
+                        iface: "br0".to_string(),
                         ..Default::default()
                     },
                     tmp_root.clone(),

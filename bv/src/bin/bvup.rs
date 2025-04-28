@@ -33,7 +33,7 @@ pub struct CmdArgs {
     pub nodexeus_api_url: String,
 
     /// Network bridge interface name
-    #[clap(long = "ifa", default_value = "bvbr0")]
+    #[clap(long = "ifa", default_value = "br0")]
     pub bridge_ifa: String,
 
     /// Network gateway IP address
