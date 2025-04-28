@@ -28,9 +28,9 @@ jobs:
           VERSION=$(grep -A1 "\[workspace.package\]" Cargo.toml | grep "version" | cut -d '"' -f 2)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       
-      - name: Set Home Directory
-        run: |
-          echo "HOME=/" >> ${GITHUB_ENV}
+      # - name: Set Home Directory
+      #   run: |
+      #     echo "HOME=/" >> ${GITHUB_ENV}
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -40,7 +40,7 @@ jobs:
       
       - name: Setup packages
         run: >
-          sudo apt -y install build-essential pkg-config libssl-dev cmake musl-tools pigz jq
+          sudo apt -y install build-essential pkg-config libssl-dev cmake musl-tools pigz jq unzip
       
       - name: Install protoc
         run: |
