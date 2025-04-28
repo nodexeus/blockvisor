@@ -100,7 +100,7 @@ jobs:
           key_id: ${{ secrets.B2_KEY_ID }}
           application_key: ${{ secrets.B2_APP_KEY }}
           bucket_name: ${{ secrets.B2_DEV_BUCKET }}
-          file_path: ./bundle-dev.tar.gz
+          file_path: ./bundle.tar.gz
           remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
 
   deploy-prod:
