@@ -189,7 +189,7 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
     }
 
     /// Returns the jailed status of the node.
-    pub async fn jailed(&mut self) -> Result<Option<bool>> {
+    pub async fn jailed(&mut self) -> Result<bool> {
         self.on_plugin(|plugin| plugin.jailed()).await
     }
 

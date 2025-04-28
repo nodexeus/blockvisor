@@ -818,8 +818,9 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         Ok(apr_str.parse::<f64>()?)
     }
 
-    fn jailed(&self) -> Result<Option<bool>> {
-        self.call_fn("jailed", ())
+    fn jailed(&self) -> Result<bool> {
+        let jailed_bool: String = self.call_fn("jailed", ())?;
+        Ok(jailed_bool.parse::<bool>()?)
     }
 
     fn jailed_reason(&self) -> Result<String> {
