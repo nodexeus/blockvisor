@@ -41,6 +41,7 @@ pub struct Metric {
     pub jobs: JobsInfo,
     pub jailed: Option<bool>,
     pub jailed_reason: Option<String>,
+    pub sqd_name: Option<String>,
 }
 
 impl Metrics {
@@ -54,6 +55,7 @@ impl Metrics {
                 || !m.jobs.is_empty()
                 || m.jailed.is_some()
                 || m.jailed_reason.is_some()
+                || m.sqd_name.is_some()
         })
     }
 }
@@ -133,6 +135,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 jobs,
                 jailed: None,
                 jailed_reason: None,
+                sqd_name: None,
             })
         }
         Some(ProtocolStatus { state, .. })
@@ -154,6 +157,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 jobs,
                 jailed: None,
                 jailed_reason: None,
+                sqd_name: None,
             })
         }
         _ => {
@@ -186,7 +190,10 @@ pub async fn collect_metric<N: NodeConnection>(
                 true => timeout(babel_engine.jailed_reason()).await.ok(),
                 false => None,
             };
-
+            let sqd_name = match babel_engine.has_capability("sqd_name") {
+                true => timeout(babel_engine.sqd_name()).await.ok(),
+                false => None,
+            };
             Some(Metric {
                 // these could be optional
                 height,
@@ -198,6 +205,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 jobs,
                 jailed,
                 jailed_reason,
+                sqd_name,
             })
         }
     }
@@ -270,7 +278,6 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     .collect();
                 pb::NodeMetrics {
                     node_id: k.to_string(),
-                    node_name: v.name,
                     height: v.height,
                     block_age: v.block_age,
                     consensus: v.consensus,
@@ -281,6 +288,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     jobs,
                     jailed: v.jailed,
                     jailed_reason: v.jailed_reason,
+                    sqd_name: v.sqd_name,
                 }
             })
             .collect();

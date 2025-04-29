@@ -31,6 +31,9 @@ pub trait Plugin {
     /// Returns the jailed reason of the node.
     fn jailed_reason(&self) -> Result<String>;
 
+    /// Returns the SQD name of the node.
+    fn sqd_name(&self) -> Result<String>;
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example

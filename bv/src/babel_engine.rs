@@ -198,6 +198,11 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         self.on_plugin(|plugin| plugin.jailed_reason()).await
     }
 
+    /// Returns the SQD name of the node.
+    pub async fn sqd_name(&mut self) -> Result<String> {
+        self.on_plugin(|plugin| plugin.sqd_name()).await
+    }
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example

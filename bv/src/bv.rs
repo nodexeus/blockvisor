@@ -433,6 +433,7 @@ pub async fn process_node_command(bv_url: String, command: NodeCommand) -> Resul
             println!("APR:            {}", fmt_opt(metrics.apr));
             println!("Jailed:         {}", fmt_opt(metrics.jailed));
             println!("Jailed reason:  {}", fmt_opt(metrics.jailed_reason));
+            println!("SQD name:       {}", fmt_opt(metrics.sqd_name));
             println!("In consensus:   {}", fmt_opt(metrics.consensus));
             if !metrics.jobs.is_empty() {
                 println!("Jobs:");

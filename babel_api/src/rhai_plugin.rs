@@ -827,6 +827,10 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         self.call_fn("jailed_reason", ())
     }
 
+    fn sqd_name(&self) -> Result<String> {
+        self.call_fn("sqd_name", ())
+    }
+
     fn name(&self) -> Result<String> {
         self.call_fn("name", ())
     }
@@ -1215,6 +1219,10 @@ mod tests {
             ""
         }
 
+        fn sqd_name() {
+            "sqd name"
+        }
+
         fn name() {
             "block name"
         }
@@ -1253,6 +1261,7 @@ mod tests {
         assert_eq!(5.25, plugin.apr()?);
         assert_eq!(false, plugin.jailed()?);
         assert_eq!("", &plugin.jailed_reason()?);
+        assert_eq!("sqd name", &plugin.sqd_name()?);
         assert_eq!("block name", &plugin.name()?);
         assert_eq!("node address", &plugin.address()?);
         assert!(plugin.consensus()?);
