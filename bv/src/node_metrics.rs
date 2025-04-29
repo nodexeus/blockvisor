@@ -38,7 +38,7 @@ pub struct Metric {
     pub consensus: Option<bool>,
     pub protocol_status: Option<ProtocolStatus>,
     pub apr: Option<f64>,
-    pub node_name: Option<String>,
+    pub name: Option<String>,
     pub jobs: JobsInfo,
     pub jailed: Option<bool>,
     pub jailed_reason: Option<String>,
@@ -49,7 +49,7 @@ impl Metrics {
         self.0.values().any(|m| {
             m.height.is_some()
                 || m.block_age.is_some()
-                || m.node_name.is_some()
+                || m.name.is_some()
                 || m.consensus.is_some()
                 || m.protocol_status.is_some()
                 || m.apr.is_some()
@@ -132,7 +132,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 consensus: None,
                 protocol_status,
                 apr: None,
-                node_name: None,
+                name: None,
                 jobs,
                 jailed: None,
                 jailed_reason: None,
@@ -154,7 +154,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 consensus: None,
                 protocol_status,
                 apr: None,
-                node_name: None,
+                name: None,
                 jobs,
                 jailed: None,
                 jailed_reason: None,
@@ -177,7 +177,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 true => timeout(babel_engine.apr()).await.ok(),
                 false => None,
             };
-            let node_name = match babel_engine.has_capability("name") {
+            let name = match babel_engine.has_capability("name") {
                 true => timeout(babel_engine.name()).await.ok(),
                 false => None,
             };
@@ -203,7 +203,7 @@ pub async fn collect_metric<N: NodeConnection>(
                 apr,
                 // these are expected in every chain
                 protocol_status,
-                node_name,
+                name,
                 jobs,
                 jailed,
                 jailed_reason,
@@ -279,7 +279,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     .collect();
                 pb::NodeMetrics {
                     node_id: k.to_string(),
-                    node_name: v.name,
+                    name: v.name,
                     height: v.height,
                     block_age: v.block_age,
                     consensus: v.consensus,
@@ -287,7 +287,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                         .protocol_status
                         .map(|protocol_status| protocol_status.into()),
                     apr: v.apr,
-                    node_name: v.node_name,
+                    name: v.name,
                     jobs,
                     jailed: v.jailed,
                     jailed_reason: v.jailed_reason,
