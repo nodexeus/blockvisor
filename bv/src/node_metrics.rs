@@ -270,6 +270,7 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     .collect();
                 pb::NodeMetrics {
                     node_id: k.to_string(),
+                    node_name: v.name,
                     height: v.height,
                     block_age: v.block_age,
                     consensus: v.consensus,
