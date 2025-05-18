@@ -208,7 +208,7 @@ pub enum NodeCommand {
     },
 
     /// Manage jobs on given node.
-    #[clap(alias = "j")]
+    #[clap(short = "j")]
     Job {
         #[clap(subcommand)]
         command: JobCommand,
@@ -275,10 +275,10 @@ pub enum JobCommand {
         /// Job name. Get all jobs logs if not specified.
         name: Option<String>,
         /// Output the last N lines.
-        #[clap(long, short, alias = "n", default_value = "50")]
+        #[clap(long, short = 'n', default_value = "50")]
         lines: usize,
         /// Follow logs.
-        #[clap(long, short, alias = "f", default_value = "false")]
+        #[clap(long, short = 'f', default_value = "false")]
         follow: bool,
     },
 }
@@ -286,15 +286,15 @@ pub enum JobCommand {
 #[derive(Subcommand)]
 pub enum HostCommand {
     /// Collect host system information
-    #[clap(alias = "i")]
+    #[clap(short = "i")]
     Info,
 
     /// Update host system information record in API
-    #[clap(alias = "u")]
+    #[clap(short = "u")]
     Update,
 
     /// Collect metrics about the current host
-    #[clap(alias = "m")]
+    #[clap(short = "m")]
     Metrics,
 }
 
@@ -316,7 +316,7 @@ pub enum ProtocolCommand {
 #[derive(Subcommand)]
 pub enum ClusterCommand {
     /// Show host cluster information
-    #[clap(alias = "s")]
+    #[clap(short = "s")]
     Status {},
 }
 
