@@ -1168,6 +1168,23 @@ mod tests {
             self.engine.run_sh("consensus", None)?;
             Ok(true)
         }
+        fn apr(&self) -> Result<f64> {
+            self.engine.run_sh("apr", None)?;
+            Ok(1.1)
+        }
+        fn jailed(&self) -> Result<bool> {
+            self.engine.run_sh("jailed", None)?;
+            Ok(true)
+        }
+        fn jailed_reason(&self) -> Result<String> {
+            self.engine.run_sh("jailed_reason", None)?;
+            Ok(self.engine.run_sh("dummy reason", None)?.stdout)
+        }
+        fn sqd_name(&self) -> Result<String> {
+            self.engine.run_sh("sqd_name", None)?;
+            Ok(self.engine.run_sh("dummy name", None)?.stdout)
+        }
+
         fn protocol_status(&self) -> Result<ProtocolStatus> {
             self.engine.run_sh("protocol_status", None)?;
             Ok(ProtocolStatus {
