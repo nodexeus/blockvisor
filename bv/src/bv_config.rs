@@ -266,7 +266,7 @@ impl NetConf {
         Self::from_json(&run_cmd("ip", ["--json", "route"]).await?, ifa_name)
     }
 
-    fn from_json(json: &str, ifa_name: &str) -> Result<Self> {
+    pub fn from_json(json: &str, ifa_name: &str) -> Result<Self> {
         debug!("Starting network detection for interface: {}", ifa_name);
         
         let routes = serde_json::from_str::<Vec<IpRoute>>(json)
@@ -1730,6 +1730,631 @@ pub mod tests {
         assert!(error_chain.contains("Available interfaces: [eth0]"));
     }
 
+    // ========== Real-World Network Configuration Test Cases ==========
+
+    #[test]
+    fn test_real_world_aws_ec2_classic() {
+        // Test case: AWS EC2 Classic network configuration
+        // Gateway is typically in a different subnet than the instance
+        // Based on actual AWS EC2 Classic routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.1.0/24",
+               "flags" : [],
+               "prefsrc" : "10.0.1.45",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "169.254.169.254/32",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.0.1.45").unwrap()));
+        assert_eq!(result.prefix, 24);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // Should have 253 available IPs (254 usable - host)
+        // Gateway is not in the subnet so it doesn't reduce available count
+        assert_eq!(result.available_ips.len(), 253);
+        
+        // Verify expected range
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.1.1").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.1.44").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.1.46").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.1.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_aws_vpc() {
+        // Test case: AWS VPC network configuration
+        // Based on actual AWS VPC routing table with NAT gateway
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "172.31.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "172.31.32.0/20",
+               "flags" : [],
+               "prefsrc" : "172.31.35.142",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "169.254.169.254/32",
+               "flags" : [],
+               "gateway" : "172.31.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("172.31.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("172.31.35.142").unwrap()));
+        assert_eq!(result.prefix, 20);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // /20 subnet has 4094 usable IPs (4096 - network - broadcast)
+        // Minus 1 for host = 4093 available IPs (gateway is outside subnet)
+        assert_eq!(result.available_ips.len(), 4093);
+        
+        // Verify some expected IPs are available
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.31.32.1").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.31.35.141").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.31.35.143").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.31.47.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_gcp_compute_engine() {
+        // Test case: Google Cloud Platform Compute Engine network configuration
+        // Based on actual GCP VM routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "10.128.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.128.0.0/20",
+               "flags" : [],
+               "prefsrc" : "10.128.0.2",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "169.254.169.254/32",
+               "flags" : [],
+               "gateway" : "10.128.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.128.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.128.0.2").unwrap()));
+        assert_eq!(result.prefix, 20);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // /20 subnet has 4094 usable IPs (4096 - network - broadcast)
+        // Minus host and gateway = 4092 available IPs (gateway is in same subnet)
+        assert_eq!(result.available_ips.len(), 4092);
+        
+        // Verify expected range (excluding .1 gateway and .2 host)
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.128.0.3").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.128.15.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_azure_vm() {
+        // Test case: Microsoft Azure VM network configuration
+        // Based on actual Azure VM routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.0.0/24",
+               "flags" : [],
+               "prefsrc" : "10.0.0.4",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "168.63.129.16/32",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "169.254.169.254/32",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.4").unwrap()));
+        assert_eq!(result.prefix, 24);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // Should have 252 available IPs (254 usable - host - gateway)
+        assert_eq!(result.available_ips.len(), 252);
+        
+        // Verify expected range (excluding .1 gateway and .4 host)
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.0.2").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.0.3").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.0.5").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.0.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_docker_bridge_network() {
+        // Test case: Docker bridge network configuration
+        // Based on actual Docker bridge network routing
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "192.168.1.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "docker0",
+               "dst" : "172.17.0.0/16",
+               "flags" : [],
+               "prefsrc" : "172.17.0.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "br-abc123",
+               "dst" : "172.18.0.0/16",
+               "flags" : [],
+               "prefsrc" : "172.18.0.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "192.168.1.0/24",
+               "flags" : [],
+               "prefsrc" : "192.168.1.100",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]"#;
+        
+        // Test with Docker bridge interface
+        let result = NetConf::from_json(json, "docker0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("192.168.1.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("172.17.0.1").unwrap()));
+        assert_eq!(result.prefix, 16);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // /16 subnet has 65534 usable IPs (65536 - network - broadcast)
+        // Minus 1 for host = 65533 available IPs (gateway is outside subnet)
+        assert_eq!(result.available_ips.len(), 65533);
+        
+        // Verify expected range
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.17.0.2").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.17.255.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_kubernetes_pod_network() {
+        // Test case: Kubernetes pod network configuration (Flannel/Calico style)
+        // Based on actual Kubernetes node routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "cni0",
+               "dst" : "10.244.0.0/24",
+               "flags" : [],
+               "prefsrc" : "10.244.0.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "flannel.1",
+               "dst" : "10.244.1.0/24",
+               "flags" : [],
+               "gateway" : "10.244.1.0",
+               "protocol" : "static",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.0.0/24",
+               "flags" : [],
+               "prefsrc" : "10.0.0.10",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]"#;
+        
+        // Test with CNI bridge interface
+        let result = NetConf::from_json(json, "cni0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.244.0.1").unwrap()));
+        assert_eq!(result.prefix, 24);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // Should have 253 available IPs (254 usable - host)
+        // Gateway is outside subnet so doesn't reduce count
+        assert_eq!(result.available_ips.len(), 253);
+        
+        // Verify expected range (excluding .1 host)
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.244.0.2").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.244.0.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_openvpn_server() {
+        // Test case: OpenVPN server network configuration
+        // Based on actual OpenVPN server routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "192.168.1.1",
+               "protocol" : "static",
+               "scope" : "global"
+            },
+            {
+               "dev" : "tun0",
+               "dst" : "10.8.0.0/24",
+               "flags" : [],
+               "prefsrc" : "10.8.0.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "192.168.1.0/24",
+               "flags" : [],
+               "prefsrc" : "192.168.1.50",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]"#;
+        
+        // Test with VPN tunnel interface
+        let result = NetConf::from_json(json, "tun0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("192.168.1.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.8.0.1").unwrap()));
+        assert_eq!(result.prefix, 24);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // Should have 253 available IPs (254 usable - host)
+        // Gateway is outside subnet so doesn't reduce count
+        assert_eq!(result.available_ips.len(), 253);
+        
+        // Verify expected range (excluding .1 host)
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.8.0.2").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.8.0.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_complex_multi_interface_routing() {
+        // Test case: Complex routing scenario with multiple interfaces and routes
+        // Based on actual enterprise server with multiple network interfaces
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.0.0/24",
+               "flags" : [],
+               "prefsrc" : "10.0.0.100",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth1",
+               "dst" : "192.168.10.0/24",
+               "flags" : [],
+               "prefsrc" : "192.168.10.50",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "br0",
+               "dst" : "172.16.0.0/16",
+               "flags" : [],
+               "prefsrc" : "172.16.1.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "docker0",
+               "dst" : "172.17.0.0/16",
+               "flags" : [],
+               "prefsrc" : "172.17.0.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "virbr0",
+               "dst" : "192.168.122.0/24",
+               "flags" : [],
+               "prefsrc" : "192.168.122.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]"#;
+        
+        // Test with primary bridge interface (br0)
+        let result_br0 = NetConf::from_json(json, "br0").unwrap();
+        
+        assert_eq!(result_br0.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result_br0.host_ip, IpAddr::from(Ipv4Addr::from_str("172.16.1.1").unwrap()));
+        assert_eq!(result_br0.prefix, 16);
+        
+        // /16 subnet has 65534 usable IPs, minus 1 for host = 65533 available
+        // Gateway is outside subnet so doesn't reduce count
+        assert_eq!(result_br0.available_ips.len(), 65533);
+        
+        // Test with secondary interface (eth1)
+        let result_eth1 = NetConf::from_json(json, "eth1").unwrap();
+        
+        assert_eq!(result_eth1.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result_eth1.host_ip, IpAddr::from(Ipv4Addr::from_str("192.168.10.50").unwrap()));
+        assert_eq!(result_eth1.prefix, 24);
+        
+        // Should have 253 available IPs (254 usable - host)
+        // Gateway is outside subnet so doesn't reduce count
+        assert_eq!(result_eth1.available_ips.len(), 253);
+        
+        // Verify both exclude their respective host IPs and the same gateway
+        assert!(!result_br0.available_ips.contains(&result_br0.host_ip));
+        assert!(!result_br0.available_ips.contains(&result_br0.gateway_ip));
+        assert!(!result_eth1.available_ips.contains(&result_eth1.host_ip));
+        assert!(!result_eth1.available_ips.contains(&result_eth1.gateway_ip));
+    }
+
+    #[test]
+    fn test_real_world_cloud_nat_gateway() {
+        // Test case: Cloud environment with NAT gateway in different subnet
+        // Common in AWS/GCP/Azure when using NAT gateways for private subnets
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.2.0/24",
+               "flags" : [],
+               "prefsrc" : "10.0.2.15",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "10.0.0.0/16",
+               "flags" : [],
+               "gateway" : "10.0.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("10.0.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("10.0.2.15").unwrap()));
+        assert_eq!(result.prefix, 24);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // Should have 253 available IPs (254 usable - host)
+        // Gateway is outside the /24 subnet so doesn't reduce count
+        assert_eq!(result.available_ips.len(), 253);
+        
+        // Verify expected range (excluding .15 host)
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.2.1").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.2.14").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.2.16").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("10.0.2.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_container_orchestration_network() {
+        // Test case: Container orchestration network (like Nomad, Docker Swarm)
+        // Based on actual container orchestration routing table
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : [],
+               "gateway" : "172.31.0.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "nomad0",
+               "dst" : "172.26.64.0/20",
+               "flags" : [],
+               "prefsrc" : "172.26.64.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "consul0",
+               "dst" : "172.26.80.0/20",
+               "flags" : [],
+               "prefsrc" : "172.26.80.1",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "172.31.16.0/20",
+               "flags" : [],
+               "prefsrc" : "172.31.20.100",
+               "protocol" : "kernel",
+               "scope" : "link"
+            }
+         ]"#;
+        
+        // Test with Nomad bridge interface
+        let result = NetConf::from_json(json, "nomad0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("172.31.0.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("172.26.64.1").unwrap()));
+        assert_eq!(result.prefix, 20);
+        
+        // Verify available IPs exclude both host and gateway
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+        
+        // /20 subnet has 4094 usable IPs, minus 1 for host = 4093 available
+        // Gateway is outside subnet so doesn't reduce count
+        assert_eq!(result.available_ips.len(), 4093);
+        
+        // Verify expected range
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.26.64.2").unwrap())));
+        assert!(result.available_ips.contains(&IpAddr::from(Ipv4Addr::from_str("172.26.79.254").unwrap())));
+    }
+
+    #[test]
+    fn test_real_world_edge_case_single_ip_allocation() {
+        // Test case: Real-world edge case where cloud provider allocates single /32 IP
+        // with gateway in management network (common in some cloud setups)
+        let json = r#"[
+            {
+               "dev" : "eth0",
+               "dst" : "default",
+               "flags" : ["onlink"],
+               "gateway" : "169.254.1.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "203.0.113.45/32",
+               "flags" : [],
+               "prefsrc" : "203.0.113.45",
+               "protocol" : "kernel",
+               "scope" : "link"
+            },
+            {
+               "dev" : "eth0",
+               "dst" : "169.254.1.0/24",
+               "flags" : [],
+               "gateway" : "169.254.1.1",
+               "protocol" : "dhcp",
+               "scope" : "global"
+            }
+         ]"#;
+        
+        let result = NetConf::from_json(json, "eth0").unwrap();
+        
+        assert_eq!(result.gateway_ip, IpAddr::from(Ipv4Addr::from_str("169.254.1.1").unwrap()));
+        assert_eq!(result.host_ip, IpAddr::from(Ipv4Addr::from_str("203.0.113.45").unwrap()));
+        assert_eq!(result.prefix, 32);
+        
+        // /32 network has no available IPs for allocation - operates in host-network mode
+        assert_eq!(result.available_ips.len(), 0);
+        
+        // Verify both host and gateway are excluded from available pool (even though pool is empty)
+        assert!(!result.available_ips.contains(&result.host_ip));
+        assert!(!result.available_ips.contains(&result.gateway_ip));
+    }
+
     #[test]
     fn test_error_handling_interface_route_wrong_protocol() {
         // Test case: Interface route exists but wrong protocol (not "kernel")
@@ -1917,8 +2542,9 @@ pub mod tests {
         assert!(result.is_err());
         let error_chain = format!("{:#}", result.unwrap_err());
         
-        // Should show available interfaces
-        assert!(error_chain.contains("Available interfaces: [br0, eth0]"));
+        // Should show available interfaces (order may vary due to HashSet)
+        assert!(error_chain.contains("Available interfaces: [br0, eth0]") || 
+                error_chain.contains("Available interfaces: [eth0, br0]"));
         
         // Should show searched routes for br0 interface
         assert!(error_chain.contains("Searched routes:"));
