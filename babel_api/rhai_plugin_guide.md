@@ -196,7 +196,7 @@ To make implementation of Babel Plugin interface possible, BV provides following
 ### HttpResponse
 
 ```rust
-struct HttpResponse { 
+struct HttpResponse {
   status_code: i32,
   body: String,
 }
@@ -208,7 +208,7 @@ Above structure provide following helper functions:
 ### ShResponse
 
 ```rust
-struct ShResponse{ 
+struct ShResponse{
   exit_code: i32,
   stdout: String,
   stderr: String,
@@ -283,7 +283,7 @@ fn some_function() {
 ```
 Output:
 ```
-<time>  INFO babel_api::rhai_plugin: node_id: <node_id>|some important step logged with INFO level 
+<time>  INFO babel_api::rhai_plugin: node_id: <node_id>|some important step logged with INFO level
 ```
 
 ## Protocol Data Archives
@@ -312,7 +312,7 @@ see [example](examples/custom_download_upload.rhai) of custom `init()` function.
 
 Typically, download job is started in `init()` before other protocol services are started. This is achieved by job
 `needs` configuration. See also example in [Background Jobs](#background-jobs) chapter for all possible
-download job config options. 
+download job config options.
 
 ## Common Use Cases
 
@@ -362,7 +362,7 @@ fn block_age() {
 ### Output Mapping
 
 Rhai language has convenient `switch` statement, which is very similar to Rust `match`.
-Hence, it is a good candidate for output mapping. 
+Hence, it is a good candidate for output mapping.
 
 **Example:**
 ```
@@ -463,7 +463,7 @@ Then it can be rendered e.g. during node initialization:
 ```
 fn init(keys) {
     let params = #{
-        param1: "value1", 
+        param1: "value1",
         param2: 2,
         aParam: ["a", "bb", "ccc"],
     };
@@ -479,6 +479,245 @@ second_parameter: 2
 optional_parameter: None
 array: ["a","bb","ccc",]
 ```
+
+## Dynamic Configuration
+
+Some protocols may require dynamic configuration parameters.
+
+The Blockvisor system uses two key files to define and use custom dynamic values:
+
+  1. `babel.yaml` - Defines the properties/parameters available for a protocol image
+  2. `main.rhai` - Accesses and uses these properties to configure the node runtime
+### Steps to Add Custom Properties
+  1. Adding Custom Properties in `babel.yaml`
+
+  Properties are defined in the properties section of `babel.yaml`. Here are the supported property types:
+
+```
+  Text Input Properties
+  properties:
+    - key: rpc-port                    # Used to access via node_params()["rpc-port"]
+      name: RPC Port                   # Display name in UI
+      description: Port for RPC server # Optional description
+      dynamic_value: true              # Can be changed after deployment
+      default_value: "8545"           # Default value
+      ui_type: !text
+        new_archive: false            # Whether this requires new protocol data
+        add_cpu: 0                    # Additional CPU cores needed
+        add_memory_mb: 512            # Additional memory in MB
+        add_disk_gb: 1                # Additional disk space in GB
+
+  Switch/Toggle Properties
+
+    - key: enable-metrics
+      name: Enable Metrics
+      description: Enable prometheus metrics collection
+      dynamic_value: true
+      default_value: "false"
+      ui_type: !switch
+        on:
+          add_cpu: 1
+          add_memory_mb: 256
+          add_disk_gb: 0
+        off: null
+
+  Enum/Dropdown Properties
+
+    - key: sync-mode
+      name: Sync Mode
+      description: Blockchain synchronization mode
+      dynamic_value: true
+      default_value: fast
+      ui_type: !enum
+        - value: fast
+          name: Fast Sync
+          impact: null
+        - value: full
+          name: Full Sync
+          impact:
+            add_cpu: 2
+            add_memory_mb: 1024
+            add_disk_gb: 10
+```
+  2. Using Custom Properties in main.rhai
+
+  Accessing Property Values
+
+  Properties are accessed in Rhai scripts using the node_params() function:
+```
+  // Get a property value
+  let rpc_port = node_params()["rpc-port"];
+  let enable_metrics = node_params()["enable-metrics"];
+  let sync_mode = node_params()["sync-mode"];
+```
+  Using Properties in Service Configuration
+```
+  fn plugin_config() {
+    #{
+      services: [
+        #{
+          name: "blockchain_node",
+          // Use properties in command line arguments
+          run_sh: `/usr/bin/node --rpc-port=${node_params()["rpc-port"]} --sync-mode=${node_params()["sync-mode"]}` +
+                  if node_params()["enable-metrics"] == "true" { " --metrics" } else { "" },
+          restart_config: #{
+            backoff_timeout_ms: 60000,
+            backoff_base_ms: 1000,
+          },
+        }
+      ]
+    }
+  }
+```
+  Safe Parameter Handling
+```
+  fn plugin_config() {
+    // Safely handle parameters with defaults
+    let rpc_port = node_params()["rpc-port"] || "8545";
+    let metrics_enabled = node_params()["enable-metrics"] == "true";
+
+    #{
+      init: #{
+        commands: [
+          // Use in shell commands (be sure to sanitize!)
+          `echo "Starting with RPC on port ${sanitize_sh_param(rpc_port)}"`,
+        ]
+      },
+      services: [
+        #{
+          name: "main_service",
+          run_sh: build_command(rpc_port, metrics_enabled),
+        }
+      ]
+    }
+  }
+
+  fn build_command(port, metrics) {
+    let base_cmd = `/usr/bin/service --port=${port}`;
+    if metrics {
+      base_cmd += " --enable-metrics";
+    }
+    base_cmd
+  }
+```
+  Configuration File Templates
+
+  Properties can also be used to generate configuration files:
+```
+  fn plugin_config() {
+    #{
+      config_files: [
+        #{
+          template: "/var/lib/babel/templates/node.conf.template",
+          destination: "/etc/node.conf",
+          params: #{
+            rpc_port: node_params()["rpc-port"],
+            metrics_enabled: node_params()["enable-metrics"] == "true",
+            sync_mode: node_params()["sync-mode"],
+            node_name: node_env().node_name,
+          },
+        },
+      ]
+    }
+  }
+```
+  3. Complete Example
+
+  Here's a complete example showing both files working together:
+
+  `babel.yaml`
+```
+  version: 0.0.1
+  protocol_key: my-protocol
+  container_uri: docker://myorg/my-protocol/mainnet/0.0.1
+
+  properties:
+    - key: rpc-port
+      name: RPC Port
+      description: Port for JSON-RPC server
+      dynamic_value: true
+      default_value: "8545"
+      ui_type: !text
+        add_memory_mb: 128
+
+    - key: enable-debug
+      name: Enable Debug Logging
+      description: Enable detailed debug logs
+      dynamic_value: true
+      default_value: "false"
+      ui_type: !switch
+        on:
+          add_cpu: 1
+          add_memory_mb: 512
+
+    - key: network-mode
+      name: Network Mode
+      description: Which network to connect to
+      dynamic_value: false  # Can't change after deployment
+      default_value: mainnet
+      ui_type: !enum
+        - value: mainnet
+          name: Mainnet
+          impact: null
+        - value: testnet
+          name: Testnet
+          impact:
+            add_memory_mb: -256
+
+  variants:
+    - key: mainnet
+      min_cpu: 2
+      min_memory_mb: 4096
+      min_disk_gb: 100
+```
+  `main.rhai`
+```
+  fn plugin_config() {
+    let rpc_port = node_params()["rpc-port"] || "8545";
+    let debug_enabled = node_params()["enable-debug"] == "true";
+    let network = node_params()["network-mode"] || "mainnet";
+
+    #{
+      init: #{
+        commands: [
+          `mkdir -p /opt/protocol/data`,
+          if debug_enabled { `touch /opt/protocol/debug.log` } else { `` },
+        ]
+      },
+
+      services: [
+        #{
+          name: "protocol_node",
+          run_sh: `/usr/bin/protocol-node` +
+                 ` --rpc-port=${rpc_port}` +
+                 ` --network=${network}` +
+                 if debug_enabled { ` --debug` } else { `` },
+          restart_config: #{
+            backoff_timeout_ms: 60000,
+            backoff_base_ms: 1000,
+          },
+          use_protocol_data: true,
+        }
+      ]
+    }
+  }
+
+  fn protocol_status() {
+    #{state: "broadcasting", health: "healthy"}
+  }
+```
+  4. Key Points
+
+  - Property keys must be lower-kebab-case (e.g., rpc-port, not rpcPort)
+  - Access properties via node_params()["property-key"]
+  - Always handle missing/default values safely
+  - Use sanitize_sh_param() when using properties in shell commands
+  - Properties with dynamic_value: true can be changed post-deployment
+  - Properties with new_archive: true require new protocol data when changed
+  - Resource impacts (CPU/memory/disk) are automatically calculated and displayed in the UI
+
+  This architecture allows you to create flexible, configurable node images where users can customize behavior through the admin interface, and those settings are automatically passed to your Rhai scripts
+   for runtime configuration.
 
 ## Unit Testing
 
