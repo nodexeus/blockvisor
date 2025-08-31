@@ -283,7 +283,7 @@ impl CommandsService<'_> {
             warn!("failed to update command '{command_id}' status: {err:#}");
         }
         self.save_cache().await;
-        Ok(command_result?)
+        Ok(())
     }
 
     async fn send_service_status_update(
