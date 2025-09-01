@@ -150,6 +150,9 @@ pub struct ImageProperty {
     pub dynamic_value: bool,
     pub default_value: String,
     pub ui_type: UiType,
+    /// Optional array of variant keys where this property should be displayed. None means show for all variants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variants: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

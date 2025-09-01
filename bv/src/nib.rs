@@ -654,6 +654,12 @@ impl ImageVariant {
                     ensure_kebab_case!(format!("in property '{}', value", item.key), variant.value);
                 }
             }
+            // Validate variants field if present
+            if let Some(variants) = &item.variants {
+                for variant in variants {
+                    ensure_kebab_case!(format!("in property '{}', variant", item.key), variant);
+                }
+            }
         }
         for archive_pointer in &self.archive_pointers {
             if let StorePointer::StoreKey(store_key) = &archive_pointer.pointer {
