@@ -97,9 +97,9 @@ impl SnapshotMetadata {
         format!("{}-{}-{}-{}-v1", protocol, client, network, node_type)
     }
     
-    /// Build archive path (API will handle latest version automatically)
-    pub fn build_full_path(archive_id: &str, _version: u64) -> String {
-        archive_id.to_string() // No version suffix - API returns latest
+    /// Build archive path with version
+    pub fn build_full_path(archive_id: &str, version: u64) -> String {
+        format!("{}/{}", archive_id, version)
     }
     
     /// Parse archive ID back to components  

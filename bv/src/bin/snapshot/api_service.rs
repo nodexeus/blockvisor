@@ -75,27 +75,40 @@ impl ApiService {
                                         networks: HashMap::new(),
                                     });
                                 
-                                                // Create snapshot metadata (always use latest version)
-                                let full_path = archive.store_key.clone(); // Don't append version - API handles latest
+                                                // Try to fetch multiple versions (try versions 1-5 to see what exists)
+                                let mut snapshots = Vec::new();
                                 
-                                let snapshot = SnapshotMetadata {
-                                    protocol: parsed_protocol.clone(),
-                                    client: parsed_client.clone(),
-                                    network: parsed_network.clone(),
-                                    node_type: parsed_node_type.clone(),
-                                    version: 0, // 0 indicates latest version
-                                    total_size: 0, // Will be populated when metadata is fetched
-                                    chunks: 0, // Will be populated when metadata is fetched
-                                    compression: None,
-                                    created_at: SystemTime::now(),
-                                    archive_uuid: archive.archive_id.clone(), // UUID for API calls
-                                    archive_id: archive.store_key.clone(),    // User-friendly ID
-                                    full_path,
-                                };
+                                // Try to fetch versions 1 through 5 (most archives won't have more than this)
+                                for version in 1..=5 {
+                                    match self.fetch_download_metadata_with_version(&archive.archive_id, Some(version)).await {
+                                        Ok(metadata) => {
+                                            let full_path = format!("{}/{}", archive.store_key, version);
+                                            
+                                            let snapshot = SnapshotMetadata {
+                                                protocol: parsed_protocol.clone(),
+                                                client: parsed_client.clone(),
+                                                network: parsed_network.clone(),
+                                                node_type: parsed_node_type.clone(),
+                                                version,
+                                                total_size: metadata.total_size,
+                                                chunks: metadata.chunks,
+                                                compression: metadata.compression,
+                                                created_at: SystemTime::UNIX_EPOCH, // Placeholder - actual metadata comes from download
+                                                archive_uuid: archive.archive_id.clone(),
+                                                archive_id: archive.store_key.clone(),
+                                                full_path,
+                                            };
+                                            snapshots.push(snapshot);
+                                        },
+                                        Err(e) => {
+                                            debug!("Version {} not found for archive {}: {}", version, archive.archive_id, e);
+                                        }
+                                    }
+                                }
                                 
-                                let snapshots = vec![snapshot];
-                                
-                                client_group.networks.insert(parsed_network, snapshots);
+                                if !snapshots.is_empty() {
+                                    client_group.networks.insert(parsed_network, snapshots);
+                                }
                             }
                         }
                     }
@@ -467,7 +480,11 @@ impl ApiService {
         }).await
     }
 
-    async fn fetch_download_metadata(&self, archive_id: &str) -> Result<babel_api::engine::DownloadMetadata> {
+    pub async fn fetch_download_metadata(&self, archive_id: &str) -> Result<babel_api::engine::DownloadMetadata> {
+        self.fetch_download_metadata_with_version(archive_id, None).await
+    }
+    
+    pub async fn fetch_download_metadata_with_version(&self, archive_id: &str, version: Option<u64>) -> Result<babel_api::engine::DownloadMetadata> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
         drop(config);
@@ -480,6 +497,7 @@ impl ApiService {
             let api_url = api_url.clone();
             let archive_id = archive_id.clone();
             let org_id = org_id.clone();
+            let data_version = version;
             Box::pin(async move {
                 let endpoint = Endpoint::from_shared(api_url)
                     .map_err(|e| tonic::Status::invalid_argument(format!("Invalid API URL: {}", e)))?;
@@ -497,8 +515,8 @@ impl ApiService {
                 let response = client
                     .get_download_metadata(pb::ArchiveServiceGetDownloadMetadataRequest {
                         archive_id,
-                        org_id, // Use extracted org_id from JWT token
-                        data_version: None,
+                        org_id,
+                        data_version,
                     })
                     .await?
                     .into_inner();

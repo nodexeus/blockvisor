@@ -52,9 +52,9 @@ enum Commands {
         /// Output directory for download
         #[arg(short, long)]
         output: PathBuf,
-        /// Node type (e.g., "archive", "full")
-        #[arg(long, default_value = "archive")]
-        node_type: String,
+        /// Node type (e.g., "archive", "full") - auto-detected if not specified
+        #[arg(long)]
+        node_type: Option<String>,
         /// Specific version to download (latest if not specified)
         #[arg(short, long)]
         version: Option<u64>,
@@ -170,13 +170,66 @@ async fn handle_download_command(
     client: String, 
     network: String,
     output: PathBuf,
-    node_type: String,
+    node_type: Option<String>,
     version: Option<u64>,
     workers: usize,
     max_connections: usize,
     dry_run: bool,
 ) -> Result<()> {
     let snapshot_client = SnapshotClient::new().await?;
+    
+    // Determine the node type - auto-detect if not specified
+    let actual_node_type = match node_type {
+        Some(nt) => nt,
+        None => {
+            // List available snapshots to find what node types are available
+            let filter = ListFilter {
+                protocol: Some(protocol.clone()),
+                client: Some(client.clone()),
+                network: Some(network.clone()),
+            };
+            let groups = snapshot_client.list_snapshots(filter).await?;
+            
+            // Find the available node types
+            let mut available_types = std::collections::HashSet::new();
+            for group in &groups {
+                for (_, client_group) in &group.clients {
+                    for (_, snapshots) in &client_group.networks {
+                        for snapshot in snapshots {
+                            available_types.insert(snapshot.node_type.clone());
+                        }
+                    }
+                }
+            }
+            
+            // Decide which node type to use
+            match available_types.len() {
+                0 => {
+                    return Err(eyre::anyhow!("No snapshots found for {}/{}/{}", protocol, client, network));
+                },
+                1 => {
+                    // Only one type available, use it
+                    let node_type = available_types.into_iter().next().unwrap();
+                    println!("Auto-detected node type: {}", node_type);
+                    node_type
+                },
+                _ => {
+                    // Multiple types available
+                    if available_types.contains("archive") {
+                        println!("Multiple node types available. Using 'archive' by default.");
+                        println!("Available types: {}", available_types.iter().cloned().collect::<Vec<_>>().join(", "));
+                        "archive".to_string()
+                    } else {
+                        // No archive type, pick the first one
+                        let available_list: Vec<String> = available_types.iter().cloned().collect();
+                        let node_type = available_list[0].clone();
+                        println!("Using node type: {} (available: {})", node_type, available_list.join(", "));
+                        node_type
+                    }
+                }
+            }
+        }
+    };
     
     let download_config = DownloadConfig {
         workers,
@@ -186,14 +239,14 @@ async fn handle_download_command(
     
     if dry_run {
         let info = snapshot_client.get_download_info(
-            &protocol, &client, &network, &node_type, version
+            &protocol, &client, &network, &actual_node_type, version
         ).await?;
         print_download_info(&info)?;
         return Ok(());
     }
     
     snapshot_client.download_snapshot(
-        &protocol, &client, &network, &node_type, 
+        &protocol, &client, &network, &actual_node_type, 
         version, download_config
     ).await?;
     
@@ -219,16 +272,22 @@ fn print_simple_snapshots(groups: &[ProtocolGroup]) -> Result<()> {
     for group in groups {
         println!("Protocol: {}", group.protocol);
         for (client_name, client_group) in &group.clients {
-            print!("  - {} (", client_name);
-            let networks: Vec<String> = client_group.networks.keys()
-                .map(|n| {
-                    let snapshots = &client_group.networks[n];
-                    let latest_version = snapshots.iter().map(|s| s.version).max().unwrap_or(1);
-                    format!("{}: v{} ({} versions)", n, latest_version, snapshots.len())
-                })
-                .collect();
-            print!("{}", networks.join(" | "));
-            println!(")");
+            println!("  Client: {}", client_name);
+            for (network_name, snapshots) in &client_group.networks {
+                // Group snapshots by node type
+                let mut by_node_type: std::collections::HashMap<String, Vec<&SnapshotMetadata>> = std::collections::HashMap::new();
+                for snapshot in snapshots {
+                    by_node_type.entry(snapshot.node_type.clone()).or_default().push(snapshot);
+                }
+                
+                for (node_type, type_snapshots) in by_node_type {
+                    let latest_version = type_snapshots.iter().map(|s| s.version).max().unwrap_or(1);
+                    let versions_count = type_snapshots.len();
+                    println!("    - {}/{}: v{} ({} version{})", 
+                        network_name, node_type, latest_version, 
+                        versions_count, if versions_count == 1 { "" } else { "s" });
+                }
+            }
         }
         println!();
     }
@@ -240,16 +299,25 @@ fn print_detailed_snapshots(groups: &[ProtocolGroup]) -> Result<()> {
     for group in groups {
         for (client_name, client_group) in &group.clients {
             for (network_name, snapshots) in &client_group.networks {
-                println!("{}/{}/{}:", group.protocol, client_name, network_name);
-                
+                // Group snapshots by node type
+                let mut by_node_type: std::collections::HashMap<String, Vec<&SnapshotMetadata>> = std::collections::HashMap::new();
                 for snapshot in snapshots {
-                    let size_gb = snapshot.total_size as f64 / (1024.0 * 1024.0 * 1024.0);
-                    println!("  - Version {} - {:.1}GB - {}", 
-                        snapshot.version, size_gb, 
-                        snapshot.created_at.duration_since(std::time::UNIX_EPOCH)
-                            .unwrap().as_secs() / 86400); // days since epoch, simplified
+                    by_node_type.entry(snapshot.node_type.clone()).or_default().push(snapshot);
                 }
-                println!();
+                
+                for (node_type, mut type_snapshots) in by_node_type {
+                    println!("{}/{}/{}/{}:", group.protocol, client_name, network_name, node_type);
+                    
+                    // Sort by version
+                    type_snapshots.sort_by_key(|s| s.version);
+                    
+                    for snapshot in type_snapshots {
+                        let size_gb = snapshot.total_size as f64 / (1024.0 * 1024.0 * 1024.0);
+                        println!("  - Version {} - {:.1}GB", 
+                            snapshot.version, size_gb);
+                    }
+                    println!();
+                }
             }
         }
     }

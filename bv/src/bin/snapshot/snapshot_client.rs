@@ -193,12 +193,19 @@ impl SnapshotClient {
         let archive_id =
             SnapshotMetadata::build_archive_id(&normalized_protocol, client, network, node_type);
 
-        let target_version = version.unwrap_or(1); // Default to version 1 if not specified
-        let full_path =
-            SnapshotMetadata::build_full_path(&archive_id, target_version);
-
         // Use API service to get real metadata
         let api_service = ApiService::new(config.clone());
+        
+        // If no version specified, get metadata to determine the latest version
+        let (target_version, full_path) = if let Some(v) = version {
+            // Use the specified version
+            (v, format!("{}/{}", archive_id, v))
+        } else {
+            // Get metadata without version to fetch the latest
+            let latest_info = api_service.get_download_metadata_by_store_key(&archive_id).await?;
+            (latest_info.version, format!("{}/{}", archive_id, latest_info.version))
+        };
+        
         let mut download_info = api_service.get_download_metadata_by_store_key(&full_path).await?;
 
         // Override version info
@@ -224,15 +231,18 @@ impl SnapshotClient {
         let archive_id =
             SnapshotMetadata::build_archive_id(&normalized_protocol, client, network, node_type);
 
-        let target_version = version.unwrap_or_else(|| {
-            // TODO: Get latest version from API
-            1 // Default to version 1
-        });
+        // Get the latest version if not specified
+        let api_service = ApiService::new(auth_config.clone());
+        let (target_version, full_path) = if let Some(v) = version {
+            // Use the specified version
+            (v, format!("{}/{}", archive_id, v))
+        } else {
+            // Get metadata without version to fetch the latest
+            let latest_info = api_service.get_download_metadata_by_store_key(&archive_id).await?;
+            (latest_info.version, format!("{}/{}", archive_id, latest_info.version))
+        };
 
-        let full_path =
-            SnapshotMetadata::build_full_path(&archive_id, target_version);
-
-        println!("Starting download: {}", full_path);
+        println!("Starting download: {} (version {})", archive_id, target_version);
         println!("Output directory: {}", config.output_dir.display());
         println!(
             "Workers: {}, Max connections: {}",
