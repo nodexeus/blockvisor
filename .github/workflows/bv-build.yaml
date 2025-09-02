@@ -71,6 +71,7 @@ jobs:
             /tmp/bundle.tar.gz
             /tmp/bvup
             /tmp/bundle/blockvisor/bin/nib
+            /tmp/bv-snapshot
           generate_release_notes: true
           body: |
             Blockvisor version ${{ steps.get_version.outputs.VERSION }}
