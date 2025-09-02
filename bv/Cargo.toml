@@ -35,6 +35,10 @@ path = "src/bin/blockvisord-dev.rs"
 name = "nib"
 path = "src/bin/nib.rs"
 
+[[bin]]
+name = "bv-snapshot"
+path = "src/bin/bv_snapshot.rs"
+
 [dependencies]
 bv_utils = { version = "*", path = "../bv_utils" }
 async-trait = "0.1.87"
@@ -79,6 +83,7 @@ tracing = "0.1.41"
 uuid = { version = "1.15.1", features = ["serde", "v4"] }
 url = "2.5.4"
 walkdir = "2.5.0"
+zstd = "0.13.0"
 
 [build-dependencies]
 clap = { version = "4.5.31", features = ["derive", "cargo"] }
