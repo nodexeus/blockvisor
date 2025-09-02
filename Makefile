@@ -8,6 +8,8 @@ build-release:
 	chmod u+s target/x86_64-unknown-linux-musl/release/bv
 	strip target/x86_64-unknown-linux-musl/release/nib
 	chmod u+s target/x86_64-unknown-linux-musl/release/nib
+	strip target/x86_64-unknown-linux-musl/release/bv-snapshot
+	chmod u+s target/x86_64-unknown-linux-musl/release/bv-snapshot
 	strip target/x86_64-unknown-linux-musl/release/bvup
 	strip target/x86_64-unknown-linux-musl/release/blockvisord
 	strip target/x86_64-unknown-linux-musl/release/blockvisord-dev
@@ -23,6 +25,7 @@ bundle-base: build-release
 	cp target/x86_64-unknown-linux-musl/release/installer /tmp/bundle
 	cp bv/data/blockvisor.service /tmp/bundle/blockvisor/services
 	cp target/x86_64-unknown-linux-musl/release/nib /tmp/bundle/blockvisor/bin
+	cp target/x86_64-unknown-linux-musl/release/nib /tmp/bv-snapshot
 	mkdir -p /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/babel /tmp/bundle/babel/bin
 	cp target/x86_64-unknown-linux-musl/release/babel_job_runner /tmp/bundle/babel/bin
