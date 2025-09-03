@@ -128,9 +128,9 @@ impl ApiService {
 
     /// Get download metadata for a snapshot (using its UUID)
     pub async fn get_download_metadata(&self, snapshot: &SnapshotMetadata) -> Result<DownloadInfo> {
-        info!("Getting download metadata for archive: {}", snapshot.archive_id);
+        info!("Getting download metadata for archive: {} version {}", snapshot.archive_id, snapshot.version);
         
-        let metadata = self.fetch_download_metadata(&snapshot.archive_uuid).await?;
+        let metadata = self.fetch_download_metadata_with_version(&snapshot.archive_uuid, Some(snapshot.version)).await?;
         
         Ok(DownloadInfo {
             protocol: snapshot.protocol.clone(),
@@ -150,21 +150,53 @@ impl ApiService {
     pub async fn get_download_metadata_by_store_key(&self, store_key: &str) -> Result<DownloadInfo> {
         info!("Looking up download metadata for store key: {}", store_key);
         
+        // Parse the store_key to separate base archive_id from version
+        let (base_archive_id, requested_version) = if store_key.contains('/') {
+            let parts: Vec<&str> = store_key.splitn(2, '/').collect();
+            let base_id = parts[0];
+            let version = parts[1].parse::<u64>().map_err(|_| anyhow!("Invalid version in store key: {}", store_key))?;
+            (base_id, Some(version))
+        } else {
+            (store_key, None)
+        };
+        
         // First discover all snapshots to find the UUID for this store_key
         let protocol_groups = self.discover_snapshots().await?;
         
-        // Search through all snapshots to find the matching store_key
+        // Search through all snapshots to find the matching base archive_id
         for group in protocol_groups {
             debug!("Searching protocol group: {}", group.protocol);
             for (_, client_group) in group.clients {
                 debug!("  Searching client group: {}", client_group.client);
-                for (network, snapshots) in client_group.networks {
+                for (network, snapshots) in &client_group.networks {
                     debug!("    Searching network: {}", network);
-                    for snapshot in snapshots {
-                        debug!("      Found archive_id: {}", snapshot.archive_id);
-                        if snapshot.archive_id == store_key {
-                            debug!("      MATCH! Using archive_uuid: {}", snapshot.archive_uuid);
-                            return self.get_download_metadata(&snapshot).await;
+                    
+                    // Check if any snapshot in this network matches our base_archive_id
+                    let matching_snapshots: Vec<&SnapshotMetadata> = snapshots.iter()
+                        .filter(|s| s.archive_id == base_archive_id)
+                        .collect();
+                    
+                    if !matching_snapshots.is_empty() {
+                        debug!("      MATCH! Base archive_id found: {}", base_archive_id);
+                        
+                        // If a specific version was requested, find that version
+                        if let Some(version) = requested_version {
+                            // Find the specific version in the snapshots
+                            for snap in &matching_snapshots {
+                                if snap.version == version {
+                                    debug!("      Found requested version {}: {}", version, snap.archive_uuid);
+                                    return self.get_download_metadata(snap).await;
+                                }
+                            }
+                            return Err(anyhow!("Version {} not found for archive '{}'", version, base_archive_id));
+                        } else {
+                            // No specific version requested, find the latest version
+                            let latest_snapshot = matching_snapshots.iter()
+                                .max_by_key(|s| s.version)
+                                .ok_or_else(|| anyhow!("No versions found for archive '{}'", base_archive_id))?;
+                            
+                            debug!("      Using latest version {}: {}", latest_snapshot.version, latest_snapshot.archive_uuid);
+                            return self.get_download_metadata(latest_snapshot).await;
                         }
                     }
                 }

@@ -54,7 +54,7 @@ impl SnapshotDownloader {
             total_size: download_info.total_size,
             chunks: download_info.chunks,
             compression: download_info.compression,
-            data_version: 1, // Set to 1 since we're using the latest version
+            data_version: download_info.version, // Use the actual version from download_info
         };
 
         // Step 2: Save metadata for status reporting
@@ -175,17 +175,24 @@ impl SnapshotDownloader {
         // Get API service to fetch chunk URLs  
         let api_service = ApiService::new((*self.config.lock().await).clone());
         
+        // Parse the archive_id to get the base archive ID (without version)
+        let base_archive_id = if archive_id.contains('/') {
+            archive_id.split('/').next().unwrap()
+        } else {
+            archive_id
+        };
+        
         // First discover to get the archive UUID
         let protocol_groups = api_service.discover_snapshots().await?;
         
         // Find the matching snapshot to get the UUID
         let mut archive_uuid = None;
         'outer: for group in protocol_groups {
-            for (_, client_group) in group.clients {
-                for (_, snapshots) in client_group.networks {
+            for (_, client_group) in &group.clients {
+                for (_, snapshots) in &client_group.networks {
                     for snapshot in snapshots {
-                        if snapshot.archive_id == archive_id {
-                            archive_uuid = Some(snapshot.archive_uuid);
+                        if snapshot.archive_id == base_archive_id {
+                            archive_uuid = Some(snapshot.archive_uuid.clone());
                             break 'outer;
                         }
                     }
