@@ -321,6 +321,7 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
                     add_memory_bytes: property.add_memory_bytes,
                     add_disk_bytes: property.add_disk_bytes,
                     is_group_default: property.is_group_default,
+                    variants: property.variants,
                 })
                 .collect::<Vec<_>>();
             remote_properties.sort_by(|a, b| a.key.cmp(&b.key));
@@ -509,6 +510,7 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                         .as_ref()
                         .and_then(|impact| impact.add_disk_gb.map(|value| value * 1_000_000_000)),
                     is_group_default: None,
+                    variants: property.variants.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()),
                 })
             }
             UiType::Switch { on, off } => {
@@ -533,6 +535,7 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                     add_disk_bytes: on
                         .as_ref()
                         .and_then(|impact| impact.add_disk_gb.map(|value| value * 1_000_000_000)),
+                    variants: property.variants.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()),
                 });
                 add_properties.push(pb::AddImageProperty {
                     key: format!("{}-off", property.key),
@@ -555,6 +558,7 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                     add_disk_bytes: off
                         .as_ref()
                         .and_then(|impact| impact.add_disk_gb.map(|value| value * 1_000_000_000)),
+                    variants: property.variants.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()),
                 });
             }
             UiType::Enum(variants) => {
@@ -582,6 +586,7 @@ fn add_properties(image_properties: Vec<nib_meta::ImageProperty>) -> Vec<pb::Add
                         add_disk_bytes: variant.impact.as_ref().and_then(|impact| {
                             impact.add_disk_gb.map(|value| value * 1_000_000_000)
                         }),
+                        variants: property.variants.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()),
                     })
                 }
             }

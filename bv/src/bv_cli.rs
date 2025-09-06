@@ -267,7 +267,7 @@ pub enum JobCommand {
         /// Job name. Get all jobs logs if not specified.
         name: Option<String>,
         /// Output the last N lines.
-        #[clap(long, short, alias = "n", default_value = "50")]
+        #[clap(long, short, alias = "n", default_value = "100")]
         lines: usize,
         /// Follow logs.
         #[clap(long, short, alias = "f", default_value = "false")]

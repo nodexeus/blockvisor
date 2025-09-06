@@ -14,7 +14,7 @@ pub struct Config {
     /// Client auth token.
     pub token: String,
     /// API endpoint url.
-    pub blockjoy_api_url: String,
+    pub nodexeus_api_url: String,
 }
 
 impl Config {

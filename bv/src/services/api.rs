@@ -251,6 +251,9 @@ impl CommandsService<'_> {
                 retry_hint_seconds: None,
             },
             Err(err) => {
+                // Log the error locally for debugging while still reporting to API
+                error!("command '{command_id}' failed: {err:#}");
+                
                 let mut req = pb::CommandServiceUpdateRequest {
                     command_id: command_id.to_string(),
                     exit_code: Some(match &err {
@@ -283,7 +286,7 @@ impl CommandsService<'_> {
             warn!("failed to update command '{command_id}' status: {err:#}");
         }
         self.save_cache().await;
-        Ok(command_result?)
+        Ok(())
     }
 
     async fn send_service_status_update(

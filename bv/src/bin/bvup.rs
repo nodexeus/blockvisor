@@ -28,12 +28,12 @@ pub struct CmdArgs {
     #[clap(long = "region")]
     pub region: Option<String>,
 
-    /// BlockJoy API url
-    #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
-    pub blockjoy_api_url: String,
+    /// Nodexeus API url
+    #[clap(long = "api", default_value = "https://api.nodexeus.io")]
+    pub nodexeus_api_url: String,
 
     /// Network bridge interface name
-    #[clap(long = "ifa", default_value = "bvbr0")]
+    #[clap(long = "ifa", default_value = "br0")]
     pub bridge_ifa: String,
 
     /// Network gateway IP address
@@ -98,9 +98,9 @@ async fn main() -> Result<()> {
         }
         println!("Provision and init blockvisor configuration");
 
-        let blockjoy_api_url = ask_value("blockjoy API url", &cmd_args.blockjoy_api_url, y)?
-            .unwrap_or(cmd_args.blockjoy_api_url);
-        if blockjoy_api_url.is_empty() {
+        let nodexeus_api_url = ask_value("Nodexeus API url", &cmd_args.nodexeus_api_url, y)?
+            .unwrap_or(cmd_args.nodexeus_api_url);
+        if nodexeus_api_url.is_empty() {
             bail!("API url can't be empty");
         }
 
@@ -177,7 +177,7 @@ async fn main() -> Result<()> {
         let to_gb = |n| n as f64 / 1_000_000_000.0;
 
         println!("Hostname:            {:>16}", host_info.name);
-        println!("API url:             {:>16}", blockjoy_api_url);
+        println!("API url:             {:>16}", nodexeus_api_url);
         println!("Region:              {:>16}", region);
         println!("OS:                  {:>16}", host_info.os);
         println!("OS version:          {:>16}", host_info.os_version);
@@ -237,7 +237,7 @@ async fn main() -> Result<()> {
         }
 
         let mut client = pb::host_service_client::HostServiceClient::connect(
-            Endpoint::from_shared(blockjoy_api_url.clone())?
+            Endpoint::from_shared(nodexeus_api_url.clone())?
                 .connect_timeout(DEFAULT_API_CONNECT_TIMEOUT)
                 .timeout(DEFAULT_API_REQUEST_TIMEOUT),
         )
@@ -293,9 +293,9 @@ async fn main() -> Result<()> {
             api_config: ApiConfig {
                 token: host_resp.token,
                 refresh_token: host_resp.refresh,
-                blockjoy_api_url,
+                nodexeus_api_url,
             },
-            blockjoy_mqtt_url: None,
+            nodexeus_mqtt_url: None,
             update_check_interval_secs: Some(cmd_args.update_check_interval_secs),
             blockvisor_port: cmd_args
                 .blockvisor_port

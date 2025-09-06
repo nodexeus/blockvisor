@@ -1178,9 +1178,9 @@ pub mod tests {
                 api_config: ApiConfig {
                     token: "token".to_string(),
                     refresh_token: "refresh_token".to_string(),
-                    blockjoy_api_url: "api.url".to_string(),
+                    nodexeus_api_url: "api.url".to_string(),
                 },
-                blockjoy_mqtt_url: Some("mqtt.url".to_string()),
+                nodexeus_mqtt_url: Some("mqtt.url".to_string()),
                 blockvisor_port: 888,
                 iface: "bvbr7".to_string(),
                 ..Default::default()

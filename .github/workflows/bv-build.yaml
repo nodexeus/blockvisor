@@ -1,0 +1,156 @@
+name: Release BV
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write # Needed for AWS authentication
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: blockvisor
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Get Version
+        id: get_version
+        run: |
+          VERSION=$(grep -A1 "\[workspace.package\]" Cargo.toml | grep "version" | cut -d '"' -f 2)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      - name: Set Home Directory
+        run: |
+          echo "HOME=/opt/actions-runner" >> ${GITHUB_ENV}
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: x86_64-unknown-linux-musl
+
+      - name: Setup packages
+        run: >
+          sudo apt -y install build-essential pkg-config libssl-dev cmake musl-tools pigz jq unzip
+
+      - name: Install protoc
+        run: |
+          PB_REL="https://github.com/protocolbuffers/protobuf/releases"
+          curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip
+          rm -rf $HOME/.local
+          unzip protoc-3.15.8-linux-x86_64.zip -d $HOME/.local
+          export PATH="$PATH:$HOME/.local/bin"
+
+      - name: Set protoc path
+        run: |
+          echo "PROTOC=$HOME/.local/bin/protoc" >> ${GITHUB_ENV}
+
+      - name: Build bundle file
+        run: >
+          make bundle bundle-dev
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          name: Release v${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          body_path: host_setup_guide.md
+          files: |
+            /tmp/bundle-dev.tar.gz
+            /tmp/bundle.tar.gz
+            /tmp/bvup
+            /tmp/bundle/blockvisor/bin/nib
+            /tmp/snapper
+          generate_release_notes: true
+          body: |
+            Blockvisor version ${{ steps.get_version.outputs.VERSION }}
+
+            ## Changes
+            Automated build from the latest blockvisor code.
+
+      - name: Upload artifacts for later stages
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockvisor-artifacts-${{ steps.get_version.outputs.VERSION }}
+          path: |
+            /tmp/bundle-dev.tar.gz
+            /tmp/bundle.tar.gz
+          retention-days: 7
+          overwrite: true
+
+  deploy-dev:
+    name: Deploy to Dev
+    needs: build
+    runs-on: blockvisor
+    environment:
+      name: development
+      url: https://app.dev.nodexeus.io
+
+    steps:
+      - name: Download artifacts for dev
+        uses: actions/download-artifact@v4
+        with:
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
+
+      - name: Upload to R2 Dev bucket
+        uses: magicwallet/r2-upload@main
+        with:
+          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
+          access_key_id: ${{ secrets.B2_KEY_ID }}
+          secret_access_key: ${{ secrets.B2_APP_KEY }}
+          bucket: ${{ secrets.B2_DEV_BUCKET }}
+          file: ./bundle.tar.gz
+          destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+  #     - name: Upload to B2 Dev Bucket
+  #       uses: yamatt/backblaze-b2-upload-action@v7
+  #       with:
+  #         key_id: ${{ secrets.B2_KEY_ID }}
+  #         application_key: ${{ secrets.B2_APP_KEY }}
+  #         bucket_name: ${{ secrets.B2_DEV_BUCKET }}
+  #         file_path: ./bundle.tar.gz
+  #         remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: [build, deploy-dev]
+    runs-on: blockvisor
+    environment:
+      name: production
+      url: https://app.nodexeus.io
+
+    steps:
+      - name: Download artifacts for production
+        uses: actions/download-artifact@v4
+        with:
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
+
+      # - name: Upload to B2 Production Bucket
+      #   uses: yamatt/backblaze-b2-upload-action@v7
+      #   with:
+      #     key_id: ${{ secrets.B2_KEY_ID }}
+      #     application_key: ${{ secrets.B2_APP_KEY }}
+      #     bucket_name: ${{ secrets.B2_PROD_BUCKET }}
+      #     file_path: ./bundle.tar.gz
+      #     remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+      - name: Upload to R2 production bucket
+        uses: magicwallet/r2-upload@main
+        with:
+          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
+          access_key_id: ${{ secrets.B2_KEY_ID }}
+          secret_access_key: ${{ secrets.B2_APP_KEY }}
+          bucket: ${{ secrets.B2_PROD_BUCKET }}
+          file: ./bundle.tar.gz
+          destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz

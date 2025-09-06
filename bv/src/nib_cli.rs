@@ -15,9 +15,9 @@ pub struct App {
 pub struct LoginArgs {
     /// User id.
     pub user_id: String,
-    /// BlockJoy API url.
-    #[clap(long = "api", default_value = "https://api.prod.blockjoy.com")]
-    pub blockjoy_api_url: String,
+    /// Nodexeus API url.
+    #[clap(long = "api", default_value = "https://api.nodexeus.io")]
+    pub nodexeus_api_url: String,
 }
 
 #[derive(Subcommand)]

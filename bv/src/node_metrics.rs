@@ -37,7 +37,11 @@ pub struct Metric {
     pub block_age: Option<u64>,
     pub consensus: Option<bool>,
     pub protocol_status: Option<ProtocolStatus>,
+    pub apr: Option<f64>,
     pub jobs: JobsInfo,
+    pub jailed: Option<bool>,
+    pub jailed_reason: Option<String>,
+    pub sqd_name: Option<String>,
 }
 
 impl Metrics {
@@ -47,7 +51,11 @@ impl Metrics {
                 || m.block_age.is_some()
                 || m.consensus.is_some()
                 || m.protocol_status.is_some()
+                || m.apr.is_some()
                 || !m.jobs.is_empty()
+                || m.jailed.is_some()
+                || m.jailed_reason.is_some()
+                || m.sqd_name.is_some()
         })
     }
 }
@@ -123,7 +131,11 @@ pub async fn collect_metric<N: NodeConnection>(
                 block_age: None,
                 consensus: None,
                 protocol_status,
+                apr: None,
                 jobs,
+                jailed: None,
+                jailed_reason: None,
+                sqd_name: None,
             })
         }
         Some(ProtocolStatus { state, .. })
@@ -141,7 +153,11 @@ pub async fn collect_metric<N: NodeConnection>(
                 block_age: None,
                 consensus: None,
                 protocol_status,
+                apr: None,
                 jobs,
+                jailed: None,
+                jailed_reason: None,
+                sqd_name: None,
             })
         }
         _ => {
@@ -157,19 +173,39 @@ pub async fn collect_metric<N: NodeConnection>(
                 true => timeout(babel_engine.consensus()).await.ok(),
                 false => None,
             };
+            let apr = match babel_engine.has_capability("apr") {
+                true => timeout(babel_engine.apr()).await.ok(),
+                false => None,
+            };
             let jobs = timeout(babel_engine.get_jobs())
                 .await
                 .ok()
                 .unwrap_or_default();
 
+            let jailed = match babel_engine.has_capability("jailed") {
+                true => timeout(babel_engine.jailed()).await.ok(),
+                false => None,
+            };
+            let jailed_reason = match babel_engine.has_capability("jailed_reason") {
+                true => timeout(babel_engine.jailed_reason()).await.ok(),
+                false => None,
+            };
+            let sqd_name = match babel_engine.has_capability("sqd_name") {
+                true => timeout(babel_engine.sqd_name()).await.ok(),
+                false => None,
+            };
             Some(Metric {
                 // these could be optional
                 height,
                 block_age,
                 consensus,
+                apr,
                 // these are expected in every chain
                 protocol_status,
                 jobs,
+                jailed,
+                jailed_reason,
+                sqd_name,
             })
         }
     }
@@ -248,7 +284,11 @@ impl From<Metrics> for pb::MetricsServiceNodeRequest {
                     node_status: v
                         .protocol_status
                         .map(|protocol_status| protocol_status.into()),
+                    apr: v.apr,
                     jobs,
+                    jailed: v.jailed,
+                    jailed_reason: v.jailed_reason,
+                    sqd_name: v.sqd_name,
                 }
             })
             .collect();

@@ -35,6 +35,10 @@ path = "src/bin/blockvisord-dev.rs"
 name = "nib"
 path = "src/bin/nib.rs"
 
+[[bin]]
+name = "snapper"
+path = "src/bin/snapper.rs"
+
 [dependencies]
 bv_utils = { version = "*", path = "../bv_utils" }
 async-trait = "0.1.87"
@@ -53,13 +57,20 @@ homedir = "0.3.4"
 ipnet = "2.11.0"
 lazy_static = "1.5.0"
 metrics = "0.24.1"
-petname = { version = "2.0.2", features = ["default-words", "default-rng"], default-features = false }
+petname = { version = "2.0.2", features = [
+    "default-words",
+    "default-rng",
+], default-features = false }
 prost = "0.11.9"
 prost-types = "0.11.9"
 rand = "0.9.0"
-reqwest = { version = "0.12.12", features = ["rustls-tls"], default-features = false }
+reqwest = { version = "0.12.12", features = [
+    "rustls-tls",
+], default-features = false }
 rpassword = "7.3.1"
-rumqttc = { version = "0.24.0", features = ["use-rustls"], default-features = false }
+rumqttc = { version = "0.24.0", features = [
+    "use-rustls",
+], default-features = false }
 rustls-native-certs = "0.8.1"
 semver = "1.0.26"
 serde = "1.0.218"
@@ -79,6 +90,7 @@ tracing = "0.1.41"
 uuid = { version = "1.15.1", features = ["serde", "v4"] }
 url = "2.5.4"
 walkdir = "2.5.0"
+zstd = "0.13.0"
 
 [build-dependencies]
 clap = { version = "4.5.31", features = ["derive", "cargo"] }

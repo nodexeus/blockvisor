@@ -183,6 +183,26 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         self.on_plugin(|plugin| plugin.block_age()).await
     }
 
+    /// Returns the APR (Annual Percentage Rate) of the node as a percentage value.
+    pub async fn apr(&mut self) -> Result<f64> {
+        self.on_plugin(|plugin| plugin.apr()).await
+    }
+
+    /// Returns the jailed status of the node.
+    pub async fn jailed(&mut self) -> Result<bool> {
+        self.on_plugin(|plugin| plugin.jailed()).await
+    }
+
+    /// Returns the jailed reason of the node.
+    pub async fn jailed_reason(&mut self) -> Result<String> {
+        self.on_plugin(|plugin| plugin.jailed_reason()).await
+    }
+
+    /// Returns the SQD name of the node.
+    pub async fn sqd_name(&mut self) -> Result<String> {
+        self.on_plugin(|plugin| plugin.sqd_name()).await
+    }
+
     /// Returns the name of the node. This is usually some random generated name that you may use
     /// to recognise the node, but the purpose may vary per protocol.
     /// ### Example
@@ -1147,6 +1167,23 @@ mod tests {
             self.engine.run_sh("consensus", None)?;
             Ok(true)
         }
+        fn apr(&self) -> Result<f64> {
+            self.engine.run_sh("apr", None)?;
+            Ok(1.1)
+        }
+        fn jailed(&self) -> Result<bool> {
+            self.engine.run_sh("jailed", None)?;
+            Ok(true)
+        }
+        fn jailed_reason(&self) -> Result<String> {
+            self.engine.run_sh("jailed_reason", None)?;
+            Ok(self.engine.run_sh("dummy reason", None)?.stdout)
+        }
+        fn sqd_name(&self) -> Result<String> {
+            self.engine.run_sh("sqd_name", None)?;
+            Ok(self.engine.run_sh("dummy name", None)?.stdout)
+        }
+
         fn protocol_status(&self) -> Result<ProtocolStatus> {
             self.engine.run_sh("protocol_status", None)?;
             Ok(ProtocolStatus {
@@ -1304,7 +1341,7 @@ mod tests {
                 connection,
                 SharedConfig::new(
                     Config {
-                        iface: "bvbr0".to_string(),
+                        iface: "br0".to_string(),
                         ..Default::default()
                     },
                     tmp_root.clone(),

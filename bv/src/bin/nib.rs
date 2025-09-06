@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     match args.command {
         Command::Login(nib_cli::LoginArgs {
             user_id,
-            blockjoy_api_url,
+            nodexeus_api_url,
         }) => {
             print!("email: ");
             std::io::stdout().flush()?;
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
             std::io::stdin().lock().read_line(&mut email)?;
             let password = rpassword::prompt_password("password: ")?;
             let mut client =
-                pb::auth_service_client::AuthServiceClient::connect(blockjoy_api_url.clone())
+                pb::auth_service_client::AuthServiceClient::connect(nodexeus_api_url.clone())
                     .await?;
             let login = client
                 .login(pb::AuthServiceLoginRequest {
@@ -44,7 +44,7 @@ async fn main() -> Result<()> {
                 })
                 .await?
                 .into_inner();
-            let channel = tonic::transport::Endpoint::from_shared(blockjoy_api_url.clone())?
+            let channel = tonic::transport::Endpoint::from_shared(nodexeus_api_url.clone())?
                 .connect()
                 .await?;
             let mut client = pb::api_key_service_client::ApiKeyServiceClient::with_interceptor(
@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
                 .into_inner();
             Config {
                 token: response.api_key,
-                blockjoy_api_url,
+                nodexeus_api_url,
             }
             .save()
             .await?;
@@ -111,7 +111,7 @@ impl ApiServiceConnector for NibConnector {
         let config = Config::load()
             .await
             .map_err(|err| Status::internal(format!("{err:#}")))?;
-        let endpoint = Endpoint::from_str(&config.blockjoy_api_url)
+        let endpoint = Endpoint::from_str(&config.nodexeus_api_url)
             .map_err(|err| Status::internal(format!("{err:#}")))?
             .connect_timeout(DEFAULT_API_CONNECT_TIMEOUT);
         let channel = Endpoint::connect_lazy(&endpoint);
