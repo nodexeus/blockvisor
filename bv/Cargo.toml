@@ -35,10 +35,6 @@ path = "src/bin/blockvisord-dev.rs"
 name = "nib"
 path = "src/bin/nib.rs"
 
-[[bin]]
-name = "snapper"
-path = "src/bin/snapper.rs"
-
 [dependencies]
 bv_utils = { version = "*", path = "../bv_utils" }
 async-trait = "0.1.87"
