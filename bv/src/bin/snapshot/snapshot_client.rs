@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, info};
 
-const CONFIG_FILENAME: &str = ".bv-snapshot.json";
+const CONFIG_FILENAME: &str = ".snapper.json";
 
 impl SnapshotConfig {
     pub async fn load() -> Result<Self> {
@@ -19,7 +19,7 @@ impl SnapshotConfig {
             .join(CONFIG_FILENAME);
 
         if !path.exists() {
-            bail!("You are not logged-in yet, please run `bv-snapshot auth login` first.");
+            bail!("You are not logged-in yet, please run `snapper auth login` first.");
         }
 
         debug!("Reading snapshot config: {}", path.display());
@@ -122,7 +122,7 @@ impl SnapshotClient {
         config.save().await?;
         self.config = Some(config);
 
-        println!("✓ Authentication successful! Config saved to ~/.bv-snapshot.json");
+        println!("✓ Authentication successful! Config saved to ~/.snapper.json");
 
         Ok(())
     }
@@ -132,7 +132,7 @@ impl SnapshotClient {
             // TODO: Could make a test API call to verify token is still valid
             Ok(format!("Authenticated with {}", config.api_url))
         } else {
-            Ok("Not authenticated. Run `bv-snapshot auth login` first.".to_string())
+            Ok("Not authenticated. Run `snapper auth login` first.".to_string())
         }
     }
 
@@ -195,18 +195,25 @@ impl SnapshotClient {
 
         // Use API service to get real metadata
         let api_service = ApiService::new(config.clone());
-        
+
         // If no version specified, get metadata to determine the latest version
         let (target_version, full_path) = if let Some(v) = version {
             // Use the specified version
             (v, format!("{}/{}", archive_id, v))
         } else {
             // Get metadata without version to fetch the latest
-            let latest_info = api_service.get_download_metadata_by_store_key(&archive_id).await?;
-            (latest_info.version, format!("{}/{}", archive_id, latest_info.version))
+            let latest_info = api_service
+                .get_download_metadata_by_store_key(&archive_id)
+                .await?;
+            (
+                latest_info.version,
+                format!("{}/{}", archive_id, latest_info.version),
+            )
         };
-        
-        let mut download_info = api_service.get_download_metadata_by_store_key(&full_path).await?;
+
+        let mut download_info = api_service
+            .get_download_metadata_by_store_key(&full_path)
+            .await?;
 
         // Override version info
         download_info.version = target_version;
@@ -238,11 +245,19 @@ impl SnapshotClient {
             (v, format!("{}/{}", archive_id, v))
         } else {
             // Get metadata without version to fetch the latest
-            let latest_info = api_service.get_download_metadata_by_store_key(&archive_id).await?;
-            (latest_info.version, format!("{}/{}", archive_id, latest_info.version))
+            let latest_info = api_service
+                .get_download_metadata_by_store_key(&archive_id)
+                .await?;
+            (
+                latest_info.version,
+                format!("{}/{}", archive_id, latest_info.version),
+            )
         };
 
-        println!("Starting download: {} (version {})", archive_id, target_version);
+        println!(
+            "Starting download: {} (version {})",
+            archive_id, target_version
+        );
         println!("Output directory: {}", config.output_dir.display());
         println!(
             "Workers: {}, Max connections: {}",
@@ -297,7 +312,7 @@ impl SnapshotClient {
     fn require_auth(&self) -> Result<&SnapshotConfig> {
         self.config
             .as_ref()
-            .ok_or_else(|| anyhow!("Not authenticated. Please run `bv-snapshot auth login` first."))
+            .ok_or_else(|| anyhow!("Not authenticated. Please run `snapper auth login` first."))
     }
 
     /// Refresh the JWT token using the refresh token
