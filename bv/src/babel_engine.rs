@@ -168,9 +168,17 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         Ok(())
     }
 
-    pub fn update_node_info(&mut self, node_image: NodeImage, properties: NodeProperties) {
+    pub async fn update_node_info(&mut self, node_image: NodeImage, properties: NodeProperties) -> Result<()> {
         self.node_info.image = node_image;
         self.node_info.properties = properties;
+        
+        // Restart the babel engine service with updated node_info
+        if self.server.is_some() {
+            self.stop().await?;
+            self.start().await?;
+        }
+        
+        Ok(())
     }
 
     /// Returns the height of the blockchain (in blocks).
