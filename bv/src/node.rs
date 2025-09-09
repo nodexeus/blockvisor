@@ -477,6 +477,8 @@ impl<P: Pal + Debug> Node<P> {
         self.machine.update_node_env(&self.state);
         self.node_env = self.machine.node_env();
         if params_changed && status == VmStatus::Running {
+            self.babel_engine
+                .update_node_info(self.state.image.clone(), self.state.properties.clone());
             self.babel_engine.init().await?;
             self.state.initialized = true;
             self.save_state().await?;
