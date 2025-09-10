@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{path::Path, sync::Arc, time::Duration};
-use tracing::Level;
+use tracing::{info, Level};
 
 /// GraphQL request type for Rhai
 #[derive(Debug, Deserialize)]
@@ -586,7 +586,7 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                             run_as: service.run_as,
                             use_protocol_data: false,
                             log_buffer_capacity_mb: service.log_buffer_capacity_mb,
-                            log_timestamp: service.log_timestamp,         // AuxServices are not archived by default
+                            log_timestamp: service.log_timestamp,
                         },
                         vec![],
                         vec![],
