@@ -144,6 +144,7 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         plugin_builder: F,
         node_env: NodeEnv,
     ) -> Result<()> {
+        info!("BabelEngine::update_plugin - creating engine with properties: {:?}", self.node_info.properties);
         let engine = Engine {
             node_id: self.node_info.node_id,
             tx: self.engine_tx.clone(),
@@ -151,10 +152,13 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
             node_env,
             node_context: self.node_context.clone(),
         };
+        info!("BabelEngine::update_plugin - calling plugin_builder");
         self.plugin = plugin_builder(engine)?;
+        info!("BabelEngine::update_plugin - plugin created successfully, updating capabilities");
         self.capabilities = self
             .on_plugin(move |plugin| Ok(plugin.capabilities()))
             .await?;
+        info!("BabelEngine::update_plugin - completed successfully");
         Ok(())
     }
 

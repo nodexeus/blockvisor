@@ -67,7 +67,6 @@ jobs:
           prerelease: false
           body_path: host_setup_guide.md
           files: |
-            /tmp/bundle-dev.tar.gz
             /tmp/bundle.tar.gz
             /tmp/bvup
             /tmp/bundle/blockvisor/bin/nib
@@ -84,7 +83,6 @@ jobs:
         with:
           name: blockvisor-artifacts-${{ steps.get_version.outputs.VERSION }}
           path: |
-            /tmp/bundle-dev.tar.gz
             /tmp/bundle.tar.gz
           retention-days: 7
           overwrite: true

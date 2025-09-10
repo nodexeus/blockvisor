@@ -101,6 +101,7 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
     }
 
     pub fn from_file(plugin_path: PathBuf, babel_engine: E) -> Result<Self> {
+        info!("RhaiPlugin::from_file - loading plugin from: {:?}", plugin_path);
         let babel_engine = Arc::new(babel_engine);
         let mut rhai_engine = Self::new_rhai_engine(babel_engine.clone());
         let plugin_dir = plugin_path
@@ -110,9 +111,11 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         rhai_engine.set_module_resolver(FileModuleResolver::new_with_path(&plugin_dir));
 
         // compile script to AST
+        info!("RhaiPlugin::from_file - compiling script");
         let ast = rhai_engine
             .compile_file(plugin_path)
             .with_context(|| "Rhai syntax error")?;
+        info!("RhaiPlugin::from_file - creating plugin instance");
         Self::new(ast, babel_engine, rhai_engine, Some(plugin_dir))
     }
 
@@ -583,7 +586,7 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                             run_as: service.run_as,
                             use_protocol_data: false,
                             log_buffer_capacity_mb: service.log_buffer_capacity_mb,
-                            log_timestamp: service.log_timestamp,
+                            log_timestamp: service.log_timestamp,         // AuxServices are not archived by default
                         },
                         vec![],
                         vec![],
@@ -1840,6 +1843,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec!["post_upload_job".to_string()],
@@ -1973,6 +1979,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],
@@ -2090,6 +2099,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec!["post_download_job".to_string()],
                     vec![],
@@ -2117,6 +2129,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],
