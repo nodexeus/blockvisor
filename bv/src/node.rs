@@ -762,13 +762,21 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Read script content and update plugin with metadata
     pub async fn reload_plugin(&mut self) -> Result<()> {
+        info!("Starting reload_plugin for node {}", self.state.id);
         let plugin_path = self.machine.plugin_path();
+        
+        info!("Current babel engine node_info properties: {:?}", self.babel_engine.node_info.properties);
+        info!("Current node state properties: {:?}", self.state.properties);
+        
         self.babel_engine
             .update_plugin(
                 |engine| RhaiPlugin::from_file(plugin_path, engine),
                 self.node_env.clone(),
             )
-            .await
+            .await?;
+            
+        info!("Completed reload_plugin for node {}", self.state.id);
+        Ok(())
     }
 
     pub async fn recover(&mut self) -> Result<()> {
