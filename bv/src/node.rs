@@ -488,7 +488,7 @@ impl<P: Pal + Debug> Node<P> {
                     node_env,
                     ramdisks: self.state.vm_config.ramdisks.clone(),
                 };
-                with_retry!(babel_client.setup_babel(babel_config)).map_err(into_internal)?;
+                with_retry!(babel_client.setup_babel(babel_config.clone())).map_err(into_internal)?;
             }
             
             self.state.initialized = true;
