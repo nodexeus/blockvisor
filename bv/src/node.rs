@@ -765,7 +765,7 @@ impl<P: Pal + Debug> Node<P> {
         info!("Starting reload_plugin for node {}", self.state.id);
         let plugin_path = self.machine.plugin_path();
         
-        info!("Current babel engine node_info properties: {:?}", self.babel_engine.node_info.properties);
+        // info!("Current babel engine node_info properties: {:?}", self.babel_engine.node_info.properties);
         info!("Current node state properties: {:?}", self.state.properties);
         
         self.babel_engine
