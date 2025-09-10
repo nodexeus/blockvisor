@@ -468,7 +468,7 @@ impl<P: Pal + Debug> Node<P> {
         }
         self.machine.update_node_env(&self.state);
         self.node_env = self.machine.node_env();
-        if params_changed && status == VmStatus::Running {
+        if params_changed {
             let plugin_path = self.machine.plugin_path();
             let node_env = self.machine.node_env();
             self.babel_engine
