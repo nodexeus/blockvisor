@@ -765,15 +765,27 @@ impl<P: Pal + Debug> Node<P> {
         info!("Starting reload_plugin for node {}", self.state.id);
         let plugin_path = self.machine.plugin_path();
         
-        // info!("Current babel engine node_info properties: {:?}", self.babel_engine.node_info.properties);
         info!("Current node state properties: {:?}", self.state.properties);
         
+        // Update babel engine with current node info and properties first
+        info!("Updating babel engine node info before plugin reload");
         self.babel_engine
+            .update_node_info(self.state.image.clone(), self.state.properties.clone())
+            .await?;
+        
+        let result = self.babel_engine
             .update_plugin(
                 |engine| RhaiPlugin::from_file(plugin_path, engine),
                 self.node_env.clone(),
             )
-            .await?;
+            .await;
+            
+        match &result {
+            Ok(_) => info!("update_plugin succeeded"),
+            Err(e) => error!("update_plugin failed: {:#}", e),
+        }
+        
+        result?;
             
         info!("Completed reload_plugin for node {}", self.state.id);
         Ok(())
