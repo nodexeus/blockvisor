@@ -770,32 +770,30 @@ impl<P: Pal + Debug> Node<P> {
         // Update babel engine with current node info and properties first
         info!("Updating babel engine node info before plugin reload");
         self.babel_engine
-        //     .update_node_info(self.state.image.clone(), self.state.properties.clone())
-        //     .await?;
+            .update_node_info(self.state.image.clone(), self.state.properties.clone())
+            .await?;
         
-        // let result = self.babel_engine
-        self.babel_engine
+        let result = self.babel_engine
             .update_plugin(
                 |engine| RhaiPlugin::from_file(plugin_path, engine),
                 self.node_env.clone(),
             )
-            .await
-        
+            .await;
             
-        // match &result {
-        //     Ok(_) => info!("update_plugin succeeded"),
-        //     Err(e) => error!("update_plugin failed: {:#}", e),
-        // }
+        match &result {
+            Ok(_) => info!("update_plugin succeeded"),
+            Err(e) => error!("update_plugin failed: {:#}", e),
+        }
         
-        // result?;
+        result?;
             
         // Explicitly reload plugin config to regenerate job configs
         info!("Reloading plugin config to regenerate job configs");
-        // self.babel_engine.reload_plugin_config().await?;
+        self.babel_engine.reload_plugin_config().await?;
             
         info!("Completed reload_plugin for node {}", self.state.id);
-        // Ok(())
-}
+        Ok(())
+    }
 
     pub async fn recover(&mut self) -> Result<()> {
         if self.recovery_backoff.backoff() {
