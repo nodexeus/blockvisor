@@ -469,10 +469,17 @@ impl<P: Pal + Debug> Node<P> {
         self.machine.update_node_env(&self.state);
         self.node_env = self.machine.node_env();
         if params_changed && status == VmStatus::Running {
+            let plugin_path = self.machine.plugin_path();
+            let node_env = self.machine.node_env();
             self.babel_engine
                 .update_node_info(self.state.image.clone(), self.state.properties.clone())
                 .await?;
-            self.babel_engine.init().await?;
+            self.babel_engine
+                .update_plugin(
+                    |engine| RhaiPlugin::from_file(plugin_path, engine),
+                    node_env,
+                )
+                .await?;
             self.state.initialized = true;
             self.save_state().await?;
         }

@@ -1,4 +1,4 @@
-name: Release BV
+name: Build and Release BV
 
 on:
   push:
@@ -93,6 +93,7 @@ jobs:
     name: Deploy to Dev
     needs: build
     runs-on: blockvisor
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-dev]'))
     environment:
       name: development
       url: https://app.dev.nodexeus.io
@@ -126,6 +127,7 @@ jobs:
     name: Deploy to Production
     needs: [build, deploy-dev]
     runs-on: blockvisor
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-prod]'))
     environment:
       name: production
       url: https://app.nodexeus.io

@@ -3,6 +3,6 @@ members = ["babel_api", "babel", "bv", "bv_utils", "bv_tests_utils"]
 resolver = "2"
 
 [workspace.package]
-version = "2.16.18"
+version = "2.16.19"
 edition = "2021"
 rust-version = "1.81.0"
