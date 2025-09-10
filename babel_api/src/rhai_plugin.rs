@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{path::Path, sync::Arc, time::Duration};
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 
 /// GraphQL request type for Rhai
 #[derive(Debug, Deserialize)]
@@ -518,6 +518,38 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
             Ok(None)
         }
     }
+
+    /// Recreate service job configurations after plugin config reload
+    fn recreate_services(&mut self) -> Result<()> {
+        info!("Recreating services with updated configuration...");
+        
+        let Some(config) = self.bare.plugin_config.clone() else {
+            info!("No plugin config available, skipping service recreation");
+            return Ok(());
+        };
+        
+        // Get current jobs to determine which are services that need to be recreated
+        let current_jobs = self.bare.babel_engine.get_jobs()?;
+        let service_names: Vec<String> = config.services.iter().map(|s| s.name.clone()).collect();
+        
+        // Stop existing service jobs
+        for service_name in &service_names {
+            if current_jobs.contains_key(service_name) {
+                info!("Stopping existing service job: {}", service_name);
+                if let Err(err) = self.bare.babel_engine.stop_job(service_name) {
+                    warn!("Failed to stop service job '{}': {:#}", service_name, err);
+                }
+            }
+        }
+        
+        // Recreate service jobs with updated configuration
+        // We'll use empty needs/wait_for since this is a configuration update on a running node
+        info!("Starting {} services with updated configuration", config.services.len());
+        self.bare.start_services(config.services, vec![], vec![])?;
+        
+        info!("Successfully recreated {} services", service_names.len());
+        Ok(())
+    }
 }
 
 impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
@@ -587,9 +619,9 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                             use_protocol_data: false,
                             log_buffer_capacity_mb: service.log_buffer_capacity_mb,
                             log_timestamp: service.log_timestamp,
-                            // data_dir: None,           // AuxServices don't have data directories
-                            // store_key: None,          // AuxServices don't have store keys  
-                            // archive: false,           // AuxServices are not archived by default
+                            data_dir: None,           // AuxServices don't have data directories
+                            store_key: None,          // AuxServices don't have store keys  
+                            archive: false,           // AuxServices are not archived by default
                         },
                         vec![],
                         vec![],
@@ -767,7 +799,10 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
             info!("No plugin config to save");
         }
         
-        info!("Plugin config reloaded successfully");
+        // Recreate services with the updated configuration
+        self.recreate_services()?;
+        
+        info!("Plugin config reloaded and services recreated successfully");
         Ok(())
     }
 
@@ -1880,9 +1915,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec!["post_upload_job".to_string()],
@@ -2016,9 +2051,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],
@@ -2136,9 +2171,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec!["post_download_job".to_string()],
                     vec![],
@@ -2166,9 +2201,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],
