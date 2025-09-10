@@ -741,11 +741,14 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
         
         // Register the node_params function in the scope
         let engine_clone = self.bare.babel_engine.clone();
-        scope.push_fn("node_params", move || {
+        let node_params_fn = move || -> Map {
             let params = engine_clone.node_params();
             info!("node_params() called, returning: {:?}", params);
             params.into_iter().map(|(k, v)| (k.into(), v.into())).collect::<Map>()
-        });
+        };
+        
+        // Use the Rhai engine to register the function
+        self.rhai_engine.register_fn("node_params", node_params_fn);
         
         // Run the AST with the updated scope
         info!("Running Rhai AST...");
