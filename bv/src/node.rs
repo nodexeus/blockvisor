@@ -469,11 +469,16 @@ impl<P: Pal + Debug> Node<P> {
         self.machine.update_node_env(&self.state);
         self.node_env = self.machine.node_env();
         if params_changed {
+            info!("Updating node parameters for node {}", self.state.id);
             let plugin_path = self.machine.plugin_path();
             let node_env = self.machine.node_env();
+            
+            info!("Updating babel engine node info with new properties: {:?}", self.state.properties);
             self.babel_engine
                 .update_node_info(self.state.image.clone(), self.state.properties.clone())
                 .await?;
+                
+            info!("Updating babel engine plugin");
             self.babel_engine
                 .update_plugin(
                     |engine| RhaiPlugin::from_file(plugin_path, engine),
@@ -483,12 +488,16 @@ impl<P: Pal + Debug> Node<P> {
             
             // Apply the updated configuration to the running node
             if status == VmStatus::Running {
+                info!("Node is running, applying babel configuration update");
                 let babel_client = self.babel_engine.node_connection.babel_client().await?;
                 let babel_config = BabelConfig {
                     node_env,
                     ramdisks: self.state.vm_config.ramdisks.clone(),
                 };
                 with_retry!(babel_client.setup_babel(babel_config.clone())).map_err(into_internal)?;
+                info!("Successfully applied parameter updates to running node {}", self.state.id);
+            } else {
+                info!("Node is not running (status: {:?}), parameters will be applied on next start", status);
             }
             
             self.state.initialized = true;
