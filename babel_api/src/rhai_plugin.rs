@@ -1846,9 +1846,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        data_dir: None,
-                        store_key: None,
-                        archive: true,      // Default to archived
+                        // data_dir: None,
+                        // store_key: None,
+                        // archive: true,      // Default to archived
                     },
                     vec![],
                     vec!["post_upload_job".to_string()],
