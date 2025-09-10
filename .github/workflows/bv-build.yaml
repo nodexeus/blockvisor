@@ -84,6 +84,9 @@ jobs:
           name: blockvisor-artifacts-${{ steps.get_version.outputs.VERSION }}
           path: |
             /tmp/bundle.tar.gz
+            /tmp/bvup
+            /tmp/bundle/blockvisor/bin/nib
+            /tmp/snapper
           retention-days: 7
           overwrite: true
 
