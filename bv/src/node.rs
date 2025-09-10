@@ -495,6 +495,11 @@ impl<P: Pal + Debug> Node<P> {
                     ramdisks: self.state.vm_config.ramdisks.clone(),
                 };
                 with_retry!(babel_client.setup_babel(babel_config.clone())).map_err(into_internal)?;
+                
+                // Explicitly reload plugin config to regenerate job configs with new parameters
+                info!("Reloading plugin config to regenerate job configs with new parameters");
+                self.babel_engine.reload_plugin_config().await.map_err(into_internal)?;
+                
                 info!("Successfully applied parameter updates to running node {}", self.state.id);
             } else {
                 info!("Node is not running (status: {:?}), parameters will be applied on next start", status);
