@@ -82,6 +82,37 @@ impl PluginConfig {
                 .all(|service| unique.insert(&service.name)),
             "Services names are not unique"
         );
+        
+        // Validate service configurations (R1 requirements)
+        for service in &self.services {
+            // R1.2: Validate store_key is present for archived services
+            if service.archive && service.store_key.is_none() {
+                return Err(eyre::anyhow!(
+                    "Service '{}' has archive=true but no store_key specified", 
+                    service.name
+                ));
+            }
+            
+            // R1.1: Validate data_dir format if specified
+            if let Some(data_dir) = &service.data_dir {
+                ensure!(
+                    !data_dir.is_empty() && !data_dir.starts_with('/') && !data_dir.contains(".."),
+                    "Service '{}' data_dir '{}' must be a relative path without '..' components",
+                    service.name,
+                    data_dir
+                );
+            }
+            
+            // R1.2: Validate store_key format if specified
+            if let Some(store_key) = &service.store_key {
+                ensure!(
+                    !store_key.is_empty() && store_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+                    "Service '{}' store_key '{}' must contain only alphanumeric characters, hyphens, and underscores",
+                    service.name,
+                    store_key
+                );
+            }
+        }
         if let Some(pre_upload) = &self.pre_upload {
             ensure!(
                 pre_upload.jobs.iter().all(|job| unique.insert(&job.name)),
@@ -227,8 +258,24 @@ pub struct Service {
     pub log_buffer_capacity_mb: Option<usize>,
     /// Prepend timestamp to each log, or not.
     pub log_timestamp: Option<bool>,
+    /// Data directory for this service relative to protocol_data_path.
+    /// If not specified, defaults to the service name.
+    /// R1.1: Per-client data directories
+    pub data_dir: Option<String>,
+    /// Store key identifier for this service's snapshot archive.
+    /// Should be resolved from variant-specific configuration.
+    /// R1.2: Individual store key identifiers
+    pub store_key: Option<String>,
+    /// Whether this service should be archived.
+    /// R1.3: Archive control (defaults to true)
+    #[serde(default = "default_archive")]
+    pub archive: bool,
 }
 fn default_use_protocol_data() -> bool {
+    true
+}
+
+fn default_archive() -> bool {
     true
 }
 
@@ -501,5 +548,226 @@ pub fn build_upload_job_config(value: Option<Upload>, pre_upload_jobs: Vec<Strin
             use_protocol_data: None,
             one_time: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_service_default_values() {
+        let json = r#"{
+            "name": "test_service",
+            "run_sh": "/usr/bin/test"
+        }"#;
+        
+        let service: Service = serde_json::from_str(json).unwrap();
+        assert_eq!(service.name, "test_service");
+        assert_eq!(service.run_sh, "/usr/bin/test");
+        assert!(service.use_protocol_data); // default_use_protocol_data
+        assert!(service.archive); // default_archive
+        assert!(service.data_dir.is_none());
+        assert!(service.store_key.is_none());
+    }
+
+    #[test]
+    fn test_service_with_all_fields() {
+        let json = r#"{
+            "name": "reth",
+            "run_sh": "/usr/bin/reth node",
+            "use_protocol_data": false,
+            "archive": false,
+            "data_dir": "ethereum-data",
+            "store_key": "ethereum-reth-mainnet-v1"
+        }"#;
+        
+        let service: Service = serde_json::from_str(json).unwrap();
+        assert_eq!(service.name, "reth");
+        assert_eq!(service.run_sh, "/usr/bin/reth node");
+        assert!(!service.use_protocol_data);
+        assert!(!service.archive);
+        assert_eq!(service.data_dir, Some("ethereum-data".to_string()));
+        assert_eq!(service.store_key, Some("ethereum-reth-mainnet-v1".to_string()));
+    }
+
+    #[test]
+    fn test_service_serialization() {
+        let service = Service {
+            name: "lighthouse".to_string(),
+            run_sh: "/usr/bin/lighthouse bn".to_string(),
+            restart_config: None,
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            run_as: None,
+            use_protocol_data: true,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            data_dir: Some("beacon".to_string()),
+            store_key: Some("ethereum-lighthouse-mainnet-v1".to_string()),
+            archive: true,
+        };
+
+        let json = serde_json::to_string(&service).unwrap();
+        let deserialized: Service = serde_json::from_str(&json).unwrap();
+        
+        assert_eq!(service.name, deserialized.name);
+        assert_eq!(service.data_dir, deserialized.data_dir);
+        assert_eq!(service.store_key, deserialized.store_key);
+        assert_eq!(service.archive, deserialized.archive);
+    }
+
+    #[test]
+    fn test_plugin_config_with_multi_client_services() {
+        let json = r#"{
+            "services": [
+                {
+                    "name": "reth",
+                    "run_sh": "/usr/bin/reth node",
+                    "store_key": "ethereum-reth-mainnet-v1",
+                    "archive": true
+                },
+                {
+                    "name": "lighthouse",
+                    "run_sh": "/usr/bin/lighthouse bn",
+                    "data_dir": "beacon",
+                    "store_key": "ethereum-lighthouse-mainnet-v1",
+                    "archive": true
+                },
+                {
+                    "name": "monitoring",
+                    "run_sh": "/usr/bin/prometheus",
+                    "archive": false
+                }
+            ]
+        }"#;
+        
+        let config: PluginConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.services.len(), 3);
+        
+        // Check reth service
+        let reth = &config.services[0];
+        assert_eq!(reth.name, "reth");
+        assert_eq!(reth.store_key, Some("ethereum-reth-mainnet-v1".to_string()));
+        assert!(reth.archive);
+        assert!(reth.data_dir.is_none()); // Should default to service name
+        
+        // Check lighthouse service
+        let lighthouse = &config.services[1];
+        assert_eq!(lighthouse.name, "lighthouse");
+        assert_eq!(lighthouse.data_dir, Some("beacon".to_string()));
+        assert_eq!(lighthouse.store_key, Some("ethereum-lighthouse-mainnet-v1".to_string()));
+        assert!(lighthouse.archive);
+        
+        // Check monitoring service (not archived)
+        let monitoring = &config.services[2];
+        assert_eq!(monitoring.name, "monitoring");
+        assert!(!monitoring.archive);
+        assert!(monitoring.store_key.is_none());
+    }
+
+    #[test]
+    fn test_validate_services() {
+        let valid_service = Service {
+            name: "valid_service".to_string(),
+            run_sh: "/usr/bin/valid".to_string(),
+            restart_config: None,
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            run_as: None,
+            use_protocol_data: true,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            data_dir: Some("valid-dir".to_string()),
+            store_key: Some("valid-store-key-v1".to_string()),
+            archive: true,
+        };
+        
+        let config = PluginConfig {
+            config_files: None,
+            aux_services: None,
+            init: None,
+            download: None,
+            alternative_download: None,
+            post_download: None,
+            cold_init: None,
+            services: vec![valid_service],
+            pre_upload: None,
+            upload: None,
+            post_upload: None,
+            scheduled: None,
+        };
+        
+        // Should not panic or fail
+        assert!(config.services.len() == 1);
+        assert!(config.services[0].archive);
+        assert!(config.services[0].store_key.is_some());
+    }
+
+    #[test]
+    fn test_default_functions() {
+        assert!(default_use_protocol_data());
+        assert!(default_archive());
+    }
+
+    #[test] 
+    fn test_service_build_job_config() {
+        let service = Service {
+            name: "test_service".to_string(),
+            run_sh: "/usr/bin/test".to_string(),
+            restart_config: None,
+            shutdown_timeout_secs: Some(30),
+            shutdown_signal: None,
+            run_as: None,
+            use_protocol_data: true,
+            log_buffer_capacity_mb: Some(10),
+            log_timestamp: Some(true),
+            data_dir: Some("test-data".to_string()),
+            store_key: Some("test-store-key-v1".to_string()),
+            archive: true,
+        };
+        
+        let needs = vec!["init1".to_string(), "init2".to_string()];
+        let wait_for = vec!["download".to_string()];
+        
+        let job_config = build_service_job_config(service, needs.clone(), wait_for.clone());
+        
+        assert!(matches!(job_config.job_type, JobType::RunSh(_)));
+        assert!(matches!(job_config.restart, engine::RestartPolicy::Always(_)));
+        assert_eq!(job_config.shutdown_timeout_secs, Some(30));
+        assert_eq!(job_config.needs, Some(needs));
+        assert_eq!(job_config.wait_for, Some(wait_for));
+        assert_eq!(job_config.log_buffer_capacity_mb, Some(10));
+        assert_eq!(job_config.log_timestamp, Some(true));
+        assert_eq!(job_config.use_protocol_data, Some(true));
+    }
+
+    #[test]
+    fn test_service_without_protocol_data() {
+        let service = Service {
+            name: "auxiliary_service".to_string(),
+            run_sh: "/usr/bin/aux".to_string(),
+            restart_config: None,
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            run_as: None,
+            use_protocol_data: false,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            data_dir: None,
+            store_key: None,
+            archive: false,
+        };
+        
+        let needs = vec!["init1".to_string()];
+        let wait_for = vec!["download".to_string()];
+        
+        let job_config = build_service_job_config(service, needs, wait_for);
+        
+        // Service that doesn't use protocol data shouldn't have needs or wait_for
+        assert_eq!(job_config.needs, None);
+        assert_eq!(job_config.wait_for, None);
+        assert_eq!(job_config.use_protocol_data, Some(false));
     }
 }

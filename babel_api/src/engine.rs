@@ -130,6 +130,8 @@ pub struct NodeEnv {
     pub data_mount_point: PathBuf,
     /// Absolute path to directory where protocol data are stored.
     pub protocol_data_path: PathBuf,
+    /// Runtime configuration properties (key-value pairs).
+    pub properties: std::collections::HashMap<String, String>,
 }
 
 /// Structure describing where decompressed data shall be written to and how many bytes.
@@ -295,6 +297,24 @@ pub enum JobType {
         url_expires_secs: Option<u32>,
         /// Version number for uploaded data. Auto-assigned if `None`.
         data_version: Option<u64>,
+    },
+    /// R2.4: Multi-client upload - uploads multiple clients in parallel
+    MultiClientUpload {
+        /// Maximum number of parallel opened connections.
+        max_connections: Option<usize>,
+        /// Maximum number of parallel workers.
+        max_runners: Option<usize>,
+        /// Seconds after which presigned urls in generated `UploadManifest` may expire.
+        url_expires_secs: Option<u32>,
+        /// Version number for uploaded data. Auto-assigned if `None`.
+        data_version: Option<u64>,
+    },
+    /// R3.1: Multi-client download - downloads multiple clients in parallel  
+    MultiClientDownload {
+        /// Maximum number of parallel opened connections.
+        max_connections: Option<usize>,
+        /// Maximum number of parallel workers.
+        max_runners: Option<usize>,
     },
 }
 
