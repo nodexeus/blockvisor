@@ -42,6 +42,15 @@ const UPLOAD_SINGLE_CHUNK_TIMEOUT: Duration = Duration::from_secs(50 * 60);
 const BLUEPRINT_FILENAME: &str = "upload.blueprint";
 const CHUNKS_FILENAME: &str = "upload.chunks";
 
+/// R2.1: Configuration for a client-specific archive
+#[derive(Debug, Clone)]
+pub struct ClientArchiveConfig {
+    pub client_name: String,
+    pub data_directory: PathBuf,           // /blockjoy/protocol_data/reth
+    pub store_key: String,
+    pub exclude_patterns: Vec<Pattern>,
+}
+
 #[derive(Debug, Error)]
 pub enum NonRecoverableError {
     #[error("file {file_path} disapeared: {err:#}")]
@@ -330,6 +339,98 @@ impl<C: BabelEngineConnector> Uploader<C> {
             compression: self.config.compression,
             chunks,
         })
+    }
+    
+    /// R2.1: Parse main.rhai to extract services that should be archived (default true)
+    pub fn get_archivable_clients(&self, plugin_config: &babel_api::plugin_config::PluginConfig) -> Result<Vec<ClientArchiveConfig>> {
+        let protocol_data_path = &self.config.data_mount_point;
+        
+        plugin_config.services.iter()
+            .filter(|service| service.archive)                      // R2.1: Archive by default unless explicitly false
+            .filter(|service| service.store_key.is_some())          // Only services with store_key
+            .map(|service| {
+                let data_dir_name = service.data_dir.as_ref()
+                    .unwrap_or(&service.name);                       // R1.1: Default to service name
+                let data_dir = protocol_data_path.join(data_dir_name);
+                Ok(ClientArchiveConfig {
+                    client_name: service.name.clone(),
+                    data_directory: data_dir,
+                    store_key: service.store_key.clone().unwrap(),   // R2.2: Individual store key
+                    exclude_patterns: self.exclude.clone(),
+                })
+            })
+            .collect()
+    }
+}
+
+/// R2.4: Multi-client uploader that uploads each client separately
+pub struct MultiClientUploader<C> {
+    connector: C,
+    config: TransferConfig,
+    url_expires_secs: u32,
+    data_version: Option<u64>,
+}
+
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploader<C> {
+    pub fn new(
+        connector: C,
+        url_expires_secs: Option<u32>,
+        data_version: Option<u64>,
+        config: TransferConfig,
+    ) -> Self {
+        let url_expires_secs = url_expires_secs.unwrap_or(3600 + (config.max_runners as u32) * 15);
+        Self {
+            connector,
+            config,
+            url_expires_secs,
+            data_version,
+        }
+    }
+
+    /// R2.4: Upload multiple clients in parallel
+    pub async fn upload_all_clients(&mut self, clients: Vec<ClientArchiveConfig>, mut run: RunFlag) -> Result<()> {
+        let mut upload_futures = FuturesUnordered::new();
+        
+        for client in clients {
+            let mut uploader = Uploader::new(
+                self.connector.clone(),
+                client.data_directory.clone(),
+                client.exclude_patterns.iter().map(|p| p.as_str().to_string()).collect(), // Convert Pattern back to String
+                None, // auto-calculate chunks
+                Some(self.url_expires_secs),
+                self.data_version,
+                self.config.clone(),
+            )?;
+            
+            let client_name = client.client_name.clone();
+            let run_flag = run.child_flag();
+            upload_futures.push(Box::pin(async move {
+                let result = uploader.run(run_flag).await;
+                (client_name, result)
+            }));
+        }
+        
+        // Wait for all uploads to complete
+        while let Some((client_name, result)) = upload_futures.next().await {
+            match result {
+                Ok(_) => tracing::info!("Client '{}' upload completed", client_name),
+                Err(err) => {
+                    tracing::error!("Client '{}' upload failed: {:#}", client_name, err);
+                    return Err(err.wrap_err(format!("Client '{}' upload failed", client_name)));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for MultiClientUploader<C> {
+    async fn run(&mut self, _run: RunFlag) -> Result<()> {
+        // This would need to be called from the main job runner with the parsed plugin config
+        // For now, we'll return an error since we need the plugin config to determine clients
+        bail!("MultiClientUploader::run() should not be called directly. Use upload_all_clients() instead.")
     }
 }
 

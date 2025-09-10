@@ -43,6 +43,14 @@ const CHUNKS_FILENAME: &str = "download.chunks";
 const PARTS_FILENAME: &str = "download.parts";
 const METADATA_FILENAME: &str = "download.metadata";
 
+/// R3.1: Configuration for a client-specific download
+#[derive(Debug, Clone)]
+pub struct ClientDownloadConfig {
+    pub client_name: String,
+    pub data_directory: PathBuf,           // /blockjoy/protocol_data/reth
+    pub store_key: String,
+}
+
 pub fn cleanup_job(meta_dir: &Path, destination_dir: &Path) -> Result<()> {
     let chunks_path = meta_dir.join(CHUNKS_FILENAME);
     if chunks_path.exists() {
@@ -239,6 +247,102 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
                 .with_context(|| format!("can't set times for `{}`", full_path.display()))?;
         }
         Ok(())
+    }
+}
+
+/// R3.1: Multi-client downloader that creates separate download jobs for each client
+pub struct MultiClientDownloader<C> {
+    connector: C,
+    config: TransferConfig,
+}
+
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloader<C> {
+    pub fn new(connector: C, config: TransferConfig) -> Self {
+        Self { connector, config }
+    }
+
+    /// R3.1: Create separate download jobs for each required client
+    pub fn create_multi_client_jobs(
+        connector: C, 
+        clients: Vec<ClientDownloadConfig>,
+        config: TransferConfig
+    ) -> Vec<(String, Downloader<C>)> {
+        clients.into_iter().map(|client| {
+            let job_name = format!("download_{}", client.client_name);  // R3.1: Named jobs
+            let downloader = Downloader::new(
+                connector.clone(),
+                client.data_directory,      // R3.2: Client-specific directory
+                config.clone(),
+            );
+            (job_name, downloader)
+        }).collect()
+    }
+    
+    /// R3.2: Download to client-specific subdirectory
+    async fn get_client_metadata(&self, store_key: &str) -> Result<(DownloadMetadata, Vec<Chunk>)> {
+        let metadata_path = self.config.archive_jobs_meta_dir
+            .join(format!("{}_metadata.json", store_key));
+            
+        if metadata_path.exists() {
+            // Load existing metadata for this specific client
+            let metadata = load_job_data::<DownloadMetadata>(&metadata_path)?;
+            let chunks_path = self.config.archive_jobs_meta_dir
+                .join(format!("{}_chunks.json", store_key));
+            let chunks = load_chunks(&chunks_path).unwrap_or_default();
+            Ok((metadata, chunks))
+        } else {
+            // Fetch metadata from API for this specific client
+            let mut client = self.connector.connect();
+            let metadata = with_selective_retry!(client.get_download_metadata(with_timeout(
+                (),
+                Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+            )))?
+            .into_inner();
+            save_job_data(&metadata_path, &metadata)?;
+            Ok((metadata, vec![]))
+        }
+    }
+
+    /// R3.1: Download all clients in parallel
+    pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
+        let mut download_futures = FuturesUnordered::new();
+        
+        for client in clients {
+            let mut downloader = Downloader::new(
+                self.connector.clone(),
+                client.data_directory.clone(),
+                self.config.clone(),
+            );
+            
+            let client_name = client.client_name.clone();
+            let run_flag = run.child_flag();
+            download_futures.push(Box::pin(async move {
+                let result = downloader.run(run_flag).await;
+                (client_name, result)
+            }));
+        }
+        
+        // Wait for all downloads to complete
+        while let Some((client_name, result)) = download_futures.next().await {
+            match result {
+                Ok(_) => tracing::info!("Client '{}' download completed", client_name),
+                Err(err) => {
+                    tracing::error!("Client '{}' download failed: {:#}", client_name, err);
+                    return Err(err.wrap_err(format!("Client '{}' download failed", client_name)));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for MultiClientDownloader<C> {
+    async fn run(&mut self, _run: RunFlag) -> Result<()> {
+        // This would need to be called from the main job runner with the parsed plugin config
+        // For now, we'll return an error since we need the plugin config to determine clients
+        bail!("MultiClientDownloader::run() should not be called directly. Use download_all_clients() instead.")
     }
 }
 

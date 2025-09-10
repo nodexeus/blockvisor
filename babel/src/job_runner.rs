@@ -1,8 +1,8 @@
-use crate::download_job::Downloader;
+use crate::download_job::{Downloader, MultiClientDownloader};
 use crate::jobs::PERSISTENT_JOBS_META_DIR;
 use crate::log_buffer::LogBuffer;
 use crate::run_sh_job::RunShJob;
-use crate::upload_job::Uploader;
+use crate::upload_job::{Uploader, MultiClientUploader};
 use crate::{
     chroot_platform, jobs,
     pal::BabelEngineConnector,
@@ -174,6 +174,63 @@ pub async fn run_job(
             .run(run, &job_name, &jobs::JOBS_DIR)
             .await;
         }
+        JobType::MultiClientUpload {
+            max_connections,
+            max_runners,
+            url_expires_secs,
+            data_version,
+        } => {
+            // R2.4: Parse plugin config to get archivable clients
+            let _multi_uploader = MultiClientUploader::new(
+                connector,
+                url_expires_secs,
+                data_version,
+                build_transfer_config(
+                    babel_config.node_env.data_mount_point.clone(),
+                    job_dir.join(jobs::PROGRESS_FILENAME),
+                    None, // Compression will be handled per-client
+                    max_connections.unwrap_or(DEFAULT_MAX_UPLOAD_CONNECTIONS),
+                    max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
+                )?,
+            );
+
+            // This would need the parsed plugin config to determine which clients to upload
+            // For now, we'll return an error directing to use the proper interface
+            save_job_status(
+                &JobStatus::Finished {
+                    exit_code: Some(-1),
+                    message: "Multi-client upload requires plugin configuration. Use upload_all_clients() instead.".to_string(),
+                },
+                &job_name,
+                &jobs::JOBS_DIR,
+            ).await;
+        }
+        JobType::MultiClientDownload {
+            max_connections,
+            max_runners,
+        } => {
+            // R3.1: Multi-client download handler
+            let _multi_downloader = MultiClientDownloader::new(
+                connector,
+                build_transfer_config(
+                    babel_config.node_env.data_mount_point.clone(),
+                    job_dir.join(jobs::PROGRESS_FILENAME),
+                    None,
+                    max_connections.unwrap_or(DEFAULT_MAX_DOWNLOAD_CONNECTIONS),
+                    max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
+                )?,
+            );
+
+            // Similar to upload, this needs plugin configuration
+            save_job_status(
+                &JobStatus::Finished {
+                    exit_code: Some(-1),
+                    message: "Multi-client download requires plugin configuration. Use download_all_clients() instead.".to_string(),
+                },
+                &job_name,
+                &jobs::JOBS_DIR,
+            ).await;
+        }
     }
     if job_config.one_time == Some(true) {
         jobs::backup_job(&babel_config.node_env.data_mount_point, &job_name, &job_dir)?;
@@ -193,7 +250,10 @@ fn build_transfer_config(
     if !archive_jobs_meta_dir.exists() {
         fs::create_dir_all(&archive_jobs_meta_dir)?;
     }
+    #[cfg(target_os = "linux")]
     let max_opened_files = usize::try_from(rlimit::increase_nofile_limit(MAX_OPENED_FILES)?)?;
+    #[cfg(not(target_os = "linux"))]
+    let max_opened_files = usize::try_from(MAX_OPENED_FILES).unwrap_or(1024);
     Ok(TransferConfig {
         max_opened_files,
         max_runners,
