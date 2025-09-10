@@ -727,13 +727,44 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
     }
 
     fn reload_plugin_config(&mut self) -> Result<()> {
-        self.rhai_engine.run_ast(&self.bare.ast)?;
+        info!("Reloading plugin configuration...");
+        
+        // Create a new scope for this execution
+        let mut scope = rhai::Scope::new();
+        
+        // Get fresh node params and add them to the scope as a constant
+        let params = self.bare.babel_engine.node_params();
+        info!("Current node parameters: {:?}", params);
+        
+        let params_map: Map = params.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        scope.push_constant("NODE_PARAMS", params_map);
+        
+        // Register the node_params function in the scope
+        let engine_clone = self.bare.babel_engine.clone();
+        scope.push_fn("node_params", move || {
+            let params = engine_clone.node_params();
+            info!("node_params() called, returning: {:?}", params);
+            params.into_iter().map(|(k, v)| (k.into(), v.into())).collect::<Map>()
+        });
+        
+        // Run the AST with the updated scope
+        info!("Running Rhai AST...");
+        self.rhai_engine.run_ast_with_scope(&mut scope, &self.bare.ast)?;
+        
+        // Get the updated plugin config
+        info!("Getting plugin config...");
         self.bare.plugin_config = self.get_config(PLUGIN_CONFIG_FN_NAME)?;
 
+        // Save the config if it exists
         if let Some(plugin_config) = &mut self.bare.plugin_config {
+            info!("Validating and saving plugin config...");
             plugin_config.validate()?;
             self.bare.babel_engine.save_config(plugin_config)?;
+        } else {
+            info!("No plugin config to save");
         }
+        
+        info!("Plugin config reloaded successfully");
         Ok(())
     }
 
