@@ -477,9 +477,20 @@ impl<P: Pal + Debug> Node<P> {
             self.babel_engine
                 .update_plugin(
                     |engine| RhaiPlugin::from_file(plugin_path, engine),
-                    node_env,
+                    node_env.clone(),
                 )
                 .await?;
+            
+            // Apply the updated configuration to the running node
+            if status == VmStatus::Running {
+                let babel_client = self.babel_engine.node_connection.babel_client().await?;
+                let babel_config = BabelConfig {
+                    node_env,
+                    ramdisks: self.state.vm_config.ramdisks.clone(),
+                };
+                with_retry!(babel_client.setup_babel(babel_config))?;
+            }
+            
             self.state.initialized = true;
             self.save_state().await?;
         }
