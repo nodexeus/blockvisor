@@ -223,14 +223,6 @@ impl<P: Pal + Debug> Node<P> {
             } else if let Err(err) = check_job_runner(&mut node_conn, pal.job_runner_path()).await {
                 warn!("failed to check/update job runner on running node {node_id}: {err:#}");
                 node_conn.close();
-            } else if state.image.uri.starts_with("legacy://") {
-                // LEGACY node support - remove once all nodes upgraded
-                let babel_client = node_conn.babel_client().await?;
-                let babel_config = BabelConfig {
-                    node_env: node_env.clone(),
-                    ramdisks: state.vm_config.ramdisks.clone(),
-                };
-                with_retry!(babel_client.setup_babel(babel_config.clone()))?;
             }
         }
         let mut babel_engine = BabelEngine::new(
@@ -476,8 +468,43 @@ impl<P: Pal + Debug> Node<P> {
         }
         self.machine.update_node_env(&self.state);
         self.node_env = self.machine.node_env();
-        if params_changed && status == VmStatus::Running {
-            self.babel_engine.init().await?;
+        if params_changed {
+            info!("Updating node parameters for node {}", self.state.id);
+            let plugin_path = self.machine.plugin_path();
+            let node_env = self.machine.node_env();
+            
+            info!("Updating babel engine node info with new properties: {:?}", self.state.properties);
+            self.babel_engine
+                .update_node_info(self.state.image.clone(), self.state.properties.clone())
+                .await?;
+                
+            info!("Updating babel engine plugin");
+            self.babel_engine
+                .update_plugin(
+                    |engine| RhaiPlugin::from_file(plugin_path, engine),
+                    node_env.clone(),
+                )
+                .await?;
+            
+            // Apply the updated configuration to the running node
+            if status == VmStatus::Running {
+                info!("Node is running, applying babel configuration update");
+                let babel_client = self.babel_engine.node_connection.babel_client().await?;
+                let babel_config = BabelConfig {
+                    node_env,
+                    ramdisks: self.state.vm_config.ramdisks.clone(),
+                };
+                with_retry!(babel_client.setup_babel(babel_config.clone())).map_err(into_internal)?;
+                
+                // Reload plugin config which will also recreate service job configs with new parameters
+                info!("Reloading plugin config to regenerate job configs with new parameters");
+                self.babel_engine.reload_plugin_config().await.map_err(into_internal)?;
+                
+                info!("Successfully applied parameter updates to running node {}", self.state.id);
+            } else {
+                info!("Node is not running (status: {:?}), parameters will be applied on next start", status);
+            }
+            
             self.state.initialized = true;
             self.save_state().await?;
         }
@@ -617,7 +644,8 @@ impl<P: Pal + Debug> Node<P> {
             let node_env = self.machine.node_env();
             self.node_env = node_env.clone();
             self.babel_engine
-                .update_node_info(self.state.image.clone(), self.state.properties.clone());
+                .update_node_info(self.state.image.clone(), self.state.properties.clone())
+                .await?;
             let res = self
                 .babel_engine
                 .update_plugin(
@@ -699,7 +727,8 @@ impl<P: Pal + Debug> Node<P> {
             let node_env = self.machine.node_env();
             self.node_env = node_env.clone();
             self.babel_engine
-                .update_node_info(self.state.image.clone(), self.state.properties.clone());
+                .update_node_info(self.state.image.clone(), self.state.properties.clone())
+                .await?;
             self.babel_engine
                 .update_plugin(
                     |engine| RhaiPlugin::from_file(plugin_path, engine),
@@ -738,13 +767,37 @@ impl<P: Pal + Debug> Node<P> {
 
     /// Read script content and update plugin with metadata
     pub async fn reload_plugin(&mut self) -> Result<()> {
+        info!("Starting reload_plugin for node {}", self.state.id);
         let plugin_path = self.machine.plugin_path();
+        
+        info!("Current node state properties: {:?}", self.state.properties);
+        
+        // Update babel engine with current node info and properties first
+        info!("Updating babel engine node info before plugin reload");
         self.babel_engine
+            .update_node_info(self.state.image.clone(), self.state.properties.clone())
+            .await?;
+        
+        let result = self.babel_engine
             .update_plugin(
                 |engine| RhaiPlugin::from_file(plugin_path, engine),
                 self.node_env.clone(),
             )
-            .await
+            .await;
+            
+        match &result {
+            Ok(_) => info!("update_plugin succeeded"),
+            Err(e) => error!("update_plugin failed: {:#}", e),
+        }
+        
+        result?;
+            
+        // Explicitly reload plugin config to regenerate job configs
+        info!("Reloading plugin config to regenerate job configs");
+        self.babel_engine.reload_plugin_config().await?;
+            
+        info!("Completed reload_plugin for node {}", self.state.id);
+        Ok(())
     }
 
     pub async fn recover(&mut self) -> Result<()> {

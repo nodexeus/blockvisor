@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{path::Path, sync::Arc, time::Duration};
-use tracing::Level;
+use tracing::{info, warn, Level};
 
 /// GraphQL request type for Rhai
 #[derive(Debug, Deserialize)]
@@ -40,8 +40,6 @@ pub const PLUGIN_CONFIG_CONST_NAME: &str = "PLUGIN_CONFIG";
 pub const PLUGIN_CONFIG_FN_NAME: &str = "plugin_config";
 const INIT_FN_NAME: &str = "init";
 const PROTOCOL_STATUS_FN_NAME: &str = "protocol_status";
-const BASE_CONFIG_CONST_NAME: &str = "BASE_CONFIG";
-const BASE_CONFIG_FN_NAME: &str = "base_config";
 
 #[derive(Debug)]
 pub struct RhaiPlugin<E> {
@@ -103,6 +101,7 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
     }
 
     pub fn from_file(plugin_path: PathBuf, babel_engine: E) -> Result<Self> {
+        info!("RhaiPlugin::from_file - loading plugin from: {:?}", plugin_path);
         let babel_engine = Arc::new(babel_engine);
         let mut rhai_engine = Self::new_rhai_engine(babel_engine.clone());
         let plugin_dir = plugin_path
@@ -112,9 +111,11 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         rhai_engine.set_module_resolver(FileModuleResolver::new_with_path(&plugin_dir));
 
         // compile script to AST
+        info!("RhaiPlugin::from_file - compiling script");
         let ast = rhai_engine
             .compile_file(plugin_path)
             .with_context(|| "Rhai syntax error")?;
+        info!("RhaiPlugin::from_file - creating plugin instance");
         Self::new(ast, babel_engine, rhai_engine, Some(plugin_dir))
     }
 
@@ -491,28 +492,12 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         name: &str,
         args: P,
     ) -> Result<R> {
-        let mut scope = self.build_scope();
         self.rhai_engine
-            .call_fn::<R>(&mut scope, &self.bare.ast, name, args)
+            .call_fn::<R>(&mut rhai::Scope::new(), &self.bare.ast, name, args)
             .with_context(|| format!("Rhai function '{name}' returned error"))
     }
 
-    fn build_scope(&self) -> rhai::Scope<'static> {
-        let mut scope = rhai::Scope::new();
-        // LEGACY node support - remove once all nodes upgraded
-        scope.push(
-            "BLOCKCHAIN_DATA_PATH",
-            self.bare.babel_engine.node_env().protocol_data_path,
-        );
-        scope
-    }
-
-    fn get_config<T: DeserializeOwned>(
-        &self,
-        scope: &rhai::Scope<'_>,
-        config_fn_name: &str,
-        config_const_name: &str,
-    ) -> Result<Option<T>> {
+    fn get_config<T: DeserializeOwned>(&self, config_fn_name: &str) -> Result<Option<T>> {
         let dynamic = if self
             .bare
             .ast
@@ -523,17 +508,47 @@ impl<E: Engine + Sync + Send + 'static> RhaiPlugin<E> {
         } else {
             None
         };
-        // LEGACY left for backward compatibility - remove once all nodes upgraded
-        let dynamic = dynamic.as_ref().or(scope.get(config_const_name));
 
         if let Some(dynamic) = dynamic {
-            let value: T = from_dynamic(dynamic).with_context(|| {
+            let value: T = from_dynamic(&dynamic).with_context(|| {
                 format!("Invalid Rhai script - failed to deserialize {config_fn_name}")
             })?;
             Ok(Some(value))
         } else {
             Ok(None)
         }
+    }
+
+    /// Recreate service job configurations after plugin config reload
+    fn recreate_services(&mut self) -> Result<()> {
+        info!("Recreating services with updated configuration...");
+        
+        let Some(config) = self.bare.plugin_config.clone() else {
+            info!("No plugin config available, skipping service recreation");
+            return Ok(());
+        };
+        
+        // Get current jobs to determine which are services that need to be recreated
+        let current_jobs = self.bare.babel_engine.get_jobs()?;
+        let service_names: Vec<String> = config.services.iter().map(|s| s.name.clone()).collect();
+        
+        // Stop existing service jobs
+        for service_name in &service_names {
+            if current_jobs.contains_key(service_name) {
+                info!("Stopping existing service job: {}", service_name);
+                if let Err(err) = self.bare.babel_engine.stop_job(service_name) {
+                    warn!("Failed to stop service job '{}': {:#}", service_name, err);
+                }
+            }
+        }
+        
+        // Recreate service jobs with updated configuration
+        // We'll use empty needs/wait_for since this is a configuration update on a running node
+        info!("Starting {} services with updated configuration", config.services.len());
+        self.bare.start_services(config.services, vec![], vec![])?;
+        
+        info!("Successfully recreated {} services", service_names.len());
+        Ok(())
     }
 }
 
@@ -731,76 +746,74 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
     fn init(&mut self) -> Result<()> {
         self.reload_plugin_config()?;
 
-        if let Some(init_meta) = self
+        if self
             .bare
             .ast
             .iter_functions()
-            .find(|meta| meta.name == INIT_FN_NAME)
+            .any(|meta| meta.name == INIT_FN_NAME)
         {
-            if init_meta.params.is_empty() {
-                self.call_fn(INIT_FN_NAME, ())
-            } else {
-                // LEGACY node support - remove once all nodes upgraded
-                // keep backward compatibility with obsolete `upload(param)` functions
-                self.call_fn(INIT_FN_NAME, (Map::default(),))
-            }
+            self.call_fn(INIT_FN_NAME, ())
         } else {
             self.bare.default_init()
         }
     }
 
     fn reload_plugin_config(&mut self) -> Result<()> {
-        let mut scope = self.build_scope();
-        self.rhai_engine
-            .run_ast_with_scope(&mut scope, &self.bare.ast)?;
-        self.bare.plugin_config =
-            self.get_config(&scope, PLUGIN_CONFIG_FN_NAME, PLUGIN_CONFIG_CONST_NAME)?;
+        info!("Reloading plugin configuration...");
+        
+        // Create a new scope for this execution
+        let mut scope = rhai::Scope::new();
+        
+        // Get fresh node params and add them to the scope as a constant
+        let params = self.bare.babel_engine.node_params();
+        info!("Current node parameters: {:?}", params);
+        
+        let params_map: Map = params.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+        scope.push_constant("NODE_PARAMS", params_map);
+        
+        // Register the node_params function in the scope
+        let engine_clone = self.bare.babel_engine.clone();
+        let node_params_fn = move || -> Map {
+            let params = engine_clone.node_params();
+            info!("node_params() called, returning: {:?}", params);
+            params.into_iter().map(|(k, v)| (k.into(), v.into())).collect::<Map>()
+        };
+        
+        // Use the Rhai engine to register the function
+        self.rhai_engine.register_fn("node_params", node_params_fn);
+        
+        // Run the AST with the updated scope
+        info!("Running Rhai AST...");
+        self.rhai_engine.run_ast_with_scope(&mut scope, &self.bare.ast)?;
+        
+        // Get the updated plugin config
+        info!("Getting plugin config...");
+        self.bare.plugin_config = self.get_config(PLUGIN_CONFIG_FN_NAME)?;
 
-        // LEGACY left for backward compatibility - remove once all nodes upgraded
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        pub struct BaseConfig {
-            pub config_files: Option<Vec<ConfigFile>>,
-            pub services: Option<Vec<AuxService>>,
-        }
-        let base_config =
-            self.get_config::<BaseConfig>(&scope, BASE_CONFIG_FN_NAME, BASE_CONFIG_CONST_NAME)?;
-
+        // Save the config if it exists
         if let Some(plugin_config) = &mut self.bare.plugin_config {
-            if let Some(base_config) = base_config {
-                plugin_config.config_files =
-                    match (plugin_config.config_files.take(), base_config.config_files) {
-                        (Some(mut a), Some(mut b)) => {
-                            a.append(&mut b);
-                            Some(a)
-                        }
-                        (Some(a), None) => Some(a),
-                        (None, Some(b)) => Some(b),
-                        (None, None) => None,
-                    };
-                plugin_config.aux_services = base_config.services;
-            }
-
+            info!("Validating and saving plugin config...");
             plugin_config.validate()?;
             self.bare.babel_engine.save_config(plugin_config)?;
+        } else {
+            info!("No plugin config to save");
         }
+        
+        // Recreate services with the updated configuration
+        self.recreate_services()?;
+        
+        info!("Plugin config reloaded and services recreated successfully");
         Ok(())
     }
 
     fn upload(&self) -> Result<()> {
-        if let Some(fn_meta) = self
+        if self
             .bare
             .ast
             .iter_functions()
-            .find(|meta| meta.name == UPLOAD_JOB_NAME)
+            .any(|meta| meta.name == UPLOAD_JOB_NAME)
         {
-            if fn_meta.params.is_empty() {
-                self.call_fn(UPLOAD_JOB_NAME, ())
-            } else {
-                // LEGACY node support - remove once all nodes upgraded
-                // keep backward compatibility with obsolete `upload(param)` functions
-                self.call_fn(UPLOAD_JOB_NAME, ("",))
-                    .map(|_ignored: String| ())
-            }
+            self.call_fn(UPLOAD_JOB_NAME, ())
         } else {
             self.bare.default_upload()
         }
@@ -875,24 +888,9 @@ impl<E: Engine + Sync + Send + 'static> Plugin for RhaiPlugin<E> {
                 health: NodeHealth::Neutral,
             })
         } else {
-            // LEGACY node support - remove once all nodes upgraded
-            if !self.bare.ast.iter_functions().any(|function| {
-                function.name == PROTOCOL_STATUS_FN_NAME && function.params.is_empty()
-            }) && self
-                .bare
-                .ast
-                .iter_functions()
-                .any(|function| function.name == "application_status" && function.params.is_empty())
-            {
-                Ok(ProtocolStatus {
-                    state: self.call_fn::<_, String>("application_status", ())?,
-                    health: NodeHealth::Neutral,
-                })
-            } else {
-                Ok(from_dynamic(
-                    &self.call_fn::<_, Dynamic>(PROTOCOL_STATUS_FN_NAME, ())?,
-                )?)
-            }
+            Ok(from_dynamic(
+                &self.call_fn::<_, Dynamic>(PROTOCOL_STATUS_FN_NAME, ())?,
+            )?)
         }
     }
 
@@ -1574,7 +1572,7 @@ mod tests {
         babel
             .expect_node_params()
             .return_once(|| HashMap::from_iter([("key_A".to_string(), "value_A".to_string())]));
-        babel.expect_node_env().times(2).returning(|| NodeEnv {
+        babel.expect_node_env().once().returning(|| NodeEnv {
             node_id: "node_id".to_string(),
             ..Default::default()
         });

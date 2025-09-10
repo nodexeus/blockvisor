@@ -144,6 +144,7 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         plugin_builder: F,
         node_env: NodeEnv,
     ) -> Result<()> {
+        info!("BabelEngine::update_plugin - creating engine with properties: {:?}", self.node_info.properties);
         let engine = Engine {
             node_id: self.node_info.node_id,
             tx: self.engine_tx.clone(),
@@ -151,10 +152,13 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
             node_env,
             node_context: self.node_context.clone(),
         };
+        info!("BabelEngine::update_plugin - calling plugin_builder");
         self.plugin = plugin_builder(engine)?;
+        info!("BabelEngine::update_plugin - plugin created successfully, updating capabilities");
         self.capabilities = self
             .on_plugin(move |plugin| Ok(plugin.capabilities()))
             .await?;
+        info!("BabelEngine::update_plugin - completed successfully");
         Ok(())
     }
 
@@ -168,9 +172,17 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
         Ok(())
     }
 
-    pub fn update_node_info(&mut self, node_image: NodeImage, properties: NodeProperties) {
+    pub async fn update_node_info(&mut self, node_image: NodeImage, properties: NodeProperties) -> Result<()> {
         self.node_info.image = node_image;
         self.node_info.properties = properties;
+        
+        // Restart the babel engine service with updated node_info
+        if self.server.is_some() {
+            self.stop().await?;
+            self.start().await?;
+        }
+        
+        Ok(())
     }
 
     /// Returns the height of the blockchain (in blocks).
@@ -255,7 +267,6 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
             "address" => self.address().await?,
             "consensus" => self.consensus().await?.to_string(),
             "protocol_status" => serde_json::to_string(&self.protocol_status().await?)?,
-            "application_status" => serde_json::to_string(&self.protocol_status().await?)?, // LEGACY node support - remove once all nodes upgraded
             "upload" => serde_json::to_string(&self.upload().await?)?,
             _ => {
                 let method_name = name.to_owned();
