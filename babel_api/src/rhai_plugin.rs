@@ -587,6 +587,9 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                             use_protocol_data: false,
                             log_buffer_capacity_mb: service.log_buffer_capacity_mb,
                             log_timestamp: service.log_timestamp,
+                            data_dir: None,           // AuxServices don't have data directories
+                            store_key: None,          // AuxServices don't have store keys  
+                            archive: false,           // AuxServices are not archived by default
                         },
                         vec![],
                         vec![],
