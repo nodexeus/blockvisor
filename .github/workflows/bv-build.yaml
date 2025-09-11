@@ -89,11 +89,6 @@ jobs:
             /tmp/snapper
           retention-days: 7
           overwrite: true
-      
-      - name: Download artifacts for dev
-        uses: actions/download-artifact@v4
-        with:
-          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
 
       - name: Upload bvup to bins bucket
         uses: magicwallet/r2-upload@main
@@ -102,7 +97,7 @@ jobs:
           access_key_id: ${{ secrets.B2_KEY_ID }}
           secret_access_key: ${{ secrets.B2_APP_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
-          file: ./bvup
+          file: /tmp/bvup
           destination: ${{ needs.build.outputs.version }}/bvup
       
       - name: Upload snapper to bins bucket
@@ -112,7 +107,7 @@ jobs:
           access_key_id: ${{ secrets.B2_KEY_ID }}
           secret_access_key: ${{ secrets.B2_APP_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
-          file: ./snapper
+          file: /tmp/snapper
           destination: ${{ needs.build.outputs.version }}/snapper
 
   deploy-dev:
