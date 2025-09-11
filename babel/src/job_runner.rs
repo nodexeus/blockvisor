@@ -211,7 +211,7 @@ pub async fn run_job(
             // Extract archivable clients from plugin config
             let clients = crate::multi_client_integration::get_archivable_clients(
                 &plugin_config,
-                &babel_config.node_env.data_mount_point,
+                &babel_config.node_env.protocol_data_path,
                 &[] // Empty exclude patterns for now
             )?;
             
@@ -285,7 +285,7 @@ pub async fn run_job(
             // Extract downloadable clients from plugin config
             let clients = crate::multi_client_integration::get_downloadable_clients(
                 &plugin_config, 
-                &babel_config.node_env.data_mount_point
+                &babel_config.node_env.protocol_data_path
             )?;
             
             if clients.is_empty() {
