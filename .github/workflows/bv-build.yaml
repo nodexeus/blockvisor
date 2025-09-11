@@ -89,6 +89,12 @@ jobs:
             /tmp/snapper
           retention-days: 7
           overwrite: true
+      
+      - name: Download artifacts for dev
+        uses: actions/download-artifact@v4
+        with:
+          name: blockvisor-artifacts-${{ needs.build.outputs.version }}
+
       - name: Upload bvup to bins bucket
         uses: magicwallet/r2-upload@main
         with:
