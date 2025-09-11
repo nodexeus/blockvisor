@@ -29,6 +29,8 @@ pub trait Babel {
     /// Create background job with unique name. Created job is initialized with `Stopped` state.
     /// Use `start_job` to when it is time to start.
     fn create_job(job_name: String, job: JobConfig);
+    /// Save plugin configuration for a specific job (used for multi-client uploads).
+    fn save_plugin_config_for_job(job_name: String, plugin_config_json: String);
     /// Start background job with unique name.
     fn start_job(job_name: String);
     /// Stop background job with given unique name if running.

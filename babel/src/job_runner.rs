@@ -180,10 +180,24 @@ pub async fn run_job(
             url_expires_secs,
             data_version,
         } => {
-            // R2.4: Parse plugin config to get archivable clients
-            let _multi_uploader = MultiClientUploader::new(
+            // R2.4: Load plugin config to get archivable clients and upload them
+            // The plugin config is saved by the babel engine and should be available in the job's metadata directory
+            let plugin_config_path = jobs_dir.join(&job_name).join("plugin_config.json");
+            
+            let plugin_config = if plugin_config_path.exists() {
+                let config_str = fs::read_to_string(&plugin_config_path)
+                    .map_err(|e| eyre::anyhow!("Failed to read plugin config from {}: {}", plugin_config_path.display(), e))?;
+                serde_json::from_str::<babel_api::plugin_config::PluginConfig>(&config_str)
+                    .map_err(|e| eyre::anyhow!("Failed to parse plugin config: {}", e))?
+            } else {
+                // If plugin config doesn't exist in job dir, try to find it from the babel engine
+                // by creating a job config file from the node config. For now, return an error.
+                return Err(eyre::anyhow!("Multi-client upload requires plugin configuration at {}", plugin_config_path.display()).into());
+            };
+            
+            let mut multi_uploader = MultiClientUploader::new(
                 connector,
-                url_expires_secs,
+                Some(url_expires_secs.unwrap_or(3600)),
                 data_version,
                 build_transfer_config(
                     babel_config.node_env.data_mount_point.clone(),
@@ -193,24 +207,71 @@ pub async fn run_job(
                     max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
                 )?,
             );
-
-            // This would need the parsed plugin config to determine which clients to upload
-            // For now, we'll return an error directing to use the proper interface
-            save_job_status(
-                &JobStatus::Finished {
-                    exit_code: Some(-1),
-                    message: "Multi-client upload requires plugin configuration. Use upload_all_clients() instead.".to_string(),
-                },
-                &job_name,
-                &jobs::JOBS_DIR,
-            ).await;
+            
+            // Extract archivable clients from plugin config
+            let clients = crate::multi_client_integration::get_archivable_clients(
+                &plugin_config,
+                &babel_config.node_env.data_mount_point,
+                &[] // Empty exclude patterns for now
+            )?;
+            
+            if clients.is_empty() {
+                save_job_status(
+                    &JobStatus::Finished {
+                        exit_code: Some(0),
+                        message: "No archivable clients found with store_key configured".to_string(),
+                    },
+                    &job_name,
+                    &jobs::JOBS_DIR,
+                ).await;
+            } else {
+                // Use a simple async block to run the multi-client upload
+                let upload_result = {
+                    let run_flag = run.clone();
+                    multi_uploader.upload_all_clients(clients, run_flag).await
+                };
+                
+                match upload_result {
+                    Ok(_) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(0),
+                                message: "Multi-client upload completed successfully".to_string(),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                    Err(err) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(-1),
+                                message: format!("Multi-client upload failed: {:#}", err),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                }
+            }
         }
         JobType::MultiClientDownload {
             max_connections,
             max_runners,
         } => {
-            // R3.1: Multi-client download handler
-            let _multi_downloader = MultiClientDownloader::new(
+            // R3.1: Multi-client download handler - load plugin config and download each client
+            let plugin_config_path = jobs_dir.join(&job_name).join("plugin_config.json");
+            
+            let plugin_config = if plugin_config_path.exists() {
+                let config_str = fs::read_to_string(&plugin_config_path)
+                    .map_err(|e| eyre::anyhow!("Failed to read plugin config from {}: {}", plugin_config_path.display(), e))?;
+                serde_json::from_str::<babel_api::plugin_config::PluginConfig>(&config_str)
+                    .map_err(|e| eyre::anyhow!("Failed to parse plugin config: {}", e))?
+            } else {
+                return Err(eyre::anyhow!("Multi-client download requires plugin configuration at {}", plugin_config_path.display()).into());
+            };
+            
+            let mut multi_downloader = MultiClientDownloader::new(
                 connector,
                 build_transfer_config(
                     babel_config.node_env.data_mount_point.clone(),
@@ -220,16 +281,52 @@ pub async fn run_job(
                     max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
                 )?,
             );
-
-            // Similar to upload, this needs plugin configuration
-            save_job_status(
-                &JobStatus::Finished {
-                    exit_code: Some(-1),
-                    message: "Multi-client download requires plugin configuration. Use download_all_clients() instead.".to_string(),
-                },
-                &job_name,
-                &jobs::JOBS_DIR,
-            ).await;
+            
+            // Extract downloadable clients from plugin config
+            let clients = crate::multi_client_integration::get_downloadable_clients(
+                &plugin_config, 
+                &babel_config.node_env.data_mount_point
+            )?;
+            
+            if clients.is_empty() {
+                save_job_status(
+                    &JobStatus::Finished {
+                        exit_code: Some(0),
+                        message: "No downloadable clients found with store_key configured".to_string(),
+                    },
+                    &job_name,
+                    &jobs::JOBS_DIR,
+                ).await;
+            } else {
+                // Use a simple async block to run the multi-client download
+                let download_result = {
+                    let run_flag = run.clone();
+                    multi_downloader.download_all_clients(clients, run_flag).await
+                };
+                
+                match download_result {
+                    Ok(_) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(0),
+                                message: "Multi-client download completed successfully".to_string(),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                    Err(err) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(-1),
+                                message: format!("Multi-client download failed: {:#}", err),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                }
+            }
         }
     }
     if job_config.one_time == Some(true) {

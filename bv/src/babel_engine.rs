@@ -605,6 +605,25 @@ impl<N: NodeConnection, P: Plugin + Clone + Send + 'static> BabelEngine<N, P> {
                 )
             }
         }
+        
+        // For multi-client uploads and downloads, save the plugin configuration to the job directory
+        // so the job runner can access it within the container
+        if let JobType::MultiClientUpload { .. } | JobType::MultiClientDownload { .. } = &job_config.job_type {
+            // Try to load plugin config from the engine
+            if self.node_context.plugin_config.exists() {
+                if let Ok(plugin_config_str) = fs::read_to_string(&self.node_context.plugin_config) {
+                    // Send plugin config to babel client to be saved in the job directory
+                    match with_retry!(babel_client.save_plugin_config_for_job((
+                        job_name.clone(),
+                        plugin_config_str.clone()
+                    ))) {
+                        Ok(_) => {},
+                        Err(err) => return Err(self.handle_connection_errors(err)),
+                    }
+                }
+            }
+        }
+        
         with_retry!(babel_client.create_job((job_name.clone(), job_config.clone())))
             .map_err(|err| self.handle_connection_errors(err))
             .map(|v| v.into_inner())
@@ -1090,6 +1109,10 @@ mod tests {
                 &self,
                 request: Request<(String, JobConfig)>,
             ) -> Result<Response<()>, Status>;
+            async fn save_plugin_config_for_job(
+                &self,
+                request: Request<(String, String)>,
+            ) -> Result<Response<()>, Status>;
             async fn start_job(
                 &self,
                 request: Request<String>,
@@ -1431,6 +1454,9 @@ mod tests {
                 name == "custom_name" && config.job_type == JobType::RunSh("param".to_string())
             })
             .return_once(|_| Ok(Response::new(())));
+        babel_mock
+            .expect_save_plugin_config_for_job()
+            .returning(|_| Ok(Response::new(())));
         babel_mock
             .expect_start_job()
             .withf(|req| {

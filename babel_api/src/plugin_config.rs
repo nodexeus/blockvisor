@@ -551,6 +551,102 @@ pub fn build_upload_job_config(value: Option<Upload>, pre_upload_jobs: Vec<Strin
     }
 }
 
+/// R2.4: Build job config for multi-client upload
+pub fn build_multi_client_upload_job_config(value: Option<Upload>, pre_upload_jobs: Vec<String>) -> JobConfig {
+    const DEFAULT_RESTART_CONFIG: RestartConfig = RestartConfig {
+        backoff_timeout_ms: 600_000,
+        backoff_base_ms: 500,
+        max_retries: Some(10),
+    };
+    if let Some(upload) = value {
+        JobConfig {
+            job_type: JobType::MultiClientUpload {
+                max_connections: upload.max_connections,
+                max_runners: upload.max_runners,
+                url_expires_secs: upload.url_expires_secs,
+                data_version: upload.data_version,
+            },
+            restart: engine::RestartPolicy::OnFailure(
+                upload.restart_config.unwrap_or(DEFAULT_RESTART_CONFIG),
+            ),
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            needs: Some(pre_upload_jobs),
+            wait_for: None,
+            run_as: None,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            use_protocol_data: None,
+            one_time: None,
+        }
+    } else {
+        JobConfig {
+            job_type: JobType::MultiClientUpload {
+                max_connections: None,
+                max_runners: None,
+                url_expires_secs: None,
+                data_version: None,
+            },
+            restart: engine::RestartPolicy::OnFailure(DEFAULT_RESTART_CONFIG),
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            needs: Some(pre_upload_jobs),
+            wait_for: None,
+            run_as: None,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            use_protocol_data: None,
+            one_time: None,
+        }
+    }
+}
+
+/// R3.1: Build job config for multi-client download
+pub fn build_multi_client_download_job_config(value: Option<Download>, init_jobs: Vec<String>) -> JobConfig {
+    const DEFAULT_RESTART_CONFIG: RestartConfig = RestartConfig {
+        backoff_timeout_ms: 600_000,
+        backoff_base_ms: 500,
+        max_retries: Some(10),
+    };
+    if let Some(download) = value {
+        JobConfig {
+            job_type: JobType::MultiClientDownload {
+                max_connections: download.max_connections,
+                max_runners: download.max_runners,
+            },
+            restart: engine::RestartPolicy::OnFailure(
+                download.restart_config.unwrap_or(DEFAULT_RESTART_CONFIG),
+            ),
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            needs: Some(init_jobs),
+            wait_for: None,
+            run_as: None,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            use_protocol_data: None,
+            one_time: None,
+        }
+    } else {
+        JobConfig {
+            job_type: JobType::MultiClientDownload {
+                max_connections: None,
+                max_runners: None,
+            },
+            restart: engine::RestartPolicy::OnFailure(DEFAULT_RESTART_CONFIG),
+            shutdown_timeout_secs: None,
+            shutdown_signal: None,
+            needs: Some(init_jobs),
+            wait_for: None,
+            run_as: None,
+            log_buffer_capacity_mb: None,
+            log_timestamp: None,
+            use_protocol_data: None,
+            one_time: None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

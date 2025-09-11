@@ -1989,6 +1989,9 @@ pub mod tests {
         babel_mock
             .expect_create_job()
             .returning(|_| Ok(Response::new(())));
+        babel_mock
+            .expect_save_plugin_config_for_job()
+            .returning(|_| Ok(Response::new(())));
 
         fs::write(&test_env.tmp_root.join("job_runner"), "dummy job_runner")
             .await
@@ -2255,6 +2258,9 @@ pub mod tests {
         babel_mock
             .expect_create_job()
             .times(2)
+            .returning(|_| Ok(Response::new(())));
+        babel_mock
+            .expect_save_plugin_config_for_job()
             .returning(|_| Ok(Response::new(())));
         babel_mock
             .expect_start_job()
