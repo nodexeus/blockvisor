@@ -200,7 +200,7 @@ pub async fn run_job(
                 Some(url_expires_secs.unwrap_or(3600)),
                 data_version,
                 build_transfer_config(
-                    babel_config.node_env.data_mount_point.clone(),
+                    babel_config.node_env.protocol_data_path.clone(),
                     job_dir.join(jobs::PROGRESS_FILENAME),
                     None, // Compression will be handled per-client
                     max_connections.unwrap_or(DEFAULT_MAX_UPLOAD_CONNECTIONS),

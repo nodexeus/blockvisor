@@ -98,7 +98,7 @@ jobs:
           secret_access_key: ${{ secrets.B2_APP_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
           file: /tmp/bvup
-          destination: ${{ needs.build.outputs.version }}/bvup
+          destination: ${{ steps.get_version.outputs.VERSION }}/bvup
       
       - name: Upload snapper to bins bucket
         uses: magicwallet/r2-upload@main
@@ -108,7 +108,7 @@ jobs:
           secret_access_key: ${{ secrets.B2_APP_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
           file: /tmp/snapper
-          destination: ${{ needs.build.outputs.version }}/snapper
+          destination: ${{ steps.get_version.outputs.VERSION }}/snapper
 
   deploy-dev:
     name: Deploy to Dev

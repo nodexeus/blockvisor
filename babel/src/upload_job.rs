@@ -252,6 +252,29 @@ async fn fetch_slots(
     .into_inner())
 }
 
+async fn fetch_slots_for_store_key(
+    mut client: BabelEngineClient,
+    store_key: &str,
+    chunks: &[Chunk],
+    count: usize,
+    data_version: Option<u64>,
+    url_expires_secs: u32,
+) -> Result<UploadSlots> {
+    let chunks = chunks
+        .iter()
+        .rev()
+        .take(count)
+        .map(|chunk| chunk.index)
+        .collect::<Vec<_>>();
+    Ok(with_selective_retry!(client.get_upload_slots_for_store_key(with_timeout(
+        (store_key.to_string(), data_version, chunks.clone(), url_expires_secs),
+        // let make timeout proportional to number of slots
+        // it is expected that 1000 of slots should be downloaded in less thant 5s
+        RPC_REQUEST_TIMEOUT * 2 + Duration::from_secs(count as u64 / 200)
+    )))?
+    .into_inner())
+}
+
 fn assign_slots(chunks: &mut [Chunk], slots: Vec<Slot>) {
     for slot in slots {
         if let Some(chunk) = chunks.iter_mut().find(|chunk| chunk.index == slot.index) {
@@ -363,6 +386,214 @@ impl<C: BabelEngineConnector> Uploader<C> {
     }
 }
 
+/// R2.2: Client-specific uploader that uses store_key for upload slots
+pub struct ClientUploader<C> {
+    connector: C,
+    store_key: String,
+    source_dir: PathBuf,
+    exclude: Vec<Pattern>,
+    config: TransferConfig,
+    total_slots: u32,
+    sources_list: Option<SourcesList>,
+    url_expires_secs: u32,
+    data_version: Option<u64>,
+}
+
+impl<C: BabelEngineConnector> ClientUploader<C> {
+    pub fn new(
+        connector: C,
+        store_key: String,
+        source_dir: PathBuf,
+        exclude: Vec<String>,
+        number_of_chunks: Option<u32>,
+        url_expires_secs: Option<u32>,
+        data_version: Option<u64>,
+        config: TransferConfig,
+    ) -> Result<Self> {
+        let exclude = exclude
+            .iter()
+            .map(|pattern_str| Pattern::new(pattern_str))
+            .collect::<Result<Vec<Pattern>, PatternError>>()?;
+        let (total_slots, sources_list) = if let Some(number_of_chunks) = number_of_chunks {
+            if number_of_chunks == 0 {
+                bail!("invalid number of chunks - need at leas one");
+            }
+            (number_of_chunks, None)
+        } else {
+            let sources_list = sources_list(&source_dir, &exclude)?;
+            // recommended size of chunk is around 500MB
+            (
+                (1 + sources_list.total_size / 500_000_000) as u32,
+                Some(sources_list),
+            )
+        };
+        let url_expires_secs = url_expires_secs.unwrap_or(3600 + (config.max_runners as u32) * 15);
+        Ok(Self {
+            connector,
+            store_key,
+            source_dir,
+            exclude,
+            config,
+            total_slots,
+            sources_list,
+            url_expires_secs,
+            data_version,
+        })
+    }
+
+    /// Prepare DownloadManifest blueprint with files to chunks mapping, based on provided slots.
+    fn prepare_manifest_blueprint(&mut self) -> Result<DownloadManifest> {
+        let mut sources_list = if let Some(sources_list) = self.sources_list.take() {
+            sources_list
+        } else {
+            sources_list(&self.source_dir, &self.exclude)?
+        };
+        sources_list.sources.sort_by(|a, b| a.path.cmp(&b.path));
+        let chunk_size = sources_list.total_size / self.total_slots as u64;
+        let last_chunk_size = chunk_size + sources_list.total_size % self.total_slots as u64;
+        let mut chunks: Vec<_> = Default::default();
+        let mut index = 0;
+        while index < self.total_slots {
+            let chunk_size = if index < self.total_slots - 1 {
+                chunk_size
+            } else {
+                last_chunk_size
+            };
+            let destinations = build_destinations(chunk_size, &mut sources_list.sources);
+            if destinations.is_empty() {
+                // no more files - skip rest of the slots
+                break;
+            }
+            chunks.push(Chunk {
+                index,
+                key: Default::default(),
+                url: None,
+                checksum: Checksum::Sha1(Default::default()), // unknown yet
+                size: 0,                                      // unknown yet
+                destinations,
+            });
+            index += 1;
+        }
+        Ok(DownloadManifest {
+            total_size: sources_list.total_size,
+            compression: self.config.compression,
+            chunks,
+        })
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
+    async fn run(&mut self, mut run: RunFlag) -> Result<()> {
+        let blueprint_path = self.config.archive_jobs_meta_dir.join(BLUEPRINT_FILENAME);
+        let chunks_path = self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME);
+        let blueprint = load_job_data::<Blueprint>(&blueprint_path).and_then(|blueprint| {
+            if blueprint.data_stamp == utils::protocol_data_stamp(&self.config.data_mount_point)? {
+                Ok(blueprint)
+            } else {
+                bail!("protocol_data stamp doesn't match, need to start upload from scratch")
+            }
+        });
+        let (mut blueprint, uploaded) = if let Ok(blueprint) = blueprint {
+            (blueprint, load_chunks(&chunks_path)?)
+        } else {
+            let manifest = self.prepare_manifest_blueprint()?;
+            // Use store_key-specific slot fetching
+            let slots = fetch_slots_for_store_key(
+                self.connector.connect(),
+                &self.store_key,
+                &manifest.chunks,
+                self.config.max_runners,
+                self.data_version,
+                self.url_expires_secs,
+            )
+            .await?;
+            let mut blueprint = Blueprint {
+                manifest,
+                data_version: slots.data_version,
+                data_stamp: utils::protocol_data_stamp(&self.config.data_mount_point)?,
+            };
+            save_job_data(&blueprint_path, &blueprint)?;
+            assign_slots(&mut blueprint.manifest.chunks, slots.slots);
+            (blueprint, Default::default())
+        };
+        
+        // Rest of the upload logic remains the same as regular Uploader
+        let mark_uploaded = |chunks: &mut Vec<Chunk>, chunk: Chunk| {
+            let Some(blueprint) = chunks.iter_mut().find(|item| item.index == chunk.index) else {
+                bail!("internal error - finished upload of chunk that doesn't exists in manifest");
+            };
+            *blueprint = chunk;
+            Ok(())
+        };
+        let mut uploaded_chunks = uploaded.len() as u32;
+        for chunk in uploaded {
+            mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
+        }
+        let mut parallel_uploaders_run = run.child_flag();
+        let mut uploaders = ParallelChunkUploaders::new(
+            parallel_uploaders_run.clone(),
+            blueprint.manifest.chunks.clone(),
+            self.config.clone(),
+            self.url_expires_secs,
+            blueprint.data_version,
+        );
+        let mut save_uploaded = |chunk| {
+            save_chunk(&chunks_path, &chunk)?;
+            mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
+            uploaded_chunks += 1;
+            save_job_data(
+                &self.config.progress_file_path,
+                &JobProgress {
+                    total: self.total_slots,
+                    current: uploaded_chunks,
+                    message: "chunks".to_string(),
+                },
+            )
+        };
+        let mut uploaders_state = RunnersState {
+            result: Ok(()),
+            run: parallel_uploaders_run,
+        };
+        loop {
+            if uploaders_state.run.load() {
+                if let Err(err) = uploaders.update_slots(self.connector.connect()).await {
+                    uploaders_state.handle_error(err);
+                } else {
+                    uploaders.launch_more(&self.connector);
+                }
+            }
+            match uploaders.wait_for_next().await {
+                Some(Ok(chunk)) => {
+                    if let Err(err) = save_uploaded(chunk) {
+                        uploaders_state.handle_error(err);
+                    }
+                }
+                Some(Err(err)) => uploaders_state.handle_error(err),
+                None => break,
+            }
+        }
+        if let Err(err) = uploaders_state.result {
+            if err.chain().any(|cause| cause.is::<NonRecoverableError>()) {
+                cleanup_job(&self.config.archive_jobs_meta_dir)?;
+            }
+            return Err(err);
+        }
+        if !run.load() {
+            return Ok(());
+        }
+        self.connector
+            .connect()
+            .put_download_manifest(with_timeout(
+                (blueprint.manifest, blueprint.data_version),
+                RPC_REQUEST_TIMEOUT,
+            ))
+            .await?;
+        cleanup_job(&self.config.archive_jobs_meta_dir)?;
+        Ok(())
+    }
+}
+
 /// R2.4: Multi-client uploader that uploads each client separately
 pub struct MultiClientUploader<C> {
     connector: C,
@@ -392,8 +623,9 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
         let mut upload_futures = FuturesUnordered::new();
         
         for client in clients {
-            let mut uploader = Uploader::new(
+            let mut uploader = ClientUploader::new(
                 self.connector.clone(),
+                client.store_key.clone(),
                 client.data_directory.clone(),
                 client.exclude_patterns.iter().map(|p| p.as_str().to_string()).collect(), // Convert Pattern back to String
                 None, // auto-calculate chunks

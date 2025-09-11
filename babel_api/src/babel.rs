@@ -98,10 +98,25 @@ pub trait BabelEngine {
     fn put_download_manifest(manifest: DownloadManifest, data_version: u64);
     /// Get `DownloadMetadata` from API.
     fn get_download_metadata() -> DownloadMetadata;
+    /// Get `DownloadMetadata` from API using client-specific store key.
+    fn get_download_metadata_for_store_key(store_key: String) -> DownloadMetadata;
     /// Get `Chunk`s to download from API.
     fn get_download_chunks(data_version: u64, chunk_indexes: Vec<u32>) -> Vec<Chunk>;
+    /// Get `Chunk`s to download from API using client-specific store key.
+    fn get_download_chunks_for_store_key(
+        store_key: String,
+        data_version: u64,
+        chunk_indexes: Vec<u32>,
+    ) -> Vec<Chunk>;
     /// Get upload `Slot`s from API.
     fn get_upload_slots(
+        data_version: Option<u64>,
+        slots: Vec<u32>,
+        url_expires_secs: u32,
+    ) -> UploadSlots;
+    /// Get upload `Slot`s from API using client-specific store key.
+    fn get_upload_slots_for_store_key(
+        store_key: String,
         data_version: Option<u64>,
         slots: Vec<u32>,
         url_expires_secs: u32,
