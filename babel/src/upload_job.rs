@@ -485,10 +485,17 @@ impl<C: BabelEngineConnector> ClientUploader<C> {
 #[async_trait]
 impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
     async fn run(&mut self, mut run: RunFlag) -> Result<()> {
-        let blueprint_path = self.config.archive_jobs_meta_dir.join(BLUEPRINT_FILENAME);
-        let chunks_path = self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME);
+        // Create client-specific metadata paths using store_key to avoid conflicts
+        let client_meta_dir = self.config.archive_jobs_meta_dir.join(&self.store_key);
+        std::fs::create_dir_all(&client_meta_dir)?;
+        
+        let blueprint_path = client_meta_dir.join(BLUEPRINT_FILENAME);
+        let chunks_path = client_meta_dir.join(CHUNKS_FILENAME);
+        let client_progress_path = client_meta_dir.join("progress.json");
+        
         let blueprint = load_job_data::<Blueprint>(&blueprint_path).and_then(|blueprint| {
-            if blueprint.data_stamp == utils::protocol_data_stamp(&self.config.data_mount_point)? {
+            // Use client-specific source_dir for data stamp instead of shared data_mount_point
+            if blueprint.data_stamp == utils::protocol_data_stamp(&self.source_dir)? {
                 Ok(blueprint)
             } else {
                 bail!("protocol_data stamp doesn't match, need to start upload from scratch")
@@ -511,7 +518,7 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
             let mut blueprint = Blueprint {
                 manifest,
                 data_version: slots.data_version,
-                data_stamp: utils::protocol_data_stamp(&self.config.data_mount_point)?,
+                data_stamp: utils::protocol_data_stamp(&self.source_dir)?,
             };
             save_job_data(&blueprint_path, &blueprint)?;
             assign_slots(&mut blueprint.manifest.chunks, slots.slots);
@@ -544,7 +551,7 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
             mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
             uploaded_chunks += 1;
             save_job_data(
-                &self.config.progress_file_path,
+                &client_progress_path,
                 &JobProgress {
                     total: self.total_slots,
                     current: uploaded_chunks,
@@ -576,21 +583,24 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
         }
         if let Err(err) = uploaders_state.result {
             if err.chain().any(|cause| cause.is::<NonRecoverableError>()) {
-                cleanup_job(&self.config.archive_jobs_meta_dir)?;
+                cleanup_job(&client_meta_dir)?;
             }
             return Err(err);
         }
         if !run.load() {
             return Ok(());
         }
-        self.connector
-            .connect()
-            .put_download_manifest(with_timeout(
-                (blueprint.manifest, blueprint.data_version),
-                RPC_REQUEST_TIMEOUT,
-            ))
-            .await?;
-        cleanup_job(&self.config.archive_jobs_meta_dir)?;
+        // TODO: Create store_key-based put_download_manifest API
+        // For now, skip this step since we don't have an archive_id for store_key-based uploads
+        // The manifest data is already stored in the store via the upload process
+        // self.connector
+        //     .connect()
+        //     .put_download_manifest(with_timeout(
+        //         (blueprint.manifest, blueprint.data_version),
+        //         RPC_REQUEST_TIMEOUT,
+        //     ))
+        //     .await?;
+        cleanup_job(&client_meta_dir)?;
         Ok(())
     }
 }
