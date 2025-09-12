@@ -203,66 +203,52 @@ pub async fn get_upload_slots_by_store_key(
     slots: Vec<u32>,
     url_expires: u32,
 ) -> Result<UploadSlots> {
-    // For now, use a hash-based approach to create a deterministic archive_id
-    // This allows different store_keys to map to different archive_ids
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    let mut client = connect_protocol_archive_service(config).await?;
     
-    let mut hasher = DefaultHasher::new();
-    store_key.hash(&mut hasher);
-    let hash = hasher.finish();
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetUploadSlotsByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version,
+        url_expires: Some(url_expires),
+        slot_indexes: slots,
+    };
     
-    // Create a deterministic UUID from the hash
-    let uuid_bytes = [
-        (hash & 0xFF) as u8,
-        ((hash >> 8) & 0xFF) as u8,
-        ((hash >> 16) & 0xFF) as u8,
-        ((hash >> 24) & 0xFF) as u8,
-        ((hash >> 32) & 0xFF) as u8,
-        ((hash >> 40) & 0xFF) as u8,
-        ((hash >> 48) & 0xFF) as u8,
-        ((hash >> 56) & 0xFF) as u8,
-        0, 0, 0, 0, 0, 0, 0, 0,  // Fill remaining bytes
-    ];
-    
-    let deterministic_uuid = uuid::Uuid::from_bytes(uuid_bytes);
-    let synthetic_archive_id = deterministic_uuid.to_string();
-    
-    // Call the regular get_upload_slots with the synthetic archive_id
-    get_upload_slots(config, synthetic_archive_id, data_version, slots, url_expires).await
+    api_with_retry!(
+        client,
+        client.get_upload_slots_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get upload slots by store key")?
+    .into_inner()
+    .try_into()
 }
 
 pub async fn get_download_metadata_by_store_key(
     config: &SharedConfig,
     store_key: String,
 ) -> Result<DownloadMetadata> {
-    // For now, use a hash-based approach to create a deterministic archive_id
-    // This allows different store_keys to map to different archive_ids
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    let mut client = connect_protocol_archive_service(config).await?;
     
-    let mut hasher = DefaultHasher::new();
-    store_key.hash(&mut hasher);
-    let hash = hasher.finish();
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetDownloadMetadataByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version: None,
+    };
     
-    // Create a deterministic UUID from the hash
-    let uuid_bytes = [
-        (hash & 0xFF) as u8,
-        ((hash >> 8) & 0xFF) as u8,
-        ((hash >> 16) & 0xFF) as u8,
-        ((hash >> 24) & 0xFF) as u8,
-        ((hash >> 32) & 0xFF) as u8,
-        ((hash >> 40) & 0xFF) as u8,
-        ((hash >> 48) & 0xFF) as u8,
-        ((hash >> 56) & 0xFF) as u8,
-        0, 0, 0, 0, 0, 0, 0, 0,  // Fill remaining bytes
-    ];
-    
-    let deterministic_uuid = uuid::Uuid::from_bytes(uuid_bytes);
-    let synthetic_archive_id = deterministic_uuid.to_string();
-    
-    // Call the regular get_download_metadata with the synthetic archive_id
-    get_download_metadata(config, synthetic_archive_id).await
+    api_with_retry!(
+        client,
+        client.get_download_metadata_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get download metadata by store key")?
+    .into_inner()
+    .try_into()
 }
 
 pub async fn get_download_chunks_by_store_key(
@@ -271,33 +257,31 @@ pub async fn get_download_chunks_by_store_key(
     data_version: u64,
     chunk_indexes: Vec<u32>,
 ) -> Result<Vec<Chunk>> {
-    // For now, use a hash-based approach to create a deterministic archive_id
-    // This allows different store_keys to map to different archive_ids
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    let mut client = connect_protocol_archive_service(config).await?;
     
-    let mut hasher = DefaultHasher::new();
-    store_key.hash(&mut hasher);
-    let hash = hasher.finish();
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetDownloadChunksByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version,
+        chunk_indexes,
+    };
     
-    // Create a deterministic UUID from the hash
-    let uuid_bytes = [
-        (hash & 0xFF) as u8,
-        ((hash >> 8) & 0xFF) as u8,
-        ((hash >> 16) & 0xFF) as u8,
-        ((hash >> 24) & 0xFF) as u8,
-        ((hash >> 32) & 0xFF) as u8,
-        ((hash >> 40) & 0xFF) as u8,
-        ((hash >> 48) & 0xFF) as u8,
-        ((hash >> 56) & 0xFF) as u8,
-        0, 0, 0, 0, 0, 0, 0, 0,  // Fill remaining bytes
-    ];
+    let chunks = api_with_retry!(
+        client,
+        client.get_download_chunks_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get download chunks by store key")?
+    .into_inner();
     
-    let deterministic_uuid = uuid::Uuid::from_bytes(uuid_bytes);
-    let synthetic_archive_id = deterministic_uuid.to_string();
-    
-    // Call the regular get_download_chunks with the synthetic archive_id
-    get_download_chunks(config, synthetic_archive_id, data_version, chunk_indexes).await
+    chunks
+        .chunks
+        .into_iter()
+        .map(|chunk| chunk.try_into())
+        .collect::<Result<Vec<_>>>()
 }
 
 impl From<pb::compression::Compression> for Compression {
