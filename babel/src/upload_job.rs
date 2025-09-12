@@ -268,9 +268,9 @@ async fn fetch_slots_for_store_key(
         .collect::<Vec<_>>();
     Ok(with_selective_retry!(client.get_upload_slots_for_store_key(with_timeout(
         (store_key.to_string(), data_version, chunks.clone(), url_expires_secs),
-        // let make timeout proportional to number of slots
-        // it is expected that 1000 of slots should be downloaded in less thant 5s
-        RPC_REQUEST_TIMEOUT * 2 + Duration::from_secs(count as u64 / 200)
+        // Use longer timeout for store_key requests to match services layer
+        // Store operations can be time-consuming, especially for large uploads
+        Duration::from_secs(60),
     )))?
     .into_inner())
 }
@@ -531,10 +531,11 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
             mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
         }
         let mut parallel_uploaders_run = run.child_flag();
-        let mut uploaders = ParallelChunkUploaders::new(
+        let mut uploaders = ClientChunkUploaders::new(
             parallel_uploaders_run.clone(),
             blueprint.manifest.chunks.clone(),
             self.config.clone(),
+            self.store_key.clone(),
             self.url_expires_secs,
             blueprint.data_version,
         );
@@ -707,6 +708,18 @@ struct ParallelChunkUploaders<'a> {
     data_version: u64,
 }
 
+/// Store_key-specific chunk uploaders for ClientUploader
+struct ClientChunkUploaders<'a> {
+    run: RunFlag,
+    config: TransferConfig,
+    futures: FuturesUnordered<BoxFuture<'a, Result<Result<Chunk>, JoinError>>>,
+    chunks: Vec<Chunk>,
+    connection_pool: ConnectionPool,
+    store_key: String,
+    url_expires_secs: u32,
+    data_version: u64,
+}
+
 impl ParallelChunkUploaders<'_> {
     fn new(
         run: RunFlag,
@@ -734,6 +747,70 @@ impl ParallelChunkUploaders<'_> {
         if let Some(Chunk { url: None, .. }) = self.chunks.last() {
             let slots = fetch_slots(
                 client,
+                &self.chunks,
+                self.config.max_runners,
+                Some(self.data_version),
+                self.url_expires_secs,
+            )
+            .await?
+            .slots;
+            assign_slots(&mut self.chunks, slots);
+        }
+        Ok(())
+    }
+
+    fn launch_more(&mut self, connector: &impl BabelEngineConnector) {
+        while self.futures.len() < self.config.max_runners {
+            let Some(chunk) = self.chunks.pop() else {
+                break;
+            };
+            let uploader =
+                ChunkUploader::new(chunk, self.config.clone(), self.connection_pool.clone());
+            let client = connector.connect();
+            self.futures.push(Box::pin(tokio::spawn(
+                uploader.run(self.run.clone(), client),
+            )));
+        }
+    }
+
+    async fn wait_for_next(&mut self) -> Option<Result<Chunk>> {
+        self.futures
+            .next()
+            .await
+            .map(|r| r.unwrap_or_else(|err| bail!("{err:#}")))
+    }
+}
+
+impl ClientChunkUploaders<'_> {
+    fn new(
+        run: RunFlag,
+        mut chunks: Vec<Chunk>,
+        mut config: TransferConfig,
+        store_key: String,
+        url_expires_secs: u32,
+        data_version: u64,
+    ) -> Self {
+        config.max_runners = min(config.max_runners, config.max_opened_files);
+        let connection_pool = Arc::new(Semaphore::new(config.max_connections));
+        chunks.retain(|chunk| chunk.size == 0);
+
+        Self {
+            run,
+            config,
+            futures: FuturesUnordered::new(),
+            chunks,
+            connection_pool,
+            store_key,
+            url_expires_secs,
+            data_version,
+        }
+    }
+
+    async fn update_slots(&mut self, client: BabelEngineClient) -> Result<()> {
+        if let Some(Chunk { url: None, .. }) = self.chunks.last() {
+            let slots = fetch_slots_for_store_key(
+                client,
+                &self.store_key,
                 &self.chunks,
                 self.config.max_runners,
                 Some(self.data_version),
