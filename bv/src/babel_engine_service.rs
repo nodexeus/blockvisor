@@ -47,6 +47,35 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
         }
     }
 
+    async fn put_download_manifest_for_store_key(
+        &self,
+        request: Request<(String, DownloadManifest, u64)>,
+    ) -> eyre::Result<Response<()>, Status> {
+        let (store_key, manifest, data_version) = request.into_inner();
+        debug!(
+            "putting DownloadManifest to API from node {} for store_key {} (data_version={})",
+            self.node_info.node_id, store_key, data_version,
+        );
+        if let Err(err) = services::archive::put_download_manifest_for_store_key(
+            &self.config,
+            store_key.clone(),
+            manifest,
+            data_version,
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "put_download_manifest_for_store_key for node {} (store_key={})",
+                self.node_info.node_id, store_key
+            )
+        }) {
+            warn!("{err:#}");
+            Err(Status::internal(err.to_string()))
+        } else {
+            Ok(Response::new(()))
+        }
+    }
+
     async fn get_download_metadata(
         &self,
         _request: Request<()>,
@@ -73,6 +102,34 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
             Ok(metadata) => Ok(Response::new(metadata)),
         }
     }
+
+    async fn get_download_metadata_for_store_key(
+        &self,
+        request: Request<String>,
+    ) -> eyre::Result<Response<DownloadMetadata>, Status> {
+        let store_key = request.into_inner();
+        debug!(
+            "getting DownloadMetadata from API for node {} with store_key {}",
+            self.node_info.node_id, store_key
+        );
+        match services::archive::get_download_metadata_by_store_key(
+            &self.config,
+            store_key.clone(),
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "get_download_metadata_for_store_key for node {} (store_key={})",
+                self.node_info.node_id, store_key
+            )
+        }) {
+            Err(err) => {
+                warn!("{err:#}");
+                Err(Status::internal(err.to_string()))
+            }
+            Ok(metadata) => Ok(Response::new(metadata)),
+        }
+    }
     async fn get_download_chunks(
         &self,
         request: Request<(u64, Vec<u32>)>,
@@ -85,6 +142,31 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
         match services::archive::get_download_chunks(
             &self.config,
             self.node_info.image.archive_id.clone(),
+            data_version,
+            chunk_indexes,
+        )
+        .await
+        {
+            Err(err) => {
+                warn!("{err:#}");
+                Err(Status::internal(err.to_string()))
+            }
+            Ok(chunks) => Ok(Response::new(chunks)),
+        }
+    }
+
+    async fn get_download_chunks_for_store_key(
+        &self,
+        request: Request<(String, u64, Vec<u32>)>,
+    ) -> eyre::Result<Response<Vec<Chunk>>, Status> {
+        let (store_key, data_version, chunk_indexes) = request.into_inner();
+        debug!(
+            "getting DownloadChunks from API for node {} with store_key {} (data_version={})",
+            self.node_info.node_id, store_key, data_version,
+        );
+        match services::archive::get_download_chunks_by_store_key(
+            &self.config,
+            store_key.clone(),
             data_version,
             chunk_indexes,
         )
@@ -120,6 +202,48 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
             format!(
                 "get_upload_slots for node {} (archive_id={}/{:?}, slots={})",
                 self.node_info.node_id, self.node_info.image.archive_id, data_version, slots_count
+            )
+        }) {
+            Err(err) => {
+                warn!("{err:#}");
+                Err(
+                    if let Some(tonic::Code::AlreadyExists) =
+                        err.downcast_ref::<Status>().map(|status| status.code())
+                    {
+                        Status::already_exists(err.to_string())
+                    } else {
+                        Status::internal(err.to_string())
+                    },
+                )
+            }
+            Ok(slots) => Ok(Response::new(slots)),
+        }
+    }
+
+    async fn get_upload_slots_for_store_key(
+        &self,
+        request: Request<(String, Option<u64>, Vec<u32>, u32)>,
+    ) -> eyre::Result<Response<UploadSlots>, Status> {
+        let (store_key, data_version, slots, url_expires_secs) = request.into_inner();
+        let slots_count = slots.len();
+        debug!(
+            "getting UploadSlots from API for node {} with store_key {} (data_version={:?}, slots={})",
+            self.node_info.node_id, store_key, data_version, slots_count
+        );
+        
+        // Convert store_key to archive_id by calling the API
+        match services::archive::get_upload_slots_by_store_key(
+            &self.config,
+            store_key.clone(),
+            data_version,
+            slots,
+            url_expires_secs,
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "get_upload_slots_for_store_key for node {} (store_key={}/{:?}, slots={})",
+                self.node_info.node_id, store_key, data_version, slots_count
             )
         }) {
             Err(err) => {

@@ -7,10 +7,33 @@ const NETS = #{
     },
 };
 
+/// Variant-specific store keys for per-client snapshots
+/// R1.2: Each service can have its own store key per variant
+const VARIANTS = #{
+    "reth-mainnet-archive": #{
+        net: "mainnet",
+        reth_store_key: "ethereum-reth-mainnet-archive-v1",
+        lighthouse_store_key: "ethereum-lighthouse-mainnet-archive-v1",
+    },
+    "reth-mainnet-full": #{
+        net: "mainnet",
+        reth_store_key: "ethereum-reth-mainnet-full-v1",
+        lighthouse_store_key: "ethereum-lighthouse-mainnet-archive-v1", // intentionally left as archive because the lighthouse dataset is the same between full and archive
+    },
+    "reth-testnet-archive": #{
+        net: "testnet",
+        reth_store_key: "ethereum-reth-testnet-archive-v1",
+        lighthouse_store_key: "ethereum-lighthouse-testnet-archive-v1",
+    },
+};
+
+const RETH_STORE_KEY = VARIANTS[node_env().node_variant].reth_store_key;
+const LIGHTHOUSE_STORE_KEY = VARIANTS[node_env().node_variant].lighthouse_store_key;
+
 const API_HOST = "http://localhost:4467/";
-const A_DIR = node_env().protocol_data_path + "/A";
-const B_DIR = node_env().protocol_data_path + "/B";
-const NET =  global::NETS[node_env().node_variant];
+const RETH_DIR = node_env().protocol_data_path + "/reth";
+const LIGHTHOUSE_DIR = node_env().protocol_data_path + "/lighthouse";
+const NET = global::NETS[node_env().node_variant];
 
 fn plugin_config() {
   #{
@@ -80,7 +103,7 @@ fn plugin_config() {
                 /// Unique job name.
                 name: "init_job",
                 /// Sh script body. It shall be blocking (foreground) process.
-                run_sh: `openssl rand -hex 32 > ${global::A_DIR}/jwt.txt`,
+                run_sh: `openssl rand -hex 32 > ${global::RETH_DIR}/jwt.txt`,
                 /// [optional] InitJob restart policy.
                 /// If not set default to "never".
                 restart: "never",
@@ -117,10 +140,11 @@ fn plugin_config() {
     /// List of services to be started once init jobs and download is finished.
     services: [
         #{
-            /// Unique service job name.
-            name: "protocol_service_a",
-            /// Sh script body. It shall be blocking (foreground) process.
-            run_sh: `/usr/bin/protocol_service_a start --home=${global::A_DIR} --chain=${global::NET.net_type} --rest-server --seeds ${global::NET.seeds} "$@"`,
+            name: "reth",
+            /// data_dir: "reth",                                 // R1.1: Optional, defaults to service name
+            store_key: global::RETH_STORE_KEY,                   // R1.2: Individual store key
+            run_sh: `/usr/bin/reth node --datadir ${global::RETH_DIR} --chain mainnet --http --http-addr 0.0.0.0 "$@"`,
+            use_protocol_data: true,
             /// [optional] Job restart config.
             /// If not set default to:
             /// #{
@@ -152,17 +176,13 @@ fn plugin_config() {
             /// [optional] Prepend timestamp to each log, or not.
             /// If not set default to false.
             log_timestamp: true,
-            /// [optional] Flag indicating if service uses protocol data.
-            /// Services that uses protocol data won't be started until all init steps and download
-            /// is finished. They are also stopped while uploading protocol archive.
-            /// Additionally services that uses protocol data, automatically create lock that prevents
-            /// re-initialization of the data after job is started.
-            /// NOTE: In contrast to regular jobs, for services default value is true.
-            use_protocol_data: true,
         },
         #{
-            name: "protocol_service_b",
-            run_sh: `/usr/bin/protocol_service_b --chain=${global::NET.net_type} --datadir=${global::A_DIR} --snapshots=false`,
+            name: "lighthouse",
+            /// data_dir defaults to "lighthouse" since name is "lighthouse"
+            store_key: global::LIGHTHOUSE_STORE_KEY,
+            run_sh: `/usr/bin/lighthouse beacon_node --datadir ${global::LIGHTHOUSE_DIR} --network mainnet --execution-endpoint http://127.0.0.1:8551 "$@"`,
+            use_protocol_data: true,
         }
     ],
     /// [optional] Download configuration.

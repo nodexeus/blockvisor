@@ -27,6 +27,7 @@ pub fn new(
         bv_api_url: bv_context.url.clone(),
         data_mount_point,
         protocol_data_path,
+        properties: node_state.properties.clone(),
     }
 }
 

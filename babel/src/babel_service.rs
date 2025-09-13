@@ -15,7 +15,7 @@ use reqwest::{
 use serde_json::json;
 use std::{
     ops::Deref,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     str::FromStr,
     sync::Arc,
@@ -140,6 +140,26 @@ impl<J: JobsManagerClient + Sync + Send + 'static, P: BabelPal + Sync + Send + '
             .create(&name, config)
             .await
             .map_err(|err| Status::internal(format!("create_job failed: {err:#}")))?;
+        Ok(Response::new(()))
+    }
+
+    async fn save_plugin_config_for_job(
+        &self,
+        request: Request<(String, String)>,
+    ) -> Result<Response<()>, Status> {
+        let (job_name, plugin_config_json) = request.into_inner();
+        
+        // Save plugin config to job directory so the job runner can access it
+        let job_dir = Path::new("/var/lib/babel/jobs").join(&job_name);
+        if !job_dir.exists() {
+            std::fs::create_dir_all(&job_dir)
+                .map_err(|err| Status::internal(format!("Failed to create job directory {}: {}", job_dir.display(), err)))?;
+        }
+        
+        let plugin_config_path = job_dir.join("plugin_config.json");
+        std::fs::write(&plugin_config_path, plugin_config_json)
+            .map_err(|err| Status::internal(format!("Failed to save plugin config to {}: {}", plugin_config_path.display(), err)))?;
+        
         Ok(Response::new(()))
     }
 

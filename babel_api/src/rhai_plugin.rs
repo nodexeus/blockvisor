@@ -619,9 +619,9 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                             use_protocol_data: false,
                             log_buffer_capacity_mb: service.log_buffer_capacity_mb,
                             log_timestamp: service.log_timestamp,
-                            // data_dir: None,           // AuxServices don't have data directories
-                            // store_key: None,          // AuxServices don't have store keys  
-                            // archive: false,           // AuxServices are not archived by default
+                            data_dir: None,           // AuxServices don't have data directories
+                            store_key: None,          // AuxServices don't have store keys  
+                            archive: false,           // AuxServices are not archived by default
                         },
                         vec![],
                         vec![],
@@ -664,10 +664,23 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
         let mut services_needs = self.run_actions(config.init, vec![])?;
         if self.babel_engine.protocol_data_stamp()?.is_none() {
             if self.babel_engine.has_protocol_archive()? {
-                self.create_and_start_job(
-                    DOWNLOAD_JOB_NAME,
-                    plugin_config::build_download_job_config(config.download, services_needs),
-                )?;
+                // Check if we have any services with store_key defined (multi-client setup)
+                let has_multi_client_services = config.services.iter()
+                    .any(|service| service.archive && service.store_key.is_some());
+                
+                if has_multi_client_services {
+                    // Use multi-client download for per-client snapshots
+                    self.create_and_start_job(
+                        DOWNLOAD_JOB_NAME,
+                        plugin_config::build_multi_client_download_job_config(config.download, services_needs),
+                    )?;
+                } else {
+                    // Fall back to traditional single download
+                    self.create_and_start_job(
+                        DOWNLOAD_JOB_NAME,
+                        plugin_config::build_download_job_config(config.download, services_needs),
+                    )?;
+                }
                 services_needs =
                     self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
             } else if let Some(alternative_download) = config.alternative_download {
@@ -712,10 +725,25 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
             self.babel_engine.stop_job(&service.name)?;
         }
         let pre_upload_jobs = self.run_actions(config.pre_upload, vec![])?;
-        self.create_and_start_job(
-            UPLOAD_JOB_NAME,
-            plugin_config::build_upload_job_config(config.upload, pre_upload_jobs),
-        )?;
+        
+        // Check if we have any services with store_key defined (multi-client setup)
+        let has_multi_client_services = config.services.iter()
+            .any(|service| service.archive && service.store_key.is_some());
+        
+        if has_multi_client_services {
+            // Use multi-client upload for per-client snapshots
+            self.create_and_start_job(
+                UPLOAD_JOB_NAME,
+                plugin_config::build_multi_client_upload_job_config(config.upload, pre_upload_jobs),
+            )?;
+        } else {
+            // Fall back to traditional single upload
+            self.create_and_start_job(
+                UPLOAD_JOB_NAME,
+                plugin_config::build_upload_job_config(config.upload, pre_upload_jobs),
+            )?;
+        }
+        
         let post_upload_jobs =
             self.run_jobs(config.post_upload, vec![UPLOAD_JOB_NAME.to_string()])?;
         self.start_services(config.services, Default::default(), post_upload_jobs)?;
@@ -1915,9 +1943,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec!["post_upload_job".to_string()],
@@ -2051,9 +2079,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],
@@ -2171,9 +2199,9 @@ mod tests {
                         use_protocol_data: true,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec!["post_download_job".to_string()],
                     vec![],
@@ -2201,9 +2229,9 @@ mod tests {
                         use_protocol_data: false,
                         log_buffer_capacity_mb: None,
                         log_timestamp: None,
-                        // data_dir: None,
-                        // store_key: None,
-                        // archive: true,      // Default to archived
+                        data_dir: None,
+                        store_key: None,
+                        archive: true,      // Default to archived
                     },
                     vec![],
                     vec![],

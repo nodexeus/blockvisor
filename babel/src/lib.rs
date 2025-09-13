@@ -9,6 +9,7 @@ pub mod job_runner;
 pub mod jobs;
 pub mod jobs_manager;
 pub mod log_buffer;
+pub mod multi_client_integration;
 pub mod pal;
 pub mod run_sh_job;
 pub mod upload_job;

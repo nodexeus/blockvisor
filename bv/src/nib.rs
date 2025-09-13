@@ -207,24 +207,26 @@ pub async fn process_image_command(
                     )
                 };
             println!("Checking plugin");
+            let node_env = NodeEnv {
+                node_id: "node-id".to_string(),
+                node_name: "node_name".to_string(),
+                node_version: image_variant.version,
+                node_protocol: image_variant.protocol_key,
+                node_variant: variant.key,
+                node_ip: "1.2.3.4".to_string(),
+                node_gateway: "4.3.2.1".to_string(),
+                dev_mode: true,
+                bv_host_id: "host-id".to_string(),
+                bv_host_name: "hostname".to_string(),
+                bv_api_url: "none.com".to_string(),
+                node_org_id: "org-id".to_string(),
+                data_mount_point: PathBuf::from("/blockjoy"),
+                protocol_data_path: PathBuf::from("/blockjoy/protocol_data"),
+                properties: properties.clone(),
+            };
             let mut res = rhai_plugin_linter::check(
                 rootfs_path.join(PLUGIN_PATH).join(PLUGIN_MAIN_FILENAME),
-                NodeEnv {
-                    node_id: "node-id".to_string(),
-                    node_name: "node_name".to_string(),
-                    node_version: image_variant.version,
-                    node_protocol: image_variant.protocol_key,
-                    node_variant: variant.key,
-                    node_ip: "1.2.3.4".to_string(),
-                    node_gateway: "4.3.2.1".to_string(),
-                    dev_mode: true,
-                    bv_host_id: "host-id".to_string(),
-                    bv_host_name: "hostname".to_string(),
-                    bv_api_url: "none.com".to_string(),
-                    node_org_id: "org-id".to_string(),
-                    data_mount_point: PathBuf::from("/blockjoy"),
-                    protocol_data_path: PathBuf::from("/blockjoy/protocol_data"),
-                },
+                node_env,
                 properties,
             );
             if let Some(mut dev_node) = dev_node {
