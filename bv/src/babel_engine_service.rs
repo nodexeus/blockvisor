@@ -47,6 +47,35 @@ impl babel_api::babel::babel_engine_server::BabelEngine for BabelEngineService {
         }
     }
 
+    async fn put_download_manifest_for_store_key(
+        &self,
+        request: Request<(String, DownloadManifest, u64)>,
+    ) -> eyre::Result<Response<()>, Status> {
+        let (store_key, manifest, data_version) = request.into_inner();
+        debug!(
+            "putting DownloadManifest to API from node {} for store_key {} (data_version={})",
+            self.node_info.node_id, store_key, data_version,
+        );
+        if let Err(err) = services::archive::put_download_manifest_for_store_key(
+            &self.config,
+            store_key.clone(),
+            manifest,
+            data_version,
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "put_download_manifest_for_store_key for node {} (store_key={})",
+                self.node_info.node_id, store_key
+            )
+        }) {
+            warn!("{err:#}");
+            Err(Status::internal(err.to_string()))
+        } else {
+            Ok(Response::new(()))
+        }
+    }
+
     async fn get_download_metadata(
         &self,
         _request: Request<()>,

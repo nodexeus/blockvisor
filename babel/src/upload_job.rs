@@ -590,16 +590,32 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
         if !run.load() {
             return Ok(());
         }
-        // TODO: Create store_key-based put_download_manifest API
-        // For now, skip this step since we don't have an archive_id for store_key-based uploads
-        // The manifest data is already stored in the store via the upload process
-        // self.connector
-        //     .connect()
-        //     .put_download_manifest(with_timeout(
-        //         (blueprint.manifest, blueprint.data_version),
-        //         RPC_REQUEST_TIMEOUT,
-        //     ))
-        //     .await?;
+        
+        // Make destinations paths relative to source_dir
+        for chunk in &mut blueprint.manifest.chunks {
+            for destination in &mut chunk.destinations {
+                destination.path = destination
+                    .path
+                    .strip_prefix(&self.source_dir)?
+                    .to_path_buf();
+            }
+        }
+        
+        // Register the manifest using the store_key-based API
+        let custom_timeout = RPC_REQUEST_TIMEOUT
+            + bv_utils::rpc::estimate_put_download_manifest_request_timeout(
+                blueprint.manifest.chunks.len(),
+            );
+        let mut client = self.connector.connect();
+        with_selective_retry!(client.put_download_manifest_for_store_key(with_timeout(
+            (self.store_key.clone(), blueprint.manifest.clone(), blueprint.data_version),
+            custom_timeout,
+        )))
+        .with_context(|| format!("failed to register DownloadManifest for store_key '{}'", self.store_key))?;
+        
+        tracing::info!("Successfully registered manifest for store_key '{}' with {} chunks", 
+                      self.store_key, blueprint.manifest.chunks.len());
+        
         cleanup_job(&client_meta_dir)?;
         Ok(())
     }
@@ -631,21 +647,39 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
 
     /// R2.4: Upload multiple clients in parallel
     pub async fn upload_all_clients(&mut self, clients: Vec<ClientArchiveConfig>, mut run: RunFlag) -> Result<()> {
-        let mut upload_futures = FuturesUnordered::new();
+        // Calculate total chunks across all clients for progress tracking
+        let mut total_chunks = 0u32;
+        let mut client_uploaders = Vec::new();
         
         for client in clients {
-            let mut uploader = ClientUploader::new(
+            let uploader = ClientUploader::new(
                 self.connector.clone(),
                 client.store_key.clone(),
                 client.data_directory.clone(),
-                client.exclude_patterns.iter().map(|p| p.as_str().to_string()).collect(), // Convert Pattern back to String
+                client.exclude_patterns.iter().map(|p| p.as_str().to_string()).collect(),
                 None, // auto-calculate chunks
                 Some(self.url_expires_secs),
                 self.data_version,
                 self.config.clone(),
             )?;
             
-            let client_name = client.client_name.clone();
+            total_chunks += uploader.total_slots;
+            client_uploaders.push((client.client_name.clone(), uploader));
+        }
+        
+        // Initialize overall progress
+        save_job_data(
+            &self.config.progress_file_path,
+            &JobProgress {
+                total: total_chunks,
+                current: 0,
+                message: "multi-client upload".to_string(),
+            },
+        )?;
+        
+        let mut upload_futures = FuturesUnordered::new();
+        
+        for (client_name, mut uploader) in client_uploaders {
             let run_flag = run.child_flag();
             upload_futures.push(Box::pin(async move {
                 let result = uploader.run(run_flag).await;
@@ -653,15 +687,73 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
             }));
         }
         
+        // Track progress while uploads run
+        let mut completed_clients = 0;
+        let total_clients = upload_futures.len();
+        
         // Wait for all uploads to complete
         while let Some((client_name, result)) = upload_futures.next().await {
             match result {
-                Ok(_) => tracing::info!("Client '{}' upload completed", client_name),
+                Ok(_) => {
+                    completed_clients += 1;
+                    tracing::info!("Client '{}' upload completed ({}/{})", client_name, completed_clients, total_clients);
+                    
+                    // Update overall progress by aggregating all client progress files
+                    if let Err(err) = self.update_overall_progress().await {
+                        tracing::warn!("Failed to update overall progress: {:#}", err);
+                    }
+                }
                 Err(err) => {
                     tracing::error!("Client '{}' upload failed: {:#}", client_name, err);
                     return Err(err.wrap_err(format!("Client '{}' upload failed", client_name)));
                 }
             }
+        }
+        
+        // Final progress update to show completion
+        save_job_data(
+            &self.config.progress_file_path,
+            &JobProgress {
+                total: total_chunks,
+                current: total_chunks,
+                message: "multi-client upload completed".to_string(),
+            },
+        )?;
+        
+        Ok(())
+    }
+
+    /// Aggregate progress from all client-specific progress files and update the main job progress
+    async fn update_overall_progress(&self) -> Result<()> {
+        let mut total_chunks = 0u32;
+        let mut completed_chunks = 0u32;
+        
+        // Scan all client subdirectories for progress files
+        if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let client_progress_path = entry.path().join("progress.json");
+                    if client_progress_path.exists() {
+                        if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
+                            total_chunks += progress.total;
+                            completed_chunks += progress.current;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update the main job progress file
+        if total_chunks > 0 {
+            save_job_data(
+                &self.config.progress_file_path,
+                &JobProgress {
+                    total: total_chunks,
+                    current: completed_chunks,
+                    message: format!("multi-client upload ({} clients)", 
+                        if completed_chunks == total_chunks { "completed" } else { "in progress" }),
+                },
+            )?;
         }
         
         Ok(())

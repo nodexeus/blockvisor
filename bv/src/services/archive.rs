@@ -91,6 +91,59 @@ pub async fn put_download_manifest(
     Ok(())
 }
 
+pub async fn put_download_manifest_for_store_key(
+    config: &SharedConfig,
+    store_key: String,
+    manifest: DownloadManifest,
+    data_version: u64,
+) -> Result<()> {
+    info!("Putting download manifest for store_key {}...", store_key);
+    let mut client = connect_protocol_archive_service(config).await?;
+    // DownloadManifest may be pretty big, so better set longer timeout that depends on number of chunks
+    let custom_timeout =
+        bv_utils::rpc::estimate_put_download_manifest_request_timeout(manifest.chunks.len());
+    let compression = manifest.compression.map(|v| v.into());
+    let chunks = manifest
+        .chunks
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let checksum = value.checksum.into();
+            let destinations = value
+                .destinations
+                .into_iter()
+                .map(|value| pb::ChunkTarget {
+                    path: value.path.to_string_lossy().to_string(),
+                    position_bytes: value.pos,
+                    size_bytes: value.size,
+                })
+                .collect();
+            pb::ArchiveChunk {
+                index: index as u32,
+                key: value.key,
+                url: value.url.map(|url| url.to_string()),
+                checksum: Some(checksum),
+                size: value.size,
+                destinations,
+            }
+        })
+        .collect();
+    let manifest = pb::ArchiveServicePutDownloadManifestByStoreKeyRequest {
+        store_key,
+        data_version,
+        org_id: None,
+        total_size: manifest.total_size,
+        compression,
+        chunks,
+    };
+    api_with_retry!(
+        client,
+        client.put_download_manifest_by_store_key(with_timeout(manifest.clone(), custom_timeout))
+    )
+    .with_context(|| "put_download_manifest_for_store_key failed")?;
+    Ok(())
+}
+
 pub async fn get_download_metadata(
     config: &SharedConfig,
     archive_id: String,

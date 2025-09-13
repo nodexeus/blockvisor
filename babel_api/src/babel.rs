@@ -96,6 +96,12 @@ pub trait JobsMonitor {
 pub trait BabelEngine {
     /// Send `DownloadManifest` blueprint to API.
     fn put_download_manifest(manifest: DownloadManifest, data_version: u64);
+    /// Send `DownloadManifest` blueprint to API using client-specific store key.
+    fn put_download_manifest_for_store_key(
+        store_key: String,
+        manifest: DownloadManifest,
+        data_version: u64,
+    );
     /// Get `DownloadMetadata` from API.
     fn get_download_metadata() -> DownloadMetadata;
     /// Get `DownloadMetadata` from API using client-specific store key.
