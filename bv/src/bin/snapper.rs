@@ -52,9 +52,6 @@ enum Commands {
         /// Node type (e.g., "archive", "full") - auto-detected if not specified
         #[arg(long)]
         node_type: Option<String>,
-        /// Specific version to download (latest if not specified)
-        #[arg(short, long)]
-        version: Option<u64>,
         /// Number of parallel workers
         #[arg(short, long, default_value = "4")]
         workers: usize,
@@ -111,7 +108,6 @@ async fn main() -> Result<()> {
             network,
             output,
             node_type,
-            version,
             workers,
             max_connections,
             dry_run,
@@ -122,7 +118,6 @@ async fn main() -> Result<()> {
                 network,
                 output,
                 node_type,
-                version,
                 workers,
                 max_connections,
                 dry_run,
@@ -186,7 +181,6 @@ async fn handle_download_command(
     network: String,
     output: PathBuf,
     node_type: Option<String>,
-    version: Option<u64>,
     workers: usize,
     max_connections: usize,
     dry_run: bool,
@@ -270,7 +264,7 @@ async fn handle_download_command(
 
     if dry_run {
         let info = snapshot_client
-            .get_download_info(&protocol, &client, &network, &actual_node_type, version)
+            .get_download_info(&protocol, &client, &network, &actual_node_type, None)
             .await?;
         print_download_info(&info)?;
         return Ok(());
@@ -282,7 +276,7 @@ async fn handle_download_command(
             &client,
             &network,
             &actual_node_type,
-            version,
+            None,
             download_config,
         )
         .await?;
@@ -324,14 +318,11 @@ fn print_simple_snapshots(groups: &[ProtocolGroup]) -> Result<()> {
                 for (node_type, type_snapshots) in by_node_type {
                     let latest_version =
                         type_snapshots.iter().map(|s| s.version).max().unwrap_or(1);
-                    let versions_count = type_snapshots.len();
                     println!(
-                        "    - {}/{}: v{} ({} version{})",
+                        "    - {}/{}: v{} (latest)",
                         network_name,
                         node_type,
-                        latest_version,
-                        versions_count,
-                        if versions_count == 1 { "" } else { "s" }
+                        latest_version
                     );
                 }
             }
@@ -367,7 +358,7 @@ fn print_detailed_snapshots(groups: &[ProtocolGroup]) -> Result<()> {
 
                     for snapshot in type_snapshots {
                         let size_gb = snapshot.total_size as f64 / (1024.0 * 1024.0 * 1024.0);
-                        println!("  - Version {} - {:.1}GB", snapshot.version, size_gb);
+                        println!("  - Version {} (latest) - {:.1}GB", snapshot.version, size_gb);
                     }
                     println!();
                 }
@@ -380,7 +371,7 @@ fn print_detailed_snapshots(groups: &[ProtocolGroup]) -> Result<()> {
 
 fn print_download_info(info: &DownloadInfo) -> Result<()> {
     println!(
-        "Would download: {}/{}/{} version {}",
+        "Would download: {}/{}/{} (latest version {})",
         info.protocol, info.client, info.network, info.version
     );
     println!("Archive ID: {}", info.archive_id);

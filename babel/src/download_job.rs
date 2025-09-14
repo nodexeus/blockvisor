@@ -43,6 +43,14 @@ const CHUNKS_FILENAME: &str = "download.chunks";
 const PARTS_FILENAME: &str = "download.parts";
 const METADATA_FILENAME: &str = "download.metadata";
 
+/// R3.1: Configuration for a client-specific download
+#[derive(Debug, Clone)]
+pub struct ClientDownloadConfig {
+    pub client_name: String,
+    pub data_directory: PathBuf,           // /blockjoy/protocol_data/reth
+    pub store_key: String,
+}
+
 pub fn cleanup_job(meta_dir: &Path, destination_dir: &Path) -> Result<()> {
     let chunks_path = meta_dir.join(CHUNKS_FILENAME);
     if chunks_path.exists() {
@@ -165,10 +173,119 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
                 load_chunks(&self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME))?,
             )
         } else {
-            cleanup_job(&self.config.archive_jobs_meta_dir, &self.destination_dir)?;
             let mut client = self.connector.connect();
             let metadata = with_selective_retry!(client.get_download_metadata(with_timeout(
                 (),
+                Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+            )))?
+            .into_inner();
+            let chunks = with_selective_retry!(client.get_download_chunks(with_timeout(
+                (metadata.data_version, (0..metadata.chunks).collect::<Vec<u32>>()),
+                Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+            )))?
+            .into_inner();
+            save_job_data(&metadata_path, &metadata)?;
+            save_job_data(&self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME), &chunks)?;
+            (metadata, chunks)
+        })
+    }
+
+    fn check_disk_space(&self, metadata: &DownloadMetadata, downloaded_chunks: &[Chunk]) -> Result<()> {
+        let available_space = bv_utils::system::available_disk_space_by_path(&self.destination_dir)?;
+        let required_space = required_disk_space(metadata, downloaded_chunks)?;
+        if required_space > available_space {
+            bail!(
+                "Can't download {} bytes of data while only {} available",
+                required_space,
+                available_space
+            )
+        }
+        Ok(())
+    }
+
+    fn init_writer(
+        &self,
+        mut run: RunFlag,
+        total_chunks_count: u32,
+        downloaded_chunks: Vec<Chunk>,
+        rx: mpsc::Receiver<ChunkData>,
+    ) -> JoinHandle<Result<Vec<Chunk>>> {
+        let writer = Writer::new(
+            rx,
+            self.destination_dir.clone(),
+            self.config.max_opened_files,
+            self.config.progress_file_path.clone(),
+            self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME),
+            total_chunks_count,
+            downloaded_chunks,
+        );
+        tokio::spawn(writer.run(run.clone()))
+    }
+
+    fn unify_file_times(&self, chunks: &[Chunk]) -> Result<()> {
+        let now = std::time::SystemTime::now();
+        let times = fs::FileTimes::new().set_accessed(now).set_modified(now);
+        let paths = chunks
+            .iter()
+            .fold(HashSet::new(), |paths, chunk| {
+                chunk.destinations.iter().fold(paths, |mut paths, dest| {
+                    paths.insert(&dest.path);
+                    paths
+                })
+            });
+        for path in paths {
+            let full_path = self.destination_dir.join(path);
+            let file = File::options()
+                .write(true)
+                .open(&full_path)
+                .with_context(|| format!("can't open `{}` to change times", full_path.display()))?;
+            file.set_times(times)
+                .with_context(|| format!("can't set times for `{}`", full_path.display()))?;
+        }
+        Ok(())
+    }
+}
+
+
+
+/// R3.2: Client-specific downloader that uses store_key for download metadata and chunks
+pub struct ClientDownloader<C> {
+    connector: C,
+    store_key: String,
+    destination_dir: PathBuf,
+    config: TransferConfig,
+}
+
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C> {
+    pub fn new(
+        connector: C,
+        store_key: String,
+        destination_dir: PathBuf,
+        config: TransferConfig,
+    ) -> Self {
+        Self {
+            connector,
+            store_key,
+            destination_dir,
+            config,
+        }
+    }
+
+    async fn get_metadata(&self) -> Result<(DownloadMetadata, Vec<Chunk>)> {
+        let metadata_path = self.config.archive_jobs_meta_dir
+            .join("manifest-header.json");
+        Ok(if metadata_path.exists() {
+            (
+                load_job_data::<DownloadMetadata>(&metadata_path)?,
+                load_chunks(&self.config.archive_jobs_meta_dir
+                    .join("manifest-data.json"))?,
+            )
+        } else {
+            cleanup_job(&self.config.archive_jobs_meta_dir, &self.destination_dir)?;
+            let mut client = self.connector.connect();
+            // Use store_key-specific metadata fetching
+            let metadata = with_selective_retry!(client.get_download_metadata_for_store_key(with_timeout(
+                self.store_key.clone(),
                 // checking download manifest require validity check, which may be time-consuming
                 // let's give it a minute
                 Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
@@ -210,7 +327,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
             self.destination_dir.clone(),
             self.config.max_opened_files,
             self.config.progress_file_path.clone(),
-            self.config.archive_jobs_meta_dir.join(CHUNKS_FILENAME),
+            self.config.archive_jobs_meta_dir.join("manifest-data.json"),
             total_chunks_count,
             downloaded_chunks,
         );
@@ -239,6 +356,158 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
                 .with_context(|| format!("can't set times for `{}`", full_path.display()))?;
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for ClientDownloader<C> {
+    async fn run(&mut self, mut run: RunFlag) -> Result<()> {
+        let (metadata, downloaded_chunks) = self.get_metadata().await?;
+        self.config.compression = metadata.compression;
+        self.check_disk_space(&metadata, &downloaded_chunks)?;
+        let downloaded_indexes = downloaded_chunks.iter().map(|chunk| chunk.index).collect();
+        let (tx, rx) = mpsc::channel(self.config.max_runners);
+        let mut parallel_downloaders_run = run.child_flag();
+        let writer = self.init_writer(
+            parallel_downloaders_run.clone(),
+            metadata.chunks,
+            downloaded_chunks,
+            rx,
+        );
+
+        let mut downloaders = ClientChunkDownloaders::new(
+            self.connector.clone(),
+            self.store_key.clone(),
+            parallel_downloaders_run.clone(),
+            tx,
+            metadata.chunks,
+            metadata.data_version,
+            downloaded_indexes,
+            self.config.clone(),
+        );
+        let mut downloaders_state = RunnersState {
+            result: Ok(()),
+            run: parallel_downloaders_run,
+        };
+        loop {
+            if downloaders_state.run.load() {
+                if let Err(err) = downloaders.launch_more().await {
+                    downloaders_state.handle_error(err);
+                }
+            }
+            match downloaders.wait_for_next().await {
+                Some(Err(err)) => downloaders_state.handle_error(err),
+                Some(Ok(_)) => {}
+                None => break,
+            }
+        }
+        drop(downloaders); // drop last sender so writer know that download is done
+
+        let downloaded_chunks = writer.await??;
+        downloaders_state.result?;
+        self.unify_file_times(&downloaded_chunks)?;
+        if !run.load() {
+            bail!("download interrupted");
+        }
+        Ok(())
+    }
+}
+
+/// R3.1: Multi-client downloader that creates separate download jobs for each client
+pub struct MultiClientDownloader<C> {
+    connector: C,
+    config: TransferConfig,
+}
+
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloader<C> {
+    pub fn new(connector: C, config: TransferConfig) -> Self {
+        Self { connector, config }
+    }
+
+    /// R3.1: Create separate download jobs for each required client
+    pub fn create_multi_client_jobs(
+        connector: C, 
+        clients: Vec<ClientDownloadConfig>,
+        config: TransferConfig
+    ) -> Vec<(String, ClientDownloader<C>)> {
+        clients.into_iter().map(|client| {
+            let job_name = format!("download_{}", client.client_name);  // R3.1: Named jobs
+            let downloader = ClientDownloader::new(
+                connector.clone(),
+                client.store_key,           // R3.2: Use store_key for client-specific downloads
+                client.data_directory,      // R3.2: Client-specific directory
+                config.clone(),
+            );
+            (job_name, downloader)
+        }).collect()
+    }
+    
+    /// R3.2: Download to client-specific subdirectory
+    async fn get_client_metadata(&self, store_key: &str) -> Result<(DownloadMetadata, Vec<Chunk>)> {
+        let metadata_path = self.config.archive_jobs_meta_dir
+            .join("manifest-header.json");
+            
+        if metadata_path.exists() {
+            // Load existing metadata for this specific client
+            let metadata = load_job_data::<DownloadMetadata>(&metadata_path)?;
+            let chunks_path = self.config.archive_jobs_meta_dir
+                .join("manifest-data.json");
+            let chunks = load_chunks(&chunks_path).unwrap_or_default();
+            Ok((metadata, chunks))
+        } else {
+            // Fetch metadata from API for this specific client
+            let mut client = self.connector.connect();
+            let metadata = with_selective_retry!(client.get_download_metadata(with_timeout(
+                (),
+                Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+            )))?
+            .into_inner();
+            save_job_data(&metadata_path, &metadata)?;
+            Ok((metadata, vec![]))
+        }
+    }
+
+    /// R3.1: Download all clients in parallel
+    pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
+        let mut download_futures = FuturesUnordered::new();
+        
+        for client in clients {
+            let mut downloader = ClientDownloader::new(
+                self.connector.clone(),
+                client.store_key.clone(),
+                client.data_directory.clone(),
+                self.config.clone(),
+            );
+            
+            let client_name = client.client_name.clone();
+            let run_flag = run.child_flag();
+            download_futures.push(Box::pin(async move {
+                let result = downloader.run(run_flag).await;
+                (client_name, result)
+            }));
+        }
+        
+        // Wait for all downloads to complete
+        while let Some((client_name, result)) = download_futures.next().await {
+            match result {
+                Ok(_) => tracing::info!("Client '{}' download completed", client_name),
+                Err(err) => {
+                    tracing::error!("Client '{}' download failed: {:#}", client_name, err);
+                    return Err(err.wrap_err(format!("Client '{}' download failed", client_name)));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for MultiClientDownloader<C> {
+    async fn run(&mut self, _run: RunFlag) -> Result<()> {
+        // This would need to be called from the main job runner with the parsed plugin config
+        // For now, we'll return an error since we need the plugin config to determine clients
+        bail!("MultiClientDownloader::run() should not be called directly. Use download_all_clients() instead.")
     }
 }
 
@@ -337,6 +606,99 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
                 );
                 self.futures
                     .push(Box::pin(tokio::spawn(downloader.run(self.run.clone()))));
+            }
+        }
+        Ok(())
+    }
+
+    async fn wait_for_next(&mut self) -> Option<Result<()>> {
+        self.futures
+            .next()
+            .await
+            .map(|r| r.unwrap_or_else(|err| bail!("{err:#}")))
+    }
+}
+
+/// Client-specific chunk downloader that uses store_key for fetching chunks
+struct ClientChunkDownloaders<'a, C> {
+    connector: C,
+    store_key: String,
+    run: RunFlag,
+    tx: mpsc::Sender<ChunkData>,
+    chunk_indexes: HashSet<u32>,
+    config: TransferConfig,
+    futures: FuturesUnordered<BoxFuture<'a, Result<Result<()>, JoinError>>>,
+    chunks: Vec<Chunk>,
+    parts_path: PathBuf,
+    data_version: u64,
+    connection_pool: ConnectionPool,
+}
+
+impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDownloaders<'a, C> {
+    fn new(
+        connector: C,
+        store_key: String,
+        run: RunFlag,
+        tx: mpsc::Sender<ChunkData>,
+        chunks_count: u32,
+        data_version: u64,
+        downloaded_indexes: HashSet<u32>,
+        mut config: TransferConfig,
+    ) -> Self {
+        config.max_runners = min(config.max_runners, config.max_opened_files);
+        let connection_pool = Arc::new(Semaphore::new(config.max_connections));
+        let mut chunk_indexes = (0..chunks_count).collect::<HashSet<_>>();
+        chunk_indexes.retain(|index| !downloaded_indexes.contains(index));
+        let parts_path = config.archive_jobs_meta_dir.join("download-parts.json");
+        Self {
+            connector,
+            store_key,
+            run,
+            tx,
+            chunk_indexes,
+            config,
+            futures: FuturesUnordered::new(),
+            chunks: Default::default(),
+            parts_path,
+            data_version,
+            connection_pool,
+        }
+    }
+
+    async fn launch_more(&mut self) -> Result<()> {
+        if !self.chunk_indexes.is_empty() {
+            if self.chunks.is_empty() {
+                let indexes = self
+                    .chunk_indexes
+                    .iter()
+                    .take(self.config.max_runners)
+                    .map(|index| index.to_owned())
+                    .collect::<Vec<_>>();
+                let mut client = self.connector.connect();
+                // Use store_key-specific chunk fetching
+                self.chunks = with_selective_retry!(client.get_download_chunks_for_store_key(with_timeout(
+                    (self.store_key.clone(), self.data_version, indexes.clone()),
+                    // checking download manifest require validity check, which may be time-consuming
+                    // let's give it a minute
+                    Duration::from_secs(60) + RPC_REQUEST_TIMEOUT,
+                )))?
+                .into_inner();
+            }
+            while self.futures.len() < self.config.max_runners {
+                let Some(chunk) = self.chunks.pop() else {
+                    break;
+                };
+                self.chunk_indexes.remove(&chunk.index);
+                let downloader = ChunkDownloader::new(
+                    self.connector.clone(),
+                    chunk,
+                    self.tx.clone(),
+                    self.config.clone(),
+                    self.connection_pool.clone(),
+                );
+                self.futures.push(Box::pin(tokio::spawn(
+                    downloader.run(self.run.clone()),
+                )));
             }
         }
         Ok(())
