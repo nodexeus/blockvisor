@@ -42,6 +42,15 @@ const UPLOAD_SINGLE_CHUNK_TIMEOUT: Duration = Duration::from_secs(50 * 60);
 const BLUEPRINT_FILENAME: &str = "upload.blueprint";
 const CHUNKS_FILENAME: &str = "upload.chunks";
 
+/// R2.1: Configuration for a client-specific archive
+#[derive(Debug, Clone)]
+pub struct ClientArchiveConfig {
+    pub client_name: String,                   // From service.name in config
+    pub store_key: String,                     // Primary identifier for operations
+    pub data_directory: PathBuf,               // /blockjoy/protocol_data/reth
+    pub exclude_patterns: Vec<Pattern>,
+}
+
 #[derive(Debug, Error)]
 pub enum NonRecoverableError {
     #[error("file {file_path} disapeared: {err:#}")]
@@ -243,6 +252,29 @@ async fn fetch_slots(
     .into_inner())
 }
 
+async fn fetch_slots_for_store_key(
+    mut client: BabelEngineClient,
+    store_key: &str,
+    chunks: &[Chunk],
+    count: usize,
+    data_version: Option<u64>,
+    url_expires_secs: u32,
+) -> Result<UploadSlots> {
+    let chunks = chunks
+        .iter()
+        .rev()
+        .take(count)
+        .map(|chunk| chunk.index)
+        .collect::<Vec<_>>();
+    Ok(with_selective_retry!(client.get_upload_slots_for_store_key(with_timeout(
+        (store_key.to_string(), data_version, chunks.clone(), url_expires_secs),
+        // Use longer timeout for store_key requests to match services layer
+        // Store operations can be time-consuming, especially for large uploads
+        Duration::from_secs(60),
+    )))?
+    .into_inner())
+}
+
 fn assign_slots(chunks: &mut [Chunk], slots: Vec<Slot>) {
     for slot in slots {
         if let Some(chunk) = chunks.iter_mut().find(|chunk| chunk.index == slot.index) {
@@ -331,6 +363,446 @@ impl<C: BabelEngineConnector> Uploader<C> {
             chunks,
         })
     }
+    
+    /// R2.1: Parse main.rhai to extract services that should be archived (default true)
+    pub fn get_archivable_clients(&self, plugin_config: &babel_api::plugin_config::PluginConfig) -> Result<Vec<ClientArchiveConfig>> {
+        let protocol_data_path = &self.config.data_mount_point;
+        
+        plugin_config.services.iter()
+            .filter(|service| service.archive)                      // R2.1: Archive by default unless explicitly false
+            .filter(|service| service.store_key.is_some())          // Only services with store_key
+            .map(|service| {
+                let data_dir_name = service.data_dir.as_ref()
+                    .unwrap_or(&service.name);                       // R1.1: Default to service name
+                let data_dir = protocol_data_path.join(data_dir_name);
+                Ok(ClientArchiveConfig {
+                    client_name: service.name.clone(),
+                    store_key: service.store_key.clone().unwrap(),   // R2.2: Individual store key
+                    data_directory: data_dir,
+                    exclude_patterns: self.exclude.clone(),
+                })
+            })
+            .collect()
+    }
+}
+
+/// R2.2: Client-specific uploader that uses store_key for upload slots
+pub struct ClientUploader<C> {
+    connector: C,
+    store_key: String,
+    source_dir: PathBuf,
+    exclude: Vec<Pattern>,
+    config: TransferConfig,
+    total_slots: u32,
+    sources_list: Option<SourcesList>,
+    url_expires_secs: u32,
+    data_version: Option<u64>,
+}
+
+impl<C: BabelEngineConnector> ClientUploader<C> {
+    pub fn new(
+        connector: C,
+        store_key: String,
+        source_dir: PathBuf,
+        exclude: Vec<String>,
+        number_of_chunks: Option<u32>,
+        url_expires_secs: Option<u32>,
+        data_version: Option<u64>,
+        config: TransferConfig,
+    ) -> Result<Self> {
+        let exclude = exclude
+            .iter()
+            .map(|pattern_str| Pattern::new(pattern_str))
+            .collect::<Result<Vec<Pattern>, PatternError>>()?;
+        let (total_slots, sources_list) = if let Some(number_of_chunks) = number_of_chunks {
+            if number_of_chunks == 0 {
+                bail!("invalid number of chunks - need at leas one");
+            }
+            (number_of_chunks, None)
+        } else {
+            let sources_list = sources_list(&source_dir, &exclude)?;
+            // recommended size of chunk is around 500MB
+            (
+                (1 + sources_list.total_size / 500_000_000) as u32,
+                Some(sources_list),
+            )
+        };
+        let url_expires_secs = url_expires_secs.unwrap_or(3600 + (config.max_runners as u32) * 15);
+        Ok(Self {
+            connector,
+            store_key,
+            source_dir,
+            exclude,
+            config,
+            total_slots,
+            sources_list,
+            url_expires_secs,
+            data_version,
+        })
+    }
+
+    /// Prepare DownloadManifest blueprint with files to chunks mapping, based on provided slots.
+    fn prepare_manifest_blueprint(&mut self) -> Result<DownloadManifest> {
+        let mut sources_list = if let Some(sources_list) = self.sources_list.take() {
+            sources_list
+        } else {
+            sources_list(&self.source_dir, &self.exclude)?
+        };
+        sources_list.sources.sort_by(|a, b| a.path.cmp(&b.path));
+        let chunk_size = sources_list.total_size / self.total_slots as u64;
+        let last_chunk_size = chunk_size + sources_list.total_size % self.total_slots as u64;
+        let mut chunks: Vec<_> = Default::default();
+        let mut index = 0;
+        while index < self.total_slots {
+            let chunk_size = if index < self.total_slots - 1 {
+                chunk_size
+            } else {
+                last_chunk_size
+            };
+            let destinations = build_destinations(chunk_size, &mut sources_list.sources);
+            if destinations.is_empty() {
+                // no more files - skip rest of the slots
+                break;
+            }
+            chunks.push(Chunk {
+                index,
+                key: Default::default(),
+                url: None,
+                checksum: Checksum::Sha1(Default::default()), // unknown yet
+                size: 0,                                      // unknown yet
+                destinations,
+            });
+            index += 1;
+        }
+        Ok(DownloadManifest {
+            total_size: sources_list.total_size,
+            compression: self.config.compression,
+            chunks,
+        })
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
+    async fn run(&mut self, mut run: RunFlag) -> Result<()> {
+        // Create client-specific metadata paths using store_key to avoid conflicts
+        let client_meta_dir = self.config.archive_jobs_meta_dir.join(&self.store_key);
+        std::fs::create_dir_all(&client_meta_dir)?;
+        
+        let blueprint_path = client_meta_dir.join(BLUEPRINT_FILENAME);
+        let chunks_path = client_meta_dir.join(CHUNKS_FILENAME);
+        let client_progress_path = client_meta_dir.join("progress.json");
+        
+        let blueprint = load_job_data::<Blueprint>(&blueprint_path).and_then(|blueprint| {
+            // Use client-specific source_dir for data stamp instead of shared data_mount_point
+            if blueprint.data_stamp == utils::protocol_data_stamp(&self.source_dir)? {
+                Ok(blueprint)
+            } else {
+                bail!("protocol_data stamp doesn't match, need to start upload from scratch")
+            }
+        });
+        let (mut blueprint, uploaded) = if let Ok(blueprint) = blueprint {
+            (blueprint, load_chunks(&chunks_path)?)
+        } else {
+            let manifest = self.prepare_manifest_blueprint()?;
+            // Use store_key-specific slot fetching
+            let slots = fetch_slots_for_store_key(
+                self.connector.connect(),
+                &self.store_key,
+                &manifest.chunks,
+                self.config.max_runners,
+                self.data_version,
+                self.url_expires_secs,
+            )
+            .await?;
+            let mut blueprint = Blueprint {
+                manifest,
+                data_version: slots.data_version,
+                data_stamp: utils::protocol_data_stamp(&self.source_dir)?,
+            };
+            save_job_data(&blueprint_path, &blueprint)?;
+            assign_slots(&mut blueprint.manifest.chunks, slots.slots);
+            (blueprint, Default::default())
+        };
+        
+        // Rest of the upload logic remains the same as regular Uploader
+        let mark_uploaded = |chunks: &mut Vec<Chunk>, chunk: Chunk| {
+            let Some(blueprint) = chunks.iter_mut().find(|item| item.index == chunk.index) else {
+                bail!("internal error - finished upload of chunk that doesn't exists in manifest");
+            };
+            *blueprint = chunk;
+            Ok(())
+        };
+        let mut uploaded_chunks = uploaded.len() as u32;
+        for chunk in uploaded {
+            mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
+        }
+        let mut parallel_uploaders_run = run.child_flag();
+        let mut uploaders = ClientChunkUploaders::new(
+            parallel_uploaders_run.clone(),
+            blueprint.manifest.chunks.clone(),
+            self.config.clone(),
+            self.store_key.clone(),
+            self.url_expires_secs,
+            blueprint.data_version,
+        );
+        let mut save_uploaded = |chunk| {
+            save_chunk(&chunks_path, &chunk)?;
+            mark_uploaded(&mut blueprint.manifest.chunks, chunk)?;
+            uploaded_chunks += 1;
+            save_job_data(
+                &client_progress_path,
+                &JobProgress {
+                    total: self.total_slots,
+                    current: uploaded_chunks,
+                    message: "chunks".to_string(),
+                },
+            )
+        };
+        let mut uploaders_state = RunnersState {
+            result: Ok(()),
+            run: parallel_uploaders_run,
+        };
+        loop {
+            if uploaders_state.run.load() {
+                if let Err(err) = uploaders.update_slots(self.connector.connect()).await {
+                    uploaders_state.handle_error(err);
+                } else {
+                    uploaders.launch_more(&self.connector);
+                }
+            }
+            match uploaders.wait_for_next().await {
+                Some(Ok(chunk)) => {
+                    if let Err(err) = save_uploaded(chunk) {
+                        uploaders_state.handle_error(err);
+                    }
+                }
+                Some(Err(err)) => uploaders_state.handle_error(err),
+                None => break,
+            }
+        }
+        if let Err(err) = uploaders_state.result {
+            if err.chain().any(|cause| cause.is::<NonRecoverableError>()) {
+                cleanup_job(&client_meta_dir)?;
+            }
+            return Err(err);
+        }
+        if !run.load() {
+            return Ok(());
+        }
+        
+        // Make destinations paths relative to source_dir
+        for chunk in &mut blueprint.manifest.chunks {
+            for destination in &mut chunk.destinations {
+                destination.path = destination
+                    .path
+                    .strip_prefix(&self.source_dir)?
+                    .to_path_buf();
+            }
+        }
+        
+        // Register the manifest using the store_key-based API
+        let custom_timeout = RPC_REQUEST_TIMEOUT
+            + bv_utils::rpc::estimate_put_download_manifest_request_timeout(
+                blueprint.manifest.chunks.len(),
+            );
+        let mut client = self.connector.connect();
+        with_selective_retry!(client.put_download_manifest_for_store_key(with_timeout(
+            (self.store_key.clone(), blueprint.manifest.clone(), blueprint.data_version),
+            custom_timeout,
+        )))
+        .with_context(|| format!("failed to register DownloadManifest for store_key '{}'", self.store_key))?;
+        
+        tracing::info!("Successfully registered manifest for store_key '{}' with {} chunks", 
+                      self.store_key, blueprint.manifest.chunks.len());
+        
+        cleanup_job(&client_meta_dir)?;
+        Ok(())
+    }
+}
+
+/// R2.4: Multi-client uploader that uploads each client separately
+pub struct MultiClientUploader<C> {
+    connector: C,
+    config: TransferConfig,
+    url_expires_secs: u32,
+    data_version: Option<u64>,
+}
+
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploader<C> {
+    pub fn new(
+        connector: C,
+        url_expires_secs: Option<u32>,
+        data_version: Option<u64>,
+        config: TransferConfig,
+    ) -> Self {
+        let url_expires_secs = url_expires_secs.unwrap_or(3600 + (config.max_runners as u32) * 15);
+        Self {
+            connector,
+            config,
+            url_expires_secs,
+            data_version,
+        }
+    }
+
+    /// R2.4: Upload multiple clients in parallel
+    pub async fn upload_all_clients(&mut self, clients: Vec<ClientArchiveConfig>, mut run: RunFlag) -> Result<()> {
+        // Calculate total chunks across all clients for progress tracking
+        let mut total_chunks = 0u32;
+        let mut client_uploaders = Vec::new();
+        
+        for client in clients {
+            let uploader = ClientUploader::new(
+                self.connector.clone(),
+                client.store_key.clone(),
+                client.data_directory.clone(),
+                client.exclude_patterns.iter().map(|p| p.as_str().to_string()).collect(),
+                None, // auto-calculate chunks
+                Some(self.url_expires_secs),
+                self.data_version,
+                self.config.clone(),
+            )?;
+            
+            total_chunks += uploader.total_slots;
+            // Track both store_key and client_name - store_key for operations, client_name for display
+            client_uploaders.push((client.store_key.clone(), client.client_name.clone(), uploader));
+        }
+        
+        // Initialize overall progress
+        save_job_data(
+            &self.config.progress_file_path,
+            &JobProgress {
+                total: total_chunks,
+                current: 0,
+                message: "multi-client upload".to_string(),
+            },
+        )?;
+        
+        let mut upload_futures = FuturesUnordered::new();
+        
+        for (store_key, client_name, mut uploader) in client_uploaders {
+            let run_flag = run.child_flag();
+            upload_futures.push(Box::pin(async move {
+                let result = uploader.run(run_flag).await;
+                (store_key, client_name, result)
+            }));
+        }
+        
+        // Track progress while uploads run
+        let mut completed_clients = 0;
+        let total_clients = upload_futures.len();
+        
+        // Add periodic progress updates
+        const PROGRESS_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+        
+        // Immediate first update to get any existing progress
+        if let Err(err) = self.update_overall_progress().await {
+            tracing::warn!("Failed to update initial overall progress: {:#}", err);
+        }
+        
+        // Wait for all uploads to complete with periodic progress updates
+        loop {
+            // Use a timeout to ensure we periodically update progress even if no clients complete
+            let next_future = tokio::time::timeout(
+                PROGRESS_UPDATE_INTERVAL,
+                upload_futures.next()
+            ).await;
+            
+            match next_future {
+                Ok(Some((store_key, client_name, result))) => {
+                    // A client upload completed
+                    match result {
+                        Ok(_) => {
+                            completed_clients += 1;
+                            // Use client_name from config for display
+                            tracing::info!("Client '{}' upload completed ({}/{})", client_name, completed_clients, total_clients);
+                        }
+                        Err(err) => {
+                            tracing::error!("Client '{}' upload failed: {:#}", client_name, err);
+                            return Err(err.wrap_err(format!("Client '{}' upload failed", client_name)));
+                        }
+                    }
+                    
+                    // Update overall progress
+                    if let Err(err) = self.update_overall_progress().await {
+                        tracing::warn!("Failed to update overall progress: {:#}", err);
+                    }
+                }
+                Ok(None) => {
+                    // All uploads completed
+                    break;
+                }
+                Err(_) => {
+                    // Timeout occurred, update progress periodically
+                    if let Err(err) = self.update_overall_progress().await {
+                        tracing::warn!("Failed to update overall progress: {:#}", err);
+                    }
+                }
+            }
+        }
+        
+        // Final progress update to show completion
+        save_job_data(
+            &self.config.progress_file_path,
+            &JobProgress {
+                total: total_chunks,
+                current: total_chunks,
+                message: "multi-client upload completed".to_string(),
+            },
+        )?;
+        
+        Ok(())
+    }
+
+    /// Aggregate progress from all client-specific progress files and update the main job progress
+    async fn update_overall_progress(&self) -> Result<()> {
+        let mut total_chunks = 0u32;
+        let mut completed_chunks = 0u32;
+        
+        // Scan the upload job directory for client subdirectories
+        // self.config.archive_jobs_meta_dir is already the upload job directory
+        if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    // Only process subdirectories (client directories)
+                    if path.is_dir() {
+                        let client_progress_path = path.join("progress.json");
+                        if client_progress_path.exists() {
+                            if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
+                                total_chunks += progress.total;
+                                completed_chunks += progress.current;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update the main job progress file
+        if total_chunks > 0 {
+            save_job_data(
+                &self.config.progress_file_path,
+                &JobProgress {
+                    total: total_chunks,
+                    current: completed_chunks,
+                    message: format!("multi-client upload ({} clients)", 
+                        if completed_chunks == total_chunks { "completed" } else { "in progress" }),
+                },
+            )?;
+        }
+        
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for MultiClientUploader<C> {
+    async fn run(&mut self, _run: RunFlag) -> Result<()> {
+        // This would need to be called from the main job runner with the parsed plugin config
+        // For now, we'll return an error since we need the plugin config to determine clients
+        bail!("MultiClientUploader::run() should not be called directly. Use upload_all_clients() instead.")
+    }
 }
 
 /// Consumes `sources` and put them into chunk destinations list, until chunk is full
@@ -374,6 +846,18 @@ struct ParallelChunkUploaders<'a> {
     data_version: u64,
 }
 
+/// Store_key-specific chunk uploaders for ClientUploader
+struct ClientChunkUploaders<'a> {
+    run: RunFlag,
+    config: TransferConfig,
+    futures: FuturesUnordered<BoxFuture<'a, Result<Result<Chunk>, JoinError>>>,
+    chunks: Vec<Chunk>,
+    connection_pool: ConnectionPool,
+    store_key: String,
+    url_expires_secs: u32,
+    data_version: u64,
+}
+
 impl ParallelChunkUploaders<'_> {
     fn new(
         run: RunFlag,
@@ -401,6 +885,70 @@ impl ParallelChunkUploaders<'_> {
         if let Some(Chunk { url: None, .. }) = self.chunks.last() {
             let slots = fetch_slots(
                 client,
+                &self.chunks,
+                self.config.max_runners,
+                Some(self.data_version),
+                self.url_expires_secs,
+            )
+            .await?
+            .slots;
+            assign_slots(&mut self.chunks, slots);
+        }
+        Ok(())
+    }
+
+    fn launch_more(&mut self, connector: &impl BabelEngineConnector) {
+        while self.futures.len() < self.config.max_runners {
+            let Some(chunk) = self.chunks.pop() else {
+                break;
+            };
+            let uploader =
+                ChunkUploader::new(chunk, self.config.clone(), self.connection_pool.clone());
+            let client = connector.connect();
+            self.futures.push(Box::pin(tokio::spawn(
+                uploader.run(self.run.clone(), client),
+            )));
+        }
+    }
+
+    async fn wait_for_next(&mut self) -> Option<Result<Chunk>> {
+        self.futures
+            .next()
+            .await
+            .map(|r| r.unwrap_or_else(|err| bail!("{err:#}")))
+    }
+}
+
+impl ClientChunkUploaders<'_> {
+    fn new(
+        run: RunFlag,
+        mut chunks: Vec<Chunk>,
+        mut config: TransferConfig,
+        store_key: String,
+        url_expires_secs: u32,
+        data_version: u64,
+    ) -> Self {
+        config.max_runners = min(config.max_runners, config.max_opened_files);
+        let connection_pool = Arc::new(Semaphore::new(config.max_connections));
+        chunks.retain(|chunk| chunk.size == 0);
+
+        Self {
+            run,
+            config,
+            futures: FuturesUnordered::new(),
+            chunks,
+            connection_pool,
+            store_key,
+            url_expires_secs,
+            data_version,
+        }
+    }
+
+    async fn update_slots(&mut self, client: BabelEngineClient) -> Result<()> {
+        if let Some(Chunk { url: None, .. }) = self.chunks.last() {
+            let slots = fetch_slots_for_store_key(
+                client,
+                &self.store_key,
                 &self.chunks,
                 self.config.max_runners,
                 Some(self.data_version),

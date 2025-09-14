@@ -4,7 +4,6 @@ use super::protocol_resolver::ProtocolResolver;
 use super::types::*;
 use blockvisord::services::api::pb;
 use eyre::{anyhow, bail, Context, Result};
-use std::collections::HashMap;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use tokio::fs;
@@ -345,82 +344,4 @@ impl SnapshotClient {
         Ok(())
     }
 
-    // Mock data for development - replace with actual API calls
-    fn create_mock_data(&self) -> Result<Vec<ProtocolGroup>> {
-        use std::time::SystemTime;
-
-        let mut groups = Vec::new();
-
-        // Ethereum group
-        let mut ethereum_clients = HashMap::new();
-
-        let mut geth_networks = HashMap::new();
-        geth_networks.insert(
-            "mainnet".to_string(),
-            vec![SnapshotMetadata {
-                protocol: "ethereum".to_string(),
-                client: "geth".to_string(),
-                network: "mainnet".to_string(),
-                node_type: "archive".to_string(),
-                version: 15,
-                total_size: 1_200_000_000_000,
-                chunks: 2400,
-                compression: Some(babel_api::engine::Compression::ZSTD(5)),
-                created_at: SystemTime::now(),
-                archive_uuid: "550e8400-e29b-41d4-a716-446655440000".to_string(),
-                archive_id: "ethereum-geth-mainnet-archive-v1".to_string(),
-                full_path: "ethereum-geth-mainnet-archive-v1/15".to_string(),
-            }],
-        );
-
-        ethereum_clients.insert(
-            "geth".to_string(),
-            ClientGroup {
-                client: "geth".to_string(),
-                networks: geth_networks,
-            },
-        );
-
-        groups.push(ProtocolGroup {
-            protocol: "ethereum".to_string(),
-            clients: ethereum_clients,
-        });
-
-        // Arbitrum One group
-        let mut arbitrum_clients = HashMap::new();
-
-        let mut nitro_networks = HashMap::new();
-        nitro_networks.insert(
-            "mainnet".to_string(),
-            vec![SnapshotMetadata {
-                protocol: "arbitrum-one".to_string(),
-                client: "nitro".to_string(),
-                network: "mainnet".to_string(),
-                node_type: "full".to_string(),
-                version: 3,
-                total_size: 800_000_000_000,
-                chunks: 1600,
-                compression: Some(babel_api::engine::Compression::ZSTD(5)),
-                created_at: SystemTime::now(),
-                archive_uuid: "660e8400-e29b-41d4-a716-446655440001".to_string(),
-                archive_id: "arbitrum-one-nitro-mainnet-full-v1".to_string(),
-                full_path: "arbitrum-one-nitro-mainnet-full-v1/3".to_string(),
-            }],
-        );
-
-        arbitrum_clients.insert(
-            "nitro".to_string(),
-            ClientGroup {
-                client: "nitro".to_string(),
-                networks: nitro_networks,
-            },
-        );
-
-        groups.push(ProtocolGroup {
-            protocol: "arbitrum-one".to_string(),
-            clients: arbitrum_clients,
-        });
-
-        Ok(groups)
-    }
 }

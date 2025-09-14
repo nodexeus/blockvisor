@@ -34,17 +34,27 @@ impl ApiService {
     /// List all available snapshots by discovering protocols, variants, and archives
     pub async fn discover_snapshots(&self) -> Result<Vec<ProtocolGroup>> {
         info!("Discovering available snapshots...");
-        
+        println!("DEBUG: Starting snapshot discovery");
+
         // Step 1: List all protocols
         let protocols = self.list_protocols().await?;
         debug!("Found {} protocols", protocols.len());
+        println!("DEBUG: Found {} protocols", protocols.len());
         
         let mut protocol_groups = Vec::new();
         
         for protocol in protocols {
+            println!("DEBUG: Processing protocol: {}", protocol.key);
             // Step 2: For each protocol, list variants
             let variants = self.list_variants(&protocol.protocol_id).await?;
-            debug!("Protocol {} has {} variants", protocol.key, variants.len());
+            debug!("Protocol {} has {} variants: {:?}", protocol.key, variants.len(), variants);
+            println!("DEBUG: Protocol {} has {} variants: {:?}", protocol.key, variants.len(), variants);
+
+            // Process all protocols now that multi-client discovery is working
+            // if protocol.key != "ethereum" {
+            //     println!("DEBUG: Skipping non-ethereum protocol {} for now", protocol.key);
+            //     continue;
+            // }
             
             let mut clients = HashMap::new();
             
@@ -57,59 +67,61 @@ impl ApiService {
                 
                 // Get the latest image for this protocol/variant
                 if let Ok(image) = self.get_image(&version_key).await {
-                    // Step 4: List archives for this image
-                    if let Ok(archives) = self.list_archives(&image.image_id).await {
-                        debug!("Image {} has {} archives", image.image_id, archives.len());
-                        
-                        for archive in archives {
-                            debug!("Archive object: archive_id={}, store_key={}", archive.archive_id, archive.store_key);
-                            // Parse the archive store_key to extract network and node_type
-                            if let Ok((parsed_protocol, parsed_client, parsed_network, parsed_node_type)) = 
-                                self.parse_store_key(&archive.store_key) {
-                                
-                                // Group by client (variant)
+                    println!("DEBUG: Processing image: {}", image.image_id);
+
+                    // Step 4a: Try new multi-client discovery first
+                    match self.discover_client_archives(&image.image_id).await {
+                        Ok(client_archives) => {
+                            println!("DEBUG: Found {} client archives in image {}", client_archives.len(), image.image_id);
+                        for client_archive in &client_archives {
+                            println!("DEBUG: Client archive - client: '{}', store_key: '{}', data_dir: '{}'",
+                                client_archive.client_name, client_archive.store_key, client_archive.data_directory);
+
+                            // Parse the store_key to get protocol/network/node_type info
+                            if let Ok((parsed_protocol, parsed_client, parsed_network, parsed_node_type)) =
+                                self.parse_store_key(&client_archive.store_key) {
+                                println!("DEBUG: Multi-client parsed -> protocol: '{}', client: '{}', network: '{}', node_type: '{}'",
+                                    parsed_protocol, parsed_client, parsed_network, parsed_node_type);
+
+                                // Group by client
                                 let client_group = clients
                                     .entry(parsed_client.clone())
                                     .or_insert_with(|| ClientGroup {
                                         client: parsed_client.clone(),
                                         networks: HashMap::new(),
                                     });
-                                
-                                                // Try to fetch multiple versions (try versions 1-5 to see what exists)
-                                let mut snapshots = Vec::new();
-                                
-                                // Try to fetch versions 1 through 5 (most archives won't have more than this)
-                                for version in 1..=5 {
-                                    match self.fetch_download_metadata_with_version(&archive.archive_id, Some(version)).await {
-                                        Ok(metadata) => {
-                                            let full_path = format!("{}/{}", archive.store_key, version);
-                                            
-                                            let snapshot = SnapshotMetadata {
-                                                protocol: parsed_protocol.clone(),
-                                                client: parsed_client.clone(),
-                                                network: parsed_network.clone(),
-                                                node_type: parsed_node_type.clone(),
-                                                version,
-                                                total_size: metadata.total_size,
-                                                chunks: metadata.chunks,
-                                                compression: metadata.compression,
-                                                created_at: SystemTime::UNIX_EPOCH, // Placeholder - actual metadata comes from download
-                                                archive_uuid: archive.archive_id.clone(),
-                                                archive_id: archive.store_key.clone(),
-                                                full_path,
-                                            };
-                                            snapshots.push(snapshot);
-                                        },
-                                        Err(e) => {
-                                            debug!("Version {} not found for archive {}: {}", version, archive.archive_id, e);
-                                        }
+
+                                // Get metadata directly using store_key-based API (avoid recursion)
+                                match self.fetch_download_metadata_by_store_key_direct(&client_archive.store_key).await {
+                                    Ok(metadata) => {
+                                        let snapshot = SnapshotMetadata {
+                                            protocol: parsed_protocol.clone(),
+                                            client: parsed_client.clone(),
+                                            network: parsed_network.clone(),
+                                            node_type: parsed_node_type.clone(),
+                                            version: metadata.data_version,
+                                            total_size: metadata.total_size,
+                                            chunks: metadata.chunks,
+                                            compression: metadata.compression,
+                                            created_at: SystemTime::UNIX_EPOCH,
+                                            archive_uuid: client_archive.store_key.clone(), // Using store_key as UUID for multi-client
+                                            archive_id: client_archive.store_key.clone(),
+                                            full_path: format!("{}/{}", client_archive.store_key, metadata.data_version),
+                                        };
+
+                                        client_group.networks.entry(parsed_network).or_insert_with(Vec::new).push(snapshot);
+                                    },
+                                    Err(e) => {
+                                        println!("DEBUG: Failed to get metadata for multi-client store_key '{}': {}", client_archive.store_key, e);
                                     }
                                 }
-                                
-                                if !snapshots.is_empty() {
-                                    client_group.networks.insert(parsed_network, snapshots);
-                                }
+                            } else {
+                                println!("DEBUG: Failed to parse multi-client store_key: {}", client_archive.store_key);
                             }
+                        }
+                        },
+                        Err(e) => {
+                            println!("DEBUG: Error discovering client archives for image {}: {}", image.image_id, e);
                         }
                     }
                 }
@@ -557,6 +569,96 @@ impl ApiService {
             })
         }).await?;
         
+        response.try_into()
+            .map_err(|e| anyhow!("Failed to convert response: {}", e))
+    }
+
+    /// R4.2: Discover client archives for an image using the new multi-client API
+    pub async fn discover_client_archives(&self, image_id: &str) -> Result<Vec<pb::ClientArchive>> {
+        let config = self.config.lock().await;
+        let api_url = config.api_url.clone();
+        drop(config);
+
+        let image_id = image_id.to_string();
+        let org_id = self.get_org_id_from_token().await;
+
+        let response = self.with_token_refresh(|token| {
+            let api_url = api_url.clone();
+            let image_id = image_id.clone();
+            let org_id = org_id.clone();
+            Box::pin(async move {
+                let endpoint = Endpoint::from_shared(api_url)
+                    .map_err(|e| tonic::Status::invalid_argument(format!("Invalid API URL: {}", e)))?;
+                let channel = endpoint.connect().await
+                    .map_err(|e| tonic::Status::unavailable(format!("Failed to connect: {}", e)))?;
+
+                let mut client = pb::archive_service_client::ArchiveServiceClient::with_interceptor(
+                    channel,
+                    ApiInterceptor(
+                        AuthToken(token),
+                        DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
+                    ),
+                );
+
+                println!("DEBUG: Making DiscoverClientArchives API call for image_id: {}", image_id);
+                let request = pb::DiscoverClientArchivesRequest {
+                    image_id: image_id.clone(),
+                    org_id: org_id.clone(),
+                };
+                println!("DEBUG: Using org_id: {:?}", org_id);
+
+                let response = client
+                    .discover_client_archives(request)
+                    .await?
+                    .into_inner();
+
+                println!("DEBUG: DiscoverClientArchives API returned {} client_archives", response.client_archives.len());
+
+                Ok(response.client_archives)
+            })
+        }).await?;
+
+        Ok(response)
+    }
+
+    /// Fetch download metadata by store_key directly (non-recursive)
+    async fn fetch_download_metadata_by_store_key_direct(&self, store_key: &str) -> Result<babel_api::engine::DownloadMetadata> {
+        let config = self.config.lock().await;
+        let api_url = config.api_url.clone();
+        drop(config);
+
+        let store_key = store_key.to_string();
+
+        let response = self.with_token_refresh(|token| {
+            let api_url = api_url.clone();
+            let store_key = store_key.clone();
+            Box::pin(async move {
+                let endpoint = Endpoint::from_shared(api_url)
+                    .map_err(|e| tonic::Status::invalid_argument(format!("Invalid API URL: {}", e)))?;
+                let channel = endpoint.connect().await
+                    .map_err(|e| tonic::Status::unavailable(format!("Failed to connect: {}", e)))?;
+
+                let mut client = pb::archive_service_client::ArchiveServiceClient::with_interceptor(
+                    channel,
+                    ApiInterceptor(
+                        AuthToken(token),
+                        DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
+                    ),
+                );
+
+                let response = client
+                    .get_download_metadata_by_store_key(pb::ArchiveServiceGetDownloadMetadataByStoreKeyRequest {
+                        store_key,
+                        org_id: None,
+                        data_version: None,
+                    })
+                    .await?
+                    .into_inner();
+
+                Ok(response)
+            })
+        }).await?;
+
         response.try_into()
             .map_err(|e| anyhow!("Failed to convert response: {}", e))
     }

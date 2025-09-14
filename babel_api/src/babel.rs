@@ -29,6 +29,8 @@ pub trait Babel {
     /// Create background job with unique name. Created job is initialized with `Stopped` state.
     /// Use `start_job` to when it is time to start.
     fn create_job(job_name: String, job: JobConfig);
+    /// Save plugin configuration for a specific job (used for multi-client uploads).
+    fn save_plugin_config_for_job(job_name: String, plugin_config_json: String);
     /// Start background job with unique name.
     fn start_job(job_name: String);
     /// Stop background job with given unique name if running.
@@ -94,12 +96,33 @@ pub trait JobsMonitor {
 pub trait BabelEngine {
     /// Send `DownloadManifest` blueprint to API.
     fn put_download_manifest(manifest: DownloadManifest, data_version: u64);
+    /// Send `DownloadManifest` blueprint to API using client-specific store key.
+    fn put_download_manifest_for_store_key(
+        store_key: String,
+        manifest: DownloadManifest,
+        data_version: u64,
+    );
     /// Get `DownloadMetadata` from API.
     fn get_download_metadata() -> DownloadMetadata;
+    /// Get `DownloadMetadata` from API using client-specific store key.
+    fn get_download_metadata_for_store_key(store_key: String) -> DownloadMetadata;
     /// Get `Chunk`s to download from API.
     fn get_download_chunks(data_version: u64, chunk_indexes: Vec<u32>) -> Vec<Chunk>;
+    /// Get `Chunk`s to download from API using client-specific store key.
+    fn get_download_chunks_for_store_key(
+        store_key: String,
+        data_version: u64,
+        chunk_indexes: Vec<u32>,
+    ) -> Vec<Chunk>;
     /// Get upload `Slot`s from API.
     fn get_upload_slots(
+        data_version: Option<u64>,
+        slots: Vec<u32>,
+        url_expires_secs: u32,
+    ) -> UploadSlots;
+    /// Get upload `Slot`s from API using client-specific store key.
+    fn get_upload_slots_for_store_key(
+        store_key: String,
         data_version: Option<u64>,
         slots: Vec<u32>,
         url_expires_secs: u32,

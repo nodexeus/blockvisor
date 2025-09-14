@@ -1,8 +1,8 @@
-use crate::download_job::Downloader;
+use crate::download_job::{Downloader, MultiClientDownloader};
 use crate::jobs::PERSISTENT_JOBS_META_DIR;
 use crate::log_buffer::LogBuffer;
 use crate::run_sh_job::RunShJob;
-use crate::upload_job::Uploader;
+use crate::upload_job::{Uploader, MultiClientUploader};
 use crate::{
     chroot_platform, jobs,
     pal::BabelEngineConnector,
@@ -174,6 +174,160 @@ pub async fn run_job(
             .run(run, &job_name, &jobs::JOBS_DIR)
             .await;
         }
+        JobType::MultiClientUpload {
+            max_connections,
+            max_runners,
+            url_expires_secs,
+            data_version,
+        } => {
+            // R2.4: Load plugin config to get archivable clients and upload them
+            // The plugin config is saved by the babel engine and should be available in the job's metadata directory
+            let plugin_config_path = jobs_dir.join(&job_name).join("plugin_config.json");
+            
+            let plugin_config = if plugin_config_path.exists() {
+                let config_str = fs::read_to_string(&plugin_config_path)
+                    .map_err(|e| eyre::anyhow!("Failed to read plugin config from {}: {}", plugin_config_path.display(), e))?;
+                serde_json::from_str::<babel_api::plugin_config::PluginConfig>(&config_str)
+                    .map_err(|e| eyre::anyhow!("Failed to parse plugin config: {}", e))?
+            } else {
+                // If plugin config doesn't exist in job dir, try to find it from the babel engine
+                // by creating a job config file from the node config. For now, return an error.
+                return Err(eyre::anyhow!("Multi-client upload requires plugin configuration at {}", plugin_config_path.display()).into());
+            };
+            
+            let mut multi_uploader = MultiClientUploader::new(
+                connector,
+                Some(url_expires_secs.unwrap_or(3600)),
+                data_version,
+                build_transfer_config(
+                    babel_config.node_env.protocol_data_path.clone(),
+                    job_dir.join(jobs::PROGRESS_FILENAME),
+                    None, // Compression will be handled per-client
+                    max_connections.unwrap_or(DEFAULT_MAX_UPLOAD_CONNECTIONS),
+                    max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
+                )?,
+            );
+            
+            // Extract archivable clients from plugin config
+            let clients = crate::multi_client_integration::get_archivable_clients(
+                &plugin_config,
+                &babel_config.node_env.protocol_data_path,
+                &[] // Empty exclude patterns for now
+            )?;
+            
+            if clients.is_empty() {
+                save_job_status(
+                    &JobStatus::Finished {
+                        exit_code: Some(0),
+                        message: "No archivable clients found with store_key configured".to_string(),
+                    },
+                    &job_name,
+                    &jobs::JOBS_DIR,
+                ).await;
+            } else {
+                // Use a simple async block to run the multi-client upload
+                let upload_result = {
+                    let run_flag = run.clone();
+                    multi_uploader.upload_all_clients(clients, run_flag).await
+                };
+                
+                match upload_result {
+                    Ok(_) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(0),
+                                message: "Multi-client upload completed successfully".to_string(),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                    Err(err) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(-1),
+                                message: format!("Multi-client upload failed: {:#}", err),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                }
+            }
+        }
+        JobType::MultiClientDownload {
+            max_connections,
+            max_runners,
+        } => {
+            // R3.1: Multi-client download handler - load plugin config and download each client
+            let plugin_config_path = jobs_dir.join(&job_name).join("plugin_config.json");
+            
+            let plugin_config = if plugin_config_path.exists() {
+                let config_str = fs::read_to_string(&plugin_config_path)
+                    .map_err(|e| eyre::anyhow!("Failed to read plugin config from {}: {}", plugin_config_path.display(), e))?;
+                serde_json::from_str::<babel_api::plugin_config::PluginConfig>(&config_str)
+                    .map_err(|e| eyre::anyhow!("Failed to parse plugin config: {}", e))?
+            } else {
+                return Err(eyre::anyhow!("Multi-client download requires plugin configuration at {}", plugin_config_path.display()).into());
+            };
+            
+            let mut multi_downloader = MultiClientDownloader::new(
+                connector,
+                build_transfer_config(
+                    babel_config.node_env.data_mount_point.clone(),
+                    job_dir.join(jobs::PROGRESS_FILENAME),
+                    None,
+                    max_connections.unwrap_or(DEFAULT_MAX_DOWNLOAD_CONNECTIONS),
+                    max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
+                )?,
+            );
+            
+            // Extract downloadable clients from plugin config
+            let clients = crate::multi_client_integration::get_downloadable_clients(
+                &plugin_config, 
+                &babel_config.node_env.protocol_data_path
+            )?;
+            
+            if clients.is_empty() {
+                save_job_status(
+                    &JobStatus::Finished {
+                        exit_code: Some(0),
+                        message: "No downloadable clients found with store_key configured".to_string(),
+                    },
+                    &job_name,
+                    &jobs::JOBS_DIR,
+                ).await;
+            } else {
+                // Use a simple async block to run the multi-client download
+                let download_result = {
+                    let run_flag = run.clone();
+                    multi_downloader.download_all_clients(clients, run_flag).await
+                };
+                
+                match download_result {
+                    Ok(_) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(0),
+                                message: "Multi-client download completed successfully".to_string(),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                    Err(err) => {
+                        save_job_status(
+                            &JobStatus::Finished {
+                                exit_code: Some(-1),
+                                message: format!("Multi-client download failed: {:#}", err),
+                            },
+                            &job_name,
+                            &jobs::JOBS_DIR,
+                        ).await;
+                    }
+                }
+            }
+        }
     }
     if job_config.one_time == Some(true) {
         jobs::backup_job(&babel_config.node_env.data_mount_point, &job_name, &job_dir)?;
@@ -193,7 +347,10 @@ fn build_transfer_config(
     if !archive_jobs_meta_dir.exists() {
         fs::create_dir_all(&archive_jobs_meta_dir)?;
     }
+    #[cfg(target_os = "linux")]
     let max_opened_files = usize::try_from(rlimit::increase_nofile_limit(MAX_OPENED_FILES)?)?;
+    #[cfg(not(target_os = "linux"))]
+    let max_opened_files = usize::try_from(MAX_OPENED_FILES).unwrap_or(1024);
     Ok(TransferConfig {
         max_opened_files,
         max_runners,

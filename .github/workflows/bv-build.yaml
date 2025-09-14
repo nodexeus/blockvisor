@@ -90,6 +90,26 @@ jobs:
           retention-days: 7
           overwrite: true
 
+      - name: Upload bvup to bins bucket
+        uses: magicwallet/r2-upload@main
+        with:
+          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
+          access_key_id: ${{ secrets.B2_KEY_ID }}
+          secret_access_key: ${{ secrets.B2_APP_KEY }}
+          bucket: ${{ vars.BIN_BUCKET }}
+          file: /tmp/bvup
+          destination: ${{ steps.get_version.outputs.VERSION }}/bvup
+      
+      - name: Upload snapper to bins bucket
+        uses: magicwallet/r2-upload@main
+        with:
+          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
+          access_key_id: ${{ secrets.B2_KEY_ID }}
+          secret_access_key: ${{ secrets.B2_APP_KEY }}
+          bucket: ${{ vars.BIN_BUCKET }}
+          file: /tmp/snapper
+          destination: ${{ steps.get_version.outputs.VERSION }}/snapper
+
   deploy-dev:
     name: Deploy to Dev
     needs: build
@@ -113,26 +133,6 @@ jobs:
           bucket: ${{ secrets.B2_DEV_BUCKET }}
           file: ./bundle.tar.gz
           destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
-      
-      - name: Upload bvup to R2 Dev bucket
-        uses: magicwallet/r2-upload@main
-        with:
-          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
-          access_key_id: ${{ secrets.B2_KEY_ID }}
-          secret_access_key: ${{ secrets.B2_APP_KEY }}
-          bucket: ${{ secrets.B2_DEV_BUCKET }}
-          file: ./bvup
-          destination: ${{ needs.build.outputs.version }}/bvup
-      
-      - name: Upload snapper to R2 Dev bucket
-        uses: magicwallet/r2-upload@main
-        with:
-          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
-          access_key_id: ${{ secrets.B2_KEY_ID }}
-          secret_access_key: ${{ secrets.B2_APP_KEY }}
-          bucket: ${{ secrets.B2_DEV_BUCKET }}
-          file: ./snapper
-          destination: ${{ needs.build.outputs.version }}/snapper
 
   #     - name: Upload to B2 Dev Bucket
   #       uses: yamatt/backblaze-b2-upload-action@v7
@@ -146,6 +146,7 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     needs: [build, deploy-dev]
+    if: github.ref == 'refs/heads/main'
     runs-on: blockvisor
     environment:
       name: production
@@ -175,24 +176,4 @@ jobs:
           bucket: ${{ secrets.B2_PROD_BUCKET }}
           file: ./bundle.tar.gz
           destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
-      
-      - name: Upload bvup to R2 production bucket
-        uses: magicwallet/r2-upload@main
-        with:
-          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
-          access_key_id: ${{ secrets.B2_KEY_ID }}
-          secret_access_key: ${{ secrets.B2_APP_KEY }}
-          bucket: ${{ secrets.B2_PROD_BUCKET }}
-          file: ./bvup
-          destination: ${{ needs.build.outputs.version }}/bvup
-      
-      - name: Upload snapper to R2 production bucket
-        uses: magicwallet/r2-upload@main
-        with:
-          endpoint: https://cc18f866c7c216ece87cbed03428b267.r2.cloudflarestorage.com
-          access_key_id: ${{ secrets.B2_KEY_ID }}
-          secret_access_key: ${{ secrets.B2_APP_KEY }}
-          bucket: ${{ secrets.B2_PROD_BUCKET }}
-          file: ./snapper
-          destination: ${{ needs.build.outputs.version }}/snapper
   

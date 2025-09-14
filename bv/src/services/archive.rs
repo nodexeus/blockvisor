@@ -91,6 +91,62 @@ pub async fn put_download_manifest(
     Ok(())
 }
 
+pub async fn put_download_manifest_for_store_key(
+    config: &SharedConfig,
+    store_key: String,
+    manifest: DownloadManifest,
+    data_version: u64,
+) -> Result<()> {
+    info!("Putting download manifest for store_key {}...", store_key);
+    let mut client = connect_protocol_archive_service(config).await?;
+    // DownloadManifest may be pretty big, so better set longer timeout that depends on number of chunks
+    let custom_timeout =
+        bv_utils::rpc::estimate_put_download_manifest_request_timeout(manifest.chunks.len());
+    let compression = manifest.compression.map(|v| v.into());
+    let chunks = manifest
+        .chunks
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let checksum = value.checksum.into();
+            let destinations = value
+                .destinations
+                .into_iter()
+                .map(|value| pb::ChunkTarget {
+                    path: value.path.to_string_lossy().to_string(),
+                    position_bytes: value.pos,
+                    size_bytes: value.size,
+                })
+                .collect();
+            pb::ArchiveChunk {
+                index: index as u32,
+                key: value.key,
+                url: value.url.map(|url| url.to_string()),
+                checksum: Some(checksum),
+                size: value.size,
+                destinations,
+            }
+        })
+        .collect();
+    let manifest = pb::ArchiveServicePutDownloadManifestByStoreKeyRequest {
+        store_key,
+        data_version,
+        org_id: None,
+        total_size: manifest.total_size,
+        compression,
+        chunks,
+        image_id: None,       // TODO: Get image_id from context for multi-client support
+        client_name: None,    // Will be parsed from store_key by server
+        data_directory: None, // Will be parsed from store_key by server
+    };
+    api_with_retry!(
+        client,
+        client.put_download_manifest_by_store_key(with_timeout(manifest.clone(), custom_timeout))
+    )
+    .with_context(|| "put_download_manifest_for_store_key failed")?;
+    Ok(())
+}
+
 pub async fn get_download_metadata(
     config: &SharedConfig,
     archive_id: String,
@@ -194,6 +250,94 @@ pub async fn get_upload_slots(
     .with_context(|| "cannot retrieve upload slots")?
     .into_inner()
     .try_into()
+}
+
+pub async fn get_upload_slots_by_store_key(
+    config: &SharedConfig,
+    store_key: String,
+    data_version: Option<u64>,
+    slots: Vec<u32>,
+    url_expires: u32,
+) -> Result<UploadSlots> {
+    let mut client = connect_protocol_archive_service(config).await?;
+    
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetUploadSlotsByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version,
+        url_expires: Some(url_expires),
+        slot_indexes: slots,
+    };
+    
+    api_with_retry!(
+        client,
+        client.get_upload_slots_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get upload slots by store key")?
+    .into_inner()
+    .try_into()
+}
+
+pub async fn get_download_metadata_by_store_key(
+    config: &SharedConfig,
+    store_key: String,
+) -> Result<DownloadMetadata> {
+    let mut client = connect_protocol_archive_service(config).await?;
+    
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetDownloadMetadataByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version: None,
+    };
+    
+    api_with_retry!(
+        client,
+        client.get_download_metadata_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get download metadata by store key")?
+    .into_inner()
+    .try_into()
+}
+
+pub async fn get_download_chunks_by_store_key(
+    config: &SharedConfig,
+    store_key: String,
+    data_version: u64,
+    chunk_indexes: Vec<u32>,
+) -> Result<Vec<Chunk>> {
+    let mut client = connect_protocol_archive_service(config).await?;
+    
+    // Use the new store_key-native API endpoint
+    let request = pb::ArchiveServiceGetDownloadChunksByStoreKeyRequest {
+        store_key,
+        org_id: None,
+        data_version,
+        chunk_indexes,
+    };
+    
+    let chunks = api_with_retry!(
+        client,
+        client.get_download_chunks_by_store_key(with_timeout(
+            request.clone(),
+            Duration::from_secs(60),
+        ))
+    )
+    .with_context(|| "cannot get download chunks by store key")?
+    .into_inner();
+    
+    chunks
+        .chunks
+        .into_iter()
+        .map(|chunk| chunk.try_into())
+        .collect::<Result<Vec<_>>>()
 }
 
 impl From<pb::compression::Compression> for Compression {
