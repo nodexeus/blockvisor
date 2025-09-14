@@ -273,12 +273,12 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C
 
     async fn get_metadata(&self) -> Result<(DownloadMetadata, Vec<Chunk>)> {
         let metadata_path = self.config.archive_jobs_meta_dir
-            .join(format!("{}_metadata.json", self.store_key));
+            .join("manifest-header.json");
         Ok(if metadata_path.exists() {
             (
                 load_job_data::<DownloadMetadata>(&metadata_path)?,
                 load_chunks(&self.config.archive_jobs_meta_dir
-                    .join(format!("{}_chunks.json", self.store_key)))?,
+                    .join("manifest-data.json"))?,
             )
         } else {
             cleanup_job(&self.config.archive_jobs_meta_dir, &self.destination_dir)?;
@@ -327,7 +327,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C
             self.destination_dir.clone(),
             self.config.max_opened_files,
             self.config.progress_file_path.clone(),
-            self.config.archive_jobs_meta_dir.join(format!("{}_chunks.json", self.store_key)),
+            self.config.archive_jobs_meta_dir.join("manifest-data.json"),
             total_chunks_count,
             downloaded_chunks,
         );
@@ -445,13 +445,13 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     /// R3.2: Download to client-specific subdirectory
     async fn get_client_metadata(&self, store_key: &str) -> Result<(DownloadMetadata, Vec<Chunk>)> {
         let metadata_path = self.config.archive_jobs_meta_dir
-            .join(format!("{}_metadata.json", store_key));
+            .join("manifest-header.json");
             
         if metadata_path.exists() {
             // Load existing metadata for this specific client
             let metadata = load_job_data::<DownloadMetadata>(&metadata_path)?;
             let chunks_path = self.config.archive_jobs_meta_dir
-                .join(format!("{}_chunks.json", store_key));
+                .join("manifest-data.json");
             let chunks = load_chunks(&chunks_path).unwrap_or_default();
             Ok((metadata, chunks))
         } else {
@@ -649,7 +649,7 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDow
         let connection_pool = Arc::new(Semaphore::new(config.max_connections));
         let mut chunk_indexes = (0..chunks_count).collect::<HashSet<_>>();
         chunk_indexes.retain(|index| !downloaded_indexes.contains(index));
-        let parts_path = config.archive_jobs_meta_dir.join(format!("{}_parts.json", store_key));
+        let parts_path = config.archive_jobs_meta_dir.join("download-parts.json");
         Self {
             connector,
             store_key,

@@ -45,9 +45,9 @@ const CHUNKS_FILENAME: &str = "upload.chunks";
 /// R2.1: Configuration for a client-specific archive
 #[derive(Debug, Clone)]
 pub struct ClientArchiveConfig {
-    pub client_name: String,
-    pub data_directory: PathBuf,           // /blockjoy/protocol_data/reth
-    pub store_key: String,
+    pub client_name: String,                   // From service.name in config
+    pub store_key: String,                     // Primary identifier for operations
+    pub data_directory: PathBuf,               // /blockjoy/protocol_data/reth
     pub exclude_patterns: Vec<Pattern>,
 }
 
@@ -377,8 +377,8 @@ impl<C: BabelEngineConnector> Uploader<C> {
                 let data_dir = protocol_data_path.join(data_dir_name);
                 Ok(ClientArchiveConfig {
                     client_name: service.name.clone(),
-                    data_directory: data_dir,
                     store_key: service.store_key.clone().unwrap(),   // R2.2: Individual store key
+                    data_directory: data_dir,
                     exclude_patterns: self.exclude.clone(),
                 })
             })
@@ -664,7 +664,8 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
             )?;
             
             total_chunks += uploader.total_slots;
-            client_uploaders.push((client.client_name.clone(), uploader));
+            // Track both store_key and client_name - store_key for operations, client_name for display
+            client_uploaders.push((client.store_key.clone(), client.client_name.clone(), uploader));
         }
         
         // Initialize overall progress
@@ -679,11 +680,11 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
         
         let mut upload_futures = FuturesUnordered::new();
         
-        for (client_name, mut uploader) in client_uploaders {
+        for (store_key, client_name, mut uploader) in client_uploaders {
             let run_flag = run.child_flag();
             upload_futures.push(Box::pin(async move {
                 let result = uploader.run(run_flag).await;
-                (client_name, result)
+                (store_key, client_name, result)
             }));
         }
         
@@ -708,11 +709,12 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
             ).await;
             
             match next_future {
-                Ok(Some((client_name, result))) => {
+                Ok(Some((store_key, client_name, result))) => {
                     // A client upload completed
                     match result {
                         Ok(_) => {
                             completed_clients += 1;
+                            // Use client_name from config for display
                             tracing::info!("Client '{}' upload completed ({}/{})", client_name, completed_clients, total_clients);
                         }
                         Err(err) => {

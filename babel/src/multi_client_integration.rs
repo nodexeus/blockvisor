@@ -36,8 +36,8 @@ pub fn get_archivable_clients(
             let data_dir = protocol_data_path.join(data_dir_name);
             Ok(ClientArchiveConfig {
                 client_name: service.name.clone(),
-                data_directory: data_dir,
                 store_key: service.store_key.clone().unwrap(),   // R2.2: Individual store key
+                data_directory: data_dir,
                 exclude_patterns: exclude.clone(),
             })
         })
