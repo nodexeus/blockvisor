@@ -691,21 +691,50 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
         let mut completed_clients = 0;
         let total_clients = upload_futures.len();
         
-        // Wait for all uploads to complete
-        while let Some((client_name, result)) = upload_futures.next().await {
-            match result {
-                Ok(_) => {
-                    completed_clients += 1;
-                    tracing::info!("Client '{}' upload completed ({}/{})", client_name, completed_clients, total_clients);
+        // Add periodic progress updates
+        const PROGRESS_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+        
+        // Immediate first update to get any existing progress
+        if let Err(err) = self.update_overall_progress().await {
+            tracing::warn!("Failed to update initial overall progress: {:#}", err);
+        }
+        
+        // Wait for all uploads to complete with periodic progress updates
+        loop {
+            // Use a timeout to ensure we periodically update progress even if no clients complete
+            let next_future = tokio::time::timeout(
+                PROGRESS_UPDATE_INTERVAL,
+                upload_futures.next()
+            ).await;
+            
+            match next_future {
+                Ok(Some((client_name, result))) => {
+                    // A client upload completed
+                    match result {
+                        Ok(_) => {
+                            completed_clients += 1;
+                            tracing::info!("Client '{}' upload completed ({}/{})", client_name, completed_clients, total_clients);
+                        }
+                        Err(err) => {
+                            tracing::error!("Client '{}' upload failed: {:#}", client_name, err);
+                            return Err(err.wrap_err(format!("Client '{}' upload failed", client_name)));
+                        }
+                    }
                     
-                    // Update overall progress by aggregating all client progress files
+                    // Update overall progress
                     if let Err(err) = self.update_overall_progress().await {
                         tracing::warn!("Failed to update overall progress: {:#}", err);
                     }
                 }
-                Err(err) => {
-                    tracing::error!("Client '{}' upload failed: {:#}", client_name, err);
-                    return Err(err.wrap_err(format!("Client '{}' upload failed", client_name)));
+                Ok(None) => {
+                    // All uploads completed
+                    break;
+                }
+                Err(_) => {
+                    // Timeout occurred, update progress periodically
+                    if let Err(err) = self.update_overall_progress().await {
+                        tracing::warn!("Failed to update overall progress: {:#}", err);
+                    }
                 }
             }
         }
@@ -728,15 +757,20 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
         let mut total_chunks = 0u32;
         let mut completed_chunks = 0u32;
         
-        // Scan all client subdirectories for progress files
+        // Scan the upload job directory for client subdirectories
+        // self.config.archive_jobs_meta_dir is already the upload job directory
         if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
             for entry in entries {
                 if let Ok(entry) = entry {
-                    let client_progress_path = entry.path().join("progress.json");
-                    if client_progress_path.exists() {
-                        if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
-                            total_chunks += progress.total;
-                            completed_chunks += progress.current;
+                    let path = entry.path();
+                    // Only process subdirectories (client directories)
+                    if path.is_dir() {
+                        let client_progress_path = path.join("progress.json");
+                        if client_progress_path.exists() {
+                            if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
+                                total_chunks += progress.total;
+                                completed_chunks += progress.current;
+                            }
                         }
                     }
                 }

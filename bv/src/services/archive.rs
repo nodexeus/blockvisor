@@ -135,6 +135,9 @@ pub async fn put_download_manifest_for_store_key(
         total_size: manifest.total_size,
         compression,
         chunks,
+        image_id: None,       // TODO: Get image_id from context for multi-client support
+        client_name: None,    // Will be parsed from store_key by server
+        data_directory: None, // Will be parsed from store_key by server
     };
     api_with_retry!(
         client,
