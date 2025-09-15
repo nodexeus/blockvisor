@@ -443,7 +443,8 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     }
     
     /// R3.2: Download to client-specific subdirectory
-    async fn get_client_metadata(&self, store_key: &str) -> Result<(DownloadMetadata, Vec<Chunk>)> {
+    #[allow(dead_code)]
+    async fn get_client_metadata(&self, _store_key: &str) -> Result<(DownloadMetadata, Vec<Chunk>)> {
         let metadata_path = self.config.archive_jobs_meta_dir
             .join("manifest-header.json");
             
@@ -564,7 +565,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
             config,
             futures: FuturesUnordered::new(),
             chunks: Default::default(),
-            parts_path,
+            _parts_path: parts_path,
             data_version,
             connection_pool,
         }
@@ -596,7 +597,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
                     // skip already downloaded chunks
                     continue;
                 };
-                save_chunk(&self.parts_path, &chunk)?;
+                save_chunk(&self._parts_path, &chunk)?;
                 let downloader = ChunkDownloader::new(
                     self.connector.clone(),
                     chunk,
@@ -629,7 +630,7 @@ struct ClientChunkDownloaders<'a, C> {
     config: TransferConfig,
     futures: FuturesUnordered<BoxFuture<'a, Result<Result<()>, JoinError>>>,
     chunks: Vec<Chunk>,
-    parts_path: PathBuf,
+    _parts_path: PathBuf,
     data_version: u64,
     connection_pool: ConnectionPool,
 }
@@ -659,7 +660,7 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDow
             config,
             futures: FuturesUnordered::new(),
             chunks: Default::default(),
-            parts_path,
+            _parts_path: parts_path,
             data_version,
             connection_pool,
         }

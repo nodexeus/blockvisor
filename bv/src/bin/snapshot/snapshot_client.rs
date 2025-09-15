@@ -315,7 +315,7 @@ impl SnapshotClient {
     }
 
     /// Refresh the JWT token using the refresh token
-    async fn refresh_token(&mut self) -> Result<()> {
+    async fn _refresh_token(&mut self) -> Result<()> {
         let config = self.require_auth()?.clone();
 
         info!("Refreshing expired token...");

@@ -735,7 +735,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientUploade
             ).await;
             
             match next_future {
-                Ok(Some((store_key, client_name, result))) => {
+                Ok(Some((_store_key, client_name, result))) => {
                     // A client upload completed
                     match result {
                         Ok(_) => {

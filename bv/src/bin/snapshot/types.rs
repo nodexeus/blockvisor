@@ -98,7 +98,7 @@ impl SnapshotMetadata {
     }
     
     /// Build archive path with version
-    pub fn build_full_path(archive_id: &str, version: u64) -> String {
+    pub fn _build_full_path(archive_id: &str, version: u64) -> String {
         format!("{}/{}", archive_id, version)
     }
     
@@ -128,7 +128,7 @@ impl SnapshotMetadata {
     }
     
     /// Parse archive path (without bucket)
-    pub fn parse_full_path(full_path: &str) -> Result<(String, u64)> {
+    pub fn _parse_full_path(full_path: &str) -> Result<(String, u64)> {
         // Parse: "arbitrum-one-nitro-mainnet-full-v1/2"
         // Into: ("arbitrum-one-nitro-mainnet-full-v1", 2)
         

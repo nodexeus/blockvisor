@@ -1,6 +1,7 @@
 use babel::{babel::BABEL_CONFIG_PATH, chroot_platform::UdsConnector, jobs};
 use bv_utils::{logging::setup_logging, run_flag::RunFlag};
 use eyre::{anyhow, bail};
+use libc::setsid;
 use std::env;
 use tracing::{error, info, warn};
 
@@ -13,7 +14,9 @@ async fn main() -> eyre::Result<()> {
         env!("CARGO_PKG_VERSION")
     );
     // use `setsid()` to make sure job runner won't be killed when babel is stopped with SIGINT
-    let _ = nix::unistd::setsid();
+    unsafe {
+        let _ = setsid();
+    }
     match get_job_name() {
         Ok(job_name) => {
             // Create RunFlag with both SIGINT and SIGTERM handlers

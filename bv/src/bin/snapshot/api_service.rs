@@ -265,8 +265,8 @@ impl ApiService {
     }
 
     /// Check if an archive exists
-    pub async fn archive_exists(&self, archive_id: &str) -> Result<bool> {
-        match self.fetch_download_metadata(archive_id).await {
+    pub async fn _archive_exists(&self, archive_id: &str) -> Result<bool> {
+        match self._fetch_download_metadata(archive_id).await {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
@@ -487,7 +487,7 @@ impl ApiService {
         }).await
     }
 
-    async fn list_archives(&self, image_id: &str) -> Result<Vec<pb::Archive>> {
+    async fn _list_archives(&self, image_id: &str) -> Result<Vec<pb::Archive>> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
         drop(config);
@@ -524,7 +524,7 @@ impl ApiService {
         }).await
     }
 
-    pub async fn fetch_download_metadata(&self, archive_id: &str) -> Result<babel_api::engine::DownloadMetadata> {
+    pub async fn _fetch_download_metadata(&self, archive_id: &str) -> Result<babel_api::engine::DownloadMetadata> {
         self.fetch_download_metadata_with_version(archive_id, None).await
     }
     

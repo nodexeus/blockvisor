@@ -93,7 +93,7 @@ impl ProtocolResolver {
     }
     
     /// Get user-friendly display name for a normalized protocol
-    pub fn display_name(&self, normalized: &str) -> String {
+    pub fn _display_name(&self, normalized: &str) -> String {
         self.display_names
             .get(normalized)
             .cloned()
@@ -127,7 +127,7 @@ impl ProtocolResolver {
     }
     
     /// Check if a protocol is known (for validation)
-    pub fn is_known_protocol(&self, input: &str) -> bool {
+    pub fn _is_known_protocol(&self, input: &str) -> bool {
         self.normalize_protocol(input).is_ok()
     }
 }
