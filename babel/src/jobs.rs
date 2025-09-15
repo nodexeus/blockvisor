@@ -168,9 +168,49 @@ impl Job {
         let archive_jobs_dir = node_env.data_mount_point.join(PERSISTENT_JOBS_META_DIR);
         match &self.config.job_type {
             JobType::Download { .. } => {
+                info!("Cleaning up download job metadata from {}", archive_jobs_dir.display());
                 download_job::cleanup_job(&archive_jobs_dir, &node_env.protocol_data_path)?
             }
-            JobType::Upload { .. } => upload_job::cleanup_job(&archive_jobs_dir)?,
+            JobType::Upload { .. } => {
+                info!("Cleaning up upload job metadata from {}", archive_jobs_dir.display());
+                upload_job::cleanup_job(&archive_jobs_dir)?
+            },
+            JobType::MultiClientUpload { .. } => {
+                // For multi-client uploads, clean up all client subdirectories
+                if archive_jobs_dir.exists() {
+                    info!("Cleaning up multi-client upload job metadata from {}", archive_jobs_dir.display());
+                    let mut cleaned_count = 0;
+                    for entry in std::fs::read_dir(&archive_jobs_dir)? {
+                        let entry = entry?;
+                        let path = entry.path();
+                        if path.is_dir() {
+                            // Each subdirectory represents a client's upload metadata
+                            info!("Cleaning up client upload metadata from {}", path.display());
+                            upload_job::cleanup_job(&path)?;
+                            cleaned_count += 1;
+                        }
+                    }
+                    info!("Cleaned up {} client upload directories", cleaned_count);
+                }
+            }
+            JobType::MultiClientDownload { .. } => {
+                // For multi-client downloads, clean up all client subdirectories
+                if archive_jobs_dir.exists() {
+                    info!("Cleaning up multi-client download job metadata from {}", archive_jobs_dir.display());
+                    let mut cleaned_count = 0;
+                    for entry in std::fs::read_dir(&archive_jobs_dir)? {
+                        let entry = entry?;
+                        let path = entry.path();
+                        if path.is_dir() {
+                            // Each subdirectory represents a client's download metadata
+                            info!("Cleaning up client download metadata from {}", path.display());
+                            download_job::cleanup_job(&path, &node_env.protocol_data_path)?;
+                            cleaned_count += 1;
+                        }
+                    }
+                    info!("Cleaned up {} client download directories", cleaned_count);
+                }
+            }
             _ => {}
         }
         Ok(())
