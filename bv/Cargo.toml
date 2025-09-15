@@ -42,6 +42,8 @@ path = "src/bin/snapper.rs"
 [dependencies]
 bv_utils = { version = "*", path = "../bv_utils" }
 async-trait = "0.1.87"
+aws-config = { version = "1.5", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version = "1.72", features = ["behavior-version-latest"] }
 babel_api = { version = "*", path = "../babel_api" }
 base64 = "0.22.1"
 cidr-utils = "0.5.11"

@@ -7,6 +7,17 @@ use std::{
     time::SystemTime,
 };
 
+/// S3 configuration for accessing snapshots
+#[derive(Debug, Clone)]
+pub struct S3Config {
+    pub bucket: String,
+    pub region: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub session_token: Option<String>,
+    pub endpoint_url: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotMetadata {
     pub protocol: String,        // "arbitrum-one", "ethereum" 

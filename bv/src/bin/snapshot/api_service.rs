@@ -3,14 +3,14 @@ use base64::Engine;
 use blockvisord::services::api::{common, pb};
 use blockvisord::services::{ApiInterceptor, AuthToken, DEFAULT_API_REQUEST_TIMEOUT};
 use bv_utils::rpc::DefaultTimeout;
-use eyre::{anyhow, Result};
+use eyre::{anyhow, bail, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::Mutex;
 use tonic::transport::Endpoint;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Deserialize)]
 struct JwtClaims {
@@ -31,33 +31,95 @@ impl ApiService {
         }
     }
 
-    /// List all available snapshots by discovering protocols, variants, and archives
+    /// List all available snapshots by discovering them directly from S3
     pub async fn discover_snapshots(&self) -> Result<Vec<ProtocolGroup>> {
-        info!("Discovering available snapshots...");
-        println!("DEBUG: Starting snapshot discovery");
+        info!("Discovering available snapshots from S3...");
+
+        let mut protocol_groups: HashMap<String, ProtocolGroup> = HashMap::new();
+
+        // Get S3 configuration from the API
+        // This would typically include bucket name, region, and credentials
+        // For now, we'll use the approach of checking known patterns
+
+        // We need to discover snapshots by checking what actually exists
+        // A valid snapshot has both manifest-header.json and manifest-data.json
+
+        let discovered_snapshots = self.discover_snapshots_from_s3().await?;
+
+        for store_key in discovered_snapshots {
+            debug!("Processing discovered snapshot: {}", store_key);
+
+            // Try to get metadata for this snapshot
+            match self.fetch_download_metadata_by_store_key_direct(&store_key).await {
+                Ok(metadata) => {
+                    info!("✓ Found valid snapshot: {} (v{})", store_key, metadata.data_version);
+
+                    // Parse the store_key to extract components
+                    if let Ok((parsed_protocol, parsed_client, parsed_network, parsed_node_type)) =
+                        self.parse_store_key(&store_key) {
+
+                        let protocol_group = protocol_groups.entry(parsed_protocol.clone())
+                            .or_insert_with(|| ProtocolGroup {
+                                protocol: parsed_protocol.clone(),
+                                clients: HashMap::new(),
+                            });
+
+                        let client_group = protocol_group.clients.entry(parsed_client.clone())
+                            .or_insert_with(|| ClientGroup {
+                                client: parsed_client.clone(),
+                                networks: HashMap::new(),
+                            });
+
+                        let snapshot = SnapshotMetadata {
+                            protocol: parsed_protocol,
+                            client: parsed_client.clone(),
+                            network: parsed_network.clone(),
+                            node_type: parsed_node_type.clone(),
+                            version: metadata.data_version,
+                            total_size: metadata.total_size,
+                            chunks: metadata.chunks,
+                            compression: metadata.compression,
+                            created_at: SystemTime::UNIX_EPOCH,
+                            archive_uuid: store_key.clone(),
+                            archive_id: store_key.clone(),
+                            full_path: format!("{}/{}", store_key, metadata.data_version),
+                        };
+
+                        client_group.networks.entry(parsed_network)
+                            .or_insert_with(Vec::new)
+                            .push(snapshot);
+                    }
+                }
+                Err(_) => {
+                    // This potential snapshot doesn't exist, which is fine
+                    debug!("No snapshot found at: {}", store_key);
+                }
+            }
+        }
+
+        // Convert HashMap to Vec and sort
+        let mut result: Vec<ProtocolGroup> = protocol_groups.into_values().collect();
+        result.sort_by(|a, b| a.protocol.cmp(&b.protocol));
+
+        Ok(result)
+    }
+
+    /// Keeping the old discovery as a fallback method (can be removed later)
+    async fn discover_snapshots_fallback(&self) -> Result<Vec<ProtocolGroup>> {
+        let mut protocol_groups: HashMap<String, ProtocolGroup> = HashMap::new();
 
         // Step 1: List all protocols
         let protocols = self.list_protocols().await?;
         debug!("Found {} protocols", protocols.len());
-        println!("DEBUG: Found {} protocols", protocols.len());
-        
-        let mut protocol_groups = Vec::new();
-        
+
         for protocol in protocols {
-            println!("DEBUG: Processing protocol: {}", protocol.key);
+            debug!("Processing protocol: {}", protocol.key);
             // Step 2: For each protocol, list variants
             let variants = self.list_variants(&protocol.protocol_id).await?;
             debug!("Protocol {} has {} variants: {:?}", protocol.key, variants.len(), variants);
-            println!("DEBUG: Protocol {} has {} variants: {:?}", protocol.key, variants.len(), variants);
 
-            // Process all protocols now that multi-client discovery is working
-            // if protocol.key != "ethereum" {
-            //     println!("DEBUG: Skipping non-ethereum protocol {} for now", protocol.key);
-            //     continue;
-            // }
-            
             let mut clients = HashMap::new();
-            
+
             for variant in variants {
                 // Step 3: For each variant, get the image and archives
                 let version_key = common::ProtocolVersionKey {
@@ -67,20 +129,20 @@ impl ApiService {
                 
                 // Get the latest image for this protocol/variant
                 if let Ok(image) = self.get_image(&version_key).await {
-                    println!("DEBUG: Processing image: {}", image.image_id);
+                    debug!("Processing image: {}", image.image_id);
 
                     // Step 4a: Try new multi-client discovery first
                     match self.discover_client_archives(&image.image_id).await {
                         Ok(client_archives) => {
-                            println!("DEBUG: Found {} client archives in image {}", client_archives.len(), image.image_id);
+                            debug!("Found {} client archives in image {}", client_archives.len(), image.image_id);
                         for client_archive in &client_archives {
-                            println!("DEBUG: Client archive - client: '{}', store_key: '{}', data_dir: '{}'",
+                            debug!("Client archive - client: '{}', store_key: '{}', data_dir: '{}'",
                                 client_archive.client_name, client_archive.store_key, client_archive.data_directory);
 
                             // Parse the store_key to get protocol/network/node_type info
                             if let Ok((parsed_protocol, parsed_client, parsed_network, parsed_node_type)) =
                                 self.parse_store_key(&client_archive.store_key) {
-                                println!("DEBUG: Multi-client parsed -> protocol: '{}', client: '{}', network: '{}', node_type: '{}'",
+                                debug!("Multi-client parsed -> protocol: '{}', client: '{}', network: '{}', node_type: '{}'",
                                     parsed_protocol, parsed_client, parsed_network, parsed_node_type);
 
                                 // Group by client
@@ -112,30 +174,41 @@ impl ApiService {
                                         client_group.networks.entry(parsed_network).or_insert_with(Vec::new).push(snapshot);
                                     },
                                     Err(e) => {
-                                        println!("DEBUG: Failed to get metadata for multi-client store_key '{}': {}", client_archive.store_key, e);
+                                        debug!("Failed to get metadata for multi-client store_key '{}': {}", client_archive.store_key, e);
                                     }
                                 }
                             } else {
-                                println!("DEBUG: Failed to parse multi-client store_key: {}", client_archive.store_key);
+                                debug!("Failed to parse multi-client store_key: {}", client_archive.store_key);
                             }
                         }
                         },
                         Err(e) => {
-                            println!("DEBUG: Error discovering client archives for image {}: {}", image.image_id, e);
+                            debug!("Error discovering client archives for image {}: {}", image.image_id, e);
                         }
                     }
                 }
             }
             
             if !clients.is_empty() {
-                protocol_groups.push(ProtocolGroup {
-                    protocol: protocol.key,
-                    clients,
-                });
+                // Merge discovered clients into existing protocol groups
+                if let Some(existing_group) = protocol_groups.get_mut(&protocol.key) {
+                    for (client_name, client_group) in clients {
+                        existing_group.clients.entry(client_name).or_insert(client_group);
+                    }
+                } else {
+                    protocol_groups.insert(protocol.key.clone(), ProtocolGroup {
+                        protocol: protocol.key,
+                        clients,
+                    });
+                }
             }
         }
-        
-        Ok(protocol_groups)
+
+        // Convert HashMap to Vec
+        let mut result: Vec<ProtocolGroup> = protocol_groups.into_values().collect();
+        result.sort_by(|a, b| a.protocol.cmp(&b.protocol));
+
+        Ok(result)
     }
 
     /// Get download metadata for a snapshot (using its UUID)
@@ -218,26 +291,26 @@ impl ApiService {
         Err(anyhow!("Archive with store key '{}' not found", store_key))
     }
 
-    /// Get download chunk URLs for an archive
-    pub async fn get_download_chunks(&self, archive_uuid: &str, data_version: u64, chunk_indexes: Vec<u32>) -> Result<Vec<pb::ArchiveChunk>> {
-        info!("Getting download chunks for archive UUID: {}", archive_uuid);
+    /// Get download chunk URLs for an archive (using store_key)
+    pub async fn get_download_chunks(&self, store_key: &str, data_version: u64, chunk_indexes: Vec<u32>) -> Result<Vec<pb::ArchiveChunk>> {
+        info!("Getting download chunks for store key: {}", store_key);
 
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
         drop(config);
 
-        let archive_uuid = archive_uuid.to_string();
+        let store_key = store_key.to_string();
 
         let response = self.with_token_refresh(|token| {
             let api_url = api_url.clone();
-            let archive_uuid = archive_uuid.clone();
+            let store_key = store_key.clone();
             let chunk_indexes = chunk_indexes.clone();
             Box::pin(async move {
                 let endpoint = Endpoint::from_shared(api_url)
                     .map_err(|e| tonic::Status::invalid_argument(format!("Invalid API URL: {}", e)))?;
                 let channel = endpoint.connect().await
                     .map_err(|e| tonic::Status::unavailable(format!("Failed to connect: {}", e)))?;
-                
+
                 let mut client = pb::archive_service_client::ArchiveServiceClient::with_interceptor(
                     channel,
                     ApiInterceptor(
@@ -245,10 +318,10 @@ impl ApiService {
                         DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
                     ),
                 );
-                
+
                 let response = client
-                    .get_download_chunks(pb::ArchiveServiceGetDownloadChunksRequest {
-                        archive_id: archive_uuid,
+                    .get_download_chunks_by_store_key(pb::ArchiveServiceGetDownloadChunksByStoreKeyRequest {
+                        store_key,
                         org_id: None,
                         data_version,
                         chunk_indexes,
@@ -274,6 +347,220 @@ impl ApiService {
 
 
     // === Private helper methods ===
+
+    /// Discover snapshots directly from S3 by listing bucket contents
+    async fn discover_snapshots_from_s3(&self) -> Result<Vec<String>> {
+        info!("Discovering snapshots from S3 bucket...");
+
+        // Get S3 credentials and configuration from API
+        let s3_config = self.get_s3_config().await?;
+
+        debug!("S3 Config - Bucket: {}, Region: {}, Endpoint: {:?}",
+               s3_config.bucket, s3_config.region, s3_config.endpoint_url);
+
+        // Create S3 client
+        let region = aws_sdk_s3::config::Region::new(s3_config.region.clone());
+        let credentials = aws_sdk_s3::config::Credentials::new(
+            s3_config.access_key_id,
+            s3_config.secret_access_key,
+            s3_config.session_token,
+            None,
+            "snapper"
+        );
+
+        let credentials_provider = aws_sdk_s3::config::SharedCredentialsProvider::new(credentials);
+
+        let mut sdk_config_builder = aws_config::SdkConfig::builder()
+            .region(region)
+            .credentials_provider(credentials_provider);
+
+        // Set custom endpoint URL if provided (for S3-compatible services)
+        if let Some(endpoint_url) = &s3_config.endpoint_url {
+            sdk_config_builder = sdk_config_builder.endpoint_url(endpoint_url);
+        }
+
+        let sdk_config = sdk_config_builder.build();
+
+        let s3_client = aws_sdk_s3::Client::new(&sdk_config);
+
+        let mut discovered_snapshots = Vec::new();
+
+        // List top-level directories (store keys)
+        info!("Listing objects in S3 bucket: {}", s3_config.bucket);
+        let list_result = s3_client
+            .list_objects_v2()
+            .bucket(&s3_config.bucket)
+            .delimiter("/")
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to list S3 bucket {}: {:?}", s3_config.bucket, e);
+                anyhow!("Failed to list S3 bucket {}: {}", s3_config.bucket, e)
+            })?;
+
+        let prefixes = list_result.common_prefixes.unwrap_or_default();
+        debug!("Found {} top-level directories in S3 bucket", prefixes.len());
+
+        for prefix in prefixes {
+                if let Some(store_key_with_slash) = prefix.prefix() {
+                    let store_key = store_key_with_slash.trim_end_matches('/');
+                    debug!("Checking store key: {}", store_key);
+
+                    // List versions under this store key
+                    let version_list = s3_client
+                        .list_objects_v2()
+                        .bucket(&s3_config.bucket)
+                        .prefix(format!("{}/", store_key))
+                        .delimiter("/")
+                        .send()
+                        .await?;
+
+                    let version_prefixes = version_list.common_prefixes.unwrap_or_default();
+                    debug!("Found {} versions for store key: {}", version_prefixes.len(), store_key);
+
+                    for version_prefix in version_prefixes {
+                            if let Some(version_path) = version_prefix.prefix() {
+                                // Extract just the version number
+                                let version = version_path
+                                    .trim_start_matches(&format!("{}/", store_key))
+                                    .trim_end_matches('/');
+
+                                debug!("Checking version {} for store key {}", version, store_key);
+
+                                // Check if both manifest files exist
+                                let header_key = format!("{}/{}/manifest-header.json", store_key, version);
+                                let data_key = format!("{}/{}/manifest-body.json", store_key, version);
+
+                                debug!("Checking for manifest files:");
+                                debug!("  - Header: {}", header_key);
+                                debug!("  - Body: {}", data_key);
+
+                                // Use HEAD requests to check if files exist
+                                let header_result = s3_client
+                                    .head_object()
+                                    .bucket(&s3_config.bucket)
+                                    .key(&header_key)
+                                    .send()
+                                    .await;
+
+                                let header_exists = match &header_result {
+                                    Ok(_) => {
+                                        debug!("✓ Header file exists");
+                                        true
+                                    }
+                                    Err(e) => {
+                                        debug!("✗ Header file check failed: {:?}", e);
+                                        false
+                                    }
+                                };
+
+                                let data_result = s3_client
+                                    .head_object()
+                                    .bucket(&s3_config.bucket)
+                                    .key(&data_key)
+                                    .send()
+                                    .await;
+
+                                let data_exists = match &data_result {
+                                    Ok(_) => {
+                                        debug!("✓ Body file exists");
+                                        true
+                                    }
+                                    Err(e) => {
+                                        debug!("✗ Body file check failed: {:?}", e);
+                                        false
+                                    }
+                                };
+
+                                if header_exists && data_exists {
+                                    info!("✓ Found valid snapshot: {}/{}", store_key, version);
+                                    discovered_snapshots.push(store_key.to_string());
+                                    break; // We found a valid version, move to next store key
+                                } else {
+                                    debug!("Snapshot {}/{} missing files - header: {}, data: {}",
+                                           store_key, version, header_exists, data_exists);
+                                }
+                            }
+                        }
+                }
+        }
+
+        info!("Discovered {} valid snapshots from S3", discovered_snapshots.len());
+        Ok(discovered_snapshots)
+    }
+
+    /// Get S3 configuration from the API
+    async fn get_s3_config(&self) -> Result<S3Config> {
+        let config = self.config.lock().await;
+        let api_url = config.api_url.clone();
+        let token = config.token.clone();
+        drop(config);
+
+        // Call the GetS3Config API
+        let endpoint = Endpoint::from_shared(api_url)
+            .map_err(|e| anyhow!("Invalid API URL: {}", e))?;
+        let channel = endpoint.connect().await
+            .map_err(|e| anyhow!("Failed to connect: {}", e))?;
+
+        let mut client = pb::archive_service_client::ArchiveServiceClient::with_interceptor(
+            channel,
+            ApiInterceptor(
+                AuthToken(token),
+                DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
+            ),
+        );
+
+        let request = pb::GetS3ConfigRequest {
+            read_only: Some(true), // We only need read access for discovery
+        };
+
+        let response = client
+            .get_s3_config(request)
+            .await
+            .map_err(|e| anyhow!("Failed to get S3 config: {}", e))?
+            .into_inner();
+
+        Ok(S3Config {
+            bucket: response.bucket,
+            region: response.region,
+            access_key_id: response.access_key_id,
+            secret_access_key: response.secret_access_key,
+            session_token: response.session_token,
+            endpoint_url: response.endpoint_url,
+        })
+    }
+
+    /// Generate potential store keys from a variant name
+    fn generate_store_keys_from_variant(&self, protocol: &str, variant: &str) -> Vec<String> {
+        let mut keys = Vec::new();
+
+        // Parse variant to extract components
+        // Common patterns:
+        // - <client>-<network>-<node_type> (e.g., "reth-mainnet-archive")
+        // - <client>-<network> (e.g., "nitro-mainnet-full")
+
+        // For ethereum, try direct mapping
+        if protocol == "ethereum" {
+            // Try the variant as-is
+            keys.push(format!("{}-{}", protocol, variant));
+            keys.push(format!("{}-{}-v1", protocol, variant));
+
+            // Also try lighthouse pattern (multi-client support)
+            if variant.contains("mainnet") {
+                keys.push(format!("{}-lighthouse-mainnet-archive", protocol));
+            }
+        } else if protocol == "arbitrum-one" {
+            // For arbitrum, the variant might be like "nitro-mainnet-full"
+            keys.push(format!("{}-{}", protocol, variant));
+            keys.push(format!("{}-{}-v1", protocol, variant));
+        } else {
+            // Generic pattern
+            keys.push(format!("{}-{}", protocol, variant));
+            keys.push(format!("{}-{}-v1", protocol, variant));
+        }
+
+        keys
+    }
 
     /// Extract org_id from JWT token without verification (for client use only)
     async fn get_org_id_from_token(&self) -> Option<String> {
@@ -528,26 +815,23 @@ impl ApiService {
         self.fetch_download_metadata_with_version(archive_id, None).await
     }
     
-    pub async fn fetch_download_metadata_with_version(&self, archive_id: &str, version: Option<u64>) -> Result<babel_api::engine::DownloadMetadata> {
+    pub async fn fetch_download_metadata_with_version(&self, store_key: &str, version: Option<u64>) -> Result<babel_api::engine::DownloadMetadata> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
         drop(config);
-        
-        let archive_id = archive_id.to_string();
-        // Try without org_id first (for public archives)
-        let org_id: Option<String> = None;
-        
+
+        let store_key = store_key.to_string();
+
         let response = self.with_token_refresh(|token| {
             let api_url = api_url.clone();
-            let archive_id = archive_id.clone();
-            let org_id = org_id.clone();
+            let store_key = store_key.clone();
             let data_version = version;
             Box::pin(async move {
                 let endpoint = Endpoint::from_shared(api_url)
                     .map_err(|e| tonic::Status::invalid_argument(format!("Invalid API URL: {}", e)))?;
                 let channel = endpoint.connect().await
                     .map_err(|e| tonic::Status::unavailable(format!("Failed to connect: {}", e)))?;
-                
+
                 let mut client = pb::archive_service_client::ArchiveServiceClient::with_interceptor(
                     channel,
                     ApiInterceptor(
@@ -555,11 +839,11 @@ impl ApiService {
                         DefaultTimeout(DEFAULT_API_REQUEST_TIMEOUT),
                     ),
                 );
-                
+
                 let response = client
-                    .get_download_metadata(pb::ArchiveServiceGetDownloadMetadataRequest {
-                        archive_id,
-                        org_id,
+                    .get_download_metadata_by_store_key(pb::ArchiveServiceGetDownloadMetadataByStoreKeyRequest {
+                        store_key,
+                        org_id: None,
                         data_version,
                     })
                     .await?
@@ -600,19 +884,19 @@ impl ApiService {
                     ),
                 );
 
-                println!("DEBUG: Making DiscoverClientArchives API call for image_id: {}", image_id);
+                debug!("Making DiscoverClientArchives API call for image_id: {}", image_id);
                 let request = pb::DiscoverClientArchivesRequest {
                     image_id: image_id.clone(),
                     org_id: org_id.clone(),
                 };
-                println!("DEBUG: Using org_id: {:?}", org_id);
+                debug!("Using org_id: {:?}", org_id);
 
                 let response = client
                     .discover_client_archives(request)
                     .await?
                     .into_inner();
 
-                println!("DEBUG: DiscoverClientArchives API returned {} client_archives", response.client_archives.len());
+                debug!("DiscoverClientArchives API returned {} client_archives", response.client_archives.len());
 
                 Ok(response.client_archives)
             })
