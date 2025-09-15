@@ -565,7 +565,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
             config,
             futures: FuturesUnordered::new(),
             chunks: Default::default(),
-            _parts_path: parts_path,
+            parts_path,
             data_version,
             connection_pool,
         }
@@ -597,7 +597,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
                     // skip already downloaded chunks
                     continue;
                 };
-                save_chunk(&self._parts_path, &chunk)?;
+                save_chunk(&self.parts_path, &chunk)?;
                 let downloader = ChunkDownloader::new(
                     self.connector.clone(),
                     chunk,
