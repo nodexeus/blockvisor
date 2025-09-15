@@ -16,8 +16,12 @@ async fn main() -> eyre::Result<()> {
     let _ = nix::unistd::setsid();
     match get_job_name() {
         Ok(job_name) => {
+            // Create RunFlag with both SIGINT and SIGTERM handlers
+            let mut run_flag = RunFlag::default();
+            setup_signal_handlers(&mut run_flag);
+
             let res = babel::job_runner::run_job(
-                RunFlag::run_until_ctrlc(),
+                run_flag,
                 job_name,
                 &jobs::JOBS_DIR,
                 babel::load_config(&BABEL_CONFIG_PATH).await?,
@@ -34,6 +38,26 @@ async fn main() -> eyre::Result<()> {
             Err(err)
         }
     }
+}
+
+fn setup_signal_handlers(run_flag: &mut RunFlag) {
+    // Handle SIGINT (Ctrl+C)
+    let mut ctrlc_run = run_flag.clone();
+    ctrlc::set_handler(move || {
+        info!("Received SIGINT, shutting down...");
+        ctrlc_run.stop();
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    // Handle SIGTERM
+    let mut sigterm_run = run_flag.clone();
+    tokio::spawn(async move {
+        use tokio::signal::unix::{signal, SignalKind};
+        let mut sigterm = signal(SignalKind::terminate()).expect("Error setting SIGTERM handler");
+        sigterm.recv().await;
+        info!("Received SIGTERM, shutting down...");
+        sigterm_run.stop();
+    });
 }
 
 fn get_job_name() -> eyre::Result<String> {

@@ -34,7 +34,7 @@ use std::{
 };
 use thiserror::Error;
 use tokio::{sync::Semaphore, task::JoinError};
-use tracing::error;
+use tracing::{error, info};
 
 // if uploading single chunk (about 500MB) takes more than 50min, it means that something
 // is not ok
@@ -178,6 +178,12 @@ impl<C: BabelEngineConnector + Send> Runner for Uploader<C> {
             run: parallel_uploaders_run,
         };
         loop {
+            // Check if we should continue running
+            if !run.load() {
+                info!("Upload job received shutdown signal, stopping gracefully...");
+                break;
+            }
+
             if uploaders_state.run.load() {
                 if let Err(err) = uploaders.update_slots(self.connector.connect()).await {
                     uploaders_state.handle_error(err);
@@ -185,7 +191,14 @@ impl<C: BabelEngineConnector + Send> Runner for Uploader<C> {
                     uploaders.launch_more(&self.connector);
                 }
             }
-            match uploaders.wait_for_next().await {
+
+            // Check run flag before waiting for next chunk
+            if !run.load() {
+                info!("Upload job received shutdown signal during operation, stopping...");
+                break;
+            }
+
+            match uploaders.wait_for_next(&mut run).await {
                 Some(Ok(chunk)) => {
                     if let Err(err) = save_uploaded(chunk) {
                         uploaders_state.handle_error(err);
@@ -564,6 +577,12 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
             run: parallel_uploaders_run,
         };
         loop {
+            // Check if we should continue running
+            if !run.load() {
+                info!("Upload job received shutdown signal, stopping gracefully...");
+                break;
+            }
+
             if uploaders_state.run.load() {
                 if let Err(err) = uploaders.update_slots(self.connector.connect()).await {
                     uploaders_state.handle_error(err);
@@ -571,7 +590,14 @@ impl<C: BabelEngineConnector + Send> Runner for ClientUploader<C> {
                     uploaders.launch_more(&self.connector);
                 }
             }
-            match uploaders.wait_for_next().await {
+
+            // Check run flag before waiting for next chunk
+            if !run.load() {
+                info!("Upload job received shutdown signal during operation, stopping...");
+                break;
+            }
+
+            match uploaders.wait_for_next(&mut run).await {
                 Some(Ok(chunk)) => {
                     if let Err(err) = save_uploaded(chunk) {
                         uploaders_state.handle_error(err);
@@ -911,11 +937,23 @@ impl ParallelChunkUploaders<'_> {
         }
     }
 
-    async fn wait_for_next(&mut self) -> Option<Result<Chunk>> {
-        self.futures
-            .next()
-            .await
-            .map(|r| r.unwrap_or_else(|err| bail!("{err:#}")))
+    async fn wait_for_next(&mut self, run: &mut RunFlag) -> Option<Result<Chunk>> {
+        // Check run flag periodically while waiting
+        loop {
+            if !run.load() {
+                info!("Upload interrupted by shutdown signal");
+                return None;
+            }
+
+            // Use timeout to check run flag periodically
+            match tokio::time::timeout(Duration::from_secs(1), self.futures.next()).await {
+                Ok(Some(result)) => {
+                    return Some(result.unwrap_or_else(|err| bail!("{err:#}")));
+                }
+                Ok(None) => return None,
+                Err(_) => continue, // Timeout, check run flag again
+            }
+        }
     }
 }
 
@@ -975,11 +1013,23 @@ impl ClientChunkUploaders<'_> {
         }
     }
 
-    async fn wait_for_next(&mut self) -> Option<Result<Chunk>> {
-        self.futures
-            .next()
-            .await
-            .map(|r| r.unwrap_or_else(|err| bail!("{err:#}")))
+    async fn wait_for_next(&mut self, run: &mut RunFlag) -> Option<Result<Chunk>> {
+        // Check run flag periodically while waiting
+        loop {
+            if !run.load() {
+                info!("Upload interrupted by shutdown signal");
+                return None;
+            }
+
+            // Use timeout to check run flag periodically
+            match tokio::time::timeout(Duration::from_secs(1), self.futures.next()).await {
+                Ok(Some(result)) => {
+                    return Some(result.unwrap_or_else(|err| bail!("{err:#}")));
+                }
+                Ok(None) => return None,
+                Err(_) => continue, // Timeout, check run flag again
+            }
+        }
     }
 }
 

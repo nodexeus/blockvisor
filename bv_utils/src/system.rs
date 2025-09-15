@@ -28,13 +28,23 @@ pub async fn gracefully_terminate_process(pid: Pid, timeout: Duration) -> bool {
         return true;
     }
     if let Some(proc) = sys.process(pid) {
+        debug!("Sending SIGTERM to process {pid}");
         proc.kill_with(Signal::Term);
         let now = std::time::Instant::now();
         while is_process_running(pid) {
             if now.elapsed() < timeout {
                 tokio::time::sleep(Duration::from_secs(1)).await
             } else {
-                return false;
+                // SIGTERM didn't work, force kill with SIGKILL
+                debug!("SIGTERM timeout expired for process {pid}, sending SIGKILL");
+                sys.refresh_process_specifics(pid, ProcessRefreshKind::new());
+                if let Some(proc) = sys.process(pid) {
+                    proc.kill_with(Signal::Kill);
+                    // Give it a moment to actually die
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                // Check one more time if it's dead
+                return !is_process_running(pid);
             }
         }
     }
