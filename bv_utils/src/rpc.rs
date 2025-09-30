@@ -7,8 +7,8 @@ use tonic::{
     {Request, Status},
 };
 
-pub const RPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
-pub const RPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
+pub const RPC_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+pub const RPC_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub fn with_timeout<T>(args: T, timeout: Duration) -> Request<T> {
     let mut req = Request::new(args);

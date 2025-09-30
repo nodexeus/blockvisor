@@ -16,8 +16,8 @@ pub mod crypt;
 pub mod mqtt;
 pub mod protocol;
 
-pub const DEFAULT_API_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-pub const DEFAULT_API_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+pub const DEFAULT_API_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+pub const DEFAULT_API_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 pub const TOKEN_EXPIRED_MESSAGE: &str = "TOKEN_EXPIRED";
 lazy_static::lazy_static! {
     pub static ref NON_RETRIABLE: Vec<tonic::Code> = vec![tonic::Code::Unauthenticated, tonic::Code::InvalidArgument,
