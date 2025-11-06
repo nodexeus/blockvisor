@@ -723,7 +723,7 @@ impl SnapshotDownloader {
         info!("Resuming download for archive: {}", archive_id);
 
         // Resume from where we left off
-        self.download_chunks(&metadata, &archive_id).await?;
+        self.download_chunks_resume(&metadata, &archive_id).await?;
 
         info!("✓ Download resumed and completed successfully!");
         self.cleanup_metadata().await?;
@@ -800,10 +800,48 @@ impl SnapshotDownloader {
 
     // === Private helper methods ===
 
+    async fn download_chunks_resume(&self, metadata: &DownloadMetadata, archive_id: &str) -> Result<()> {
+        // Load existing progress to determine which chunks to skip
+        let progress_path = self.output_dir.join(PROGRESS_FILENAME);
+        let completed_chunks = if progress_path.exists() {
+            let progress_content = fs::read_to_string(&progress_path).await?;
+            match serde_json::from_str::<JobProgress>(&progress_content) {
+                Ok(progress) => {
+                    info!("Found existing progress: {}/{} chunks completed", progress.current, progress.total);
+                    progress.current
+                }
+                Err(_) => {
+                    warn!("Could not parse progress file, starting from beginning");
+                    0
+                }
+            }
+        } else {
+            info!("No progress file found, starting from beginning");
+            0
+        };
+
+        // If all chunks are completed, nothing to do
+        if completed_chunks >= metadata.chunks {
+            info!("All chunks already completed!");
+            return Ok(());
+        }
+
+        info!("Resuming from chunk {} of {}", completed_chunks, metadata.chunks);
+        
+        // Download only the remaining chunks
+        self.download_chunks_range(metadata, archive_id, completed_chunks, metadata.chunks).await
+    }
+
     async fn download_chunks(&self, metadata: &DownloadMetadata, archive_id: &str) -> Result<()> {
+        // Download all chunks from the beginning
+        self.download_chunks_range(metadata, archive_id, 0, metadata.chunks).await
+    }
+
+    async fn download_chunks_range(&self, metadata: &DownloadMetadata, archive_id: &str, start_chunk: u32, end_chunk: u32) -> Result<()> {
+        let total_chunks_to_download = end_chunk - start_chunk;
         info!(
-            "Starting to download {} chunks with {} workers and {} max HTTP connections",
-            metadata.chunks, self.workers, self.max_connections
+            "Starting to download {} chunks (range {}-{}) with {} workers and {} max HTTP connections",
+            total_chunks_to_download, start_chunk, end_chunk - 1, self.workers, self.max_connections
         );
 
         // Get API service to fetch chunk URLs
@@ -837,12 +875,12 @@ impl SnapshotDownloader {
         let archive_uuid =
             archive_uuid.ok_or_else(|| anyhow!("Archive UUID not found for {}", archive_id))?;
 
-        // Get signed URLs for all chunks in batches (API limit is 100 chunks per request)
+        // Get signed URLs for chunks in the specified range in batches (API limit is 100 chunks per request)
         const MAX_CHUNKS_PER_REQUEST: u32 = 100;
         let mut all_chunks = Vec::new();
 
-        for batch_start in (0..metadata.chunks).step_by(MAX_CHUNKS_PER_REQUEST as usize) {
-            let batch_end = (batch_start + MAX_CHUNKS_PER_REQUEST).min(metadata.chunks);
+        for batch_start in (start_chunk..end_chunk).step_by(MAX_CHUNKS_PER_REQUEST as usize) {
+            let batch_end = (batch_start + MAX_CHUNKS_PER_REQUEST).min(end_chunk);
             let chunk_indexes: Vec<u32> = (batch_start..batch_end).collect();
 
             info!("Requesting chunk batch {}-{}", batch_start, batch_end - 1);
@@ -869,20 +907,32 @@ impl SnapshotDownloader {
             metadata.total_size,
         )));
 
-        // Download chunks in parallel using semaphore for concurrency control
+        // Process chunks in smaller batches to provide better progress granularity and memory usage
+        const DOWNLOAD_BATCH_SIZE: usize = 50; // Process 50 chunks at a time
+        
         let worker_semaphore = Arc::new(tokio::sync::Semaphore::new(self.workers));
-        // Create separate semaphore for HTTP connections
         let http_semaphore = Arc::new(tokio::sync::Semaphore::new(self.max_connections));
-        let mut handles = Vec::new();
+        
+        // Process chunks in batches
+        for batch_start in (0..chunks.len()).step_by(DOWNLOAD_BATCH_SIZE) {
+            let batch_end = (batch_start + DOWNLOAD_BATCH_SIZE).min(chunks.len());
+            let batch_chunks = &chunks[batch_start..batch_end];
+            
+            info!("Processing download batch: chunks {}-{}", 
+                  start_chunk + batch_start as u32, 
+                  start_chunk + batch_end as u32 - 1);
+            
+            let mut handles = Vec::new();
 
-        for (chunk_idx, chunk) in chunks.into_iter().enumerate() {
+            for (relative_idx, chunk) in batch_chunks.iter().cloned().enumerate() {
+                let chunk_idx = start_chunk + batch_start as u32 + relative_idx as u32;
             let client = client.clone();
             let worker_semaphore = worker_semaphore.clone();
             let http_semaphore = http_semaphore.clone();
             let output_dir = self.output_dir.clone();
             let chunk_idx = chunk_idx as u32;
             let total_chunks = metadata.chunks;
-            let config = self.config.clone();
+            let _config = self.config.clone();
             let compression = metadata.compression.clone();
             let progress_tracker = progress_tracker.clone();
             let size_monitor = size_monitor.clone();
@@ -1097,21 +1147,8 @@ impl SnapshotDownloader {
                     }
                 }
 
-                // Update progress
-                let progress = JobProgress {
-                    total: total_chunks,
-                    current: chunk_idx + 1,
-                    message: format!("Downloaded chunk {}/{}", chunk_idx + 1, total_chunks),
-                };
-
-                // Save progress (need to lock config for this)
-                let snapshot_downloader = SnapshotDownloader {
-                    config: config,
-                    output_dir: output_dir.clone(),
-                    workers: 1,         // Dummy value
-                    max_connections: 1, // Dummy value
-                };
-                snapshot_downloader.save_progress(&progress).await?;
+                // Don't save progress here - we'll save it after all chunks in the batch complete
+                // This prevents inconsistent progress state if some chunks fail
 
                 if (chunk_idx + 1) % 10 == 0 {
                     info!("Downloaded {}/{} chunks", chunk_idx + 1, total_chunks);
@@ -1123,13 +1160,35 @@ impl SnapshotDownloader {
             handles.push(handle);
         }
 
-        // Wait for all downloads to complete
-        for handle in handles {
-            handle
-                .await
-                .with_context(|| "Failed to join download task")?
-                .with_context(|| "Download task failed")?;
+            // Wait for all downloads in this batch to complete
+            let mut results = Vec::new();
+            for handle in handles {
+                let result = handle.await.with_context(|| "Failed to join download task")?;
+                results.push(result);
+            }
+            
+            // Check if all chunks in this batch succeeded before updating progress
+            for (i, result) in results.into_iter().enumerate() {
+                result.with_context(|| format!("Download task {} failed", i))?;
+            }
+            
+            // All chunks in this batch succeeded - update progress
+            let completed_chunks = start_chunk + batch_end as u32;
+            let progress = JobProgress {
+                total: metadata.chunks,
+                current: completed_chunks,
+                message: format!("Downloaded chunk {}/{}", completed_chunks, metadata.chunks),
+            };
+            self.save_progress(&progress).await?;
+            
+            info!("Completed batch: chunks {}-{} ({}/{} total chunks)", 
+                  start_chunk + batch_start as u32, 
+                  start_chunk + batch_end as u32 - 1,
+                  completed_chunks,
+                  metadata.chunks);
         }
+        
+        info!("Successfully downloaded all chunks in range {}-{}", start_chunk, end_chunk - 1);
 
         Ok(())
     }
