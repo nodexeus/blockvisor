@@ -89,6 +89,91 @@ impl SnapshotClient {
         })
     }
 
+    /// Register a new account
+    pub async fn register(&mut self, api_url: String) -> Result<()> {
+        // Prompt for registration details
+        print!("Email: ");
+        std::io::stdout().flush()?;
+        let mut email = String::new();
+        std::io::stdin().lock().read_line(&mut email)?;
+
+        print!("First Name: ");
+        std::io::stdout().flush()?;
+        let mut first_name = String::new();
+        std::io::stdin().lock().read_line(&mut first_name)?;
+
+        print!("Last Name: ");
+        std::io::stdout().flush()?;
+        let mut last_name = String::new();
+        std::io::stdin().lock().read_line(&mut last_name)?;
+
+        let password = rpassword::prompt_password("Password: ")?;
+        let confirm_password = rpassword::prompt_password("Confirm Password: ")?;
+
+        if password != confirm_password {
+            bail!("Passwords do not match");
+        }
+
+        info!("Creating account with {}...", api_url);
+
+        // Call the UserService.Create RPC (no auth required)
+        let mut user_client =
+            pb::user_service_client::UserServiceClient::connect(api_url.clone()).await?;
+        let _create_response = user_client
+            .create(pb::UserServiceCreateRequest {
+                email: email.trim().to_string(),
+                first_name: first_name.trim().to_string(),
+                last_name: last_name.trim().to_string(),
+                password: password.clone(),
+            })
+            .await?
+            .into_inner();
+
+        println!("✓ Account created successfully!");
+
+        // Try to log in automatically, but handle email verification requirement
+        println!("Attempting automatic login...");
+
+        let mut auth_client =
+            pb::auth_service_client::AuthServiceClient::connect(api_url.clone()).await?;
+
+        match auth_client
+            .login(pb::AuthServiceLoginRequest {
+                email: email.trim().to_string(),
+                password,
+            })
+            .await
+        {
+            Ok(login_response) => {
+                let login_response = login_response.into_inner();
+
+                // Save the auth tokens
+                let config = SnapshotConfig {
+                    token: login_response.token,
+                    refresh_token: login_response.refresh,
+                    api_url,
+                };
+
+                config.save().await?;
+                self.config = Some(config);
+
+                println!("✓ Logged in successfully! Config saved to ~/.snapper.json");
+            }
+            Err(status) if status.message().contains("not confirmed") => {
+                println!("\n⚠️  Email verification required!");
+                println!("Please check your email ({}) for a verification link.", email.trim());
+                println!("After verifying your email, run:");
+                println!("  snapper auth login --api-url {}", api_url);
+            }
+            Err(e) => {
+                // Re-throw other errors
+                return Err(e.into());
+            }
+        }
+
+        Ok(())
+    }
+
     /// Handle login authentication - similar to NIB's approach
     pub async fn login(&mut self, api_url: String) -> Result<()> {
         // Prompt for email and password

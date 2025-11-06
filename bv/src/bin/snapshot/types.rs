@@ -53,11 +53,73 @@ pub struct ListFilter {
     pub network: Option<String>,
 }
 
+/// Configuration for snapshot downloads
 #[derive(Debug)]
 pub struct DownloadConfig {
+    /// Number of concurrent worker tasks for processing chunks
+    /// Each worker handles the complete processing of a chunk (download, decompress, write)
     pub workers: usize,
+    
+    /// Maximum number of concurrent HTTP connections
+    /// This limits the number of simultaneous HTTP GET requests to prevent overwhelming the server
+    /// Should typically be equal to or greater than workers for optimal performance
     pub max_connections: usize,
+    
+    /// Directory where downloaded files will be stored
     pub output_dir: PathBuf,
+}
+
+impl DownloadConfig {
+    /// Validate the download configuration parameters
+    pub fn validate(&self) -> Result<()> {
+        if self.workers == 0 {
+            return Err(eyre::anyhow!("Workers must be greater than 0"));
+        }
+        
+        if self.max_connections == 0 {
+            return Err(eyre::anyhow!("Max connections must be greater than 0"));
+        }
+        
+        // Reasonable upper limits to prevent resource exhaustion
+        const MAX_WORKERS: usize = 100;
+        const MAX_CONNECTIONS: usize = 1000;
+        
+        if self.workers > MAX_WORKERS {
+            return Err(eyre::anyhow!(
+                "Workers ({}) exceeds maximum allowed ({})", 
+                self.workers, MAX_WORKERS
+            ));
+        }
+        
+        if self.max_connections > MAX_CONNECTIONS {
+            return Err(eyre::anyhow!(
+                "Max connections ({}) exceeds maximum allowed ({})", 
+                self.max_connections, MAX_CONNECTIONS
+            ));
+        }
+        
+        // Warn if max_connections is much lower than workers
+        if self.max_connections < self.workers / 2 {
+            eprintln!(
+                "Warning: max_connections ({}) is significantly lower than workers ({}). \
+                This may limit download performance.",
+                self.max_connections, self.workers
+            );
+        }
+        
+        Ok(())
+    }
+    
+    /// Create a new DownloadConfig with validation
+    pub fn new(workers: usize, max_connections: usize, output_dir: PathBuf) -> Result<Self> {
+        let config = Self {
+            workers,
+            max_connections,
+            output_dir,
+        };
+        config.validate()?;
+        Ok(config)
+    }
 }
 
 #[derive(Default, Deserialize, Serialize, Debug, Clone)]
@@ -190,16 +252,45 @@ mod tests {
 
     #[test]
     fn test_build_full_path() {
-        let full_path = SnapshotMetadata::build_full_path("arbitrum-one-nitro-mainnet-full-v1", 2);
+        let full_path = SnapshotMetadata::_build_full_path("arbitrum-one-nitro-mainnet-full-v1", 2);
         assert_eq!(full_path, "arbitrum-one-nitro-mainnet-full-v1/2");
     }
 
     #[test]
     fn test_parse_full_path() {
         let (archive_id, version) = 
-            SnapshotMetadata::parse_full_path("arbitrum-one-nitro-mainnet-full-v1/2").unwrap();
+            SnapshotMetadata::_parse_full_path("arbitrum-one-nitro-mainnet-full-v1/2").unwrap();
         
         assert_eq!(archive_id, "arbitrum-one-nitro-mainnet-full-v1");
         assert_eq!(version, 2);
+    }
+
+    #[test]
+    fn test_download_config_validation() {
+        use tempfile::TempDir;
+        
+        let temp_dir = TempDir::new().unwrap();
+        let output_dir = temp_dir.path().to_path_buf();
+        
+        // Valid configuration should pass
+        let valid_config = DownloadConfig::new(4, 8, output_dir.clone()).unwrap();
+        assert_eq!(valid_config.workers, 4);
+        assert_eq!(valid_config.max_connections, 8);
+        
+        // Zero workers should fail
+        assert!(DownloadConfig::new(0, 4, output_dir.clone()).is_err());
+        
+        // Zero max_connections should fail
+        assert!(DownloadConfig::new(4, 0, output_dir.clone()).is_err());
+        
+        // Excessive workers should fail
+        assert!(DownloadConfig::new(200, 4, output_dir.clone()).is_err());
+        
+        // Excessive max_connections should fail
+        assert!(DownloadConfig::new(4, 2000, output_dir.clone()).is_err());
+        
+        // Valid edge cases should pass
+        assert!(DownloadConfig::new(1, 1, output_dir.clone()).is_ok());
+        assert!(DownloadConfig::new(100, 1000, output_dir.clone()).is_ok());
     }
 }

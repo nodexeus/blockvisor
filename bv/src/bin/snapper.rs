@@ -78,6 +78,12 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum AuthCommands {
+    /// Create a new account
+    Register {
+        /// API endpoint URL
+        #[arg(long, default_value = "https://api.nodexeus.io")]
+        api_url: String,
+    },
     /// Set up authentication
     Login {
         /// API endpoint URL
@@ -133,6 +139,9 @@ async fn handle_auth_command(auth_command: AuthCommands) -> Result<()> {
     let mut client = SnapshotClient::new().await?;
 
     match auth_command {
+        AuthCommands::Register { api_url } => {
+            client.register(api_url).await?;
+        }
         AuthCommands::Login { api_url } => {
             client.login(api_url).await?;
             println!("✓ Authentication successful");

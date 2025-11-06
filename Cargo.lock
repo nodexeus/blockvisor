@@ -691,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "babel"
-version = "2.17.14"
+version = "2.18.0"
 dependencies = [
  "assert_fs",
  "async-trait",
@@ -736,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "babel_api"
-version = "2.17.14"
+version = "2.18.0"
 dependencies = [
  "bv_tests_utils",
  "chrono",
@@ -876,7 +876,7 @@ dependencies = [
 
 [[package]]
 name = "blockvisord"
-version = "2.17.14"
+version = "2.18.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
@@ -885,6 +885,7 @@ dependencies = [
  "aws-sdk-s3",
  "babel_api",
  "base64 0.22.1",
+ "blake3",
  "bv_tests_utils",
  "bv_utils",
  "chitchat",
@@ -897,6 +898,7 @@ dependencies = [
  "eyre",
  "fs_extra",
  "futures-util",
+ "hex",
  "homedir",
  "ipnet",
  "jsonwebtoken",
@@ -920,9 +922,12 @@ dependencies = [
  "serde_variant",
  "serde_yaml_ng",
  "serial_test",
+ "sha1",
+ "sha2",
  "sysinfo",
  "systemstat",
  "tempdir",
+ "tempfile",
  "tera",
  "thiserror 2.0.12",
  "tokio",
@@ -956,7 +961,7 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "bv_tests_utils"
-version = "2.17.14"
+version = "2.18.0"
 dependencies = [
  "babel_api",
  "bv_utils",
@@ -969,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "bv_utils"
-version = "2.17.14"
+version = "2.18.0"
 dependencies = [
  "async-trait",
  "babel_api",
