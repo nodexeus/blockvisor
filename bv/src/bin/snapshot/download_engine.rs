@@ -373,12 +373,8 @@ impl DestinationValidator {
             });
         }
         
-        // Check for zero-sized destinations
-        for (idx, dest) in destinations.iter().enumerate() {
-            if dest.size_bytes == 0 {
-                return Err(ValidationError::InvalidDestinationSize { dest_idx: idx });
-            }
-        }
+        // Allow zero-sized destinations (they represent empty files or placeholders)
+        // We'll handle them gracefully during processing by skipping the write operation
         
         Ok(())
     }
