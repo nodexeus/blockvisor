@@ -899,24 +899,28 @@ impl SnapshotDownloader {
                     }
                 };
 
-                // Download the chunk data with HTTP connection limiting
+                // Download the chunk data with HTTP connection limiting and retry logic
                 let chunk_data = {
                     // Acquire HTTP connection permit before making request
                     let _http_permit = http_semaphore.acquire().await?;
                     
-                    let response = client
-                        .get(url)
-                        .send()
-                        .await
-                        .with_context(|| format!("Failed to download chunk {}", chunk_idx))?;
+                    // Add retry logic for network errors like "end of file before message length reached"
+                    bv_utils::with_retry!(async {
+                        let response = client
+                            .get(url)
+                            .send()
+                            .await
+                            .with_context(|| format!("Failed to download chunk {}", chunk_idx))?;
 
-                    let chunk_data = response
-                        .bytes()
-                        .await
-                        .with_context(|| format!("Failed to read chunk {} data", chunk_idx))?;
+                        let chunk_data = response
+                            .bytes()
+                            .await
+                            .with_context(|| format!("Failed to read chunk {} data", chunk_idx))?;
+                        
+                        Ok::<Vec<u8>, eyre::Error>(chunk_data.to_vec())
+                    }, 5, 1000)?  // 5 retries with 1 second base backoff
                     
                     // HTTP permit is automatically released when _http_permit goes out of scope
-                    chunk_data
                 };
 
                 // Decompress if needed (assuming ZSTD compression)
