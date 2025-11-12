@@ -21,6 +21,7 @@ pub struct Variant {
     pub key: String,
     pub metadata: Option<Vec<VariantMetadata>>,
     pub sku_code: String,
+    #[serde(default)]
     pub archive_pointers: Vec<ArchivePointer>,
     pub min_cpu: u64,
     pub min_memory_mb: u64,

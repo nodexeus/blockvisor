@@ -209,10 +209,17 @@ pub async fn run_job(
             );
             
             // Extract archivable clients from plugin config
+            // Get exclude patterns from upload config if available
+            let exclude_patterns = plugin_config.upload
+                .as_ref()
+                .and_then(|u| u.exclude.as_ref())
+                .map(|e| e.as_slice())
+                .unwrap_or(&[]);
+            
             let clients = crate::multi_client_integration::get_archivable_clients(
                 &plugin_config,
                 &babel_config.node_env.protocol_data_path,
-                &[] // Empty exclude patterns for now
+                exclude_patterns,
             )?;
             
             if clients.is_empty() {

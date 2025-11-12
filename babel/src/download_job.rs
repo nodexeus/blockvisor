@@ -469,6 +469,8 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     }
 
     /// R3.1: Download all clients in parallel
+    /// Downloads available datasets for each client. If a dataset is not available (404),
+    /// it logs a warning and continues with other clients instead of failing.
     pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
         let mut download_futures = FuturesUnordered::new();
         
@@ -481,22 +483,56 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
             );
             
             let client_name = client.client_name.clone();
+            let store_key = client.store_key.clone();
             let run_flag = run.child_flag();
             download_futures.push(Box::pin(async move {
                 let result = downloader.run(run_flag).await;
-                (client_name, result)
+                (client_name, store_key, result)
             }));
         }
         
+        let mut successful_downloads = 0;
+        let mut skipped_downloads = 0;
+        let mut failed_downloads = Vec::new();
+        
         // Wait for all downloads to complete
-        while let Some((client_name, result)) = download_futures.next().await {
+        while let Some((client_name, store_key, result)) = download_futures.next().await {
             match result {
-                Ok(_) => tracing::info!("Client '{}' download completed", client_name),
+                Ok(_) => {
+                    tracing::info!("Client '{}' download completed successfully", client_name);
+                    successful_downloads += 1;
+                }
                 Err(err) => {
-                    tracing::error!("Client '{}' download failed: {:#}", client_name, err);
-                    return Err(err.wrap_err(format!("Client '{}' download failed", client_name)));
+                    // Check if this is a "not found" error (dataset doesn't exist)
+                    let err_string = format!("{:#}", err);
+                    if err_string.contains("NotFound") || err_string.contains("not found") || err_string.contains("404") {
+                        tracing::warn!(
+                            "Client '{}' dataset not available (store_key: {}). Client will start without snapshot data.",
+                            client_name, store_key
+                        );
+                        skipped_downloads += 1;
+                    } else {
+                        // This is a real error (network issue, permission, etc.)
+                        tracing::error!("Client '{}' download failed: {:#}", client_name, err);
+                        failed_downloads.push((client_name.clone(), err));
+                    }
                 }
             }
+        }
+        
+        tracing::info!(
+            "Multi-client download summary: {} successful, {} skipped (not available), {} failed",
+            successful_downloads, skipped_downloads, failed_downloads.len()
+        );
+        
+        // Only fail if there were actual errors (not just missing datasets)
+        if !failed_downloads.is_empty() {
+            let error_summary = failed_downloads
+                .iter()
+                .map(|(name, err)| format!("  - {}: {:#}", name, err))
+                .collect::<Vec<_>>()
+                .join("\n");
+            bail!("Some client downloads failed:\n{}", error_summary);
         }
         
         Ok(())

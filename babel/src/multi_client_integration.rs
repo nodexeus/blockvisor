@@ -29,6 +29,7 @@ pub fn get_archivable_clients(
     
     plugin_config.services.iter()
         .filter(|service| service.archive)                      // R2.1: Archive by default unless explicitly false
+        .filter(|service| service.use_protocol_data)            // Only services that use protocol data
         .filter(|service| service.store_key.is_some())          // Only services with store_key
         .map(|service| {
             let data_dir_name = service.data_dir.as_ref()
@@ -51,6 +52,7 @@ pub fn get_downloadable_clients(
 ) -> Result<Vec<ClientDownloadConfig>> {
     plugin_config.services.iter()
         .filter(|service| service.archive)                      // Only archived services can be downloaded
+        .filter(|service| service.use_protocol_data)            // Only services that use protocol data
         .filter(|service| service.store_key.is_some())          // Only services with store_key
         .map(|service| {
             let data_dir_name = service.data_dir.as_ref()
@@ -78,7 +80,27 @@ pub async fn execute_multi_client_upload<C: BabelEngineConnector + Clone + Send 
     let clients = get_archivable_clients(plugin_config, &config.data_mount_point, exclude_patterns)?;
     
     if clients.is_empty() {
-        warn!("No archivable clients found in plugin configuration");
+        // Check if there are any services at all
+        let total_services = plugin_config.services.len();
+        let non_archived_services: Vec<_> = plugin_config.services.iter()
+            .filter(|s| !s.archive)
+            .map(|s| s.name.as_str())
+            .collect();
+        
+        if total_services == 0 {
+            info!("No services configured - nothing to upload");
+        } else if non_archived_services.len() == total_services {
+            info!(
+                "All {} service(s) are configured with archive=false. No datasets to upload. Services: {}",
+                total_services,
+                non_archived_services.join(", ")
+            );
+        } else {
+            warn!(
+                "No archivable clients found. Services without store_key or with archive=false will not be uploaded. \
+                 To enable archiving, set archive=true and provide a store_key for each service."
+            );
+        }
         return Ok(());
     }
     
@@ -106,7 +128,27 @@ pub async fn execute_multi_client_download<C: BabelEngineConnector + Clone + Sen
     let clients = get_downloadable_clients(plugin_config, &config.data_mount_point)?;
     
     if clients.is_empty() {
-        warn!("No downloadable clients found in plugin configuration");
+        // Check if there are any services at all
+        let total_services = plugin_config.services.len();
+        let non_archived_services: Vec<_> = plugin_config.services.iter()
+            .filter(|s| !s.archive)
+            .map(|s| s.name.as_str())
+            .collect();
+        
+        if total_services == 0 {
+            info!("No services configured - nothing to download");
+        } else if non_archived_services.len() == total_services {
+            info!(
+                "All {} service(s) are configured with archive=false. No datasets to download. Services: {}",
+                total_services,
+                non_archived_services.join(", ")
+            );
+        } else {
+            info!(
+                "No downloadable clients found. Services without store_key or with archive=false will start without snapshot data. \
+                 To enable snapshot downloads, set archive=true and provide a store_key for each service."
+            );
+        }
         return Ok(());
     }
     

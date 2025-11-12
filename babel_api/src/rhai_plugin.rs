@@ -663,27 +663,21 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
         self.start_aux_services(config.aux_services)?;
         let mut services_needs = self.run_actions(config.init, vec![])?;
         if self.babel_engine.protocol_data_stamp()?.is_none() {
-            if self.babel_engine.has_protocol_archive()? {
-                // Check if we have any services with store_key defined (multi-client setup)
-                let has_multi_client_services = config.services.iter()
-                    .any(|service| service.archive && service.store_key.is_some());
-                
-                if has_multi_client_services {
-                    // Use multi-client download for per-client snapshots
-                    self.create_and_start_job(
-                        DOWNLOAD_JOB_NAME,
-                        plugin_config::build_multi_client_download_job_config(config.download, services_needs),
-                    )?;
-                } else {
-                    // Fall back to traditional single download
-                    self.create_and_start_job(
-                        DOWNLOAD_JOB_NAME,
-                        plugin_config::build_download_job_config(config.download, services_needs),
-                    )?;
-                }
+            // Check if we have any services with store_key defined (multi-client setup)
+            let has_multi_client_services = config.services.iter()
+                .any(|service| service.archive && service.store_key.is_some());
+            
+            if has_multi_client_services {
+                // Use multi-client download for per-client snapshots
+                // Each client's dataset will be downloaded if available, or skipped if not
+                self.create_and_start_job(
+                    DOWNLOAD_JOB_NAME,
+                    plugin_config::build_multi_client_download_job_config(config.download, services_needs),
+                )?;
                 services_needs =
                     self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
             } else if let Some(alternative_download) = config.alternative_download {
+                // Legacy fallback for non-multi-client configurations
                 self.create_and_start_job(
                     DOWNLOAD_JOB_NAME,
                     plugin_config::build_alternative_download_job_config(
@@ -694,6 +688,7 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
                 services_needs =
                     self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
             } else if let Some(cold_init) = config.cold_init {
+                // Cold init as final fallback
                 self.create_and_start_job(
                     COLD_INIT_JOB_NAME,
                     plugin_config::build_cold_init_job_config(cold_init, services_needs),
@@ -726,26 +721,38 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
         }
         let pre_upload_jobs = self.run_actions(config.pre_upload, vec![])?;
         
-        // Check if we have any services with store_key defined (multi-client setup)
-        let has_multi_client_services = config.services.iter()
-            .any(|service| service.archive && service.store_key.is_some());
+        // Check if we have any archivable services with store_key defined
+        let has_archivable_services = config.services.iter()
+            .any(|service| service.archive && service.use_protocol_data && service.store_key.is_some());
         
-        if has_multi_client_services {
-            // Use multi-client upload for per-client snapshots
-            self.create_and_start_job(
-                UPLOAD_JOB_NAME,
-                plugin_config::build_multi_client_upload_job_config(config.upload, pre_upload_jobs),
-            )?;
+        let mut services_needs = pre_upload_jobs;
+        
+        if has_archivable_services {
+            // Check if we have any services with store_key defined (multi-client setup)
+            let has_multi_client_services = config.services.iter()
+                .any(|service| service.archive && service.store_key.is_some());
+            
+            if has_multi_client_services {
+                // Use multi-client upload for per-client snapshots
+                self.create_and_start_job(
+                    UPLOAD_JOB_NAME,
+                    plugin_config::build_multi_client_upload_job_config(config.upload, services_needs.clone()),
+                )?;
+            } else {
+                // Fall back to traditional single upload
+                self.create_and_start_job(
+                    UPLOAD_JOB_NAME,
+                    plugin_config::build_upload_job_config(config.upload, services_needs.clone()),
+                )?;
+            }
+            services_needs = vec![UPLOAD_JOB_NAME.to_string()];
         } else {
-            // Fall back to traditional single upload
-            self.create_and_start_job(
-                UPLOAD_JOB_NAME,
-                plugin_config::build_upload_job_config(config.upload, pre_upload_jobs),
-            )?;
+            // No archivable services - skip upload entirely
+            tracing::info!("No archivable services found - skipping upload job");
         }
         
         let post_upload_jobs =
-            self.run_jobs(config.post_upload, vec![UPLOAD_JOB_NAME.to_string()])?;
+            self.run_jobs(config.post_upload, services_needs)?;
         self.start_services(config.services, Default::default(), post_upload_jobs)?;
         Ok(())
     }
