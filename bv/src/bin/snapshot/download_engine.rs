@@ -908,14 +908,17 @@ impl SnapshotDownloader {
         )));
 
         // Process chunks in smaller batches to provide better progress granularity and memory usage
-        const DOWNLOAD_BATCH_SIZE: usize = 50; // Process 50 chunks at a time
+        // const DOWNLOAD_BATCH_SIZE: usize = 8; // Process 50 chunks at a time
+        let download_batch_size = self.workers;
         
         let worker_semaphore = Arc::new(tokio::sync::Semaphore::new(self.workers));
         let http_semaphore = Arc::new(tokio::sync::Semaphore::new(self.max_connections));
         
         // Process chunks in batches
-        for batch_start in (0..chunks.len()).step_by(DOWNLOAD_BATCH_SIZE) {
-            let batch_end = (batch_start + DOWNLOAD_BATCH_SIZE).min(chunks.len());
+        // for batch_start in (0..chunks.len()).step_by(DOWNLOAD_BATCH_SIZE) {
+        //     let batch_end = (batch_start + DOWNLOAD_BATCH_SIZE).min(chunks.len());
+        for batch_start in (0..chunks.len()).step_by(download_batch_size) {
+            let batch_end = (batch_start + download_batch_size).min(chunks.len());
             let batch_chunks = &chunks[batch_start..batch_end];
             
             info!("Processing download batch: chunks {}-{}", 
