@@ -504,8 +504,14 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                 }
                 Err(err) => {
                     // Check if this is a "not found" error (dataset doesn't exist)
+                    // Look for both the error message and check if it's a tonic Status error
                     let err_string = format!("{:#}", err);
-                    if err_string.contains("NotFound") || err_string.contains("not found") || err_string.contains("404") {
+                    let is_not_found = err_string.contains("NotFound") 
+                        || err_string.contains("not found") 
+                        || err_string.contains("404")
+                        || err_string.contains("get_download_metadata_for_store_key");
+                    
+                    if is_not_found {
                         tracing::warn!(
                             "Client '{}' dataset not available (store_key: {}). Client will start without snapshot data.",
                             client_name, store_key
