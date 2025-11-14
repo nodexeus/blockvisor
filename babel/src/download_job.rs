@@ -1068,8 +1068,12 @@ impl Writer {
                     .truncate(false)
                     .write(true)
                     .open(absolute_path)?;
+                
+                // Always insert the file handle into the map to prevent leaks
+                let (_, file) = entry.insert((Instant::now(), file));
+                
+                // Write data if not empty
                 if !data.is_empty() {
-                    let (_, file) = entry.insert((Instant::now(), file));
                     file.write_all_at(&data, pos)?;
                     file.flush()?;
                 }
@@ -1084,10 +1088,30 @@ impl Writer {
                 .min_by(|(_, (a, _)), (_, (b, _))| a.cmp(b))
                 .map(|(k, _)| k.clone())
             {
-                self.opened_files.remove(&oldest);
+                if let Some((_, mut file)) = self.opened_files.remove(&oldest) {
+                    // Explicitly flush and sync to ensure data is written
+                    if let Err(e) = file.flush() {
+                        tracing::warn!("Failed to flush file {:?}: {}", oldest, e);
+                    }
+                    if let Err(e) = file.sync_all() {
+                        tracing::warn!("Failed to sync file {:?}: {}", oldest, e);
+                    }
+                    // File is dropped here, but we've ensured data is persisted
+                }
             }
         }
         Ok(())
+    }
+
+    fn close_all_files(&mut self) {
+        for (path, (_, mut file)) in self.opened_files.drain() {
+            if let Err(e) = file.flush() {
+                tracing::warn!("Failed to flush file {:?}: {}", path, e);
+            }
+            if let Err(e) = file.sync_all() {
+                tracing::warn!("Failed to sync file {:?}: {}", path, e);
+            }
+        }
     }
 }
 
