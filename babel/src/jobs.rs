@@ -222,7 +222,21 @@ pub fn load_job_data<T: DeserializeOwned>(file_path: &Path) -> Result<T> {
 }
 
 pub fn save_job_data<T: Serialize>(file_path: &Path, data: &T) -> eyre::Result<()> {
-    Ok(fs::write(file_path, serde_json::to_string(data)?)?)
+    let serialized = serde_json::to_string(data)?;
+    let mut file = fs::File::options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(file_path)?;
+    
+    file.write_all(serialized.as_bytes())?;
+    file.flush()
+        .with_context(|| format!("Failed to flush job data to {}", file_path.display()))?;
+    file.sync_all()
+        .with_context(|| format!("Failed to sync job data to {}", file_path.display()))?;
+    drop(file);  // Explicit drop for clarity
+    
+    Ok(())
 }
 
 pub fn load_config(job_dir: &Path) -> Result<JobConfig> {
