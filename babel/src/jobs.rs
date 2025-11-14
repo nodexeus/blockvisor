@@ -297,6 +297,14 @@ pub fn save_chunk(path: &Path, chunk: &Chunk) -> Result<()> {
     chunk_serialized.push('\n');
     file.write_all(chunk_serialized.as_bytes())
         .with_context(|| format!("{}:{chunk:?}", path.display()))?;
+    
+    // Explicitly flush and close to ensure file descriptor is released immediately
+    file.flush()
+        .with_context(|| format!("Failed to flush chunk metadata to {}", path.display()))?;
+    file.sync_all()
+        .with_context(|| format!("Failed to sync chunk metadata to {}", path.display()))?;
+    drop(file);  // Explicit drop for clarity
+    
     Ok(())
 }
 
