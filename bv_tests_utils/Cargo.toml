@@ -5,8 +5,8 @@ version.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-babel_api = { version = "*", path = "../babel_api" }
-bv_utils = { version = "*", path = "../bv_utils" }
+babel_api = { path = "../babel_api" }
+bv_utils = { path = "../bv_utils" }
 eyre = "0.6.12"
 mockall = "0.13.1"
 tonic = "0.8.3"

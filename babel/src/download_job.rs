@@ -1014,9 +1014,13 @@ impl Writer {
             };
             if let Err(err) = self.handle_chunk_data(chunk_data).await {
                 run.stop();
+                self.close_all_files();
                 bail!("Writer error: {err:#}")
             }
         }
+        
+        // Always cleanup on successful completion
+        self.close_all_files();
         Ok(self.downloaded_chunks)
     }
 

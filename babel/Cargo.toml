@@ -20,9 +20,9 @@ path = "src/bin/job_runner.rs"
 
 [dependencies]
 async-trait = "0.1.87"
-babel_api = { version = "*", path = "../babel_api" }
+babel_api = { path = "../babel_api" }
 blake3 = "1.6.1"
-bv_utils = { version = "*", path = "../bv_utils" }
+bv_utils = { path = "../bv_utils" }
 chrono = "0.4.40"
 crc = "3.2.1"
 eyre = "0.6.12"
@@ -58,7 +58,7 @@ rlimit = "0.10.2"
 
 [dev-dependencies]
 assert_fs = "1.1.2"
-bv_tests_utils = { version = "*", path = "../bv_tests_utils" }
+bv_tests_utils = { path = "../bv_tests_utils" }
 mockito = "1.7.0"
 mockall = "0.13.1"
 tokio-stream = { version = "0.1.17", features = ["net"] }
