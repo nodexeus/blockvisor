@@ -315,6 +315,7 @@ impl SnapshotClient {
         node_type: &str,
         version: Option<u64>,
         config: DownloadConfig,
+        daemon_mode: bool,
     ) -> Result<()> {
         let auth_config = self.require_auth()?;
 
@@ -349,7 +350,9 @@ impl SnapshotClient {
         );
 
         // Create and use the download engine
-        let downloader = SnapshotDownloader::new(auth_config.clone(), config)?;
+        // Enable progress output by default for foreground downloads
+        let enable_progress = true;
+        let downloader = SnapshotDownloader::new_with_daemon(auth_config.clone(), config, enable_progress, daemon_mode)?;
         downloader.download(&full_path).await?;
 
         Ok(())
@@ -368,7 +371,9 @@ impl SnapshotClient {
             output_dir,
         };
 
-        let downloader = SnapshotDownloader::new(auth_config.clone(), download_config)?;
+        // Enable progress output for resume (foreground operation)
+        let enable_progress = true;
+        let downloader = SnapshotDownloader::new(auth_config.clone(), download_config, enable_progress)?;
         downloader.resume().await?;
 
         Ok(())
@@ -386,7 +391,7 @@ impl SnapshotClient {
                 output_dir: dir,
             };
 
-            let downloader = SnapshotDownloader::new(auth_config.clone(), download_config)?;
+            let downloader = SnapshotDownloader::new(auth_config.clone(), download_config, false)?;
             downloader.get_status().await
         } else {
             Ok(DownloadStatus::NotStarted)

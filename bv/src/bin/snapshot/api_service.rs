@@ -3,7 +3,7 @@ use base64::Engine;
 use blockvisord::services::api::{common, pb};
 use blockvisord::services::{ApiInterceptor, AuthToken, DEFAULT_API_REQUEST_TIMEOUT};
 use bv_utils::rpc::DefaultTimeout;
-use eyre::{anyhow, bail, Result};
+use eyre::{anyhow, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,12 +14,14 @@ use tracing::{debug, error, info, warn};
 
 #[derive(Debug, Deserialize)]
 struct JwtClaims {
+    #[allow(dead_code)]
     org_id: Option<String>,
     // Add other fields as needed, but we only need org_id for now
 }
 
 pub struct ApiService {
     config: Arc<Mutex<SnapshotConfig>>,
+    #[allow(dead_code)]
     protocol_resolver: ProtocolResolver,
 }
 
@@ -105,6 +107,7 @@ impl ApiService {
     }
 
     /// Keeping the old discovery as a fallback method (can be removed later)
+    #[allow(dead_code)]
     async fn discover_snapshots_fallback(&self) -> Result<Vec<ProtocolGroup>> {
         let mut protocol_groups: HashMap<String, ProtocolGroup> = HashMap::new();
 
@@ -531,6 +534,7 @@ impl ApiService {
     }
 
     /// Generate potential store keys from a variant name
+    #[allow(dead_code)]
     fn generate_store_keys_from_variant(&self, protocol: &str, variant: &str) -> Vec<String> {
         let mut keys = Vec::new();
 
@@ -563,6 +567,7 @@ impl ApiService {
     }
 
     /// Extract org_id from JWT token without verification (for client use only)
+    #[allow(dead_code)]
     async fn get_org_id_from_token(&self) -> Option<String> {
         let config = self.config.lock().await;
         let token = config.token.clone();
@@ -661,6 +666,7 @@ impl ApiService {
         Ok(())
     }
 
+    #[allow(dead_code)]
     async fn list_protocols(&self) -> Result<Vec<pb::Protocol>> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
@@ -698,6 +704,7 @@ impl ApiService {
         }).await
     }
 
+    #[allow(dead_code)]
     async fn list_variants(&self, protocol_id: &str) -> Result<Vec<String>> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
@@ -735,6 +742,7 @@ impl ApiService {
         }).await
     }
 
+    #[allow(dead_code)]
     async fn get_image(&self, version_key: &common::ProtocolVersionKey) -> Result<pb::Image> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();
@@ -858,6 +866,7 @@ impl ApiService {
     }
 
     /// R4.2: Discover client archives for an image using the new multi-client API
+    #[allow(dead_code)]
     pub async fn discover_client_archives(&self, image_id: &str) -> Result<Vec<pb::ClientArchive>> {
         let config = self.config.lock().await;
         let api_url = config.api_url.clone();

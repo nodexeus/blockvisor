@@ -7,6 +7,17 @@ use std::{
     time::SystemTime,
 };
 
+/// Progress state for persistence and status reporting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgressState {
+    pub start_time: SystemTime,
+    pub chunks_completed: u32,
+    pub total_chunks: u32,
+    pub bytes_written: u64,
+    pub total_bytes: u64,
+    pub last_update: SystemTime,
+}
+
 /// S3 configuration for accessing snapshots
 #[derive(Debug, Clone)]
 pub struct S3Config {
@@ -54,7 +65,7 @@ pub struct ListFilter {
 }
 
 /// Configuration for snapshot downloads
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DownloadConfig {
     /// Number of concurrent worker tasks for processing chunks
     /// Each worker handles the complete processing of a chunk (download, decompress, write)
@@ -111,6 +122,7 @@ impl DownloadConfig {
     }
     
     /// Create a new DownloadConfig with validation
+    #[allow(dead_code)]
     pub fn new(workers: usize, max_connections: usize, output_dir: PathBuf) -> Result<Self> {
         let config = Self {
             workers,
@@ -137,6 +149,7 @@ pub struct DownloadInfo {
     pub protocol: String,
     pub client: String,
     pub network: String,
+    #[allow(dead_code)]
     pub node_type: String,
     pub version: u64,
     pub archive_id: String,

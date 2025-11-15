@@ -61,6 +61,9 @@ enum Commands {
         /// Show what would be downloaded without actually downloading
         #[arg(long)]
         dry_run: bool,
+        /// Run download in background (daemon mode)
+        #[arg(short = 'd', long)]
+        daemon: bool,
     },
     /// Resume an interrupted download
     Resume {
@@ -117,6 +120,7 @@ async fn main() -> Result<()> {
             workers,
             max_connections,
             dry_run,
+            daemon,
         } => {
             handle_download_command(
                 protocol,
@@ -127,6 +131,7 @@ async fn main() -> Result<()> {
                 workers,
                 max_connections,
                 dry_run,
+                daemon,
             )
             .await
         }
@@ -193,6 +198,7 @@ async fn handle_download_command(
     workers: usize,
     max_connections: usize,
     dry_run: bool,
+    daemon: bool,
 ) -> Result<()> {
     let snapshot_client = SnapshotClient::new().await?;
 
@@ -279,18 +285,66 @@ async fn handle_download_command(
         return Ok(());
     }
 
-    snapshot_client
+    // Handle daemon mode
+    if daemon {
+        use snapshot::daemon::{daemonize, DaemonConfig, DaemonState, setup_signal_handlers};
+
+        let daemon_config = DaemonConfig::new(download_config.output_dir.clone());
+        
+        // Daemonize the process
+        match daemonize(&daemon_config) {
+            Ok(_) => {
+                // We're now in the child process
+                // Set up signal handlers for graceful shutdown
+                setup_signal_handlers(
+                    daemon_config.pid_file.clone(),
+                    daemon_config.working_dir.clone(),
+                );
+
+                // Save daemon state
+                let daemon_state = DaemonState::new(
+                    std::process::id(),
+                    protocol.clone(),
+                    client.clone(),
+                    network.clone(),
+                    download_config.output_dir.clone(),
+                );
+                daemon_state.save(&download_config.output_dir)?;
+
+                // Log that we're starting
+                println!("Starting download in daemon mode (PID: {})", std::process::id());
+                println!("Log file: {:?}", daemon_config.log_file);
+            }
+            Err(e) => {
+                eprintln!("Failed to daemonize: {}", e);
+                eprintln!("Falling back to foreground execution");
+            }
+        }
+    }
+
+    // Execute download and ensure cleanup happens on completion or error
+    let download_result = snapshot_client
         .download_snapshot(
             &protocol,
             &client,
             &network,
             &actual_node_type,
             None,
-            download_config,
+            download_config.clone(),
+            daemon,
         )
-        .await?;
+        .await;
 
-    Ok(())
+    // Clean up daemon state on completion (success or failure)
+    if daemon {
+        use snapshot::daemon::{cleanup_pid_file, DaemonConfig, DaemonState};
+        let daemon_config = DaemonConfig::new(download_config.output_dir.clone());
+        let _ = cleanup_pid_file(&daemon_config.pid_file);
+        let _ = DaemonState::remove(&download_config.output_dir);
+    }
+
+    // Return the download result
+    download_result
 }
 
 async fn handle_resume_command(output: PathBuf) -> Result<()> {
@@ -300,7 +354,41 @@ async fn handle_resume_command(output: PathBuf) -> Result<()> {
 }
 
 async fn handle_status_command(output: Option<PathBuf>) -> Result<()> {
+    use snapshot::daemon::{DaemonState, is_process_running, read_pid_file, DaemonConfig};
+    
     let snapshot_client = SnapshotClient::new().await?;
+    
+    // Check for daemon state if output directory is provided
+    if let Some(ref output_dir) = output {
+        // Check if there's a daemon running
+        let daemon_config = DaemonConfig::new(output_dir.clone());
+        
+        if let Some(pid) = read_pid_file(&daemon_config.pid_file)? {
+            if is_process_running(pid) {
+                println!("Daemon status: Running (PID: {})", pid);
+                
+                // Load daemon state if available
+                if let Some(daemon_state) = DaemonState::load(output_dir)? {
+                    println!("Protocol: {}/{}/{}", 
+                        daemon_state.protocol, 
+                        daemon_state.client, 
+                        daemon_state.network
+                    );
+                    
+                    let elapsed = daemon_state.start_time.elapsed()
+                        .unwrap_or(std::time::Duration::from_secs(0));
+                    println!("Running for: {} seconds", elapsed.as_secs());
+                }
+                
+                println!("Log file: {:?}", daemon_config.log_file);
+                println!();
+            } else {
+                println!("Warning: Stale PID file found (process {} not running)", pid);
+                println!();
+            }
+        }
+    }
+    
     let status = snapshot_client.get_status(output).await?;
     print_status(&status)?;
     Ok(())

@@ -5,6 +5,8 @@ use eyre::{anyhow, Context, Result};
 use reqwest::Client;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
+use std::io::{self, Write};
 use tokio::{
     fs,
     io::{AsyncSeekExt, AsyncWriteExt},
@@ -14,20 +16,24 @@ use tracing::{info, warn, debug, error};
 
 const PROGRESS_FILENAME: &str = "download_progress.json";
 const METADATA_FILENAME: &str = "download_metadata.json";
+const PROGRESS_STATE_FILENAME: &str = "progress.json";
 
 /// Validation errors for chunk processing
 #[derive(Debug, thiserror::Error)]
 pub enum ValidationError {
+    #[allow(dead_code)]
     #[error("Incomplete chunk consumption: {remaining} bytes remaining")]
     IncompleteConsumption { remaining: usize },
     #[error("Size mismatch: expected {expected} bytes, got {actual} bytes")]
     SizeMismatch { expected: u64, actual: u64 },
     #[error("Destination overlap detected in chunk {chunk_idx}: destinations {dest1} and {dest2} overlap")]
     DestinationOverlap { chunk_idx: u32, dest1: usize, dest2: usize },
+    #[allow(dead_code)]
     #[error("Invalid destination size: destination {dest_idx} has zero size_bytes")]
     InvalidDestinationSize { dest_idx: usize },
     #[error("Checksum verification failed for chunk {chunk_idx}: expected {expected:?}, got {actual:?}")]
     ChecksumMismatch { chunk_idx: u32, expected: String, actual: String },
+    #[allow(dead_code)]
     #[error("Unsupported checksum type for chunk {chunk_idx}")]
     UnsupportedChecksum { chunk_idx: u32 },
     #[error("Invalid destination path '{path}': {reason}")]
@@ -41,9 +47,12 @@ pub enum ValidationError {
 /// Information about a destination write operation
 #[derive(Debug, Clone)]
 pub struct DestinationWrite {
+    #[allow(dead_code)]
     pub file_path: String,
+    #[allow(dead_code)]
     pub position_bytes: u64,
     pub size_bytes: u64,
+    #[allow(dead_code)]
     pub offset_in_chunk: usize,
 }
 
@@ -97,11 +106,260 @@ impl DownloadProgressTracker {
         );
     }
     
+    #[allow(dead_code)]
     pub fn get_inflation_ratio(&self) -> f64 {
         if self.expected_total_size > 0 {
             self.total_bytes_written as f64 / self.expected_total_size as f64
         } else {
             0.0
+        }
+    }
+}
+
+/// Progress reporter for real-time download progress output
+pub struct ProgressReporter {
+    start_time: Instant,
+    last_update: Instant,
+    update_interval: Duration,
+    tracker: Arc<Mutex<DownloadProgressTracker>>,
+    is_tty: bool,
+    daemon_mode: bool,
+    log_file: Option<PathBuf>,
+}
+
+impl ProgressReporter {
+    /// Create a new progress reporter
+    pub fn new(tracker: Arc<Mutex<DownloadProgressTracker>>) -> Self {
+        // Check if stdout is a TTY
+        let is_tty = atty::is(atty::Stream::Stdout);
+        
+        Self {
+            start_time: Instant::now(),
+            last_update: Instant::now(),
+            update_interval: Duration::from_secs(1),
+            tracker,
+            is_tty,
+            daemon_mode: false,
+            log_file: None,
+        }
+    }
+    
+    /// Create a new progress reporter for daemon mode
+    pub fn new_daemon(tracker: Arc<Mutex<DownloadProgressTracker>>, log_file: PathBuf) -> Self {
+        Self {
+            start_time: Instant::now(),
+            last_update: Instant::now(),
+            update_interval: Duration::from_secs(1),
+            tracker,
+            is_tty: false,
+            daemon_mode: true,
+            log_file: Some(log_file),
+        }
+    }
+    
+    /// Update progress display if enough time has passed
+    pub async fn update(&mut self) -> Result<()> {
+        let now = Instant::now();
+        if now.duration_since(self.last_update) < self.update_interval {
+            return Ok(());
+        }
+        
+        self.last_update = now;
+        self.display_progress().await?;
+        Ok(())
+    }
+    
+    /// Force display progress regardless of update interval
+    pub async fn force_update(&mut self) -> Result<()> {
+        self.last_update = Instant::now();
+        self.display_progress().await?;
+        Ok(())
+    }
+    
+    /// Display progress information to stdout
+    async fn display_progress(&self) -> Result<()> {
+        let tracker = self.tracker.lock().await;
+        let elapsed = self.start_time.elapsed();
+        
+        // Calculate progress percentage
+        let progress_percent = if tracker.total_chunks > 0 {
+            (tracker.chunks_processed as f64 / tracker.total_chunks as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        // Calculate download speed (bytes per second)
+        let speed_bps = if elapsed.as_secs() > 0 {
+            tracker.total_bytes_written as f64 / elapsed.as_secs_f64()
+        } else {
+            0.0
+        };
+        
+        // Calculate ETA
+        let remaining_bytes = tracker.expected_total_size.saturating_sub(tracker.total_bytes_written);
+        let eta_seconds = if speed_bps > 0.0 {
+            (remaining_bytes as f64 / speed_bps) as u64
+        } else {
+            0
+        };
+        
+        // Format the progress line
+        let progress_line = self.format_progress_line(
+            progress_percent,
+            tracker.total_bytes_written,
+            tracker.expected_total_size,
+            speed_bps,
+            eta_seconds,
+            tracker.chunks_processed,
+            tracker.total_chunks,
+        );
+        
+        // Output based on mode
+        if self.daemon_mode {
+            // Log to file in daemon mode
+            if let Some(log_file) = &self.log_file {
+                use std::fs::OpenOptions;
+                use std::io::Write;
+                
+                let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+                let log_line = format!("[{}] {}\n", timestamp, progress_line);
+                
+                if let Ok(mut file) = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(log_file)
+                {
+                    let _ = file.write_all(log_line.as_bytes());
+                }
+            }
+        } else if self.is_tty {
+            // Use ANSI escape codes for single-line updating
+            print!("\r\x1b[K{}", progress_line);
+            io::stdout().flush()?;
+        } else {
+            // Simple line-by-line output for non-TTY
+            println!("{}", progress_line);
+        }
+        
+        Ok(())
+    }
+    
+    /// Format progress information into a display string
+    fn format_progress_line(
+        &self,
+        progress_percent: f64,
+        downloaded_bytes: u64,
+        total_bytes: u64,
+        speed_bps: f64,
+        eta_seconds: u64,
+        chunks_complete: u32,
+        total_chunks: u32,
+    ) -> String {
+        // Format sizes in human-readable format
+        let downloaded_str = Self::format_bytes(downloaded_bytes);
+        let total_str = Self::format_bytes(total_bytes);
+        
+        // Format speed
+        let speed_str = Self::format_speed(speed_bps);
+        
+        // Format ETA
+        let eta_str = Self::format_duration(eta_seconds);
+        
+        // Create progress bar
+        let progress_bar = Self::create_progress_bar(progress_percent);
+        
+        format!(
+            "{} {:.1}% | {} / {} | {} | ETA: {} | Chunks: {}/{}",
+            progress_bar,
+            progress_percent,
+            downloaded_str,
+            total_str,
+            speed_str,
+            eta_str,
+            chunks_complete,
+            total_chunks
+        )
+    }
+    
+    /// Create a visual progress bar
+    fn create_progress_bar(percent: f64) -> String {
+        const BAR_WIDTH: usize = 20;
+        let filled = ((percent / 100.0) * BAR_WIDTH as f64) as usize;
+        let filled = filled.min(BAR_WIDTH);
+        
+        let mut bar = String::with_capacity(BAR_WIDTH + 2);
+        bar.push('[');
+        
+        for i in 0..BAR_WIDTH {
+            if i < filled {
+                bar.push('=');
+            } else if i == filled && filled < BAR_WIDTH {
+                bar.push('>');
+            } else {
+                bar.push(' ');
+            }
+        }
+        
+        bar.push(']');
+        bar
+    }
+    
+    /// Format bytes in human-readable format (GB, MB, KB)
+    fn format_bytes(bytes: u64) -> String {
+        const GB: f64 = 1024.0 * 1024.0 * 1024.0;
+        const MB: f64 = 1024.0 * 1024.0;
+        const KB: f64 = 1024.0;
+        
+        let bytes_f = bytes as f64;
+        
+        if bytes_f >= GB {
+            format!("{:.2} GB", bytes_f / GB)
+        } else if bytes_f >= MB {
+            format!("{:.1} MB", bytes_f / MB)
+        } else if bytes_f >= KB {
+            format!("{:.1} KB", bytes_f / KB)
+        } else {
+            format!("{} B", bytes)
+        }
+    }
+    
+    /// Format speed in human-readable format (MB/s, KB/s)
+    fn format_speed(bytes_per_second: f64) -> String {
+        const MB: f64 = 1024.0 * 1024.0;
+        const KB: f64 = 1024.0;
+        
+        if bytes_per_second >= MB {
+            format!("{:.1} MB/s", bytes_per_second / MB)
+        } else if bytes_per_second >= KB {
+            format!("{:.1} KB/s", bytes_per_second / KB)
+        } else {
+            format!("{:.0} B/s", bytes_per_second)
+        }
+    }
+    
+    /// Format duration in human-readable format (hours, minutes, seconds)
+    fn format_duration(seconds: u64) -> String {
+        if seconds == 0 {
+            return "calculating...".to_string();
+        }
+        
+        let hours = seconds / 3600;
+        let minutes = (seconds % 3600) / 60;
+        let secs = seconds % 60;
+        
+        if hours > 0 {
+            format!("{}h {}m", hours, minutes)
+        } else if minutes > 0 {
+            format!("{}m {}s", minutes, secs)
+        } else {
+            format!("{}s", secs)
+        }
+    }
+    
+    /// Print a final newline when progress is complete (for TTY mode)
+    pub fn finish(&self) {
+        if self.is_tty {
+            println!(); // Move to next line after progress bar
         }
     }
 }
@@ -507,10 +765,13 @@ pub struct ChunkProcessingError {
 
 #[derive(Debug, Clone)]
 pub enum ChunkErrorType {
+    #[allow(dead_code)]
     DownloadFailure,
+    #[allow(dead_code)]
     DecompressionFailure,
     ChecksumMismatch,
     ValidationFailure,
+    #[allow(dead_code)]
     FileWriteFailure,
     SecurityViolation,
 }
@@ -629,10 +890,16 @@ pub struct SnapshotDownloader {
     output_dir: PathBuf,
     workers: usize,
     max_connections: usize,
+    enable_progress: bool,
+    daemon_mode: bool,
 }
 
 impl SnapshotDownloader {
-    pub fn new(config: SnapshotConfig, download_config: DownloadConfig) -> Result<Self> {
+    pub fn new(config: SnapshotConfig, download_config: DownloadConfig, enable_progress: bool) -> Result<Self> {
+        Self::new_with_daemon(config, download_config, enable_progress, false)
+    }
+    
+    pub fn new_with_daemon(config: SnapshotConfig, download_config: DownloadConfig, enable_progress: bool, daemon_mode: bool) -> Result<Self> {
         // Validate download configuration
         download_config.validate().with_context(|| "Invalid download configuration")?;
         
@@ -649,6 +916,8 @@ impl SnapshotDownloader {
             output_dir: download_config.output_dir,
             workers: download_config.workers,
             max_connections: download_config.max_connections,
+            enable_progress,
+            daemon_mode,
         })
     }
 
@@ -691,6 +960,17 @@ impl SnapshotDownloader {
             message: "Starting download...".to_string(),
         };
         self.save_progress(&progress).await?;
+
+        // Initialize progress state
+        let progress_state = ProgressState {
+            start_time: SystemTime::now(),
+            chunks_completed: 0,
+            total_chunks: metadata.chunks,
+            bytes_written: 0,
+            total_bytes: metadata.total_size,
+            last_update: SystemTime::now(),
+        };
+        self.save_progress_state(&progress_state).await?;
 
         // Step 4: Download chunks progressively
         self.download_chunks(&metadata, archive_id).await?;
@@ -748,7 +1028,51 @@ impl SnapshotDownloader {
             serde_json::from_str(&metadata_content)
                 .with_context(|| "Failed to parse download metadata")?;
 
-        // Check progress
+        // Try to load progress state first (more accurate)
+        if let Ok(Some(state)) = self.load_progress_state().await {
+            if state.chunks_completed >= state.total_chunks {
+                return Ok(DownloadStatus::Completed);
+            }
+
+            let progress_percent = if state.total_chunks > 0 {
+                ((state.chunks_completed as f64 / state.total_chunks as f64) * 100.0) as u32
+            } else {
+                0
+            };
+
+            // Calculate speed based on elapsed time
+            let elapsed = SystemTime::now()
+                .duration_since(state.start_time)
+                .unwrap_or(std::time::Duration::from_secs(1));
+            
+            let speed_bps = if elapsed.as_secs() > 0 {
+                state.bytes_written as f64 / elapsed.as_secs_f64()
+            } else {
+                0.0
+            };
+
+            // Calculate ETA
+            let remaining_bytes = state.total_bytes.saturating_sub(state.bytes_written);
+            let eta_minutes = if speed_bps > 0.0 {
+                ((remaining_bytes as f64 / speed_bps) / 60.0) as u32
+            } else {
+                0
+            };
+
+            let speed_mbps = speed_bps / (1024.0 * 1024.0);
+
+            return Ok(DownloadStatus::InProgress {
+                progress_percent,
+                downloaded_bytes: state.bytes_written,
+                total_bytes: state.total_bytes,
+                speed_mbps,
+                eta_minutes,
+                chunks_complete: state.chunks_completed,
+                total_chunks: state.total_chunks,
+            });
+        }
+
+        // Fallback to old progress file
         if progress_path.exists() {
             let progress_content = fs::read_to_string(&progress_path)
                 .await
@@ -901,6 +1225,18 @@ impl SnapshotDownloader {
             metadata.total_size,
         )));
         
+        // Initialize progress reporter if enabled
+        let progress_reporter = if self.enable_progress {
+            if self.daemon_mode {
+                let log_file = self.output_dir.join(".snapper").join("snapper.log");
+                Some(Arc::new(Mutex::new(ProgressReporter::new_daemon(progress_tracker.clone(), log_file))))
+            } else {
+                Some(Arc::new(Mutex::new(ProgressReporter::new(progress_tracker.clone()))))
+            }
+        } else {
+            None
+        };
+        
         // Initialize size monitor
         let size_monitor = Arc::new(Mutex::new(SizeMonitor::new(
             self.output_dir.clone(),
@@ -939,6 +1275,7 @@ impl SnapshotDownloader {
             let compression = metadata.compression.clone();
             let progress_tracker = progress_tracker.clone();
             let size_monitor = size_monitor.clone();
+            let progress_reporter = progress_reporter.clone();
 
             let handle = tokio::spawn(async move {
                 let _worker_permit = worker_semaphore.acquire().await?;
@@ -1130,6 +1467,14 @@ impl SnapshotDownloader {
                     tracker.update_chunk_processed(decompressed_data.len() as u64);
                 }
                 
+                // Update progress reporter if enabled
+                if let Some(reporter) = &progress_reporter {
+                    let mut reporter = reporter.lock().await;
+                    reporter.update().await.unwrap_or_else(|e| {
+                        debug!("Failed to update progress reporter: {}", e);
+                    });
+                }
+                
                 // Update size monitor and check for warnings
                 {
                     let mut monitor = size_monitor.lock().await;
@@ -1184,11 +1529,39 @@ impl SnapshotDownloader {
             };
             self.save_progress(&progress).await?;
             
+            // Save progress state for status reporting
+            let tracker = progress_tracker.lock().await;
+            let progress_state = ProgressState {
+                start_time: SystemTime::now() - std::time::Duration::from_secs(
+                    if let Some(reporter) = &progress_reporter {
+                        reporter.lock().await.start_time.elapsed().as_secs()
+                    } else {
+                        0
+                    }
+                ),
+                chunks_completed: tracker.chunks_processed,
+                total_chunks: tracker.total_chunks,
+                bytes_written: tracker.total_bytes_written,
+                total_bytes: tracker.expected_total_size,
+                last_update: SystemTime::now(),
+            };
+            drop(tracker);
+            self.save_progress_state(&progress_state).await?;
+            
             info!("Completed batch: chunks {}-{} ({}/{} total chunks)", 
                   start_chunk + batch_start as u32, 
                   start_chunk + batch_end as u32 - 1,
                   completed_chunks,
                   metadata.chunks);
+        }
+        
+        // Final progress update and finish
+        if let Some(reporter) = &progress_reporter {
+            let mut reporter = reporter.lock().await;
+            reporter.force_update().await.unwrap_or_else(|e| {
+                debug!("Failed to update progress reporter: {}", e);
+            });
+            reporter.finish();
         }
         
         info!("Successfully downloaded all chunks in range {}-{}", start_chunk, end_chunk - 1);
@@ -1219,15 +1592,52 @@ impl SnapshotDownloader {
         Ok(())
     }
 
+    async fn save_progress_state(&self, state: &ProgressState) -> Result<()> {
+        let metadata_dir = self.output_dir.join(".snapper");
+        fs::create_dir_all(&metadata_dir)
+            .await
+            .with_context(|| "Failed to create metadata directory")?;
+
+        let state_path = metadata_dir.join(PROGRESS_STATE_FILENAME);
+        let content = serde_json::to_string_pretty(state)?;
+
+        fs::write(&state_path, content)
+            .await
+            .with_context(|| "Failed to save progress state")?;
+
+        Ok(())
+    }
+
+    async fn load_progress_state(&self) -> Result<Option<ProgressState>> {
+        let state_path = self.output_dir.join(".snapper").join(PROGRESS_STATE_FILENAME);
+        
+        if !state_path.exists() {
+            return Ok(None);
+        }
+
+        let content = fs::read_to_string(&state_path)
+            .await
+            .with_context(|| "Failed to read progress state")?;
+
+        let state: ProgressState = serde_json::from_str(&content)
+            .with_context(|| "Failed to parse progress state")?;
+
+        Ok(Some(state))
+    }
+
     async fn cleanup_metadata(&self) -> Result<()> {
         let metadata_path = self.output_dir.join(METADATA_FILENAME);
         let progress_path = self.output_dir.join(PROGRESS_FILENAME);
+        let state_path = self.output_dir.join(".snapper").join(PROGRESS_STATE_FILENAME);
 
         if metadata_path.exists() {
             fs::remove_file(&metadata_path).await.ok();
         }
         if progress_path.exists() {
             fs::remove_file(&progress_path).await.ok();
+        }
+        if state_path.exists() {
+            fs::remove_file(&state_path).await.ok();
         }
 
         Ok(())
@@ -1256,7 +1666,7 @@ mod tests {
             output_dir,
         };
 
-        let downloader = SnapshotDownloader::new(config, download_config)?;
+        let downloader = SnapshotDownloader::new(config, download_config, false)?;
 
         // Test that the downloader was created successfully
         assert!(downloader.output_dir.exists());
@@ -1283,7 +1693,7 @@ mod tests {
             output_dir,
         };
 
-        let downloader = SnapshotDownloader::new(config, download_config)?;
+        let downloader = SnapshotDownloader::new(config, download_config, false)?;
         let status = downloader.get_status().await?;
 
         matches!(status, DownloadStatus::NotStarted);
