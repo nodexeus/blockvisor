@@ -223,25 +223,89 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Downloader<C> {
     }
 
     fn unify_file_times(&self, chunks: &[Chunk]) -> Result<()> {
+        const BATCH_SIZE: usize = 50;  // Process 50 files at a time
+        
         let now = std::time::SystemTime::now();
         let times = fs::FileTimes::new().set_accessed(now).set_modified(now);
-        let paths = chunks
+        
+        // Collect all unique file paths into a Vec
+        let paths: Vec<&PathBuf> = chunks
             .iter()
             .fold(HashSet::new(), |paths, chunk| {
                 chunk.destinations.iter().fold(paths, |mut paths, dest| {
                     paths.insert(&dest.path);
                     paths
                 })
-            });
-        for path in paths {
-            let full_path = self.destination_dir.join(path);
-            let file = File::options()
-                .write(true)
-                .open(&full_path)
-                .with_context(|| format!("can't open `{}` to change times", full_path.display()))?;
-            file.set_times(times)
-                .with_context(|| format!("can't set times for `{}`", full_path.display()))?;
+            })
+            .into_iter()
+            .collect();
+        
+        let total_files = paths.len();
+        let mut updated_count = 0;
+        let mut skipped_count = 0;
+        
+        // Process files in batches
+        for (batch_idx, batch) in paths.chunks(BATCH_SIZE).enumerate() {
+            tracing::debug!(
+                "Unifying file times: batch {}/{} ({} files)",
+                batch_idx + 1,
+                (total_files + BATCH_SIZE - 1) / BATCH_SIZE,
+                batch.len()
+            );
+            
+            for path in batch {
+                let full_path = self.destination_dir.join(path);
+                
+                // Check if file exists before trying to open
+                if !full_path.exists() {
+                    tracing::warn!(
+                        "Skipping time unification for non-existent file: {}",
+                        full_path.display()
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+                
+                match File::options().write(true).open(&full_path) {
+                    Ok(file) => {
+                        if let Err(e) = file.set_times(times) {
+                            tracing::warn!(
+                                "Failed to set times for {}: {}",
+                                full_path.display(),
+                                e
+                            );
+                            skipped_count += 1;
+                        } else {
+                            updated_count += 1;
+                        }
+                        // Explicitly drop to release FD immediately
+                        drop(file);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to open {} for time unification: {}",
+                            full_path.display(),
+                            e
+                        );
+                        skipped_count += 1;
+                    }
+                }
+            }
+            
+            // Small delay between batches to allow OS to release FDs
+            // Only needed if we're processing many batches
+            if batch_idx % 10 == 9 && batch_idx < (total_files + BATCH_SIZE - 1) / BATCH_SIZE - 1 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
         }
+        
+        tracing::info!(
+            "File time unification complete: {} updated, {} skipped, {} total",
+            updated_count,
+            skipped_count,
+            total_files
+        );
+        
         Ok(())
     }
 }
@@ -261,8 +325,28 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C
         connector: C,
         store_key: String,
         destination_dir: PathBuf,
-        config: TransferConfig,
+        mut config: TransferConfig,
+        client_name: String,
     ) -> Self {
+        // Create client-specific metadata directory
+        // e.g., /blockjoy/protocol_data/.babel/lighthouse/
+        let client_meta_dir = config.archive_jobs_meta_dir.join(&client_name);
+        
+        // Create the directory if it doesn't exist
+        if !client_meta_dir.exists() {
+            if let Err(e) = std::fs::create_dir_all(&client_meta_dir) {
+                tracing::warn!(
+                    "Failed to create client metadata directory {}: {}",
+                    client_meta_dir.display(),
+                    e
+                );
+            }
+        }
+        
+        // Override config with client-specific paths
+        config.archive_jobs_meta_dir = client_meta_dir.clone();
+        config.progress_file_path = client_meta_dir.join("download.progress");
+        
         Self {
             connector,
             store_key,
@@ -336,25 +420,89 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C
 
     /// Update all downloaded files times with the same value.
     fn unify_file_times(&self, downloaded_chunks: &[Chunk]) -> Result<()> {
+        const BATCH_SIZE: usize = 50;  // Process 50 files at a time
+        
         let now = std::time::SystemTime::now();
         let times = fs::FileTimes::new().set_accessed(now).set_modified(now);
-        let paths = downloaded_chunks
+        
+        // Collect all unique file paths into a Vec
+        let paths: Vec<&PathBuf> = downloaded_chunks
             .iter()
             .fold(HashSet::new(), |paths, chunk| {
                 chunk.destinations.iter().fold(paths, |mut paths, dest| {
                     paths.insert(&dest.path);
                     paths
                 })
-            });
-        for path in paths {
-            let full_path = self.destination_dir.join(path);
-            let file = File::options()
-                .write(true)
-                .open(&full_path)
-                .with_context(|| format!("can't open `{}` to change times", full_path.display()))?;
-            file.set_times(times)
-                .with_context(|| format!("can't set times for `{}`", full_path.display()))?;
+            })
+            .into_iter()
+            .collect();
+        
+        let total_files = paths.len();
+        let mut updated_count = 0;
+        let mut skipped_count = 0;
+        
+        // Process files in batches
+        for (batch_idx, batch) in paths.chunks(BATCH_SIZE).enumerate() {
+            tracing::debug!(
+                "Unifying file times: batch {}/{} ({} files)",
+                batch_idx + 1,
+                (total_files + BATCH_SIZE - 1) / BATCH_SIZE,
+                batch.len()
+            );
+            
+            for path in batch {
+                let full_path = self.destination_dir.join(path);
+                
+                // Check if file exists before trying to open
+                if !full_path.exists() {
+                    tracing::warn!(
+                        "Skipping time unification for non-existent file: {}",
+                        full_path.display()
+                    );
+                    skipped_count += 1;
+                    continue;
+                }
+                
+                match File::options().write(true).open(&full_path) {
+                    Ok(file) => {
+                        if let Err(e) = file.set_times(times) {
+                            tracing::warn!(
+                                "Failed to set times for {}: {}",
+                                full_path.display(),
+                                e
+                            );
+                            skipped_count += 1;
+                        } else {
+                            updated_count += 1;
+                        }
+                        // Explicitly drop to release FD immediately
+                        drop(file);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to open {} for time unification: {}",
+                            full_path.display(),
+                            e
+                        );
+                        skipped_count += 1;
+                    }
+                }
+            }
+            
+            // Small delay between batches to allow OS to release FDs
+            // Only needed if we're processing many batches
+            if batch_idx % 10 == 9 && batch_idx < (total_files + BATCH_SIZE - 1) / BATCH_SIZE - 1 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
         }
+        
+        tracing::info!(
+            "File time unification complete: {} updated, {} skipped, {} total",
+            updated_count,
+            skipped_count,
+            total_files
+        );
+        
         Ok(())
     }
 }
@@ -435,9 +583,10 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
             let job_name = format!("download_{}", client.client_name);  // R3.1: Named jobs
             let downloader = ClientDownloader::new(
                 connector.clone(),
-                client.store_key,           // R3.2: Use store_key for client-specific downloads
+                client.store_key.clone(),   // R3.2: Use store_key for client-specific downloads
                 client.data_directory,      // R3.2: Client-specific directory
                 config.clone(),
+                client.client_name,         // Pass client_name
             );
             (job_name, downloader)
         }).collect()
@@ -513,6 +662,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                 client.store_key.clone(),
                 client.data_directory.clone(),
                 self.config.clone(),
+                client.client_name.clone(),  // Pass client_name
             );
             
             let client_name = client.client_name.clone();
