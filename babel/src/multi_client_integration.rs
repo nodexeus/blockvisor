@@ -156,7 +156,7 @@ pub async fn execute_multi_client_download<C: BabelEngineConnector + Clone + Sen
           clients.len(), 
           clients.iter().map(|c| &c.client_name).collect::<Vec<_>>());
     
-    let mut multi_downloader = MultiClientDownloader::new(connector, config);
+    let mut multi_downloader = MultiClientDownloader::new(connector, config, clients.clone());
     
     multi_downloader.download_all_clients(clients, run).await
 }

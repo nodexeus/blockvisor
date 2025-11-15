@@ -278,17 +278,6 @@ pub async fn run_job(
                 return Err(eyre::anyhow!("Multi-client download requires plugin configuration at {}", plugin_config_path.display()).into());
             };
             
-            let mut multi_downloader = MultiClientDownloader::new(
-                connector,
-                build_transfer_config(
-                    babel_config.node_env.data_mount_point.clone(),
-                    job_dir.join(jobs::PROGRESS_FILENAME),
-                    None,
-                    max_connections.unwrap_or(DEFAULT_MAX_DOWNLOAD_CONNECTIONS),
-                    max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
-                )?,
-            );
-            
             // Extract downloadable clients from plugin config
             let clients = crate::multi_client_integration::get_downloadable_clients(
                 &plugin_config, 
@@ -305,34 +294,24 @@ pub async fn run_job(
                     &jobs::JOBS_DIR,
                 ).await;
             } else {
-                // Use a simple async block to run the multi-client download
-                let download_result = {
-                    let run_flag = run.clone();
-                    multi_downloader.download_all_clients(clients, run_flag).await
-                };
-                
-                match download_result {
-                    Ok(_) => {
-                        save_job_status(
-                            &JobStatus::Finished {
-                                exit_code: Some(0),
-                                message: "Multi-client download completed successfully".to_string(),
-                            },
-                            &job_name,
-                            &jobs::JOBS_DIR,
-                        ).await;
-                    }
-                    Err(err) => {
-                        save_job_status(
-                            &JobStatus::Finished {
-                                exit_code: Some(-1),
-                                message: format!("Multi-client download failed: {:#}", err),
-                            },
-                            &job_name,
-                            &jobs::JOBS_DIR,
-                        ).await;
-                    }
-                }
+                // Wrap MultiClientDownloader in ArchiveJobRunner for retry logic
+                ArchiveJobRunner::new(
+                    bv_utils::timer::SysTimer,
+                    job_config.restart,
+                    MultiClientDownloader::new(
+                        connector,
+                        build_transfer_config(
+                            babel_config.node_env.data_mount_point.clone(),
+                            job_dir.join(jobs::PROGRESS_FILENAME),
+                            None,
+                            max_connections.unwrap_or(DEFAULT_MAX_DOWNLOAD_CONNECTIONS),
+                            max_runners.unwrap_or(DEFAULT_MAX_RUNNERS),
+                        )?,
+                        clients,
+                    ),
+                )
+                .run(run, &job_name, &jobs::JOBS_DIR)
+                .await;
             }
         }
     }

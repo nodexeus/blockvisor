@@ -417,11 +417,12 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for ClientD
 pub struct MultiClientDownloader<C> {
     connector: C,
     config: TransferConfig,
+    clients: Vec<ClientDownloadConfig>,
 }
 
 impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloader<C> {
-    pub fn new(connector: C, config: TransferConfig) -> Self {
-        Self { connector, config }
+    pub fn new(connector: C, config: TransferConfig, clients: Vec<ClientDownloadConfig>) -> Self {
+        Self { connector, config, clients }
     }
 
     /// R3.1: Create separate download jobs for each required client
@@ -471,6 +472,38 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     /// R3.1: Download all clients in parallel
     /// Downloads available datasets for each client. If a dataset is not available (404),
     /// it logs a warning and continues with other clients instead of failing.
+    ///
+    /// # Error Classification Strategy (Requirements 3.1, 3.2, 3.4)
+    ///
+    /// This method implements a three-tier error classification system:
+    ///
+    /// ## 1. Skippable Errors (Not Found) - Requirement 3.1
+    /// These indicate a client dataset doesn't exist and should be skipped without counting as failures:
+    /// - HTTP 404 Not Found
+    /// - gRPC NotFound status
+    /// - Error messages containing "not found" or "get_download_metadata_for_store_key"
+    /// **Action**: Log warning, increment skipped_downloads, continue with other clients
+    ///
+    /// ## 2. Transient Errors (Retryable) - Requirement 3.2
+    /// Temporary failures that may succeed on retry (handled by ArchiveJobRunner):
+    /// - HTTP 500 Internal Server Error
+    /// - HTTP 502 Bad Gateway
+    /// - HTTP 503 Service Unavailable
+    /// - Network timeouts
+    /// - Connection errors
+    /// **Action**: Add to failed_downloads, propagate error to trigger job-level retry
+    ///
+    /// ## 3. Permanent Errors (Non-Retryable) - Requirement 3.4
+    /// Failures that won't succeed on retry:
+    /// - HTTP 403 Forbidden
+    /// - Checksum mismatch
+    /// - Invalid manifest
+    /// - Disk space errors
+    /// **Action**: Add to failed_downloads, propagate error (ArchiveJobRunner will fail immediately)
+    ///
+    /// The error classification is done by string matching on the error message. All non-404 errors
+    /// are treated as failures and propagated to the ArchiveJobRunner, which will apply the
+    /// RestartPolicy to determine whether to retry (transient) or fail immediately (permanent).
     pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
         let mut download_futures = FuturesUnordered::new();
         
@@ -503,8 +536,14 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                     successful_downloads += 1;
                 }
                 Err(err) => {
-                    // Check if this is a "not found" error (dataset doesn't exist)
-                    // Look for both the error message and check if it's a tonic Status error
+                    // ERROR CLASSIFICATION: Determine if this is a skippable "not found" error
+                    // or a real failure that should trigger job retry (Requirement 3.1)
+                    //
+                    // We check for multiple patterns to catch different error representations:
+                    // - "NotFound": gRPC status code
+                    // - "not found": HTTP error messages
+                    // - "404": HTTP status code
+                    // - "get_download_metadata_for_store_key": Specific RPC method that returns NotFound
                     let err_string = format!("{:#}", err);
                     let is_not_found = err_string.contains("NotFound") 
                         || err_string.contains("not found") 
@@ -512,13 +551,20 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                         || err_string.contains("get_download_metadata_for_store_key");
                     
                     if is_not_found {
+                        // SKIPPABLE ERROR: Dataset doesn't exist for this client (Requirement 3.1)
+                        // This is expected behavior - not all protocols have snapshots for all clients.
+                        // The client will start without snapshot data and sync from genesis or peers.
                         tracing::warn!(
                             "Client '{}' dataset not available (store_key: {}). Client will start without snapshot data.",
                             client_name, store_key
                         );
                         skipped_downloads += 1;
                     } else {
-                        // This is a real error (network issue, permission, etc.)
+                        // FAILURE ERROR: Real error that should trigger retry (Requirements 3.2, 3.4)
+                        // This includes:
+                        // - Transient errors (500, timeouts, connection errors) - will be retried by ArchiveJobRunner
+                        // - Permanent errors (403, checksum mismatch) - will fail immediately
+                        // The ArchiveJobRunner will determine retry behavior based on RestartPolicy
                         tracing::error!("Client '{}' download failed: {:#}", client_name, err);
                         failed_downloads.push((client_name.clone(), err));
                     }
@@ -532,6 +578,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
         );
         
         // Only fail if there were actual errors (not just missing datasets)
+        // This error will be caught by ArchiveJobRunner which will apply the RestartPolicy
         if !failed_downloads.is_empty() {
             let error_summary = failed_downloads
                 .iter()
@@ -547,10 +594,10 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
 
 #[async_trait]
 impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for MultiClientDownloader<C> {
-    async fn run(&mut self, _run: RunFlag) -> Result<()> {
-        // This would need to be called from the main job runner with the parsed plugin config
-        // For now, we'll return an error since we need the plugin config to determine clients
-        bail!("MultiClientDownloader::run() should not be called directly. Use download_all_clients() instead.")
+    async fn run(&mut self, run: RunFlag) -> Result<()> {
+        // Call download_all_clients with stored clients and run flag
+        // Return result directly - ArchiveJobRunner will handle status and retries
+        self.download_all_clients(self.clients.clone(), run).await
     }
 }
 
