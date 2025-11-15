@@ -99,13 +99,14 @@ jobs:
         #   bucket: ${{ vars.BIN_BUCKET }}
         #   file: /tmp/bvup
         #   destination: ${{ steps.get_version.outputs.VERSION }}/bvup
+        
         uses: yamatt/backblaze-b2-upload-action@v7
         with:
           key_id: ${{ secrets.S3_KEY_ID }}
           application_key: ${{ secrets.S3_SECRET_KEY }}
           bucket_name: ${{ vars.BIN_BUCKET }}
-          file: /tmp/bvup
-          destination: ${{ steps.get_version.outputs.VERSION }}/bvup
+          file_path: /tmp/snapper
+          remote_path: ${{ needs.build.outputs.version }}/snapper
       
       - name: Upload snapper to bins bucket
         # uses: magicwallet/r2-upload@main
@@ -116,13 +117,15 @@ jobs:
         #   bucket: ${{ vars.BIN_BUCKET }}
         #   file: /tmp/snapper
         #   destination: ${{ steps.get_version.outputs.VERSION }}/snapper
+        
         uses: yamatt/backblaze-b2-upload-action@v7
         with:
           key_id: ${{ secrets.S3_KEY_ID }}
           application_key: ${{ secrets.S3_SECRET_KEY }}
           bucket_name: ${{ vars.BIN_BUCKET }}
-          file: /tmp/snapper
-          destination: ${{ steps.get_version.outputs.VERSION }}/snapper
+          file_path: /tmp/snapper
+          remote_path: ${{ needs.build.outputs.version }}/snapper
+
 
   deploy-dev:
     name: Deploy to Dev
