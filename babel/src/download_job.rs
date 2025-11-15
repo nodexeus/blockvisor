@@ -573,6 +573,47 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
         Self { connector, config, clients }
     }
 
+    /// Aggregate progress from all client-specific progress files and write to main progress file
+    fn aggregate_progress(&self) -> Result<()> {
+        let mut total_chunks = 0u32;
+        let mut completed_chunks = 0u32;
+        let mut active_clients = 0;
+        
+        // Read progress from each client's subdirectory
+        if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    // Only process subdirectories (client directories)
+                    if path.is_dir() {
+                        let client_progress_path = path.join("download.progress");
+                        if client_progress_path.exists() {
+                            if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
+                                total_chunks += progress.total;
+                                completed_chunks += progress.current;
+                                active_clients += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Write aggregated progress to main progress file
+        if active_clients > 0 {
+            save_job_data(
+                &self.config.progress_file_path,
+                &JobProgress {
+                    total: total_chunks,
+                    current: completed_chunks,
+                    message: format!("chunks ({} clients)", active_clients),
+                },
+            )?;
+        }
+        
+        Ok(())
+    }
+
     /// R3.1: Create separate download jobs for each required client
     pub fn create_multi_client_jobs(
         connector: C, 
@@ -654,6 +695,11 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     /// are treated as failures and propagated to the ArchiveJobRunner, which will apply the
     /// RestartPolicy to determine whether to retry (transient) or fail immediately (permanent).
     pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
+        // Aggregate initial progress (handles resume scenarios)
+        if let Err(e) = self.aggregate_progress() {
+            tracing::warn!("Failed to aggregate initial progress: {:#}", e);
+        }
+        
         let mut download_futures = FuturesUnordered::new();
         
         for client in clients {
@@ -720,12 +766,22 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                     }
                 }
             }
+            
+            // Aggregate progress after each client completes (success or failure)
+            if let Err(e) = self.aggregate_progress() {
+                tracing::warn!("Failed to aggregate progress: {:#}", e);
+            }
         }
         
         tracing::info!(
             "Multi-client download summary: {} successful, {} skipped (not available), {} failed",
             successful_downloads, skipped_downloads, failed_downloads.len()
         );
+        
+        // Final progress aggregation
+        if let Err(e) = self.aggregate_progress() {
+            tracing::warn!("Failed to aggregate final progress: {:#}", e);
+        }
         
         // Only fail if there were actual errors (not just missing datasets)
         // This error will be caught by ArchiveJobRunner which will apply the RestartPolicy
