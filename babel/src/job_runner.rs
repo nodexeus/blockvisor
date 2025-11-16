@@ -334,9 +334,12 @@ fn build_transfer_config(
         fs::create_dir_all(&archive_jobs_meta_dir)?;
     }
     #[cfg(target_os = "linux")]
-    let max_opened_files = usize::try_from(rlimit::increase_nofile_limit(MAX_OPENED_FILES)?)?;
-    #[cfg(not(target_os = "linux"))]
-    let max_opened_files = usize::try_from(MAX_OPENED_FILES).unwrap_or(1024);
+    {
+        // Ensure the process can open at least MAX_OPENED_FILES
+        let _ = rlimit::increase_nofile_limit(MAX_OPENED_FILES);
+    }
+    // Always use our conservative limit, not the system limit
+    let max_opened_files = usize::try_from(MAX_OPENED_FILES).unwrap_or(50);
     Ok(TransferConfig {
         max_opened_files,
         max_runners,
