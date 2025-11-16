@@ -328,9 +328,9 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientDownloader<C
         mut config: TransferConfig,
         client_name: String,
     ) -> Self {
-        // Create client-specific metadata directory
-        // e.g., /blockjoy/protocol_data/.babel/lighthouse/
-        let client_meta_dir = config.archive_jobs_meta_dir.join(&client_name);
+        // Create client-specific metadata directory with "download_" prefix to avoid conflicts
+        // with job backup directories (e.g., .babel_jobs/download_lighthouse/)
+        let client_meta_dir = config.archive_jobs_meta_dir.join(format!("download_{}", client_name));
         
         // Create the directory if it doesn't exist
         if !client_meta_dir.exists() {
@@ -579,19 +579,47 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
         let mut completed_chunks = 0u32;
         let mut active_clients = 0;
         
-        // Read progress from each client's subdirectory
+        tracing::debug!(
+            "Aggregating progress from directory: {}",
+            self.config.archive_jobs_meta_dir.display()
+        );
+        
+        // Read progress from each client's subdirectory (only those with "download_" prefix)
         if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
             for entry in entries {
                 if let Ok(entry) = entry {
                     let path = entry.path();
-                    // Only process subdirectories (client directories)
+                    // Only process subdirectories with "download_" prefix (client download directories)
                     if path.is_dir() {
-                        let client_progress_path = path.join("download.progress");
-                        if client_progress_path.exists() {
-                            if let Ok(progress) = load_job_data::<JobProgress>(&client_progress_path) {
-                                total_chunks += progress.total;
-                                completed_chunks += progress.current;
-                                active_clients += 1;
+                        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                            if dir_name.starts_with("download_") {
+                                let client_progress_path = path.join("download.progress");
+                                tracing::debug!(
+                                    "Checking for progress file: {}",
+                                    client_progress_path.display()
+                                );
+                                if client_progress_path.exists() {
+                                    match load_job_data::<JobProgress>(&client_progress_path) {
+                                        Ok(progress) => {
+                                            tracing::debug!(
+                                                "Client {}: {}/{} chunks",
+                                                dir_name,
+                                                progress.current,
+                                                progress.total
+                                            );
+                                            total_chunks += progress.total;
+                                            completed_chunks += progress.current;
+                                            active_clients += 1;
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                "Failed to load progress from {}: {}",
+                                                client_progress_path.display(),
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -601,6 +629,13 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
         
         // Write aggregated progress to main progress file
         if active_clients > 0 {
+            tracing::info!(
+                "Aggregated progress: {}/{} chunks across {} clients, writing to {}",
+                completed_chunks,
+                total_chunks,
+                active_clients,
+                self.config.progress_file_path.display()
+            );
             save_job_data(
                 &self.config.progress_file_path,
                 &JobProgress {
@@ -609,6 +644,8 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                     message: format!("chunks ({} clients)", active_clients),
                 },
             )?;
+        } else {
+            tracing::debug!("No active clients found for progress aggregation");
         }
         
         Ok(())
