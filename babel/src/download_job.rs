@@ -22,7 +22,7 @@ use futures::{future::BoxFuture, stream::FuturesUnordered, StreamExt};
 use reqwest::header::RANGE;
 use std::{
     cmp::min,
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fs,
     fs::File,
     io::Write,
@@ -865,6 +865,7 @@ struct ParallelChunkDownloaders<'a, C> {
     parts_path: PathBuf,
     data_version: u64,
     connection_pool: ConnectionPool,
+    http_client: reqwest::Client,  // Shared HTTP client to prevent FD leaks
 }
 
 impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownloaders<'_, C> {
@@ -881,6 +882,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
         let mut chunk_indexes = HashSet::from_iter(0..total_chunks_count);
         chunk_indexes.retain(|index| !downloaded_indexes.contains(index));
         let parts_path = config.archive_jobs_meta_dir.join(PARTS_FILENAME);
+        let http_client = reqwest::Client::new();  // Create one shared HTTP client
         Self {
             connector,
             run,
@@ -892,6 +894,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
             parts_path,
             data_version,
             connection_pool,
+            http_client,
         }
     }
 
@@ -928,6 +931,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> ParallelChunkDownl
                     self.tx.clone(),
                     self.config.clone(),
                     self.connection_pool.clone(),
+                    self.http_client.clone(),  // Share the HTTP client
                 );
                 self.futures
                     .push(Box::pin(tokio::spawn(downloader.run(self.run.clone()))));
@@ -957,6 +961,7 @@ struct ClientChunkDownloaders<'a, C> {
     _parts_path: PathBuf,
     data_version: u64,
     connection_pool: ConnectionPool,
+    http_client: reqwest::Client,  // Shared HTTP client to prevent FD leaks
 }
 
 impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDownloaders<'a, C> {
@@ -975,6 +980,7 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDow
         let mut chunk_indexes = (0..chunks_count).collect::<HashSet<_>>();
         chunk_indexes.retain(|index| !downloaded_indexes.contains(index));
         let parts_path = config.archive_jobs_meta_dir.join("download-parts.json");
+        let http_client = reqwest::Client::new();  // Create one shared HTTP client
         Self {
             connector,
             store_key,
@@ -987,6 +993,7 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDow
             _parts_path: parts_path,
             data_version,
             connection_pool,
+            http_client,
         }
     }
 
@@ -1020,6 +1027,7 @@ impl<'a, C: BabelEngineConnector + Clone + Send + Sync + 'static> ClientChunkDow
                     self.tx.clone(),
                     self.config.clone(),
                     self.connection_pool.clone(),
+                    self.http_client.clone(),  // Share the HTTP client
                 );
                 self.futures.push(Box::pin(tokio::spawn(
                     downloader.run(self.run.clone()),
@@ -1065,12 +1073,13 @@ impl<C: BabelEngineConnector> ChunkDownloader<C> {
         tx: mpsc::Sender<ChunkData>,
         config: TransferConfig,
         connection_pool: ConnectionPool,
+        http_client: reqwest::Client,  // Accept shared HTTP client
     ) -> Self {
         Self {
             connector,
             chunk,
             tx,
-            client: reqwest::Client::new(),
+            client: http_client,  // Use the shared client instead of creating a new one
             config,
             connection_pool,
         }
@@ -1289,17 +1298,54 @@ impl Writer {
     }
 
     async fn run(mut self, mut run: RunFlag) -> Result<Vec<Chunk>> {
+        let mut chunks_processed = 0;
+        let log_interval = 100; // Log every 100 chunks
+        
+        tracing::info!(
+            "Writer: Starting (max_opened_files: {}, total_chunks: {})",
+            self.max_opened_files,
+            self.total_chunks_count
+        );
+        
         while run.load() {
             let Some(chunk_data) = self.rx.recv().await else {
                 // stop writer when all senders/downloaders are dropped
                 break;
             };
+            
+            // Check if this is an EndOfChunk before moving chunk_data
+            let is_end_of_chunk = matches!(chunk_data, ChunkData::EndOfChunk { .. });
+            
             if let Err(err) = self.handle_chunk_data(chunk_data).await {
                 run.stop();
+                tracing::error!(
+                    "Writer: Error after processing {} chunks with {} files open",
+                    chunks_processed,
+                    self.opened_files.len()
+                );
                 self.close_all_files();
                 bail!("Writer error: {err:#}")
             }
+            
+            // Periodic logging to track FD usage
+            if is_end_of_chunk {
+                chunks_processed += 1;
+                if chunks_processed % log_interval == 0 {
+                    tracing::info!(
+                        "Writer: Progress {}/{} chunks, {} files currently open",
+                        chunks_processed,
+                        self.total_chunks_count,
+                        self.opened_files.len()
+                    );
+                }
+            }
         }
+        
+        tracing::info!(
+            "Writer: Completed processing {} chunks with {} files still open",
+            chunks_processed,
+            self.opened_files.len()
+        );
         
         // Always cleanup on successful completion
         self.close_all_files();
@@ -1331,43 +1377,22 @@ impl Writer {
         // Instant::now() is used (instead of T: AsyncTimer) just for simplicity
         // otherwise we would need to have 2 instances of T (one for job, second for Writer task),
         // or T to be Cloneable, which complicates test code, but doesn't bring a lot of benefits.
-        match self.opened_files.entry(path) {
-            Entry::Occupied(mut entry) => {
-                if !data.is_empty() {
-                    // already have opened handle to the file, so just update timestamp
-                    let (timestamp, file) = entry.get_mut();
-                    *timestamp = Instant::now();
-                    file.write_all_at(&data, pos)?;
-                    file.flush()?;
-                }
+        
+        // Check if file is already open
+        if let Some((timestamp, file)) = self.opened_files.get_mut(&path) {
+            if !data.is_empty() {
+                // already have opened handle to the file, so just update timestamp
+                *timestamp = Instant::now();
+                file.write_all_at(&data, pos)?;
+                file.flush()?;
             }
-            Entry::Vacant(entry) => {
-                let absolute_path = self.destination_dir.join(entry.key());
-                if let Some(parent) = absolute_path.parent() {
-                    if !parent.exists() {
-                        fs::create_dir_all(parent)?;
-                    }
-                }
-                // file not opened yet
-                let file = File::options()
-                    .create(true)
-                    .truncate(false)
-                    .write(true)
-                    .open(absolute_path)?;
-                
-                // Always insert the file handle into the map to prevent leaks
-                let (_, file) = entry.insert((Instant::now(), file));
-                
-                // Write data if not empty
-                if !data.is_empty() {
-                    file.write_all_at(&data, pos)?;
-                    file.flush()?;
-                }
-            }
+            return Ok(());
         }
+        
+        // File not open yet - check if we need to close one first
+        // This prevents FD exhaustion by ensuring we never exceed max_opened_files
         if self.opened_files.len() >= self.max_opened_files {
-            // can't have to many files opened at the same time, so close one with
-            // the oldest timestamp
+            // Close the oldest file before opening a new one
             if let Some(oldest) = self
                 .opened_files
                 .iter()
@@ -1375,6 +1400,12 @@ impl Writer {
                 .map(|(k, _)| k.clone())
             {
                 if let Some((_, mut file)) = self.opened_files.remove(&oldest) {
+                    tracing::debug!(
+                        "Writer: Closing file via LRU eviction: {:?} (open_files: {} -> {})",
+                        oldest,
+                        self.opened_files.len() + 1,
+                        self.opened_files.len()
+                    );
                     // Explicitly flush and sync to ensure data is written
                     if let Err(e) = file.flush() {
                         tracing::warn!("Failed to flush file {:?}: {}", oldest, e);
@@ -1382,14 +1413,64 @@ impl Writer {
                     if let Err(e) = file.sync_all() {
                         tracing::warn!("Failed to sync file {:?}: {}", oldest, e);
                     }
-                    // File is dropped here, but we've ensured data is persisted
+                    // File is dropped here, releasing the FD
                 }
             }
         }
+        
+        // Now open the new file
+        let absolute_path = self.destination_dir.join(&path);
+        if let Some(parent) = absolute_path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        
+        let file = File::options()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&absolute_path)
+            .map_err(|e| {
+                tracing::error!(
+                    "Writer: Failed to open file: {} (open_files: {}, max: {}, error: {})",
+                    absolute_path.display(),
+                    self.opened_files.len(),
+                    self.max_opened_files,
+                    e
+                );
+                e
+            })?;
+        
+        tracing::debug!(
+            "Writer: Opened file: {:?} (open_files: {} -> {})",
+            path,
+            self.opened_files.len(),
+            self.opened_files.len() + 1
+        );
+        
+        // Insert the file handle into the map
+        let timestamp = Instant::now();
+        self.opened_files.insert(path.clone(), (timestamp, file));
+        
+        // Write data if not empty
+        if !data.is_empty() {
+            let (_, file) = self.opened_files.get_mut(&path).unwrap();
+            file.write_all_at(&data, pos)?;
+            file.flush()?;
+        }
+        
         Ok(())
     }
 
     fn close_all_files(&mut self) {
+        let file_count = self.opened_files.len();
+        tracing::info!(
+            "Writer: Closing all open files (count: {}, max_allowed: {})",
+            file_count,
+            self.max_opened_files
+        );
+        
         for (path, (_, mut file)) in self.opened_files.drain() {
             if let Err(e) = file.flush() {
                 tracing::warn!("Failed to flush file {:?}: {}", path, e);
@@ -1398,6 +1479,8 @@ impl Writer {
                 tracing::warn!("Failed to sync file {:?}: {}", path, e);
             }
         }
+        
+        tracing::debug!("Writer: All files closed successfully");
     }
 }
 

@@ -245,12 +245,15 @@ pub fn load_job_data<T: DeserializeOwned>(file_path: &Path) -> Result<T> {
 }
 
 pub fn save_job_data<T: Serialize>(file_path: &Path, data: &T) -> eyre::Result<()> {
+    tracing::trace!("Opening metadata file for write: {}", file_path.display());
+    
     let serialized = serde_json::to_string(data)?;
     let mut file = fs::File::options()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(file_path)?;
+        .open(file_path)
+        .with_context(|| format!("Failed to open metadata file: {}", file_path.display()))?;
     
     file.write_all(serialized.as_bytes())?;
     file.flush()
@@ -258,6 +261,8 @@ pub fn save_job_data<T: Serialize>(file_path: &Path, data: &T) -> eyre::Result<(
     file.sync_all()
         .with_context(|| format!("Failed to sync job data to {}", file_path.display()))?;
     drop(file);  // Explicit drop for clarity
+    
+    tracing::trace!("Closed metadata file: {}", file_path.display());
     
     Ok(())
 }
@@ -329,7 +334,14 @@ pub fn load_chunks(path: &Path) -> Result<Vec<Chunk>> {
 }
 
 pub fn save_chunk(path: &Path, chunk: &Chunk) -> Result<()> {
-    let mut file = fs::File::options().append(true).create(true).open(path)?;
+    tracing::trace!("Opening chunk metadata file for append: {}", path.display());
+    
+    let mut file = fs::File::options()
+        .append(true)
+        .create(true)
+        .open(path)
+        .with_context(|| format!("Failed to open chunk metadata file: {}", path.display()))?;
+    
     let mut chunk_serialized = serde_json::to_string(chunk)?;
     chunk_serialized.push('\n');
     file.write_all(chunk_serialized.as_bytes())
@@ -341,6 +353,8 @@ pub fn save_chunk(path: &Path, chunk: &Chunk) -> Result<()> {
     file.sync_all()
         .with_context(|| format!("Failed to sync chunk metadata to {}", path.display()))?;
     drop(file);  // Explicit drop for clarity
+    
+    tracing::trace!("Closed chunk metadata file: {}", path.display());
     
     Ok(())
 }
