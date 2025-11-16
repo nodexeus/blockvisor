@@ -160,7 +160,30 @@ impl Job {
         load_status_file(&self.status_path)
     }
 
-    pub fn load_progress(&self) -> Option<JobProgress> {
+    pub fn load_progress(&self, node_env: Option<&NodeEnv>) -> Option<JobProgress> {
+        // For multi-client downloads, aggregate progress from client subdirectories on-demand
+        if matches!(self.config.job_type, JobType::MultiClientDownload { .. }) {
+            if let Some(env) = node_env {
+                // The client progress files are in data_mount_point/.babel_jobs/download_*/
+                // NOT in /var/lib/babel/jobs/ (which is for job state, not archive metadata)
+                let archive_jobs_dir = env.data_mount_point.join(PERSISTENT_JOBS_META_DIR);
+                
+                // Aggregate progress from all download_* subdirectories
+                match download_job::aggregate_multi_client_progress(&archive_jobs_dir, &self.progress_path) {
+                    Ok(_) => {
+                        // After aggregating, read the aggregated progress file
+                        return load_job_data(&self.progress_path).ok();
+                    }
+                    Err(e) => {
+                        tracing::debug!("Failed to aggregate multi-client download progress: {:#}", e);
+                        // Fall back to reading the progress file directly
+                    }
+                }
+            } else {
+                tracing::debug!("Multi-client download detected but node_env not available for aggregation");
+            }
+        }
+        
         load_job_data(&self.progress_path).ok()
     }
 

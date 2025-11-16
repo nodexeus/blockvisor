@@ -561,6 +561,85 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> Runner for ClientD
     }
 }
 
+/// Aggregate progress from all client-specific progress files and write to main progress file
+/// This is a standalone function so it can be called on-demand when progress is requested
+pub fn aggregate_multi_client_progress(archive_jobs_meta_dir: &Path, progress_file_path: &Path) -> Result<()> {
+    let mut total_chunks = 0u32;
+    let mut completed_chunks = 0u32;
+    let mut active_clients = 0;
+    
+    tracing::debug!(
+        "Aggregating progress from directory: {}",
+        archive_jobs_meta_dir.display()
+    );
+    
+    // Read progress from each client's subdirectory (only those with "download_" prefix)
+    if let Ok(entries) = std::fs::read_dir(archive_jobs_meta_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                // Only process subdirectories with "download_" prefix (client download directories)
+                if path.is_dir() {
+                    if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if dir_name.starts_with("download_") {
+                            let client_progress_path = path.join("download.progress");
+                            tracing::debug!(
+                                "Checking for progress file: {}",
+                                client_progress_path.display()
+                            );
+                            if client_progress_path.exists() {
+                                match load_job_data::<JobProgress>(&client_progress_path) {
+                                    Ok(progress) => {
+                                        tracing::debug!(
+                                            "Client {}: {}/{} chunks",
+                                            dir_name,
+                                            progress.current,
+                                            progress.total
+                                        );
+                                        total_chunks += progress.total;
+                                        completed_chunks += progress.current;
+                                        active_clients += 1;
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to load progress from {}: {}",
+                                            client_progress_path.display(),
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Write aggregated progress to main progress file
+    if active_clients > 0 {
+        tracing::info!(
+            "Aggregated progress: {}/{} chunks across {} clients, writing to {}",
+            completed_chunks,
+            total_chunks,
+            active_clients,
+            progress_file_path.display()
+        );
+        save_job_data(
+            progress_file_path,
+            &JobProgress {
+                total: total_chunks,
+                current: completed_chunks,
+                message: format!("chunks ({} clients)", active_clients),
+            },
+        )?;
+    } else {
+        tracing::debug!("No active clients found for progress aggregation");
+    }
+    
+    Ok(())
+}
+
 /// R3.1: Multi-client downloader that creates separate download jobs for each client
 pub struct MultiClientDownloader<C> {
     connector: C,
@@ -575,80 +654,7 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
 
     /// Aggregate progress from all client-specific progress files and write to main progress file
     fn aggregate_progress(&self) -> Result<()> {
-        let mut total_chunks = 0u32;
-        let mut completed_chunks = 0u32;
-        let mut active_clients = 0;
-        
-        tracing::debug!(
-            "Aggregating progress from directory: {}",
-            self.config.archive_jobs_meta_dir.display()
-        );
-        
-        // Read progress from each client's subdirectory (only those with "download_" prefix)
-        if let Ok(entries) = std::fs::read_dir(&self.config.archive_jobs_meta_dir) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    // Only process subdirectories with "download_" prefix (client download directories)
-                    if path.is_dir() {
-                        if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                            if dir_name.starts_with("download_") {
-                                let client_progress_path = path.join("download.progress");
-                                tracing::debug!(
-                                    "Checking for progress file: {}",
-                                    client_progress_path.display()
-                                );
-                                if client_progress_path.exists() {
-                                    match load_job_data::<JobProgress>(&client_progress_path) {
-                                        Ok(progress) => {
-                                            tracing::debug!(
-                                                "Client {}: {}/{} chunks",
-                                                dir_name,
-                                                progress.current,
-                                                progress.total
-                                            );
-                                            total_chunks += progress.total;
-                                            completed_chunks += progress.current;
-                                            active_clients += 1;
-                                        }
-                                        Err(e) => {
-                                            tracing::warn!(
-                                                "Failed to load progress from {}: {}",
-                                                client_progress_path.display(),
-                                                e
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Write aggregated progress to main progress file
-        if active_clients > 0 {
-            tracing::info!(
-                "Aggregated progress: {}/{} chunks across {} clients, writing to {}",
-                completed_chunks,
-                total_chunks,
-                active_clients,
-                self.config.progress_file_path.display()
-            );
-            save_job_data(
-                &self.config.progress_file_path,
-                &JobProgress {
-                    total: total_chunks,
-                    current: completed_chunks,
-                    message: format!("chunks ({} clients)", active_clients),
-                },
-            )?;
-        } else {
-            tracing::debug!("No active clients found for progress aggregation");
-        }
-        
-        Ok(())
+        aggregate_multi_client_progress(&self.config.archive_jobs_meta_dir, &self.config.progress_file_path)
     }
 
     /// R3.1: Create separate download jobs for each required client
@@ -732,11 +738,6 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
     /// are treated as failures and propagated to the ArchiveJobRunner, which will apply the
     /// RestartPolicy to determine whether to retry (transient) or fail immediately (permanent).
     pub async fn download_all_clients(&mut self, clients: Vec<ClientDownloadConfig>, mut run: RunFlag) -> Result<()> {
-        // Aggregate initial progress (handles resume scenarios)
-        if let Err(e) = self.aggregate_progress() {
-            tracing::warn!("Failed to aggregate initial progress: {:#}", e);
-        }
-        
         let mut download_futures = FuturesUnordered::new();
         
         for client in clients {
@@ -804,21 +805,12 @@ impl<C: BabelEngineConnector + Clone + Send + Sync + 'static> MultiClientDownloa
                 }
             }
             
-            // Aggregate progress after each client completes (success or failure)
-            if let Err(e) = self.aggregate_progress() {
-                tracing::warn!("Failed to aggregate progress: {:#}", e);
-            }
         }
         
         tracing::info!(
             "Multi-client download summary: {} successful, {} skipped (not available), {} failed",
             successful_downloads, skipped_downloads, failed_downloads.len()
         );
-        
-        // Final progress aggregation
-        if let Err(e) = self.aggregate_progress() {
-            tracing::warn!("Failed to aggregate final progress: {:#}", e);
-        }
         
         // Only fail if there were actual errors (not just missing datasets)
         // This error will be caught by ArchiveJobRunner which will apply the RestartPolicy

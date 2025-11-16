@@ -261,12 +261,13 @@ impl<C: BabelEngineConnector + Send> JobsManagerClient for Client<C> {
 
     async fn list(&self) -> Result<JobsInfo> {
         let jobs_context = &mut *self.jobs_registry.lock().await;
+        let node_env = jobs_context.node_env.as_ref();
         let res = jobs_context
             .jobs
             .iter_mut()
             .map(|(name, job)| {
                 job.update();
-                (name.clone(), build_job_info(job))
+                (name.clone(), build_job_info(job, node_env))
             })
             .collect();
         Ok(res)
@@ -401,13 +402,13 @@ impl<C: BabelEngineConnector + Send> JobsManagerClient for Client<C> {
             .get_mut(name)
             .with_context(|| format!("unknown status, job '{name}' not found"))?;
         job.update();
-        Ok(build_job_info(job))
+        Ok(build_job_info(job, jobs_context.node_env.as_ref()))
     }
 }
 
-fn build_job_info(job: &Job) -> JobInfo {
+fn build_job_info(job: &Job, node_env: Option<&NodeEnv>) -> JobInfo {
     let restart_count = job.restart_stamps.len();
-    let progress = job.load_progress();
+    let progress = job.load_progress(node_env);
     let logs = job.logs.iter().rev().map(|(_, log)| log.clone()).collect();
     let (status, timestamp) = match &job.state {
         JobState::Active { start_time, .. } => (JobStatus::Running, *start_time),
