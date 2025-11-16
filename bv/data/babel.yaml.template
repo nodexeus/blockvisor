@@ -169,21 +169,24 @@ variants:
     # [Blockchain]-[NodeType]-[NetType]
     sku_code: TST-TN-N
 
-    # List of protocol data archive pointers.
-    archive_pointers:
-      # Association of image variant with protocol data archive. Identify protocol data archive that will be used
-      # with given image variant and combination of properties that affect protocol data set (property with `new_archive` flag true).
-      - pointer: !store_key
-      - pointer: !store_key {{protocol_key}}-{{variant_key}}-v1-switch-property-on-value
-        # Combination of properties (with new_archive flag true).
-        # Typically, properties doesn't affect data set and there is only one `store_key`, but
-        # if it is necessary to introduce properties with `new_archive` flag true, all combinations must be defined here.
-        new_archive_properties: [ "switch-property-on-value" ]
-      - pointer: !store_key {{protocol_key}}-{{variant_key}}-v1-enum-property-variant-c
-        new_archive_properties: [ "enum-property-variant-c" ]
-      # `pointer` can be set to `combination_disallowed` if given properties combination isn't valid.
-      - pointer: !combination_disallowed
-        new_archive_properties: [ "switch-property-on-value" , "enum-property-variant-c" ]
+    # [optional] List of protocol data archive pointers.
+    # NOTE: For multi-client configurations, archive pointers (store_key) should be defined
+    # in the main.rhai file per service instead of here. This field is only needed for
+    # single-client configurations or when using the legacy download approach.
+    # archive_pointers:
+    #   # Association of image variant with protocol data archive. Identify protocol data archive that will be used
+    #   # with given image variant and combination of properties that affect protocol data set (property with `new_archive` flag true).
+    #   - pointer: !store_key
+    #   - pointer: !store_key {{protocol_key}}-{{variant_key}}-v1-switch-property-on-value
+    #     # Combination of properties (with new_archive flag true).
+    #     # Typically, properties doesn't affect data set and there is only one `store_key`, but
+    #     # if it is necessary to introduce properties with `new_archive` flag true, all combinations must be defined here.
+    #     new_archive_properties: [ "switch-property-on-value" ]
+    #   - pointer: !store_key {{protocol_key}}-{{variant_key}}-v1-enum-property-variant-c
+    #     new_archive_properties: [ "enum-property-variant-c" ]
+    #   # `pointer` can be set to `combination_disallowed` if given properties combination isn't valid.
+    #   - pointer: !combination_disallowed
+    #     new_archive_properties: [ "switch-property-on-value" , "enum-property-variant-c" ]
 
     # Minimum CPU required to run image.
     min_cpu: 1
