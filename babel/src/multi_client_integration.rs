@@ -51,7 +51,6 @@ pub fn get_downloadable_clients(
     protocol_data_path: &PathBuf,
 ) -> Result<Vec<ClientDownloadConfig>> {
     plugin_config.services.iter()
-        .filter(|service| service.archive)                      // Only archived services can be downloaded
         .filter(|service| service.use_protocol_data)            // Only services that use protocol data
         .filter(|service| service.store_key.is_some())          // Only services with store_key
         .map(|service| {

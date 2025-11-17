@@ -281,11 +281,9 @@ impl<C: ApiServiceConnector + Clone> ProtocolService<C> {
                 .into_iter()
                 .map(|ramdisk| ramdisk.into())
                 .collect(),
-            archive_pointers: image
-                .archive_pointers
-                .into_iter()
-                .map(|pointer| pointer.into())
-                .collect(),
+            // archive_pointers field is deprecated and no longer used.
+            // Archive management is now handled per-service via store_key in main.rhai.
+            archive_pointers: vec![],
             min_babel_version,
             dns_scheme: image.dns_scheme,
         };

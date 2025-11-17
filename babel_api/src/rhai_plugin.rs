@@ -662,22 +662,24 @@ impl<E: Engine + Sync + Send + 'static> BarePlugin<E> {
         self.render_configs_files(config.config_files)?;
         self.start_aux_services(config.aux_services)?;
         let mut services_needs = self.run_actions(config.init, vec![])?;
-        if self.babel_engine.protocol_data_stamp()?.is_none() {
-            // Check if we have any services with store_key defined (multi-client setup)
-            let has_multi_client_services = config.services.iter()
-                .any(|service| service.archive && service.store_key.is_some());
-            
-            if has_multi_client_services {
-                // Use multi-client download for per-client snapshots
-                // Each client's dataset will be downloaded if available, or skipped if not
-                self.create_and_start_job(
-                    DOWNLOAD_JOB_NAME,
-                    plugin_config::build_multi_client_download_job_config(config.download, services_needs),
-                )?;
-                services_needs =
-                    self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
-            } else if let Some(alternative_download) = config.alternative_download {
-                // Legacy fallback for non-multi-client configurations
+        
+        // Check if we have any services with store_key defined (multi-client setup)
+        let has_multi_client_services = config.services.iter()
+            .any(|service| service.archive && service.store_key.is_some());
+        
+        if has_multi_client_services {
+            // Multi-client setup: Always run multi-client download
+            // The downloader will check each client's data directory individually
+            // and only download missing datasets
+            self.create_and_start_job(
+                DOWNLOAD_JOB_NAME,
+                plugin_config::build_multi_client_download_job_config(config.download, services_needs),
+            )?;
+            services_needs =
+                self.run_jobs(config.post_download, vec![DOWNLOAD_JOB_NAME.to_string()])?;
+        } else if self.babel_engine.protocol_data_stamp()?.is_none() {
+            // Legacy single-client setup: Use global protocol_data_stamp check
+            if let Some(alternative_download) = config.alternative_download {
                 self.create_and_start_job(
                     DOWNLOAD_JOB_NAME,
                     plugin_config::build_alternative_download_job_config(
