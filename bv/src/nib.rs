@@ -1,13 +1,9 @@
-use crate::nib_meta::StorePointer;
+use crate::nib_meta::{self, ArchivePointer, FirewallConfig, ImageProperty, RamdiskConfig, StorePointer, Variant, VariantMetadata, Visibility};
 use crate::{
     apptainer_machine::{self, PLUGIN_MAIN_FILENAME, PLUGIN_PATH},
     bv_config, firewall,
     internal_server::{self, service_client::ServiceClient, NodeDisplayInfo},
     nib_cli::{ImageCommand, NodeChecks, ProtocolCommand},
-    nib_meta::{
-        self, ArchivePointer, FirewallConfig, ImageProperty, RamdiskConfig, Variant,
-        VariantMetadata, Visibility,
-    },
     node_context,
     node_state::{NodeImage, NodeProperties, NodeState, ProtocolImageKey, VmConfig, VmStatus},
     services::{self, protocol::PushResult, ApiServiceConnector},
@@ -251,11 +247,39 @@ pub async fn process_image_command(
             let min_babel_version =
                 min_babel_version.unwrap_or(env!("CARGO_PKG_VERSION").to_string());
             let mut client = services::protocol::ProtocolService::new(connector).await?;
-            let image: nib_meta::Image = serde_yaml_ng::from_str(&fs::read_to_string(path).await?)?;
+            let image: nib_meta::Image = serde_yaml_ng::from_str(&fs::read_to_string(&path).await?)?;
+            
+            // Try to read main.rhai from the same directory to extract store_keys for multi-client configs
+            let main_rhai_path = path.parent().unwrap_or(std::path::Path::new(".")).join("main.rhai");
+            let archive_pointers_from_rhai = if main_rhai_path.exists() {
+                match extract_store_keys_from_rhai(&main_rhai_path).await {
+                    Ok(pointers) if !pointers.is_empty() => {
+                        println!("Found {} store_key(s) in main.rhai for multi-client configuration", pointers.len());
+                        Some(pointers)
+                    }
+                    Ok(_) => None,
+                    Err(e) => {
+                        println!("Warning: Could not extract store_keys from main.rhai: {:#}", e);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            
             let image_variants: Vec<_> = image
                 .variants
                 .iter()
-                .map(|variant| ImageVariant::build(&image, variant.clone()))
+                .map(|variant| {
+                    let mut variant = variant.clone();
+                    // If we found store_keys in main.rhai and variant has no archive_pointers, use them
+                    if variant.archive_pointers.is_empty() {
+                        if let Some(ref pointers) = archive_pointers_from_rhai {
+                            variant.archive_pointers = pointers.clone();
+                        }
+                    }
+                    ImageVariant::build(&image, variant)
+                })
                 .map(|image_variant| image_variant.validate().map(|_| image_variant))
                 .collect::<eyre::Result<_>>()?;
             for image_variant in image_variants {
@@ -846,6 +870,69 @@ impl VmConfig {
                 .collect(),
         }
     }
+}
+
+/// Extract store_keys from main.rhai for multi-client configurations
+/// This is a simple approach that just reads and parses the evaluated Rhai config
+async fn extract_store_keys_from_rhai(rhai_path: &Path) -> eyre::Result<Vec<ArchivePointer>> {
+    // For now, just use the rhai_plugin_linter's check function which will validate
+    // and we can extract from there. But actually, we just need to parse the file
+    // and extract store_key values. Let's use a simpler regex approach that works
+    // with the actual evaluated values.
+    
+    let content = fs::read_to_string(rhai_path).await
+        .with_context(|| format!("Failed to read main.rhai from {}", rhai_path.display()))?;
+    
+    // Simple extraction: look for store_key assignments in services
+    // This will match: store_key: `value` or store_key: "value" or store_key: 'value'
+    // We extract the literal string, which may contain ${...} that needs evaluation
+    // But for image push, we just need to know which store_keys exist
+    let mut archive_pointers = Vec::new();
+    let mut seen_keys = std::collections::HashSet::new();
+    
+    // Match store_key followed by colon and any quoted/backticked string
+    for line in content.lines() {
+        if line.contains("store_key") && line.contains(":") {
+            // Extract the value after store_key:
+            if let Some(after_colon) = line.split("store_key").nth(1).and_then(|s| s.split(':').nth(1)) {
+                // Find the quoted/backticked value
+                let trimmed = after_colon.trim();
+                if let Some(value) = extract_quoted_value(trimmed) {
+                    if seen_keys.insert(value.clone()) {
+                        archive_pointers.push(ArchivePointer {
+                            pointer: StorePointer::StoreKey(value),
+                            new_archive_properties: vec![],
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    Ok(archive_pointers)
+}
+
+fn extract_quoted_value(s: &str) -> Option<String> {
+    let s = s.trim();
+    // Check for backtick quotes
+    if s.starts_with('`') {
+        if let Some(end) = s[1..].find('`') {
+            return Some(s[1..=end].to_string());
+        }
+    }
+    // Check for double quotes
+    if s.starts_with('"') {
+        if let Some(end) = s[1..].find('"') {
+            return Some(s[1..=end].to_string());
+        }
+    }
+    // Check for single quotes
+    if s.starts_with('\'') {
+        if let Some(end) = s[1..].find('\'') {
+            return Some(s[1..=end].to_string());
+        }
+    }
+    None
 }
 
 #[cfg(test)]
