@@ -1207,6 +1207,10 @@ pub mod tests {
                 &self,
                 request: Request<(PathBuf, PathBuf, String)>,
             ) -> Result<Response<()>, Status>;
+            async fn save_plugin_config_for_job(
+                &self,
+                request: Request<(String, String)>,
+            ) -> Result<Response<()>, Status>;
             async fn protocol_data_stamp(
                 &self,
                 request: Request<()>,

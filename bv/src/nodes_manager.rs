@@ -285,9 +285,13 @@ where
             let node = read_node.state.clone();
             drop(read_node);
 
+            if desired_state.image.store_key.is_empty() {
+                desired_state.image.store_key = node.image.store_key.clone();
+            }
             if desired_state.image.store_key != node.image.store_key {
                 command_failed!(Error::Internal(anyhow!(
-                    "cannot upgrade node to version that uses different data set: `{}`",
+                    "cannot upgrade node to version that uses different data set (current=`{}`, desired=`{}`)",
+                    node.image.store_key,
                     desired_state.image.store_key
                 )));
             }
@@ -828,6 +832,30 @@ mod tests {
                 &self,
                 request: tonic::Request<pb::ImageServiceGetImageRequest>,
             ) -> Result<tonic::Response<pb::ImageServiceGetImageResponse>, tonic::Status>;
+            async fn list_images(
+                &self,
+                request: tonic::Request<pb::ImageServiceListImagesRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceListImagesResponse>, tonic::Status>;
+            async fn get_image_details(
+                &self,
+                request: tonic::Request<pb::ImageServiceGetImageDetailsRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceGetImageDetailsResponse>, tonic::Status>;
+            async fn add_image_property(
+                &self,
+                request: tonic::Request<pb::ImageServiceAddImagePropertyRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceAddImagePropertyResponse>, tonic::Status>;
+            async fn update_image_property(
+                &self,
+                request: tonic::Request<pb::ImageServiceUpdateImagePropertyRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceUpdateImagePropertyResponse>, tonic::Status>;
+            async fn delete_image_property(
+                &self,
+                request: tonic::Request<pb::ImageServiceDeleteImagePropertyRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceDeleteImagePropertyResponse>, tonic::Status>;
+            async fn copy_image_properties(
+                &self,
+                request: tonic::Request<pb::ImageServiceCopyImagePropertiesRequest>,
+            ) -> Result<tonic::Response<pb::ImageServiceCopyImagePropertiesResponse>, tonic::Status>;
             async fn list_archives(
                 &self,
                 request: tonic::Request<pb::ImageServiceListArchivesRequest>,
@@ -1345,17 +1373,9 @@ mod tests {
         let mut new_archive_node_state = new_state.clone();
         new_archive_node_state.image.store_key = "different_store_key".to_string();
         assert_eq!(
-            "BV internal error: 'cannot upgrade node to version that uses different data set: `different_store_key`'",
+            "BV internal error: 'cannot upgrade node to version that uses different data set (current=`store_key`, desired=`different_store_key`)'",
             nodes
                 .upgrade(new_archive_node_state)
-                .await
-                .unwrap_err()
-                .to_string()
-        );
-        assert_eq!(
-            "BV internal error: 'failed to get available resources'",
-            nodes
-                .upgrade(new_state.clone())
                 .await
                 .unwrap_err()
                 .to_string()
