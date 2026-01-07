@@ -98,7 +98,7 @@ jobs:
       - name: Upload bvup to bins bucket
         uses: magicwallet/r2-upload@main
         with:
-          endpoint: ${{ S3_URL }}
+          endpoint: ${{ vars.S3_URL }}
           access_key_id: ${{ secrets.S3_KEY_ID }}
           secret_access_key: ${{ secrets.S3_SECRET_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
@@ -116,7 +116,7 @@ jobs:
       - name: Upload snapper to bins bucket
         uses: magicwallet/r2-upload@main
         with:
-          endpoint: ${{ S3_URL }}
+          endpoint: ${{ vars.S3_URL }}
           access_key_id: ${{ secrets.S3_KEY_ID }}
           secret_access_key: ${{ secrets.S3_SECRET_KEY }}
           bucket: ${{ vars.BIN_BUCKET }}
