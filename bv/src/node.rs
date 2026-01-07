@@ -882,6 +882,18 @@ impl<P: Pal + Debug> Node<P> {
         info!("Recovery: fix broken connection to node with ID `{id}`");
         if let Err(e) = self.babel_engine.node_connection.test().await {
             warn!("Recovery: reconnect to node with ID `{id}` failed: {e:#}");
+            // If the node is up but babel is not responsive, try service-level recovery first
+            // (e.g. restart babel) before escalating to full node restart.
+            if let Err(e) = self.machine.recover().await {
+                warn!("Recovery: node service recovery for ID `{id}` failed: {e:#}");
+            } else if let Err(e) = self.babel_engine.node_connection.test().await {
+                warn!(
+                    "Recovery: reconnect to node with ID `{id}` still failing after service recovery: {e:#}"
+                );
+            } else {
+                self.post_recovery();
+                return Ok(());
+            }
             if self.recovery_backoff.reconnect_failed() {
                 self.recover_by_restart().await?;
             }

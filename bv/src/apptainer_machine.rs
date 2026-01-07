@@ -515,7 +515,11 @@ impl pal::VirtualMachine for ApptainerMachine {
     async fn recover(&mut self) -> Result<()> {
         if self.is_container_running().await {
             match get_process_pid(BABEL_BIN_NAME, &self.chroot_dir.to_string_lossy()) {
-                Ok(_) => Ok(()),
+                Ok(_) => {
+                    // Babel may be present but unresponsive; restart it to recover service-level failures
+                    self.stop_babel(false).await?;
+                    self.start_babel().await
+                }
                 Err(GetProcessIdError::NotFound) => self.start_babel().await,
                 Err(GetProcessIdError::MoreThanOne) => {
                     kill_all_processes(
