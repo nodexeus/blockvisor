@@ -96,40 +96,40 @@ jobs:
           name: blockvisor-artifacts-${{ steps.get_version.outputs.VERSION }}
 
       - name: Upload bvup to bins bucket
-        # uses: magicwallet/r2-upload@main
-        # with:
-        #   endpoint: ${{ S3_URL }}
-        #   access_key_id: ${{ secrets.S3_KEY_ID }}
-        #   secret_access_key: ${{ secrets.S3_SECRET_KEY }}
-        #   bucket: ${{ vars.BIN_BUCKET }}
-        #   file: /tmp/bvup
-        #   destination: ${{ steps.get_version.outputs.VERSION }}/bvup
-        
-        uses: yamatt/backblaze-b2-upload-action@v7
+        uses: magicwallet/r2-upload@main
         with:
-          key_id: ${{ secrets.S3_KEY_ID }}
-          application_key: ${{ secrets.S3_SECRET_KEY }}
-          bucket_name: ${{ vars.BIN_BUCKET }}
-          file_path: ./bvup
-          remote_path: ${{ steps.get_version.outputs.VERSION }}/bvup
+          endpoint: ${{ S3_URL }}
+          access_key_id: ${{ secrets.S3_KEY_ID }}
+          secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+          bucket: ${{ vars.BIN_BUCKET }}
+          file: /tmp/bvup
+          destination: ${{ steps.get_version.outputs.VERSION }}/bvup
+        
+        # uses: yamatt/backblaze-b2-upload-action@v7
+        # with:
+        #   key_id: ${{ secrets.S3_KEY_ID }}
+        #   application_key: ${{ secrets.S3_SECRET_KEY }}
+        #   bucket_name: ${{ vars.BIN_BUCKET }}
+        #   file_path: ./bvup
+        #   remote_path: ${{ steps.get_version.outputs.VERSION }}/bvup
       
       - name: Upload snapper to bins bucket
-        # uses: magicwallet/r2-upload@main
-        # with:
-        #   endpoint: ${{ S3_URL }}
-        #   access_key_id: ${{ secrets.S3_KEY_ID }}
-        #   secret_access_key: ${{ secrets.S3_SECRET_KEY }}
-        #   bucket: ${{ vars.BIN_BUCKET }}
-        #   file: /tmp/snapper
-        #   destination: ${{ steps.get_version.outputs.VERSION }}/snapper
-        
-        uses: yamatt/backblaze-b2-upload-action@v7
+        uses: magicwallet/r2-upload@main
         with:
-          key_id: ${{ secrets.S3_KEY_ID }}
-          application_key: ${{ secrets.S3_SECRET_KEY }}
-          bucket_name: ${{ vars.BIN_BUCKET }}
-          file_path: ./snapper
-          remote_path: ${{ steps.get_version.outputs.VERSION }}/snapper
+          endpoint: ${{ S3_URL }}
+          access_key_id: ${{ secrets.S3_KEY_ID }}
+          secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+          bucket: ${{ vars.BIN_BUCKET }}
+          file: /tmp/snapper
+          destination: ${{ steps.get_version.outputs.VERSION }}/snapper
+        
+        # uses: yamatt/backblaze-b2-upload-action@v7
+        # with:
+        #   key_id: ${{ secrets.S3_KEY_ID }}
+        #   application_key: ${{ secrets.S3_SECRET_KEY }}
+        #   bucket_name: ${{ vars.BIN_BUCKET }}
+        #   file_path: ./snapper
+        #   remote_path: ${{ steps.get_version.outputs.VERSION }}/snapper
 
 
   deploy-dev:
@@ -146,24 +146,24 @@ jobs:
         with:
           name: blockvisor-artifacts-${{ needs.build.outputs.version }}
 
-      # - name: Upload to R2 Dev bucket
-      #   uses: magicwallet/r2-upload@main
-      #   with:
-      #     endpoint: ${{ vars.S3_URL }}
-      #     access_key_id: ${{ secrets.S3_KEY_ID }}
-      #     secret_access_key: ${{ secrets.S3_SECRET_KEY }}
-      #     bucket: ${{ vars.S3_DEV_BUCKET }}
-      #     file: ./bundle.tar.gz
-      #     destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
-
-      - name: Upload to B2 Dev Bucket
-        uses: yamatt/backblaze-b2-upload-action@v7
+      - name: Upload to R2 Dev bucket
+        uses: magicwallet/r2-upload@main
         with:
-          key_id: ${{ secrets.S3_KEY_ID }}
-          application_key: ${{ secrets.S3_SECRET_KEY }}
-          bucket_name: ${{ vars.S3_DEV_BUCKET }}
-          file_path: ./bundle.tar.gz
-          remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+          endpoint: ${{ vars.S3_URL }}
+          access_key_id: ${{ secrets.S3_KEY_ID }}
+          secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+          bucket: ${{ vars.S3_DEV_BUCKET }}
+          file: ./bundle.tar.gz
+          destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+      # - name: Upload to B2 Dev Bucket
+      #   uses: yamatt/backblaze-b2-upload-action@v7
+      #   with:
+      #     key_id: ${{ secrets.S3_KEY_ID }}
+      #     application_key: ${{ secrets.S3_SECRET_KEY }}
+      #     bucket_name: ${{ vars.S3_DEV_BUCKET }}
+      #     file_path: ./bundle.tar.gz
+      #     remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
 
   deploy-prod:
     name: Deploy to Production
@@ -180,22 +180,22 @@ jobs:
         with:
           name: blockvisor-artifacts-${{ needs.build.outputs.version }}
 
-      - name: Upload to B2 Production Bucket
-        uses: yamatt/backblaze-b2-upload-action@v7
-        with:
-          key_id: ${{ secrets.S3_KEY_ID }}
-          application_key: ${{ secrets.S3_SECRET_KEY }}
-          bucket_name: ${{ vars.S3_PROD_BUCKET }}
-          file_path: ./bundle.tar.gz
-          remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
-
-      # - name: Upload bundle to R2 production bucket
-      #   uses: magicwallet/r2-upload@main
+      # - name: Upload to B2 Production Bucket
+      #   uses: yamatt/backblaze-b2-upload-action@v7
       #   with:
-      #     endpoint: ${{ vars.S3_URL }}
-      #     access_key_id: ${{ secrets.S3_KEY_ID }}
-      #     secret_access_key: ${{ secrets.S3_SECRET_KEY }}
-      #     bucket: ${{ vars.S3_PROD_BUCKET }}
-      #     file: ./bundle.tar.gz
-      #     destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+      #     key_id: ${{ secrets.S3_KEY_ID }}
+      #     application_key: ${{ secrets.S3_SECRET_KEY }}
+      #     bucket_name: ${{ vars.S3_PROD_BUCKET }}
+      #     file_path: ./bundle.tar.gz
+      #     remote_path: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
+
+      - name: Upload bundle to R2 production bucket
+        uses: magicwallet/r2-upload@main
+        with:
+          endpoint: ${{ vars.S3_URL }}
+          access_key_id: ${{ secrets.S3_KEY_ID }}
+          secret_access_key: ${{ secrets.S3_SECRET_KEY }}
+          bucket: ${{ vars.S3_PROD_BUCKET }}
+          file: ./bundle.tar.gz
+          destination: ${{ needs.build.outputs.version }}/bvd-bundle.tgz
   
