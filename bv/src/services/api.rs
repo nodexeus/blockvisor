@@ -5,7 +5,7 @@ use crate::{
     commands::Error,
     firewall, get_bv_status,
     node_state::{self, NodeState, ProtocolImageKey, VmStatus},
-    nodes_manager::NodesManager,
+    nodes_manager::{self, NodesManager},
     pal::Pal,
     services::{ApiClient, ApiInterceptor, ApiServiceConnector, AuthenticatedService},
     ServiceStatus, BV_VAR_PATH,
@@ -26,7 +26,7 @@ use std::{
 };
 use tokio::{fs, time::Instant};
 use tonic::transport::Channel;
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 const COMMANDS_CACHE_FILENAME: &str = "commands_cache.pb";
@@ -369,6 +369,24 @@ where
                 nodes_manager.update(node_id, update.try_into()?).await?;
                 API_UPDATE_COUNTER.increment(1);
                 API_UPDATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
+            }
+            Command::RunPlugin(args) => {
+                let payload = String::from_utf8(args.payload)
+                    .map_err(|e| {
+                        Error::Internal(anyhow!("NodeRunPlugin payload not utf8: {e}"))
+                    })?;
+                let out = nodes_manager
+                    .call_method(node_id, &args.function, &payload, false)
+                    .await
+                    .map_err(|e| match e {
+                        nodes_manager::BabelError::MethodNotFound => Error::Internal(anyhow!(
+                            "plugin function '{}' not found",
+                            args.function
+                        )),
+                        nodes_manager::BabelError::Internal { err } => Error::Internal(err),
+                        nodes_manager::BabelError::Plugin { err } => Error::Internal(err),
+                    })?;
+                debug!("NodeRunPlugin {} -> {out}", args.function);
             }
         },
         None => command_failed!(Error::Internal(anyhow!("Node command is `None`"))),
