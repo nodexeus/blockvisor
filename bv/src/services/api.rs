@@ -60,6 +60,8 @@ lazy_static::lazy_static! {
     pub static ref API_UPGRADE_TIME_MS_COUNTER: Counter = counter!("api.commands.upgrade.ms");
     pub static ref API_UPDATE_COUNTER: Counter = counter!("api.commands.update.calls");
     pub static ref API_UPDATE_TIME_MS_COUNTER: Counter = counter!("api.commands.update.ms");
+    pub static ref API_RENAME_COUNTER: Counter = counter!("api.commands.rename.calls");
+    pub static ref API_RENAME_TIME_MS_COUNTER: Counter = counter!("api.commands.rename.ms");
 }
 
 pub type ProtocolServiceClient =
@@ -369,6 +371,13 @@ where
                 nodes_manager.update(node_id, update.try_into()?).await?;
                 API_UPDATE_COUNTER.increment(1);
                 API_UPDATE_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
+            }
+            Command::Rename(args) => {
+                nodes_manager
+                    .rename(node_id, args.new_node_name, args.new_dns_name)
+                    .await?;
+                API_RENAME_COUNTER.increment(1);
+                API_RENAME_TIME_MS_COUNTER.increment(now.elapsed().as_millis() as u64);
             }
             Command::RunPlugin(args) => {
                 let payload = String::from_utf8(args.payload)

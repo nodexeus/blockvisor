@@ -406,6 +406,51 @@ where
         Ok(())
     }
 
+    /// Rename a node's identity (name + dns_name) in place. Metadata-only: this
+    /// updates the in-memory name index and the persisted node state, but does
+    /// NOT restart the container or re-render config files — the API sends a
+    /// separate `NodeRestart` command, and that restart re-renders config files
+    /// from the updated state.
+    #[instrument(skip(self))]
+    pub async fn rename(
+        &self,
+        id: Uuid,
+        new_name: String,
+        new_dns_name: String,
+    ) -> commands::Result<()> {
+        {
+            let mut node_ids = self.node_ids.write().await;
+            let old_name = node_ids
+                .iter()
+                .find(|(_, v)| **v == id)
+                .map(|(k, _)| k.clone());
+            let Some(old_name) = old_name else {
+                command_failed!(Error::Internal(anyhow!("node `{id}` not found in name index")));
+            };
+            if new_name != old_name && node_ids.contains_key(&new_name) {
+                command_failed!(Error::Internal(anyhow!(
+                    "node with name `{new_name}` exists"
+                )));
+            }
+            node_ids.remove(&old_name);
+            node_ids.insert(new_name.clone(), id);
+        }
+        let nodes_lock = self.nodes.read().await;
+        let maybe_node = nodes_lock.get(&id).ok_or_else(|| Error::NodeNotFound)?;
+        let MaybeNode::Node(node_lock) = maybe_node else {
+            command_failed!(Error::Internal(anyhow!("cannot rename broken node `{id}`")));
+        };
+        let mut node = node_lock.write().await;
+        node.state.name = new_name;
+        node.state.dns_name = new_dns_name;
+        node.save_state().await.map_err(into_internal)?;
+        self.node_state_cache
+            .write()
+            .await
+            .insert(id, node.state.clone());
+        Ok(())
+    }
+
     #[instrument(skip(self))]
     async fn expected_status(&self, id: Uuid) -> Result<VmStatus> {
         let nodes_lock = self.nodes.read().await;
@@ -1558,5 +1603,72 @@ mod tests {
             };
             call_on_node(&mut *node.write().await);
         }
+    }
+
+    #[tokio::test]
+    async fn test_rename_node() -> Result<()> {
+        let test_env = TestEnv::new().await?;
+        let mut pal = test_env.default_pal();
+        pal.expect_available_cpus().return_const(2usize);
+        let config = default_config(test_env.tmp_root.clone());
+
+        let mut node_state = build_node_state("original-name", "192.168.0.7", "192.168.0.1");
+        node_state.dns_name = "original.example.com".to_string();
+        node_state.assigned_cpus = vec![1];
+        let mut vm_mock = MockTestVM::new();
+        let plugin_path = test_env.default_plugin_path.clone();
+        vm_mock
+            .expect_plugin_path()
+            .returning(move || plugin_path.clone());
+        vm_mock.expect_node_env().returning(Default::default);
+        vm_mock.expect_state().return_const(VmState::SHUTOFF);
+        add_create_node_expectations(&mut pal, 1, node_state.clone(), vm_mock);
+
+        let nodes = NodesManager::load(pal, config).await?;
+        nodes.create(node_state.clone()).await?;
+
+        // confirm baseline
+        assert_eq!(
+            node_state.id,
+            nodes.node_id_for_name("original-name").await?
+        );
+
+        // perform rename
+        nodes
+            .rename(
+                node_state.id,
+                "new-name".to_string(),
+                "new.example.com".to_string(),
+            )
+            .await?;
+
+        // old name removed, new name maps to same id
+        assert!(nodes.node_id_for_name("original-name").await.is_err());
+        assert_eq!(node_state.id, nodes.node_id_for_name("new-name").await?);
+
+        // node_state_cache reflects updated fields
+        let cached = nodes.node_state_cache(node_state.id).await?;
+        assert_eq!("new-name", cached.name);
+        assert_eq!("new.example.com", cached.dns_name);
+
+        // duplicate-name rejection: create a second node then try to rename the first to its name
+        let mut second_state = build_node_state("second-name", "192.168.0.8", "192.168.0.1");
+        second_state.assigned_cpus = vec![0];
+        nodes
+            .nodes
+            .write()
+            .await
+            .insert(second_state.id, MaybeNode::BrokenNode(second_state.clone()));
+        nodes.node_ids.write().await.insert("second-name".to_string(), second_state.id);
+        assert_eq!(
+            "BV internal error: 'node with name `second-name` exists'",
+            nodes
+                .rename(node_state.id, "second-name".to_string(), "x.example.com".to_string())
+                .await
+                .unwrap_err()
+                .to_string()
+        );
+
+        Ok(())
     }
 }
